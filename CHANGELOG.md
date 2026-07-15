@@ -10,6 +10,8 @@ jedem `MINOR` vorkommen.
 
 ## [Unreleased]
 
+## [0.5.0] – 2026-07-15
+
 ### Hinzugefügt
 - **P2.2 — Google-Timeline-Import:** Upload des Timeline-Exports (Geräte-Export
   `semanticSegments` und altes Takeout-Format `timelineObjects`) unter
@@ -27,11 +29,6 @@ jedem `MINOR` vorkommen.
   Kompendium/Timeline (kategorie-gefiltert)/Karte/Moderation, der heißeste/
   kälteste Tag öffnet das Event, Chart-Balken (Kategorien, Tiere) springen zu
   Timeline-Filter bzw. Kompendium-Detailseite.
-- **Verknüpfte Objekte im Bearbeiten-Dialog editierbar** (z. B. „Seeadler" →
-  „Adler" korrigieren, Objekte ergänzen/entfernen). `PATCH /api/moderation/{id}`
-  akzeptiert dazu ein `entities`-Feld, das die Verknüpfungen vollständig
-  ersetzt; verwaiste Entities werden aufgeräumt, die Änderung ist als Override
-  vor KI-Neuberechnungen geschützt.
 
 ### Geändert
 - **PostgreSQL ist jetzt der Compose-Standard** (kein `--profile postgres`
@@ -53,6 +50,15 @@ jedem `MINOR` vorkommen.
     (Default 1000, max. 5000).
 - Datenexport/-import und „Alle Daten löschen" erfassen jetzt auch Tracks;
   Schema-Migration ergänzt `events.external_id` in Bestands-DBs automatisch.
+
+## [0.4.0] – 2026-07-15
+
+### Hinzugefügt
+- **Verknüpfte Objekte im Bearbeiten-Dialog editierbar** (z. B. „Seeadler" →
+  „Adler" korrigieren, Objekte ergänzen/entfernen). `PATCH /api/moderation/{id}`
+  akzeptiert dazu ein `entities`-Feld, das die Verknüpfungen vollständig
+  ersetzt; verwaiste Entities werden aufgeräumt, die Änderung ist als Override
+  vor KI-Neuberechnungen geschützt.
 
 ## [0.3.2] – 2026-07-15
 
