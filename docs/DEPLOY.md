@@ -5,27 +5,29 @@ Docker Compose, HTTPS via **Pangolin (Traefik)**, Login via **Pocket ID**.
 
 ---
 
-## 1. GitHub-Repo anlegen & v0.1 pushen (Windows-Dev-Rechner)
+## 1. GitHub-Repo & Release pushen (Windows-Dev-Rechner)
 
 Auf github.com ein **öffentliches** Repo `life-dash` unter `Noxon007` anlegen
-(ohne README/License, das Repo ist schon initialisiert). Dann:
+(ohne README/License, das Repo ist schon initialisiert). Dann Code und den
+SemVer-Release-Tag pushen:
 
 ```powershell
 cd d:\Python\life-dash
 git remote add origin https://github.com/Noxon007/life-dash.git
 git push -u origin main
-git push origin v0.1
+git push origin v0.3.0
 ```
 
-Der Tag-Push startet die Action **Docker Release**: sie baut das Image und
-pusht es als `ghcr.io/noxon007/life-dash:v0.1` und `:latest`. Status unter
-*Repo → Actions*. Nach dem ersten Lauf einmal prüfen, dass das Package
+Der Tag-Push startet die Action **Docker Release**: sie baut das Multi-Arch-Image
+und pusht es als `ghcr.io/noxon007/life-dash:0.3.0`, `:0.3` und `:latest`. Status
+unter *Repo → Actions*. Nach dem ersten Lauf einmal prüfen, dass das Package
 öffentlich ist (*Profil → Packages → life-dash → Package settings →
 Visibility*) — dann zieht der Server es ohne Login.
 
-**Neue Version veröffentlichen:** committen, `git tag v0.2`, beide pushen —
-auf dem Server dann `LIFEDASH_VERSION=v0.2` in `.env` setzen und
-`docker compose pull && docker compose up -d`.
+**Neue Version veröffentlichen** (Versionsschema: [CHANGELOG.md](../CHANGELOG.md)):
+committen, CHANGELOG ergänzen, `git tag v0.3.1` (Bugfix) bzw. `v0.4.0`
+(Feature), Tag pushen. Auf dem Server dann `LIFEDASH_VERSION` in `.env`
+hochsetzen und `docker compose pull && docker compose up -d`.
 
 ## 2. Pocket ID: OIDC-Client anlegen
 
@@ -43,16 +45,12 @@ In Pocket ID (läuft bereits) einen neuen OIDC-Client anlegen:
 
 Das Image wird als Multi-Arch-Manifest gebaut (`linux/amd64` + `linux/arm64`) —
 `docker compose pull` zieht auf einem Pi 5 automatisch die passende Variante,
-kein Extra-Schritt nötig. Zwei Punkte trotzdem beachten:
+kein Extra-Schritt nötig.
 
-- **`--profile ai` (lokales Ollama) nicht auf dem Pi nutzen.** Ohne GPU ist
-  Inferenz für ein 12B-Modell (`gemma3:12b`) auf einem Pi 5 unbrauchbar
-  langsam. Stattdessen `OPENAI_BASE_URL` entweder auf die Gemini API oder auf
-  einen bestehenden Ollama-Host im Netzwerk (z. B. die RTX-5070-Ti-Maschine)
-  zeigen lassen — der Pi ist dann nur der leichte App-Server, die KI läuft
-  woanders.
-- **`--profile postgres`** (offizielles `postgres:16-alpine`) läuft nativ auf
-  ARM64, keine Einschränkung.
+Die KI läuft ohnehin über die **Gemini API** (kein LLM-Dienst im Stack), der Pi
+ist also nur der leichte App-Server — für FastAPI + SQLite/Postgres reicht er
+locker. `--profile postgres` (offizielles `postgres:16-alpine`) läuft nativ auf
+ARM64, keine Einschränkung.
 
 ## 3. Server vorbereiten
 
@@ -69,14 +67,19 @@ cp .env.example .env
 `.env` ausfüllen — Minimum:
 
 ```ini
-LIFEDASH_VERSION=v0.1
+LIFEDASH_VERSION=0.3.0
 PUBLIC_BASE_URL=https://life.example.com
 OIDC_ISSUER=https://id.example.com
 OIDC_CLIENT_ID=<aus Pocket ID>
 SESSION_SECRET=<python -c "import secrets; print(secrets.token_urlsafe(48))">
-AI_PROVIDER=openai            # oder mock zum reinen Ausprobieren
-OPENAI_BASE_URL=...           # Gemini oder Ollama, siehe .env.example
+# KI über Gemini (Standardweg) — Key von https://aistudio.google.com/apikey:
+AI_PROVIDER=openai
+OPENAI_API_KEY=<Gemini-Key>
+# AI_PROVIDER=mock lässt die KI weg (kein Key nötig) — für einen ersten Smoke-Test.
 ```
+
+Die übrigen Gemini-Defaults (Base-URL, Modell, Embeddings) sind in
+`.env.example` bereits gesetzt und müssen nur bei Abweichung angepasst werden.
 
 Start:
 

@@ -1,12 +1,13 @@
-# Baut das Life-Dash-Image bei jedem Versions-Tag (v0.1, v0.2, ...)
-# und pusht es nach ghcr.io/<owner>/life-dash:<tag> + :latest.
+# Baut das Life-Dash-Image bei jedem SemVer-Tag (vMAJOR.MINOR.PATCH, z. B. v0.3.0)
+# und pusht es nach ghcr.io/<owner>/life-dash mit den Tags:
+#   0.3.0  (exakt) · 0.3  (mitlaufend im Minor) · latest
 # Der Image-Pfad kommt automatisch aus dem Repo-Namen — kein OWNER-Platzhalter nötig.
 name: Docker Release
 
 on:
   push:
-    tags: ["v*"]
-  workflow_dispatch:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]  # nur echte SemVer-Tags
+  workflow_dispatch:                  # manueller Re-Build (taggt :main)
 
 permissions:
   contents: read
@@ -33,9 +34,12 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}
+          # SemVer-Tag v0.3.0 -> Image-Tags 0.3.0, 0.3, latest (latest=auto).
+          # Manueller Dispatch auf main -> :main (zum Nachbauen ohne Release).
           tags: |
-            type=ref,event=tag
-            type=raw,value=latest
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=ref,event=branch
 
       - name: Build & Push
         uses: docker/build-push-action@v6

@@ -6,14 +6,15 @@
 #   Lokaler Build aus dem Quell-Checkout:
 #     docker compose build && docker compose up -d
 #
-#   Profile:
-#     docker compose --profile postgres up -d   -> zusätzlich PostgreSQL
-#     docker compose --profile ai up -d         -> zusätzlich Ollama (lokales LLM)
+#   Optional PostgreSQL statt SQLite:
+#     docker compose --profile postgres up -d
 #
-# Konfiguration über .env (siehe .env.example). Details: docs/DEPLOY.md
+# KI läuft über die Gemini API (OpenAI-kompatibler Endpoint) — kein lokaler
+# LLM-Dienst im Stack. Konfiguration über .env (siehe .env.example).
+# Details: docs/DEPLOY.md
 services:
   app:
-    image: ghcr.io/noxon007/life-dash:${LIFEDASH_VERSION:-v0.2}
+    image: ghcr.io/noxon007/life-dash:${LIFEDASH_VERSION:-0.3.0}
     build: .  # greift nur bei `docker compose build` im Quell-Checkout
     restart: unless-stopped
     ports:
@@ -29,15 +30,15 @@ services:
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://127.0.0.1:8000}
       SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET in .env setzen (langer Zufallswert)}
-      # --- KI (Chat + Embeddings, OpenAI-kompatibler Endpoint) ---
-      AI_PROVIDER: ${AI_PROVIDER:-mock}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-http://ollama:11434/v1}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-not-needed}
-      OPENAI_MODEL: ${OPENAI_MODEL:-llama3.1}
-      OPENAI_EMBED_MODEL: ${OPENAI_EMBED_MODEL:-}
+      # --- KI: Gemini API (OpenAI-kompatibel), Chat + Embeddings ---
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY in .env setzen (Gemini-Key von aistudio.google.com/apikey) — oder AI_PROVIDER=mock}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gemini-3.5-flash}
+      OPENAI_EMBED_MODEL: ${OPENAI_EMBED_MODEL:-gemini-embedding-2}
       OPENAI_EMBED_BASE_URL: ${OPENAI_EMBED_BASE_URL:-}
       OPENAI_EMBED_API_KEY: ${OPENAI_EMBED_API_KEY:-}
-      SEMANTIC_MIN_SIMILARITY: ${SEMANTIC_MIN_SIMILARITY:-0.4}
+      SEMANTIC_MIN_SIMILARITY: ${SEMANTIC_MIN_SIMILARITY:-0.6}
       GEOCODING_ENABLED: ${GEOCODING_ENABLED:-true}
       # --- DB: SQLite (Default) oder Postgres (Profil "postgres") ---
       DATABASE_URL: ${DATABASE_URL:-sqlite:////data/lifedash.db}
@@ -59,14 +60,6 @@ services:
       timeout: 5s
       retries: 5
 
-  ollama:
-    image: ollama/ollama:latest
-    profiles: ["ai"]
-    restart: unless-stopped
-    volumes:
-      - lifedash-ollama:/root/.ollama
-
 volumes:
   lifedash-data:
   lifedash-pg:
-  lifedash-ollama:

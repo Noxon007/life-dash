@@ -6,6 +6,7 @@ Konzerte & mehr als responsive PWA mit KI-gestützter Erfassung und Suche.
 - **Konzept & Roadmap:** [docs/KONZEPT.md](docs/KONZEPT.md)
 - **Backend/Architektur:** [backend/README.md](backend/README.md)
 - **Deployment (Homelab):** [docs/DEPLOY.md](docs/DEPLOY.md)
+- **Änderungen pro Version:** [CHANGELOG.md](CHANGELOG.md)
 
 ## Schnellstart
 
@@ -22,5 +23,14 @@ Lokale Entwicklung ohne Docker: siehe [backend/README.md](backend/README.md)
 ## Stack
 
 FastAPI + SQLAlchemy (SQLite oder PostgreSQL) · Vanilla-JS-PWA (vom Backend
-ausgeliefert) · OIDC-Login via Pocket ID · KI über jeden OpenAI-kompatiblen
-Endpoint (Gemini, Ollama, …) · Releases als Docker-Image via GitHub Actions.
+ausgeliefert) · OIDC-Login via Pocket ID · KI über die Gemini API
+(OpenAI-kompatibler Endpoint) · Releases als Docker-Image via GitHub Actions.
+
+## Versionierung & Releases
+
+[Semantic Versioning](https://semver.org/lang/de/) (`MAJOR.MINOR.PATCH`).
+Während der `0.x`-Phase: Features → `MINOR`, Fixes → `PATCH`. Ein Release ist
+ein Git-Tag `vX.Y.Z`; der Workflow baut daraus das Image mit den Tags
+`X.Y.Z` (exakt), `X.Y` (mitlaufend) und `latest`. Auf dem Server auf eine
+konkrete Version pinnen (`LIFEDASH_VERSION`), nicht `latest`. Änderungen werden
+in [CHANGELOG.md](CHANGELOG.md) gepflegt.

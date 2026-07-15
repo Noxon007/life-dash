@@ -40,7 +40,7 @@ Beim ersten Start werden im Dev-Modus Beispieldaten geseedet (`SEED_DEMO=true`).
 
 ```bash
 cp .env.example .env   # OIDC_ISSUER, OIDC_CLIENT_ID, SESSION_SECRET setzen
-docker compose up -d   # SQLite; --profile postgres / --profile ai optional
+docker compose up -d   # SQLite; --profile postgres optional
 ```
 
 Vollständiges Server-Deployment (GHCR-Image, Pangolin/Traefik, Pocket ID,
@@ -51,8 +51,8 @@ Datenübernahme): [../docs/DEPLOY.md](../docs/DEPLOY.md)
 `GET /api/search?q=…` — hybrid:
 - **Volltext** über Titel, Beschreibung, Ortsname, Entity-Namen (immer aktiv).
 - **Semantisch** über Event-Embeddings (Cosine) — aktiv, sobald `OPENAI_EMBED_MODEL`
-  gesetzt ist. Empfohlen: `bge-m3` via Ollama (multilingual — `nomic-embed-text` ist für
-  deutsche Texte deutlich schwächer). Ohne Embeddings: reiner Volltext.
+  gesetzt ist. Standardweg: `gemini-embedding-2` über die Gemini API. Ohne
+  Embeddings: reiner Volltext.
   Nach Modellwechsel: Admin → „🧠 Embeddings berechnen" (bzw. `POST /api/admin/reindex-embeddings?force=true`).
 
 ## MVP-Stack
@@ -60,7 +60,7 @@ Datenübernahme): [../docs/DEPLOY.md](../docs/DEPLOY.md)
 | Ebene | Aktuell (MVP) | Später (Konzept) |
 |---|---|---|
 | DB | SQLite (Datei) | PostgreSQL + PostGIS + pgvector |
-| KI | Mock-Provider / OpenAI-kompatibel (Ollama, LM Studio) | Ollama (lokal) |
+| KI | Gemini API (OpenAI-kompatibel) / Mock-Provider | lokales Ollama möglich |
 | Auth | OIDC (Pocket ID) oder Dev-Modus | — |
 | Geo | lat/lng-Felder + Nominatim | PostGIS |
 | Deployment | uvicorn / Docker Compose | Docker Compose |
