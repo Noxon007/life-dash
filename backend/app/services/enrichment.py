@@ -13,30 +13,42 @@ from app.models import Event, Metric, Source
 from app.services.weather import fetch_weather
 
 
-def enrich_weather(db: Session, force: bool = False) -> int:
-    """Hängt Temperatur + Bedingung an verortete, datierte Events.
-
-    force=False: nur Events ohne Wetter. force=True: alle neu berechnen.
-    """
+def _weather_candidates(db: Session) -> list[Event]:
+    """Verortete, datierte, nicht-zukünftige Events ohne Wetter-Metrik."""
     today = datetime.now(timezone.utc).date()
-    enriched = 0
+    out: list[Event] = []
     for event in db.query(Event).all():
         loc = event.location
         if not loc or loc.lat is None or event.date_start is None:
             continue
         if event.date_start.date() > today:
             continue  # Zukunft hat noch kein Wetter
-
-        has_weather = any(m.source == Source.weather for m in event.metrics)
-        if has_weather and not force:
+        if any(m.source == Source.weather for m in event.metrics):
             continue
-        # Re-Enrichment: alte Wetter-Metriken entfernen
-        for m in list(event.metrics):
-            if m.source == Source.weather:
-                db.delete(m)
-        db.flush()
+        out.append(event)
+    return out
 
-        w = fetch_weather(loc.lat, loc.lng, event.date_start)
+
+def reset_weather(db: Session) -> int:
+    """Entfernt alle Wetter-Metriken (Vorbereitung einer vollen Neuberechnung)."""
+    count = (db.query(Metric)
+             .filter(Metric.source == Source.weather)
+             .delete(synchronize_session=False))
+    db.commit()
+    return count
+
+
+def enrich_weather(db: Session, limit: int | None = None) -> tuple[int, int]:
+    """Hängt Temperatur + Bedingung an Events ohne Wetter (Batch fürs Admin-UI).
+
+    Gibt (angereichert, verbleibend) zurück. Volle Neuberechnung: vorher
+    reset_weather() — danach sind alle Kandidaten wieder „ohne Wetter".
+    """
+    candidates = _weather_candidates(db)
+    batch = candidates if limit is None else candidates[:limit]
+    enriched = 0
+    for event in batch:
+        w = fetch_weather(event.location.lat, event.location.lng, event.date_start)
         if not w:
             continue
         if w.get("temp_c") is not None:
@@ -47,4 +59,4 @@ def enrich_weather(db: Session, force: bool = False) -> int:
                           value_text=w["condition"], source=Source.weather))
         enriched += 1
     db.commit()
-    return enriched
+    return enriched, len(candidates) - enriched

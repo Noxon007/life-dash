@@ -9,8 +9,8 @@ from sqlalchemy import inspect, text
 
 from app.auth import require_admin
 from app.database import SessionLocal, engine
-from app.services.enrichment import enrich_weather
-from app.services.ingestion import reprocess_all
+from app.services.enrichment import enrich_weather, reset_weather
+from app.services.ingestion import reprocess_pending, reset_reprocess
 
 # Alle Admin-Endpoints erfordern die Admin-Rolle (Rohdaten-Ansicht ist
 # nutzerübergreifend — bewusst nur für den Administrator).
@@ -119,28 +119,58 @@ def delete_row(name: str, row_id: str) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Neuberechnung / Enrichment
+# Neuberechnung / Enrichment — alle Lang-Läufer arbeiten in Batches:
+# das Frontend ruft nach, zeigt einen Anfragen-Ticker und kann zwischen den
+# Batches stoppen (Fortschritt bleibt, da pro Batch/Fragment committet wird).
 # --------------------------------------------------------------------------- #
-@router.post("/recompute-events")
-def recompute_events() -> dict:
-    """Stufe 2 aus den Roh-Fragmenten neu berechnen (bestätigte bleiben)."""
+@router.post("/recompute-events/reset")
+def recompute_events_reset() -> dict:
+    """Markiert Fragmente für die Stufe-2-Neuberechnung (bestätigte bleiben)."""
     db = SessionLocal()
     try:
-        count = reprocess_all(db)
+        total = reset_reprocess(db)
     finally:
         db.close()
-    return {"reprocessed_fragments": count}
+    return {"total": total}
+
+
+@router.post("/recompute-events")
+def recompute_events(limit: int = Query(5, ge=1, le=50)) -> dict:
+    """Verarbeitet einen Batch markierter Fragmente (1 KI-Anfrage je Fragment)."""
+    db = SessionLocal()
+    try:
+        processed, remaining, aborted = reprocess_pending(db, limit=limit)
+    finally:
+        db.close()
+    return {"processed": processed, "remaining": remaining, "aborted": aborted}
 
 
 @router.post("/enrich-weather")
-def enrich_weather_endpoint(force: bool = Query(False, description="Alle neu berechnen")) -> dict:
-    """Stufe-3-Wetter-Enrichment für verortete Events (Open-Meteo)."""
+def enrich_weather_endpoint(limit: int = Query(25, ge=1, le=200)) -> dict:
+    """Wetter-Batch für Events ohne Wetter (Open-Meteo, 1 Anfrage je Event)."""
     db = SessionLocal()
     try:
-        count = enrich_weather(db, force=force)
+        enriched, remaining = enrich_weather(db, limit=limit)
     finally:
         db.close()
-    return {"enriched_events": count}
+    return {"enriched_events": enriched, "remaining": remaining}
+
+
+@router.post("/reset-stage3")
+def reset_stage3() -> dict:
+    """Verwirft alle Stufe-3-Ableitungen (Wetter + Embeddings) für eine volle
+    Neuberechnung über die Batch-Endpoints."""
+    from app.models import Event
+
+    db = SessionLocal()
+    try:
+        weather = reset_weather(db)
+        embeddings = db.query(Event).update({Event.embedding: None},
+                                            synchronize_session=False)
+        db.commit()
+    finally:
+        db.close()
+    return {"weather_reset": weather, "embeddings_reset": embeddings}
 
 
 @router.post("/wipe-data")
@@ -160,13 +190,29 @@ def wipe_data() -> dict:
     return {"deleted": deleted, "total": sum(deleted.values())}
 
 
-@router.post("/reindex-embeddings")
-def reindex_embeddings(force: bool = Query(False, description="Alle neu berechnen")) -> dict:
-    """Embeddings für Events (neu) berechnen — Stufe-3-Ableitung, gefahrlos.
+@router.post("/reset-embeddings")
+def reset_embeddings() -> dict:
+    """Setzt alle Event-Embeddings auf NULL (Vorbereitung der Neuberechnung,
+    z. B. nach einem Modellwechsel)."""
+    from app.models import Event
 
-    Nötig z. B. nach dem Aktivieren von OPENAI_EMBED_MODEL oder einem
-    Modellwechsel: bestätigte Events werden vom Stufe-2-Reprocessing bewusst
-    nicht angefasst und bekämen sonst nie ein Embedding.
+    db = SessionLocal()
+    try:
+        total = db.query(Event).update({Event.embedding: None},
+                                       synchronize_session=False)
+        db.commit()
+    finally:
+        db.close()
+    return {"total": total}
+
+
+@router.post("/reindex-embeddings")
+def reindex_embeddings(limit: int = Query(25, ge=1, le=200)) -> dict:
+    """Embedding-Batch für Events ohne Embedding (1 KI-Anfrage je Event).
+
+    Volle Neuberechnung: vorher /reset-embeddings. Liefert remaining, damit
+    das Frontend nachrufen bzw. stoppen kann. `indexed_events` == 0 bei noch
+    `remaining` > 0 heißt: Embedding-Modell nicht konfiguriert/erreichbar.
     """
     from app.ai import get_provider
     from app.models import Event
@@ -174,16 +220,18 @@ def reindex_embeddings(force: bool = Query(False, description="Alle neu berechne
     provider = get_provider()
     db = SessionLocal()
     try:
+        batch = (db.query(Event)
+                 .filter(Event.embedding.is_(None))
+                 .order_by(Event.created_at)
+                 .limit(limit).all())
         count = 0
-        for event in db.query(Event).all():
-            # Python-seitig prüfen: fängt SQL NULL UND Alt-Zeilen mit JSON 'null'
-            if event.embedding and not force:
-                continue
+        for event in batch:
             vec = provider.embed(f"{event.title}\n{event.description or ''}")
             if vec:
                 event.embedding = vec
                 count += 1
         db.commit()
+        remaining = db.query(Event).filter(Event.embedding.is_(None)).count()
     finally:
         db.close()
-    return {"indexed_events": count}
+    return {"indexed_events": count, "remaining": remaining}

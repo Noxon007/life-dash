@@ -72,36 +72,62 @@ def ingest_fragment(
     return events
 
 
-def reprocess_all(db: Session) -> int:
-    """Berechnet Stufe 2 neu aus den Roh-Fragmenten (Stufe 1).
+# Import-Fragmente (Timeline/Fitness) enthalten nur Zusammenfassungen — eine
+# KI-Extraktion darüber würde Unsinn erzeugen. Nur Text-Quellen neu berechnen.
+_TEXT_SOURCES = (Source.manual, Source.ai, Source.api)
+
+
+def reset_reprocess(db: Session) -> int:
+    """Markiert alle neu zu berechnenden Fragmente (status -> pending).
 
     Fragmente mit mindestens einem bestätigten Event bleiben unangetastet
-    (moderierte Wahrheit wird geschützt). Alle übrigen werden verworfen und
-    mit dem aktuellen Provider/Geocoding neu erzeugt.
-
-    Ist der KI-Provider nicht erreichbar (z. B. Tages-Quota erschöpft),
-    bricht der Batch ab: bereits neu berechnete Fragmente bleiben (Commit je
-    Fragment), das aktuelle behält seinen Altbestand (Rollback).
+    (moderierte Wahrheit wird geschützt); ihre unbestätigten Geschwister-Events
+    ebenso. Bei den übrigen werden die alten (unbestätigten) Events verworfen.
+    Gibt die Anzahl der zu verarbeitenden Fragmente zurück.
     """
     count = 0
-    for fragment in db.query(Fragment).all():
-        has_confirmed = any(
-            e.confirmed == ConfirmState.confirmed for e in fragment.events
-        )
-        if has_confirmed:
+    for fragment in db.query(Fragment).filter(
+        Fragment.source.in_(_TEXT_SOURCES),
+        Fragment.status != FragmentStatus.discarded,
+    ).all():
+        if any(e.confirmed == ConfirmState.confirmed for e in fragment.events):
             continue
+        for event in list(fragment.events):
+            db.delete(event)
+        fragment.status = FragmentStatus.pending
+        count += 1
+    db.commit()
+    return count
+
+
+def reprocess_pending(db: Session, limit: int = 5) -> tuple[int, int, bool]:
+    """Verarbeitet bis zu `limit` pending-Fragmente neu (Batch für das Admin-UI).
+
+    Gibt (verarbeitet, verbleibend, abgebrochen) zurück. Ist der KI-Provider
+    nicht erreichbar (z. B. Quota erschöpft), bricht der Batch ab: bereits
+    Berechnetes bleibt (Commit je Fragment), das aktuelle behält den Altbestand.
+    """
+    pending = (db.query(Fragment)
+               .filter(Fragment.source.in_(_TEXT_SOURCES),
+                       Fragment.status == FragmentStatus.pending)
+               .order_by(Fragment.created_at)
+               .limit(limit).all())
+    count, aborted = 0, False
+    for fragment in pending:
         try:
-            for event in list(fragment.events):
-                db.delete(event)
-            db.flush()
             ingest_fragment(db, fragment, fallback_on_error=False)
         except ProviderUnavailable as err:
             db.rollback()
             log.warning("Neuberechnung nach %d Fragmenten abgebrochen: %s", count, err)
+            aborted = True
             break
         db.commit()
         count += 1
-    return count
+    remaining = (db.query(Fragment)
+                 .filter(Fragment.source.in_(_TEXT_SOURCES),
+                         Fragment.status == FragmentStatus.pending)
+                 .count())
+    return count, remaining, aborted
 
 
 def create_manual_event(db: Session, user_id: str, payload) -> Event:

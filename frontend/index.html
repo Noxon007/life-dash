@@ -739,6 +739,9 @@
             Aktionen
             <span class="chip" style="margin-left:auto; text-transform:none; letter-spacing:0">KI-Provider: <b style="color:var(--text)" id="ki-provider">&nbsp;…</b></span>
           </div>
+          <div class="hint">Alle Läufe arbeiten in Etappen: Der Knopf zeigt während des Laufs die
+            verbrauchten Anfragen und wird zum <b>⏹ Stopp-Knopf</b> — Fortschritt bleibt erhalten,
+            derselbe Knopf setzt später fort.</div>
           <div class="panel" style="padding:0">
             <div class="action-row">
               <button class="btn secondary" id="btn-recompute-2">🔄 Stufe 2 neu berechnen</button>
@@ -2047,22 +2050,90 @@ async function runAdmin(btn, fn, doneMsg) {
     btn.disabled = false; btn.textContent = label;
   }
 }
+// Batch-Läufe mit Stopp-Knopf & Anfragen-Ticker: Der Aktions-Button wird
+// während des Laufs zum ⏹-Stopp-Button. step() liefert {done, remaining,
+// aborted?}; gestoppt wird zwischen den Batches, Fortschritt bleibt erhalten.
+const runningOps = {};
+async function runBatchedAdmin(btn, { reset, step, unit, doneMsg }) {
+  if (runningOps[btn.id]) {                      // zweiter Klick = Stopp anfordern
+    runningOps[btn.id].stop = true;
+    btn.textContent = '… stoppe nach diesem Batch';
+    return;
+  }
+  const op = runningOps[btn.id] = { stop: false };
+  const label = btn.textContent;
+  let total = 0, remaining = null;
+  const ticker = () => {
+    btn.textContent = `⏹ Stoppen — ${total} ${unit}` + (remaining != null ? ` · noch ~${remaining}` : '');
+  };
+  try {
+    if (reset) {
+      btn.textContent = '… bereite vor';
+      remaining = await reset();
+    }
+    ticker();
+    while (!op.stop) {
+      const r = await step();
+      total += r.done;
+      remaining = r.remaining;
+      if (r.aborted) { alert(`Abgebrochen (KI nicht erreichbar): ${total} ${unit} verarbeitet, ${remaining} offen — später erneut starten.`); break; }
+      if (remaining === 0) { alert(doneMsg(total)); break; }
+      if (r.done === 0) { alert(`Kein Fortschritt mehr: ${total} ${unit} verarbeitet, ${remaining} nicht verarbeitbar (Konfiguration/Netz prüfen).`); break; }
+      ticker();
+    }
+    if (op.stop) alert(`Gestoppt: ${total} ${unit} verarbeitet, ${remaining ?? '?'} offen — derselbe Knopf setzt fort.`);
+    await refreshAll();
+    if (isAdmin()) loadDbTables();
+  } catch (err) {
+    alert('Fehler: ' + err.message);
+  } finally {
+    delete runningOps[btn.id];
+    btn.textContent = label;
+  }
+}
+
 document.getElementById('btn-recompute-2').addEventListener('click', e =>
-  runAdmin(e.target, () => api('/api/admin/recompute-events', { method: 'POST' }),
-    r => `Stufe 2 neu berechnet: ${r.reprocessed_fragments} Fragment(e) verarbeitet.`));
-// Stufe 3 = ALLE Anreicherungen neu: Wetter (force) + Embeddings (force)
+  runBatchedAdmin(e.target, {
+    reset: async () => (await api('/api/admin/recompute-events/reset', { method: 'POST' })).total,
+    step: async () => {
+      const r = await api('/api/admin/recompute-events?limit=5', { method: 'POST' });
+      return { done: r.processed, remaining: r.remaining, aborted: r.aborted };
+    },
+    unit: 'KI-Anfragen',
+    doneMsg: n => `Stufe 2 neu berechnet: ${n} Fragment(e) verarbeitet.`,
+  }));
+// Stufe 3 = ALLE Anreicherungen neu: erst Reset, dann Wetter- und Embedding-Batches
 document.getElementById('btn-recompute-3').addEventListener('click', e =>
-  runAdmin(e.target, async () => {
-    const w = await api('/api/admin/enrich-weather?force=true', { method: 'POST' });
-    const emb = await api('/api/admin/reindex-embeddings?force=true', { method: 'POST' });
-    return { w, emb };
-  }, r => `Stufe 3 neu berechnet: ${r.w.enriched_events} Event(s) mit Wetter, ${r.emb.indexed_events} Embedding(s).`));
+  runBatchedAdmin(e.target, {
+    reset: async () => { await api('/api/admin/reset-stage3', { method: 'POST' }); return null; },
+    step: async () => {
+      const w = await api('/api/admin/enrich-weather?limit=25', { method: 'POST' });
+      if (w.enriched_events || w.remaining) return { done: w.enriched_events, remaining: w.remaining + 1 }; // +1: Embeddings folgen noch
+      const emb = await api('/api/admin/reindex-embeddings?limit=25', { method: 'POST' });
+      return { done: emb.indexed_events, remaining: emb.remaining };
+    },
+    unit: 'Anfragen',
+    doneMsg: n => `Stufe 3 neu berechnet (${n} Anfragen: Wetter + Embeddings).`,
+  }));
 document.getElementById('btn-enrich').addEventListener('click', e =>
-  runAdmin(e.target, () => api('/api/admin/enrich-weather', { method: 'POST' }),
-    r => `Wetter ergänzt: ${r.enriched_events} Event(s).`));
+  runBatchedAdmin(e.target, {
+    step: async () => {
+      const r = await api('/api/admin/enrich-weather?limit=25', { method: 'POST' });
+      return { done: r.enriched_events, remaining: r.remaining };
+    },
+    unit: 'Wetter-Anfragen',
+    doneMsg: n => `Wetter ergänzt: ${n} Event(s).`,
+  }));
 document.getElementById('btn-embed').addEventListener('click', e =>
-  runAdmin(e.target, () => api('/api/admin/reindex-embeddings?force=true', { method: 'POST' }),
-    r => `Embeddings: ${r.indexed_events} Event(s) neu indexiert (0 = kein Embedding-Modell konfiguriert).`));
+  runBatchedAdmin(e.target, {
+    reset: async () => (await api('/api/admin/reset-embeddings', { method: 'POST' })).total,
+    step: async () => {
+      const r = await api('/api/admin/reindex-embeddings?limit=25', { method: 'POST' });
+      return { done: r.indexed_events, remaining: r.remaining };
+    },
+    unit: 'KI-Anfragen',
+    doneMsg: n => `Embeddings: ${n} Event(s) neu indexiert.`,
+  }));
 
 // ---------- EXPORT / IMPORT ----------
 document.getElementById('btn-export').addEventListener('click', async () => {
@@ -2132,30 +2203,16 @@ document.getElementById('timeline-file').addEventListener('change', async ev => 
   }
 });
 
-// Ortsnamen auflösen (Reverse-Geocoding) — in Etappen, bis nichts mehr offen ist
-document.getElementById('btn-resolve-names').addEventListener('click', async () => {
-  const btn = document.getElementById('btn-resolve-names');
-  btn.disabled = true;
-  let total = 0, failed = 0;
-  try {
-    while (true) {
-      btn.textContent = total ? `… ${total} aufgelöst, läuft` : '… läuft (1 Anfrage/s)';
-      const r = await api('/api/import/timeline/resolve-names?limit=25', { method: 'POST' });
-      total += r.resolved; failed = r.failed;
-      if (r.remaining === 0) { alert(`Fertig: ${total} Ortsnamen aufgelöst.`); break; }
-      if (r.resolved === 0) {
-        alert(`${total} Ortsnamen aufgelöst; ${r.remaining} nicht auflösbar (${failed} Fehler im letzten Lauf — später erneut versuchen).`);
-        break;
-      }
-      btn.textContent = `… ${total} aufgelöst, noch ${r.remaining}`;
-    }
-    await refreshAll();
-  } catch (err) {
-    alert('Ortsnamen auflösen fehlgeschlagen: ' + err.message);
-  } finally {
-    btn.disabled = false; btn.textContent = '📍 Ortsnamen auflösen';
-  }
-});
+// Ortsnamen auflösen (Reverse-Geocoding) — Batch-Lauf mit Stopp-Knopf
+document.getElementById('btn-resolve-names').addEventListener('click', e =>
+  runBatchedAdmin(e.target, {
+    step: async () => {
+      const r = await api('/api/import/timeline/resolve-names?limit=10', { method: 'POST' });
+      return { done: r.resolved, remaining: r.remaining };
+    },
+    unit: 'Nominatim-Anfragen',
+    doneMsg: n => `Fertig: ${n} Ortsnamen aufgelöst.`,
+  }));
 
 // Alle Daten löschen — mit doppelter Sicherheitsabfrage
 document.getElementById('btn-wipe').addEventListener('click', async e => {

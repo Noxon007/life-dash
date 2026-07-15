@@ -22,6 +22,13 @@ jedem `MINOR` vorkommen.
 - **Routen als Karten-Layer:** Timeline-Routen erscheinen auf der Karte als
   farbige Linien nach Aktivität (zu Fuß/Rad/Auto/Transit), zuschaltbar über
   den Chip „🛰️ Timeline-Routen", gefiltert auf den angezeigten Zeitraum.
+- **Stopp-Knopf & Anfragen-Ticker für alle Admin-Läufe:** Stufe-2-Neuberechnung,
+  Stufe 3, Wetter, Embeddings und Ortsnamen laufen jetzt in Etappen — der
+  Aktions-Knopf zeigt live die verbrauchten Anfragen („⏹ Stoppen — 120
+  KI-Anfragen · noch ~340") und stoppt auf Klick nach dem laufenden Batch.
+  Fortschritt bleibt erhalten, derselbe Knopf setzt fort. Die Stufe-2-Neuberechnung
+  fasst Import-Fragmente (Timeline) nicht mehr an — KI-Extraktion über
+  Import-Zusammenfassungen hätte Unsinn erzeugt.
 - **Ortsnamen für importierte Besuche:** Der Geräte-Export enthält keine
   Ortsnamen — neuer Button „📍 Ortsnamen auflösen" (Admin → Meine Daten) holt
   Adressen per Reverse-Geocoding (Nominatim, 1 Anfrage/s, etappenweise
