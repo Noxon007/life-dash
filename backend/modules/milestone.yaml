@@ -1,0 +1,32 @@
+# Modul: Meilensteine — besondere Lebensereignisse
+# Hochzeit, Geburt, Umzug, Abschluss, neuer Job, Taufe ...
+key: milestone
+label: Meilensteine
+icon: star
+color: "#e85dff"
+event_categories:
+  - milestone
+keywords:
+  - hochzeit
+  - geheiratet
+  - geburt
+  - geboren
+  - umzug
+  - umgezogen
+  - eingezogen
+  - taufe
+  - abschluss
+  - einschulung
+  - konfirmation
+  - neuer job
+  - jobwechsel
+  - verlobt
+  - verlobung
+entity_schema:
+  kind: string
+statistics:
+  - id: milestones_count
+    label: "Meilensteine"
+    type: count
+compendium_view:
+  group_by: name

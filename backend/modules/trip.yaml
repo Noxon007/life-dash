@@ -1,0 +1,25 @@
+# Modul: Reisen
+key: trip
+label: Reisen
+icon: airplane
+color: "#5b8cff"
+event_categories:
+  - trip
+# Schlüsselwörter helfen dem Mock-Provider bei der Kategorie-Erkennung
+keywords:
+  - urlaub
+  - reise
+  - trip
+  - städtetrip
+  - ausflug
+  - wochenende in
+entity_schema:
+  country: string
+  city: string
+statistics:
+  - id: trips_per_year
+    label: "Reisen pro Jahr"
+    type: timeseries
+compendium_view:
+  group_by: country
+  detail_map: true

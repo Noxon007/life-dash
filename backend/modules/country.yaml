@@ -1,0 +1,26 @@
+# Modul: Länder
+key: country
+label: Länder
+icon: globe
+color: "#b07bff"
+event_categories: []
+# Länder werden als Entities erkannt und mit Geo-Koordinaten hinterlegt
+known_entities:
+  frankreich: { lat: 46.2276, lng: 2.2137 }
+  deutschland: { lat: 51.1657, lng: 10.4515 }
+  portugal: { lat: 39.3999, lng: -8.2245 }
+  spanien: { lat: 40.4637, lng: -3.7492 }
+  italien: { lat: 41.8719, lng: 12.5674 }
+  tschechien: { lat: 49.8175, lng: 15.4730 }
+  österreich: { lat: 47.5162, lng: 14.5501 }
+  niederlande: { lat: 52.1326, lng: 5.2913 }
+entity_schema:
+  iso_code: string
+statistics:
+  - id: countries_visited
+    label: "Länder besucht"
+    type: count_distinct
+    field: entity.name
+compendium_view:
+  group_by: name
+  detail_map: true

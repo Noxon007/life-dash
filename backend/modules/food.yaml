@@ -1,0 +1,26 @@
+# Modul: Mahlzeiten / Essen
+# Events der Kategorie "meal" + Gerichte als Kompendium-Entities.
+key: food
+label: Essen
+icon: utensils
+color: "#ffd166"
+event_categories:
+  - meal
+keywords:
+  - gegessen
+  - restaurant
+  - mahlzeit
+  - frühstück
+  - mittagessen
+  - abendessen
+  - gekocht
+  - essen
+entity_schema:
+  cuisine: string
+statistics:
+  - id: dishes_count
+    label: "Gerichte erfasst"
+    type: count_distinct
+    field: entity.name
+compendium_view:
+  group_by: name

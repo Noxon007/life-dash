@@ -1,0 +1,26 @@
+# Modul: Konzerte / Künstler
+# Events der Kategorie "concert" + Künstler/Bands als Kompendium-Entities.
+key: artist
+label: Künstler
+icon: music
+color: "#ff5c9e"
+event_categories:
+  - concert
+keywords:
+  - konzert
+  - festival
+  - auftritt
+  - live gesehen
+  - tour
+entity_schema:
+  genre: string
+statistics:
+  - id: artists_seen
+    label: "Künstler live gesehen"
+    type: count_distinct
+    field: entity.name
+  - id: concerts_per_year
+    label: "Konzerte pro Jahr"
+    type: timeseries
+compendium_view:
+  group_by: name

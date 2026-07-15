@@ -1,0 +1,70 @@
+# Modul: Tiere
+key: animal
+label: Tiere
+icon: paw
+color: "#35c4a7"
+event_categories:
+  - sighting
+keywords:
+  - gesehen
+  - beobachtet
+  - gesichtet
+  - entdeckt
+# Bekannte Tierarten, die der Mock-Provider als Entity erkennt
+known_entities:
+  - adler
+  - seeadler
+  - reh
+  - fuchs
+  - eule
+  - eichhörnchen
+  - schwan
+  - frosch
+  - igel
+  - specht
+  - kranich
+  - storch
+  - taube
+  - amsel
+  - meise
+  - spatz
+  - rotkehlchen
+  - ente
+  - gans
+  - reiher
+  - falke
+  - bussard
+  - hase
+  - wildschwein
+  - hirsch
+  - dachs
+  - marder
+  - eichhörnchen
+  - biber
+  - otter
+  - kaninchen
+  - maus
+  - katze
+  - hund
+  - pferd
+  - kuh
+  - schaf
+  - ziege
+  - libelle
+  - schmetterling
+  - biene
+  - hummel
+entity_schema:
+  species: string
+  wild: boolean
+statistics:
+  - id: species_count
+    label: "Beobachtete Arten"
+    type: count_distinct
+    field: entity.species
+  - id: sightings_per_year
+    label: "Sichtungen pro Jahr"
+    type: timeseries
+compendium_view:
+  group_by: species
+  detail_map: true

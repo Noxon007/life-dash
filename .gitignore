@@ -1,0 +1,25 @@
+# Secrets & lokale Konfiguration
+.env
+backend/.env
+.claude/settings.local.json
+
+# Datenbanken & Backups
+*.db
+*.db.bak*
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Logs & lokale Prozess-Artefakte
+backend/_server.log
+backend/_server.err
+backend/_test.err
+*.log
+
+# OS / Editor
+.DS_Store
+Thumbs.db

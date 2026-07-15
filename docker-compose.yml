@@ -1,0 +1,72 @@
+# Life-Dash — Homelab-Deployment
+#
+#   Server (Image aus GHCR, öffentlich — kein Login nötig):
+#     docker compose pull && docker compose up -d
+#
+#   Lokaler Build aus dem Quell-Checkout:
+#     docker compose build && docker compose up -d
+#
+#   Profile:
+#     docker compose --profile postgres up -d   -> zusätzlich PostgreSQL
+#     docker compose --profile ai up -d         -> zusätzlich Ollama (lokales LLM)
+#
+# Konfiguration über .env (siehe .env.example). Details: docs/DEPLOY.md
+services:
+  app:
+    image: ghcr.io/noxon007/life-dash:${LIFEDASH_VERSION:-v0.1}
+    build: .  # greift nur bei `docker compose build` im Quell-Checkout
+    restart: unless-stopped
+    ports:
+      - "${LIFEDASH_PORT:-8000}:8000"
+    volumes:
+      - lifedash-data:/data
+    environment:
+      TZ: ${TZ:-Europe/Berlin}
+      # --- Auth (Pocket ID) ---
+      AUTH_MODE: ${AUTH_MODE:-oidc}
+      OIDC_ISSUER: ${OIDC_ISSUER:?OIDC_ISSUER in .env setzen (Pocket ID URL)}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?OIDC_CLIENT_ID in .env setzen}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://127.0.0.1:8000}
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET in .env setzen (langer Zufallswert)}
+      # --- KI (Chat + Embeddings, OpenAI-kompatibler Endpoint) ---
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-http://ollama:11434/v1}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-not-needed}
+      OPENAI_MODEL: ${OPENAI_MODEL:-llama3.1}
+      OPENAI_EMBED_MODEL: ${OPENAI_EMBED_MODEL:-}
+      OPENAI_EMBED_BASE_URL: ${OPENAI_EMBED_BASE_URL:-}
+      OPENAI_EMBED_API_KEY: ${OPENAI_EMBED_API_KEY:-}
+      SEMANTIC_MIN_SIMILARITY: ${SEMANTIC_MIN_SIMILARITY:-0.4}
+      GEOCODING_ENABLED: ${GEOCODING_ENABLED:-true}
+      # --- DB: SQLite (Default) oder Postgres (Profil "postgres") ---
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////data/lifedash.db}
+      SEED_DEMO: ${SEED_DEMO:-false}
+
+  db:
+    image: postgres:16-alpine
+    profiles: ["postgres"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: lifedash
+      POSTGRES_USER: lifedash
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lifedash}
+    volumes:
+      - lifedash-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lifedash -d lifedash"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ai"]
+    restart: unless-stopped
+    volumes:
+      - lifedash-ollama:/root/.ollama
+
+volumes:
+  lifedash-data:
+  lifedash-pg:
+  lifedash-ollama:
