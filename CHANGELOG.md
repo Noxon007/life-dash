@@ -10,6 +10,20 @@ jedem `MINOR` vorkommen.
 
 ## [Unreleased]
 
+## [0.3.2] – 2026-07-15
+
+### Behoben
+- **Karte wurde auf Mobilgeräten nicht angezeigt.** Leaflet vermisst sich jetzt
+  mehrfach neu (`invalidateSize` nach Einblenden) und reagiert auf
+  Drehen/Resize — Mobil meldete direkt nach dem Einblenden oft Höhe 0.
+- **Eingabe-Symbol in der Mobil-Navigation** hatte einen blauen runden
+  FAB-Hintergrund; entfernt, das Icon sieht jetzt aus wie die übrigen Tabs.
+
+### Hinzugefügt
+- **Sichtbarer Lade-Overlay während der KI-Analyse** (Spinner + Text). Auf Mobil
+  war die einzige Rückmeldung bisher der Button-Text, der oft außerhalb des
+  Sichtfelds lag.
+
 ## [0.3.1] – 2026-07-15
 
 ### Behoben

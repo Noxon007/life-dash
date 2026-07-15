@@ -334,6 +334,21 @@
   .login-box .logo { justify-content: center; padding-bottom: 8px; font-size: 24px; }
   .login-box p { color: var(--text-dim); font-size: 13px; line-height: 1.6; margin: 0 0 24px; }
 
+  /* ---------- Lade-Overlay (KI-Analyse etc.) ---------- */
+  .loading-overlay {
+    position: fixed; inset: 0; z-index: 2500; display: none;
+    align-items: center; justify-content: center; flex-direction: column; gap: 16px;
+    background: rgba(10,12,20,.6); backdrop-filter: blur(2px);
+  }
+  .loading-overlay.show { display: flex; }
+  .loading-overlay .spinner {
+    width: 46px; height: 46px; border-radius: 50%;
+    border: 4px solid rgba(91,140,255,.25); border-top-color: var(--accent);
+    animation: spin .8s linear infinite;
+  }
+  .loading-overlay .loading-text { color: var(--text); font-size: 14px; font-weight: 600; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   /* ============ MOBILE (Bottom-Navigation, PWA) ============ */
   @media (max-width: 860px) {
     body { flex-direction: column; }
@@ -361,10 +376,6 @@
       justify-content: center;
     }
     .nav-item .ico { width: auto; font-size: 20px; }
-    .nav-item[data-view="input"] .ico {
-      background: var(--accent); border-radius: 50%; width: 40px; height: 40px;
-      line-height: 40px; margin-top: -18px; box-shadow: 0 4px 14px rgba(91,140,255,.5);
-    }
     .nav-item.active { background: transparent; color: var(--accent); }
     .nav-badge { position: absolute; top: 0; right: 12%; margin-left: 0; }
     .topbar { padding: 10px 16px; }
@@ -393,6 +404,12 @@
       <p>Deine durchsuchbare Lebensdatenbank.<br>Bitte melde dich über Pocket ID an.</p>
       <a class="btn" href="/api/auth/login" style="text-decoration:none; display:inline-block">🔐 Anmelden (SSO)</a>
     </div>
+  </div>
+
+  <!-- LADE-OVERLAY (KI-Analyse etc.) -->
+  <div class="loading-overlay" id="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loading-text">🤖 KI analysiert…</div>
   </div>
 
   <!-- EVENT BEARBEITEN (Modal) -->
@@ -820,6 +837,14 @@ function clearBanner() {
   const b = document.getElementById('conn-banner');
   if (b) b.remove();
 }
+// Vollbild-Lade-Overlay (z. B. während der KI-Analyse). showLoading(false) blendet aus.
+function showLoading(text) {
+  const ov = document.getElementById('loading-overlay');
+  if (!ov) return;
+  if (text === false) { ov.classList.remove('show'); return; }
+  if (typeof text === 'string') document.getElementById('loading-text').textContent = text;
+  ov.classList.add('show');
+}
 
 // ---------- Kategorien ----------
 const catLabels = { trip:"Reise", sighting:"Sichtung", sport:"Aktivität", concert:"Konzert", meal:"Mahlzeit", milestone:"Meilenstein", event:"Ereignis", home:"Wohnort", media:"Medien", country:"Land" };
@@ -1224,6 +1249,7 @@ async function analyze() {
   if (!text) return;
   const btn = document.getElementById('analyze-btn');
   btn.disabled = true; btn.textContent = '🤖 analysiere…';
+  showLoading('🤖 KI analysiert…');
   try {
     const result = await api("/api/ingest", {
       method: 'POST',
@@ -1237,6 +1263,7 @@ async function analyze() {
       showBanner(`Backend-Fehler: ${err.message}`);
   } finally {
     btn.disabled = false; btn.textContent = '🤖 KI analysieren';
+    showLoading(false);
   }
 }
 function renderPreview(events) {
@@ -1534,8 +1561,12 @@ async function openMapView() {
       { attribution: '© OpenStreetMap © CARTO', maxZoom: 19 }).addTo(mapObj);
     mapMarkers = L.layerGroup().addTo(mapObj);
     mapRoute = L.layerGroup().addTo(mapObj);
+    // Auf Mobil ändert sich die Höhe beim Drehen / Ein-/Ausblenden der Adressleiste
+    window.addEventListener('resize', () => mapObj && mapObj.invalidateSize());
+    window.addEventListener('orientationchange', () => mapObj && mapObj.invalidateSize());
   }
-  setTimeout(() => mapObj.invalidateSize(), 60);
+  // Mehrfach neu vermessen: Mobil meldet direkt nach dem Einblenden oft noch 0.
+  [60, 300, 700].forEach(t => setTimeout(() => mapObj.invalidateSize(), t));
   rebuildPeriods();
   renderPeriod();
 }

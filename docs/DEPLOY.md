@@ -15,17 +15,17 @@ SemVer-Release-Tag pushen:
 cd d:\Python\life-dash
 git remote add origin https://github.com/Noxon007/life-dash.git
 git push -u origin main
-git push origin v0.3.1
+git push origin v0.3.2
 ```
 
 Der Tag-Push startet die Action **Docker Release**: sie baut das Multi-Arch-Image
-und pusht es als `ghcr.io/noxon007/life-dash:0.3.1`, `:0.3` und `:latest`. Status
+und pusht es als `ghcr.io/noxon007/life-dash:0.3.2`, `:0.3` und `:latest`. Status
 unter *Repo → Actions*. Nach dem ersten Lauf einmal prüfen, dass das Package
 öffentlich ist (*Profil → Packages → life-dash → Package settings →
 Visibility*) — dann zieht der Server es ohne Login.
 
 **Neue Version veröffentlichen** (Versionsschema: [CHANGELOG.md](../CHANGELOG.md)):
-committen, CHANGELOG ergänzen, `git tag v0.3.1` (Bugfix) bzw. `v0.4.0`
+committen, CHANGELOG ergänzen, `git tag v0.3.3` (Bugfix) bzw. `v0.4.0`
 (Feature), Tag pushen. Auf dem Server dann `LIFEDASH_VERSION` in `.env`
 hochsetzen und `docker compose pull && docker compose up -d`.
 
@@ -67,7 +67,7 @@ cp .env.example .env
 `.env` ausfüllen — Minimum:
 
 ```ini
-LIFEDASH_VERSION=0.3.1
+LIFEDASH_VERSION=0.3.2
 PUBLIC_BASE_URL=https://life.example.com
 OIDC_ISSUER=https://id.example.com
 OIDC_CLIENT_ID=<aus Pocket ID>
