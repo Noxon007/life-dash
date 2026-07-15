@@ -10,6 +10,14 @@ jedem `MINOR` vorkommen.
 
 ## [Unreleased]
 
+## [0.3.1] – 2026-07-15
+
+### Behoben
+- **OIDC-Login scheiterte hinter dem Reverse Proxy mit HTTP 403.** Die
+  Server-zu-Server-Aufrufe an Pocket ID (Discovery, JWKS, Token-Tausch) senden
+  jetzt einen expliziten `User-Agent`; der Default `Python-urllib/…` wurde von
+  Bot-Filtern (Traefik/Pangolin, CrowdSec) geblockt.
+
 ## [0.3.0] – 2026-07-15
 
 ### Geändert

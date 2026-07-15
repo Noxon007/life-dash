@@ -89,7 +89,7 @@ def callback(request: Request, code: str, state: str, db: Session = Depends(get_
     req = urllib.request.Request(
         disco["token_endpoint"],
         data=urllib.parse.urlencode(payload).encode(),
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        headers={**auth.HTTP_HEADERS, "Content-Type": "application/x-www-form-urlencoded"},
         method="POST",
     )
     try:

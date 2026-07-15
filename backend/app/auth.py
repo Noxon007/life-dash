@@ -33,6 +33,15 @@ from app.models import User, UserRole
 SESSION_COOKIE = "lifedash_session"
 STATE_COOKIE = "lifedash_oidc_state"
 
+# Manche Reverse Proxies / Bot-Filter (z. B. Traefik/Pangolin, CrowdSec)
+# blocken den Default-User-Agent von urllib ("Python-urllib/…") mit HTTP 403.
+# Darum bei allen Server-zu-Server-Aufrufen an den OIDC-Provider einen eigenen
+# User-Agent senden.
+HTTP_HEADERS = {
+    "User-Agent": "Life-Dash/1.0 (+https://github.com/Noxon007/life-dash)",
+    "Accept": "application/json",
+}
+
 # --------------------------------------------------------------------------- #
 # OIDC-Discovery & JWKS (gecacht)
 # --------------------------------------------------------------------------- #
@@ -47,7 +56,8 @@ def oidc_discovery() -> dict:
         if not settings.oidc_issuer:
             raise HTTPException(500, "OIDC_ISSUER ist nicht konfiguriert")
         url = settings.oidc_issuer.rstrip("/") + "/.well-known/openid-configuration"
-        with urllib.request.urlopen(url, timeout=10) as resp:
+        req = urllib.request.Request(url, headers=HTTP_HEADERS)
+        with urllib.request.urlopen(req, timeout=10) as resp:
             _discovery_cache = json.loads(resp.read().decode("utf-8"))
     return _discovery_cache
 
@@ -55,7 +65,7 @@ def oidc_discovery() -> dict:
 def _jwks() -> jwt.PyJWKClient:
     global _jwks_client
     if _jwks_client is None:
-        _jwks_client = jwt.PyJWKClient(oidc_discovery()["jwks_uri"])
+        _jwks_client = jwt.PyJWKClient(oidc_discovery()["jwks_uri"], headers=HTTP_HEADERS)
     return _jwks_client
 
 
