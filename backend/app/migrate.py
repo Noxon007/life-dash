@@ -13,7 +13,8 @@ from sqlalchemy.engine import Engine
 _MISSING_COLUMNS: dict[str, dict[str, str]] = {
     "fragments": {"user_id": "VARCHAR(36)"},
     "locations": {"user_id": "VARCHAR(36)"},
-    "events": {"user_id": "VARCHAR(36)", "embedding": "JSON", "note": "TEXT"},
+    "events": {"user_id": "VARCHAR(36)", "embedding": "JSON", "note": "TEXT",
+               "external_id": "VARCHAR(64)"},
     "entities": {"user_id": "VARCHAR(36)"},
 }
 

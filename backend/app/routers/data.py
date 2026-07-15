@@ -25,6 +25,7 @@ from app.models import (
     Location,
     MediaRef,
     Metric,
+    Track,
     User,
 )
 
@@ -68,6 +69,7 @@ def export_data(
     locations = db.query(Location).filter(Location.user_id == user.id).all()
     entities = db.query(Entity).filter(Entity.user_id == user.id).all()
     events = db.query(Event).filter(Event.user_id == user.id).all()
+    tracks = db.query(Track).filter(Track.user_id == user.id).all()
     event_ids = {e.id for e in events}
     links = [
         l for l in db.query(EventEntityLink).all() if l.event_id in event_ids
@@ -86,6 +88,7 @@ def export_data(
         "event_entity_links": [_row_to_dict(x) for x in links],
         "media_refs": [_row_to_dict(x) for x in media],
         "metrics": [_row_to_dict(x) for x in metrics],
+        "tracks": [_row_to_dict(x) for x in tracks],
     }
 
 
@@ -109,6 +112,7 @@ def import_data(
         ("event_entity_links", EventEntityLink, False),
         ("media_refs", MediaRef, False),
         ("metrics", Metric, False),
+        ("tracks", Track, True),
     ]
     imported: dict[str, int] = {}
     skipped = 0

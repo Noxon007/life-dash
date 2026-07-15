@@ -172,6 +172,8 @@ class Event(Base):
     # none_as_null: Python-None als SQL NULL speichern (nicht als JSON 'null'),
     # damit "fehlt noch"-Filter (IS NULL) funktionieren.
     embedding: Mapped[list | None] = mapped_column(JSON(none_as_null=True), nullable=True)
+    # Stabiler Import-Schlüssel (z. B. Timeline-Segment-Hash) -> Re-Import ist idempotent
+    external_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
@@ -240,6 +242,36 @@ class MediaRef(Base):
     captured_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     event: Mapped[Event] = relationship(back_populates="media")
+
+
+class Track(Base):
+    """Routenverlauf (Stufe 3) — aus Google Timeline (später auch Workouts).
+
+    Punkte werden unvereinfacht gespeichert (Entscheidung KONZEPT Kap. 15);
+    `external_id` ist der Segment-Hash für idempotenten Re-Import.
+    """
+
+    __tablename__ = "tracks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
+    date_start: Mapped[datetime] = mapped_column(DateTime, index=True)
+    date_end: Mapped[datetime] = mapped_column(DateTime)
+    # [[lat, lng], ...] — LineString; PostGIS-Geometrie erst mit Postgres
+    points: Mapped[list] = mapped_column(JSON, default=list)
+    activity_type: Mapped[str | None] = mapped_column(
+        String(32), nullable=True
+    )  # walk|drive|cycle|run|transit|unknown
+    distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    source: Mapped[Source] = mapped_column(Enum(Source), default=Source.google_timeline)
+    external_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    event_id: Mapped[str | None] = mapped_column(ForeignKey("events.id"), nullable=True)
+    origin_fragment_id: Mapped[str | None] = mapped_column(
+        ForeignKey("fragments.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
 
 class Metric(Base):

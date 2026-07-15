@@ -117,6 +117,30 @@ class EventManualCreate(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
+# Tracks (Routenverläufe, Stufe 3) — Google-Timeline-Import
+# --------------------------------------------------------------------------- #
+class TrackRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    date_start: datetime
+    date_end: datetime
+    points: list  # [[lat, lng], ...]
+    activity_type: str | None = None
+    distance_m: float | None = None
+    source: Source
+
+
+class TimelineImportResult(BaseModel):
+    """Zusammenfassung eines Timeline-Imports."""
+    visits_created: int
+    tracks_created: int
+    skipped_duplicates: int
+    skipped_invalid: int
+    date_min: datetime | None = None
+    date_max: datetime | None = None
+
+
+# --------------------------------------------------------------------------- #
 # Moderation
 # --------------------------------------------------------------------------- #
 class EventUpdate(BaseModel):

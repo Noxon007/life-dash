@@ -151,7 +151,7 @@ def wipe_data() -> dict:
     nur für Admins erreichbar (Router-Dependency)."""
     deleted: dict[str, int] = {}
     # Reihenfolge beachtet die Fremdschlüssel (Kinder zuerst)
-    order = ["metrics", "media_refs", "event_entity_links", "events",
+    order = ["metrics", "media_refs", "event_entity_links", "tracks", "events",
              "entities", "locations", "fragments"]
     with engine.begin() as conn:
         for table in order:

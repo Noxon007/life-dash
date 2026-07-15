@@ -183,6 +183,11 @@
   .stat-card {
     background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px;
   }
+  /* Klickbare Statistik-Kacheln & Chart-Balken (führen zu Kompendium/Timeline/Karte) */
+  .stat-card[data-go], .stat-card[data-event-slot] { cursor: pointer; transition: all .15s; }
+  .stat-card[data-go]:hover, .stat-card[data-event-slot]:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .bar-row[data-bar-key] { cursor: pointer; border-radius: 6px; }
+  .bar-row[data-bar-key]:hover { background: var(--bg-elev); }
   .stat-num { font-size: 34px; font-weight: 700; letter-spacing: -1px; }
   .stat-label { color: var(--text-dim); font-size: 13px; margin-top: 4px; }
   .stat-sub { font-size: 12px; margin-top: 8px; color: var(--accent-2); }
@@ -528,6 +533,7 @@
             <label>Route</label>
             <div class="filter-chips">
               <span class="filter-chip active" id="mp-route-toggle">🧭 Route verbinden</span>
+              <span class="filter-chip active" id="mp-tracks-toggle">🛰️ Timeline-Routen</span>
             </div>
           </div>
           <div class="filter-group" style="flex-basis:100%">
@@ -544,25 +550,25 @@
       <!-- ===== STATS ===== -->
       <div class="view" id="view-stats">
         <div class="grid cols-4" style="margin-bottom:24px">
-          <div class="stat-card"><div class="stat-num" id="stat-events">–</div><div class="stat-label">Ereignisse gesamt</div><div class="stat-sub">Stufe 2</div></div>
-          <div class="stat-card"><div class="stat-num" id="stat-countries">–</div><div class="stat-label">Länder besucht</div><div class="stat-sub">Kompendium</div></div>
-          <div class="stat-card"><div class="stat-num" id="stat-places">–</div><div class="stat-label">Orte besucht</div><div class="stat-sub">verortete Events</div></div>
-          <div class="stat-card"><div class="stat-num" id="stat-animals">–</div><div class="stat-label">Tierarten gesehen</div><div class="stat-sub">Kompendium</div></div>
-          <div class="stat-card"><div class="stat-num" id="stat-concerts">–</div><div class="stat-label">Konzerte besucht</div><div class="stat-sub">Kategorie concert</div></div>
-          <div class="stat-card"><div class="stat-num" id="stat-artists">–</div><div class="stat-label">Künstler live</div><div class="stat-sub">Kompendium</div></div>
-          <div class="stat-card"><div class="stat-num" id="stat-age">–</div><div class="stat-label">Alter</div><div class="stat-sub" id="stat-age-sub">Geburt als Meilenstein eintragen</div></div>
-          <div class="stat-card"><div class="stat-num" id="stat-milestones">–</div><div class="stat-label">Meilensteine</div><div class="stat-sub">Hochzeit, Geburt, Umzug …</div></div>
-          <div class="stat-card"><div class="stat-num" id="stat-moves">–</div><div class="stat-label">Umzüge</div><div class="stat-sub">aus Meilensteinen</div></div>
-          <div class="stat-card"><div class="stat-num" id="stat-meals">–</div><div class="stat-label">Mahlzeiten</div><div class="stat-sub">Kategorie meal</div></div>
-          <div class="stat-card"><div class="stat-num" id="stat-unconfirmed">–</div><div class="stat-label">Unbestätigt</div><div class="stat-sub">zu moderieren</div></div>
+          <div class="stat-card" data-go="timeline:all"><div class="stat-num" id="stat-events">–</div><div class="stat-label">Ereignisse gesamt</div><div class="stat-sub">Stufe 2</div></div>
+          <div class="stat-card" data-go="comp:country"><div class="stat-num" id="stat-countries">–</div><div class="stat-label">Länder besucht</div><div class="stat-sub">Kompendium</div></div>
+          <div class="stat-card" data-go="map"><div class="stat-num" id="stat-places">–</div><div class="stat-label">Orte besucht</div><div class="stat-sub">verortete Events</div></div>
+          <div class="stat-card" data-go="comp:animal"><div class="stat-num" id="stat-animals">–</div><div class="stat-label">Tierarten gesehen</div><div class="stat-sub">Kompendium</div></div>
+          <div class="stat-card" data-go="timeline:concert"><div class="stat-num" id="stat-concerts">–</div><div class="stat-label">Konzerte besucht</div><div class="stat-sub">Kategorie concert</div></div>
+          <div class="stat-card" data-go="comp:artist"><div class="stat-num" id="stat-artists">–</div><div class="stat-label">Künstler live</div><div class="stat-sub">Kompendium</div></div>
+          <div class="stat-card" data-go="timeline:milestone"><div class="stat-num" id="stat-age">–</div><div class="stat-label">Alter</div><div class="stat-sub" id="stat-age-sub">Geburt als Meilenstein eintragen</div></div>
+          <div class="stat-card" data-go="timeline:milestone"><div class="stat-num" id="stat-milestones">–</div><div class="stat-label">Meilensteine</div><div class="stat-sub">Hochzeit, Geburt, Umzug …</div></div>
+          <div class="stat-card" data-go="timeline:milestone"><div class="stat-num" id="stat-moves">–</div><div class="stat-label">Umzüge</div><div class="stat-sub">aus Meilensteinen</div></div>
+          <div class="stat-card" data-go="timeline:meal"><div class="stat-num" id="stat-meals">–</div><div class="stat-label">Mahlzeiten</div><div class="stat-sub">Kategorie meal</div></div>
+          <div class="stat-card" data-go="admin"><div class="stat-num" id="stat-unconfirmed">–</div><div class="stat-label">Unbestätigt</div><div class="stat-sub">zu moderieren</div></div>
         </div>
         <div class="grid cols-2" style="margin-bottom:24px">
-          <div class="stat-card">
+          <div class="stat-card" data-event-slot="hot">
             <div class="stat-num" id="stat-hot">–</div>
             <div class="stat-label">🔥 Heißester Tag</div>
             <div class="stat-sub" id="stat-hot-sub">Wetter-Enrichment ausführen</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card" data-event-slot="cold">
             <div class="stat-num" id="stat-cold">–</div>
             <div class="stat-label">❄️ Kältester Tag</div>
             <div class="stat-sub" id="stat-cold-sub">Wetter-Enrichment ausführen</div>
@@ -773,7 +779,12 @@
         <div class="section-title" id="mod-queue-title">Moderations-Queue</div>
         <div id="mod-queue"></div>
 
-        <div class="section-title">Meine Daten — Export &amp; Import</div>
+        <div class="section-title" id="fuzzy-title" style="margin-top:24px">⏳ Unscharfe Zeiten</div>
+        <div class="hint">Events mit grober Zeitangabe (Jahreszeit, Jahr, Jahrzehnt oder ganz ohne Datum).
+          Anklicken öffnet die Schnellbearbeitung — je konkreter die Daten, desto besser Timeline &amp; Karte.</div>
+        <div id="fuzzy-list"></div>
+
+        <div class="section-title" style="margin-top:24px">Meine Daten — Export &amp; Import</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <button class="btn secondary" id="btn-export">📦 Daten exportieren</button>
@@ -789,6 +800,17 @@
             <div class="action-desc"><b>Export-Datei zurückspielen.</b><br>
               Importiert eine Life-Dash-Export-Datei. Bereits vorhandene Einträge (gleiche ID) werden
               übersprungen — mehrfaches Importieren erzeugt keine Duplikate. Alles landet in deinem Konto.</div>
+          </div>
+          <div class="action-row">
+            <div style="flex-shrink:0; min-width:215px">
+              <button class="btn secondary" id="btn-timeline-import" style="width:100%; text-align:left">🛰️ Google Timeline importieren</button>
+              <input type="file" id="timeline-file" accept=".json,application/json" style="display:none">
+            </div>
+            <div class="action-desc"><b>Orts-Historie &amp; Routen aus Google Maps.</b><br>
+              Importiert den Timeline-Export vom Smartphone (Android: Einstellungen → Standort →
+              Standortdienste → Zeitachse → „Zeitachsendaten exportieren"; auch alte Takeout-Exporte
+              funktionieren). Besuche werden zu Events, Bewegungen zu Routen auf der Karte.
+              Mehrfach-Import erzeugt keine Duplikate (Segment-Hash).</div>
           </div>
         </div>
 
@@ -862,7 +884,7 @@ const FILTER_CATS = ['trip','sighting','sport','concert','meal','milestone','eve
 function buildCatFilter(containerId, activeSet, onChange) {
   const el = document.getElementById(containerId);
   el.innerHTML = FILTER_CATS.map(c => `
-    <span class="filter-chip active" data-cat="${c}">
+    <span class="filter-chip ${activeSet.has(c) ? 'active' : 'off'}" data-cat="${c}">
       <span class="fdot" style="background:${catColor(c)}"></span>${catLabels[c]}
     </span>`).join('');
   el.querySelectorAll('.filter-chip').forEach(chip => chip.addEventListener('click', () => {
@@ -1112,6 +1134,44 @@ async function openEntityDetail(type, entityId, name) {
   }
 }
 
+// ---------- STATISTIK — Klick-Navigation (wie im Kompendium) ----------
+// Timeline nur mit einer Kategorie (oder allen) anzeigen
+function tlFilterOnly(cat) {
+  tl.catFilter.clear();
+  (cat === 'all' ? FILTER_CATS : [cat]).forEach(c => tl.catFilter.add(c));
+  buildCatFilter('tl-filters', tl.catFilter, () => renderTimeline());
+  gotoView('timeline');
+  renderTimeline();
+}
+// Kompendium mit bestimmtem Tab öffnen
+function openCompendiumType(type) {
+  document.querySelectorAll('#comp-tabs .zoom-btn').forEach(t =>
+    t.classList.toggle('active', t.dataset.type === type));
+  gotoView('compendium');
+}
+// Direkt zur Detailseite einer Entity springen (View manuell umschalten,
+// damit loadCompendium die Detailansicht nicht gleich wieder überdeckt)
+function jumpToEntity(type, id, name) {
+  document.querySelectorAll('#comp-tabs .zoom-btn').forEach(t =>
+    t.classList.toggle('active', t.dataset.type === type));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === 'compendium'));
+  document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
+  document.getElementById('view-compendium').classList.add('active');
+  document.getElementById('view-title').textContent = titles['compendium'][0];
+  document.getElementById('view-sub').textContent = titles['compendium'][1];
+  openEntityDetail(type, id, name);
+}
+document.querySelectorAll('#view-stats .stat-card[data-go]').forEach(card =>
+  card.addEventListener('click', () => {
+    const go = card.dataset.go;
+    if (go === 'admin') gotoView('admin');
+    else if (go === 'map') gotoView('map');
+    else if (go.startsWith('comp:')) openCompendiumType(go.slice(5));
+    else if (go.startsWith('timeline:')) tlFilterOnly(go.slice(9));
+  }));
+document.querySelectorAll('#view-stats .stat-card[data-event-slot]').forEach(card =>
+  card.addEventListener('click', () => { if (card.dataset.eventId) openEventEdit(card.dataset.eventId); }));
+
 // ---------- STATISTIK ----------
 async function loadStats() {
   const [events, animals, countries, artists] = await Promise.all([
@@ -1170,6 +1230,10 @@ async function loadStats() {
     document.getElementById(id + '-sub').textContent = x
       ? `${fmtDate(x.e)} · ${placeOf(x.e) || 'ohne Ort'} — ${x.e.title}`
       : 'keine Wetterdaten — Admin → „Wetter ergänzen"';
+    // Klick auf die Kachel öffnet das Event (Schnellbearbeitung)
+    const card = document.getElementById(id).closest('.stat-card');
+    if (card) card.dataset.eventId = x ? x.e.id : '';
+    if (x) EVENT_CACHE[x.e.id] = x.e;
   };
   tempCard('stat-hot', hot);
   tempCard('stat-cold', cold);
@@ -1182,8 +1246,8 @@ async function loadStats() {
   const perCat = {};
   events.forEach(e => { perCat[e.category] = (perCat[e.category]||0) + 1; });
   const catData = Object.entries(perCat).sort((a,b) => b[1]-a[1])
-    .map(([c,v]) => [catLabels[c] || c, v]);
-  renderBars('chart-cats', catData.length ? catData : [["—",0]]);
+    .map(([c,v]) => [catLabels[c] || c, v, FILTER_CATS.includes(c) ? c : 'event']);
+  renderBars('chart-cats', catData.length ? catData : [["—",0]], cat => tlFilterOnly(cat));
 
   // Top-Orte (max. 8)
   const perPlace = {};
@@ -1191,23 +1255,62 @@ async function loadStats() {
   const placeData = Object.entries(perPlace).sort((a,b) => b[1]-a[1]).slice(0, 8);
   renderBars('chart-places', placeData.length ? placeData : [["—",0]]);
 
-  // Meistgesehene Tiere: animal-Entities über alle Events gezählt (max. 8)
+  // Meistgesehene Tiere: animal-Entities über alle Events gezählt (max. 8);
+  // Klick springt zur Kompendium-Detailseite (Entity-ID aus dem Kompendium)
+  const animalByName = {};
+  animals.forEach(a => { animalByName[a.name] = a.id; });
   const perAnimal = {};
   events.forEach(e => (e.entities || []).forEach(en => {
     if (en.type === 'animal') perAnimal[en.name] = (perAnimal[en.name]||0) + 1;
   }));
   const animalData = Object.entries(perAnimal).sort((a,b) => b[1]-a[1]).slice(0, 8)
-    .map(([n,v]) => [`${compEmoji('animal', n)} ${n}`, v]);
-  renderBars('chart-animals', animalData.length ? animalData : [["—",0]]);
+    .map(([n,v]) => [`${compEmoji('animal', n)} ${n}`, v, animalByName[n] ? `${animalByName[n]}|${n}` : null]);
+  renderBars('chart-animals', animalData.length ? animalData : [["—",0]],
+    key => { const [id, ...n] = key.split('|'); jumpToEntity('animal', id, n.join('|')); });
 }
-function renderBars(id, data) {
+function renderBars(id, data, onClick) {
   const max = Math.max(1, ...data.map(d => d[1]));
-  document.getElementById(id).innerHTML = data.map(([label,v]) => `
-    <div class="bar-row">
+  const el = document.getElementById(id);
+  el.innerHTML = data.map(([label,v,key]) => `
+    <div class="bar-row"${onClick && key != null ? ` data-bar-key="${esc(String(key))}"` : ''}>
       <div class="bar-label">${esc(String(label))}</div>
       <div class="bar-track"><div class="bar-fill" style="width:${v/max*100}%"></div></div>
       <div class="bar-val">${v}</div>
     </div>`).join('');
+  if (onClick) el.querySelectorAll('[data-bar-key]').forEach(row =>
+    row.addEventListener('click', () => onClick(row.dataset.barKey)));
+}
+
+// ---------- UNSCHARFE ZEITEN (P2.3) ----------
+const PRECISION_LABELS = { season: 'Jahreszeit', year: 'Jahr', decade: 'Jahrzehnt' };
+async function loadFuzzyDates() {
+  const el = document.getElementById('fuzzy-list');
+  if (!el) return;
+  let events = [];
+  try { events = await api('/api/events'); } catch { return; }
+  const fuzzy = events
+    .filter(e => !e.date_start || PRECISION_LABELS[e.date_precision])
+    .sort((a, b) => (a.date_start || '9999') < (b.date_start || '9999') ? -1 : 1);
+  document.getElementById('fuzzy-title').textContent =
+    `⏳ Unscharfe Zeiten — ${fuzzy.length} Event${fuzzy.length === 1 ? '' : 's'}`;
+  if (!fuzzy.length) {
+    el.innerHTML = '<div class="hint">Alle Events haben konkrete Zeitangaben. ✓</div>';
+    return;
+  }
+  el.innerHTML = fuzzy.map(e => {
+    EVENT_CACHE[e.id] = e;
+    const prec = e.date_start ? (PRECISION_LABELS[e.date_precision] || e.date_precision) : 'ohne Datum';
+    return `<div class="mod-item" data-fuzzy-id="${esc(e.id)}" style="cursor:pointer">
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
+        <span class="chip badge-unconfirmed">⏳ ${esc(prec)}</span>
+        <b>${esc(e.title)}</b>
+        <span class="stat-label">${fmtDate(e)}${e.location ? ' · ' + esc(e.location.name.split(',')[0]) : ''}</span>
+        <span class="stat-label" style="margin-left:auto">✏️ bearbeiten</span>
+      </div>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('[data-fuzzy-id]').forEach(row =>
+    row.addEventListener('click', () => openEventEdit(row.dataset.fuzzyId)));
 }
 
 // ---------- MODERATION ----------
@@ -1519,8 +1622,8 @@ function startVoice() {
 }
 
 // ---------- KARTE ----------
-let mapObj = null, mapMarkers = null, mapRoute = null;
-const mp = { mode: 'day', periods: [], index: 0, showRoute: true, located: [], catFilter: new Set(FILTER_CATS) };
+let mapObj = null, mapMarkers = null, mapRoute = null, mapTracks = null;
+const mp = { mode: 'day', periods: [], index: 0, showRoute: true, showTracks: true, located: [], catFilter: new Set(FILTER_CATS) };
 // Nur Events, die den aktiven Kategorie-Filter passieren
 function mpFiltered() { return mp.located.filter(e => passesFilter(e, mp.catFilter)); }
 
@@ -1594,6 +1697,7 @@ async function openMapView() {
       { attribution: '© OpenStreetMap © CARTO', maxZoom: 19 }).addTo(mapObj);
     mapMarkers = L.layerGroup().addTo(mapObj);
     mapRoute = L.layerGroup().addTo(mapObj);
+    mapTracks = L.layerGroup().addTo(mapObj);
     // Auf Mobil ändert sich die Höhe beim Drehen / Ein-/Ausblenden der Adressleiste
     window.addEventListener('resize', () => mapObj && mapObj.invalidateSize());
     window.addEventListener('orientationchange', () => mapObj && mapObj.invalidateSize());
@@ -1603,18 +1707,67 @@ async function openMapView() {
   rebuildPeriods();
   renderPeriod();
 }
+// ---------- Timeline-Routen (Tracks, P2.2) ----------
+const trackCache = new Map();
+const TRACK_COLORS = { walk:'#34d399', run:'#f87171', cycle:'#fbbf24', drive:'#60a5fa', transit:'#a78bfa', unknown:'#9ca3af' };
+const TRACK_LABELS = { walk:'🚶 Zu Fuß', run:'🏃 Laufen', cycle:'🚴 Fahrrad', drive:'🚗 Auto', transit:'🚆 Transit', unknown:'🛰️ Route' };
+// Perioden-Key -> [start, ende) als lokale ISO-Strings (Server filtert auf Überlappung)
+function keyRange(key) {
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T00:00:00`;
+  const plusDays = (d, n) => { const e = new Date(d); e.setDate(e.getDate()+n); return e; };
+  switch (mp.mode) {
+    case 'day':    { const d = new Date(key+'T00:00:00'); return [fmt(d), fmt(plusDays(d,1))]; }
+    case 'week':   { const [y, w] = key.split('-W').map(Number);
+                     // ISO 8601: der 4. Januar liegt immer in KW 1
+                     const jan4 = new Date(y, 0, 4);
+                     const mon1 = plusDays(jan4, -((jan4.getDay()+6)%7));
+                     const d = plusDays(mon1, (w-1)*7);
+                     return [fmt(d), fmt(plusDays(d,7))]; }
+    case 'month':  { const [y, m] = key.split('-').map(Number);
+                     return [fmt(new Date(y, m-1, 1)), fmt(new Date(y, m, 1))]; }
+    case 'year':   { const y = +key; return [fmt(new Date(y,0,1)), fmt(new Date(y+1,0,1))]; }
+    case 'decade': { const y = +key; return [fmt(new Date(y,0,1)), fmt(new Date(y+10,0,1))]; }
+    default:       return null; // 'alle' -> keine Eingrenzung
+  }
+}
+async function drawTracks(key) {
+  mapTracks.clearLayers();
+  if (!mp.showTracks) return;
+  const cacheKey = mp.mode + ':' + key;
+  let tracks = trackCache.get(cacheKey);
+  if (!tracks) {
+    const range = keyRange(key);
+    const qs = range ? `?start=${range[0]}&end=${range[1]}` : '';
+    try { tracks = await api('/api/tracks' + qs); } catch { tracks = []; }
+    trackCache.set(cacheKey, tracks);
+  }
+  // Stale-Guard: Nutzer hat inzwischen weitergeblättert
+  if (mp.periods.length && mp.periods[mp.index] !== key) return;
+  tracks.forEach(t => {
+    if (!t.points || t.points.length < 2) return;
+    const km = t.distance_m ? `${(t.distance_m/1000).toFixed(1)} km · ` : '';
+    L.polyline(t.points, { color: TRACK_COLORS[t.activity_type] || TRACK_COLORS.unknown, weight: 3, opacity: .75 })
+      .addTo(mapTracks)
+      .bindPopup(`<b>${TRACK_LABELS[t.activity_type] || TRACK_LABELS.unknown}</b><br>`
+        + `${km}${t.date_start.slice(0,10)} ${t.date_start.slice(11,16)}–${t.date_end.slice(11,16)}`);
+  });
+}
+
 function renderPeriod() {
   mapMarkers.clearLayers();
   mapRoute.clearLayers();
   const label = document.getElementById('mp-period-label');
   const stops = document.getElementById('mp-stops');
   if (!mp.periods.length) {
+    mapTracks.clearLayers();
     label.textContent = 'keine verorteten Events';
     stops.innerHTML = '<div class="stat-label">Keine Orte in diesem Zeitraum.</div>';
     return;
   }
   const key = mp.periods[mp.index];
   label.textContent = periodLabel(key);
+  drawTracks(key); // async — zeichnet die Timeline-Routen, sobald geladen
   const items = mpFiltered().filter(e => periodKey(e) === key)
     .sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
   // Datepicker mit dem angezeigten Zeitraum synchron halten
@@ -1672,6 +1825,12 @@ document.getElementById('mp-route-toggle').addEventListener('click', function ()
   this.classList.toggle('off', !mp.showRoute);
   renderPeriod();
 });
+document.getElementById('mp-tracks-toggle').addEventListener('click', function () {
+  mp.showTracks = !mp.showTracks;
+  this.classList.toggle('active', mp.showTracks);
+  this.classList.toggle('off', !mp.showTracks);
+  renderPeriod();
+});
 document.querySelectorAll('[data-mode]').forEach(chip => {
   chip.addEventListener('click', () => {
     // Anker-Datum merken (erstes Event des aktuellen Zeitraums), um nach
@@ -1707,7 +1866,7 @@ function gotoView(v) {
   if (v === 'map') setTimeout(openMapView, 40);
   if (v === 'stats') loadStats();
   if (v === 'compendium') loadCompendium(document.querySelector('#comp-tabs .zoom-btn.active').dataset.type);
-  if (v === 'admin') { loadModQueue(); if (isAdmin()) loadDbTables(); }
+  if (v === 'admin') { loadModQueue(); loadFuzzyDates(); if (isAdmin()) loadDbTables(); }
 }
 
 // ---------- DATENBANK-ROHANSICHT (nur Admin) ----------
@@ -1809,7 +1968,7 @@ document.querySelectorAll('#comp-tabs .zoom-btn').forEach(tab => {
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function isAdmin() { return AUTH.user && AUTH.user.role === 'admin'; }
 async function refreshAll() {
-  await Promise.all([loadTimeline(), loadModQueue()]);
+  await Promise.all([loadTimeline(), loadModQueue(), loadFuzzyDates()]);
 }
 
 document.getElementById('analyze-btn').addEventListener('click', analyze);
@@ -1880,6 +2039,38 @@ document.getElementById('import-file').addEventListener('change', async ev => {
     alert('Import fehlgeschlagen: ' + err.message);
   } finally {
     btn.disabled = false; btn.textContent = '📥 Daten importieren';
+    ev.target.value = '';
+  }
+});
+
+// Google-Timeline-Import (P2.2): Geräte-Export oder Takeout-JSON hochladen
+document.getElementById('btn-timeline-import').addEventListener('click', () =>
+  document.getElementById('timeline-file').click());
+document.getElementById('timeline-file').addEventListener('change', async ev => {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const btn = document.getElementById('btn-timeline-import');
+  btn.disabled = true; btn.textContent = '… importiere';
+  showLoading('🛰️ Timeline wird importiert…');
+  try {
+    const payload = JSON.parse(await file.text());
+    if (!payload.semanticSegments && !payload.timelineObjects) {
+      alert('Kein Google-Timeline-Export: Datei enthält weder "semanticSegments" (Geräte-Export) noch "timelineObjects" (Takeout).');
+      return;
+    }
+    const r = await api('/api/import/timeline', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    const range = r.date_min ? `\nZeitraum: ${r.date_min.slice(0,10)} bis ${r.date_max.slice(0,10)}` : '';
+    alert(`Timeline-Import fertig:\n${r.visits_created} Besuche als Events, ${r.tracks_created} Routen (Tracks).`
+      + `\n${r.skipped_duplicates} Dubletten übersprungen.${range}`);
+    trackCache.clear();
+    await refreshAll();
+  } catch (err) {
+    alert('Timeline-Import fehlgeschlagen: ' + err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '🛰️ Google Timeline importieren';
+    showLoading(false);
     ev.target.value = '';
   }
 });

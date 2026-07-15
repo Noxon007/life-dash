@@ -11,11 +11,31 @@ jedem `MINOR` vorkommen.
 ## [Unreleased]
 
 ### Hinzugefügt
+- **P2.2 — Google-Timeline-Import:** Upload des Timeline-Exports (Geräte-Export
+  `semanticSegments` und altes Takeout-Format `timelineObjects`) unter
+  Admin → „Meine Daten". Besuche werden zu bestätigten Events
+  (source `google_timeline`), Bewegungen zu `Track`-Zeilen (Stufe 3, Punkte
+  unvereinfacht). Re-Import ist idempotent (Segment-Hash als `external_id`).
+  Neue Endpoints: `POST /api/import/timeline`, `GET /api/tracks?start=&end=`.
+- **Routen als Karten-Layer:** Timeline-Routen erscheinen auf der Karte als
+  farbige Linien nach Aktivität (zu Fuß/Rad/Auto/Transit), zuschaltbar über
+  den Chip „🛰️ Timeline-Routen", gefiltert auf den angezeigten Zeitraum.
+- **P2.3 — Unscharfe-Zeiten-Review:** Admin-Bereich listet alle Events mit
+  grober Zeitangabe (Jahreszeit/Jahr/Jahrzehnt/ohne Datum); Klick öffnet die
+  Schnellbearbeitung.
+- **Statistik ist klickbar** (wie im Kompendium): Kacheln führen zu
+  Kompendium/Timeline (kategorie-gefiltert)/Karte/Moderation, der heißeste/
+  kälteste Tag öffnet das Event, Chart-Balken (Kategorien, Tiere) springen zu
+  Timeline-Filter bzw. Kompendium-Detailseite.
 - **Verknüpfte Objekte im Bearbeiten-Dialog editierbar** (z. B. „Seeadler" →
   „Adler" korrigieren, Objekte ergänzen/entfernen). `PATCH /api/moderation/{id}`
   akzeptiert dazu ein `entities`-Feld, das die Verknüpfungen vollständig
   ersetzt; verwaiste Entities werden aufgeräumt, die Änderung ist als Override
   vor KI-Neuberechnungen geschützt.
+
+### Geändert
+- Datenexport/-import und „Alle Daten löschen" erfassen jetzt auch Tracks;
+  Schema-Migration ergänzt `events.external_id` in Bestands-DBs automatisch.
 
 ## [0.3.2] – 2026-07-15
 
