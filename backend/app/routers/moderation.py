@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.models import ConfirmState, Event, User
+from app.models import ConfirmState, Event, EventEntityLink, User
 from app.routers._serialize import event_to_read
 from app.schemas import EventRead, EventUpdate
 
@@ -83,6 +83,31 @@ def correct_event(
             if name else None
         )
         overrides["location"] = True
+
+    # Objekte separat behandeln: Verknüpfungen vollständig ersetzen
+    # (Umbenennen = alte Entity abhängen, neue auflösen/anlegen)
+    if "entities" in data:
+        from app.services.ingestion import _resolve_entity
+
+        wanted = data.pop("entities") or []
+        old_entities = [link.entity for link in event.entity_links]
+        event.entity_links.clear()  # delete-orphan räumt die Link-Zeilen ab
+        db.flush()
+        for ent in wanted:
+            entity = _resolve_entity(
+                db, ent["type"], ent["name"].strip(), ent.get("attributes") or {}, user.id
+            )
+            entity.confirmed = ConfirmState.confirmed
+            db.add(EventEntityLink(event_id=event.id, entity_id=entity.id, role="subject"))
+        db.flush()
+        # Entities ohne verbleibende Events aufräumen (sonst Karteileichen im Kompendium)
+        for entity in old_entities:
+            still_linked = (
+                db.query(EventEntityLink).filter_by(entity_id=entity.id).count() > 0
+            )
+            if not still_linked:
+                db.delete(entity)
+        overrides["entities"] = True
 
     for key, value in data.items():
         setattr(event, key, value)

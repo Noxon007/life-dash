@@ -445,6 +445,11 @@
         </select></div></div>
       <div class="field-row"><div class="field-key">Ort / Adresse</div>
         <div class="field-val"><input id="ed-location" placeholder="z. B. Reeperbahn 1, Hamburg — wird geocodiert" style="max-width:none"></div></div>
+      <div class="field-row"><div class="field-key">🏷️ Objekte</div>
+        <div class="field-val" style="max-width:none">
+          <div id="ed-entities" style="display:flex; flex-direction:column; gap:6px"></div>
+          <button class="btn small secondary" id="ed-ent-add" style="margin-top:6px">+ Objekt</button>
+        </div></div>
       <div class="field-row"><div class="field-key">💬 Kommentar</div>
         <div class="field-val"><textarea id="ed-note" rows="3" placeholder="persönliche Notiz — bleibt von der KI unberührt" style="width:100%; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:6px 10px; color:var(--text); font-size:13px; font-family:inherit; resize:vertical"></textarea></div></div>
       <div class="btn-row" style="margin-top:18px">
@@ -1327,6 +1332,25 @@ async function discardPreview() {
 }
 // ---------- EVENT BEARBEITEN (Klick auf Karte im Zeitstrahl etc.) ----------
 let editingEvent = null;
+const ENT_TYPES = { animal:"🐾 Tier", country:"🌍 Land", artist:"🎤 Künstler", food:"🍽️ Gericht", movie:"🎬 Film", game:"🎮 Spiel", book:"📖 Buch" };
+function edEntityRow(type, name) {
+  const row = document.createElement('div');
+  row.className = 'ed-ent-row';
+  row.style.cssText = 'display:flex; gap:8px; align-items:center';
+  const opts = Object.entries(ENT_TYPES).map(([v, l]) =>
+    `<option value="${v}"${v === type ? ' selected' : ''}>${l}</option>`).join('');
+  row.innerHTML = `<select class="mf-select ed-ent-type" style="width:auto">${opts}</select>`
+    + `<input class="ed-ent-name" value="${esc(name || '')}" placeholder="Name" style="flex:1">`
+    + `<button class="btn small ghost ed-ent-del" title="entfernen" style="color:var(--danger)">✕</button>`;
+  row.querySelector('.ed-ent-del').addEventListener('click', () => row.remove());
+  return row;
+}
+function edEntities() {
+  return [...document.querySelectorAll('#ed-entities .ed-ent-row')]
+    .map(r => ({ type: r.querySelector('.ed-ent-type').value,
+                 name: r.querySelector('.ed-ent-name').value.trim(), attributes: {} }))
+    .filter(en => en.name);
+}
 function openEventEdit(id) {
   const e = EVENT_CACHE[id];
   if (!e) return;
@@ -1339,8 +1363,13 @@ function openEventEdit(id) {
   document.getElementById('ed-category').value = FILTER_CATS.includes(e.category) ? e.category : 'event';
   document.getElementById('ed-location').value = e.location ? e.location.name : '';
   document.getElementById('ed-note').value = e.note || '';
+  const entBox = document.getElementById('ed-entities');
+  entBox.innerHTML = '';
+  (e.entities || []).forEach(en => entBox.appendChild(edEntityRow(en.type, en.name)));
   document.getElementById('edit-modal').classList.add('show');
 }
+document.getElementById('ed-ent-add').addEventListener('click', () =>
+  document.getElementById('ed-entities').appendChild(edEntityRow('animal', '')));
 function closeEventEdit() {
   document.getElementById('edit-modal').classList.remove('show');
   editingEvent = null;
@@ -1369,6 +1398,10 @@ document.getElementById('ed-save').addEventListener('click', async () => {
   if (val('ed-category') !== e.category) changes.category = val('ed-category');
   if (val('ed-location').trim() !== (e.location ? e.location.name : '')) changes.location_name = val('ed-location').trim();
   if (val('ed-note').trim() !== (e.note || '')) changes.note = val('ed-note').trim();
+  const entsNow = edEntities();
+  const entsOrig = (e.entities || []).map(en => ({ type: en.type, name: en.name }));
+  if (JSON.stringify(entsNow.map(x => [x.type, x.name])) !== JSON.stringify(entsOrig.map(x => [x.type, x.name])))
+    changes.entities = entsNow;
 
   const btn = document.getElementById('ed-save');
   btn.disabled = true; btn.textContent = '… speichere';

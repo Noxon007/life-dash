@@ -131,6 +131,9 @@ class EventUpdate(BaseModel):
     # Neuer Ortsname/Adresse -> wird geocodiert (bis Straße/Hausnummer).
     # Leerer String = Ort entfernen.
     location_name: str | None = None
+    # Ersetzt die verknüpften Objekte vollständig (z. B. "Seeadler" -> "Adler").
+    # Leere Liste = alle Verknüpfungen entfernen. None = unverändert.
+    entities: list[ManualEntity] | None = None
 
 
 # --------------------------------------------------------------------------- #

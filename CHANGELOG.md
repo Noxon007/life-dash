@@ -10,6 +10,13 @@ jedem `MINOR` vorkommen.
 
 ## [Unreleased]
 
+### Hinzugefügt
+- **Verknüpfte Objekte im Bearbeiten-Dialog editierbar** (z. B. „Seeadler" →
+  „Adler" korrigieren, Objekte ergänzen/entfernen). `PATCH /api/moderation/{id}`
+  akzeptiert dazu ein `entities`-Feld, das die Verknüpfungen vollständig
+  ersetzt; verwaiste Entities werden aufgeräumt, die Änderung ist als Override
+  vor KI-Neuberechnungen geschützt.
+
 ## [0.3.2] – 2026-07-15
 
 ### Behoben
