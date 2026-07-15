@@ -13,7 +13,7 @@
 # Konfiguration über .env (siehe .env.example). Details: docs/DEPLOY.md
 services:
   app:
-    image: ghcr.io/noxon007/life-dash:${LIFEDASH_VERSION:-v0.1}
+    image: ghcr.io/noxon007/life-dash:${LIFEDASH_VERSION:-v0.2}
     build: .  # greift nur bei `docker compose build` im Quell-Checkout
     restart: unless-stopped
     ports:

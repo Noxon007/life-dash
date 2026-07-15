@@ -39,6 +39,21 @@ In Pocket ID (läuft bereits) einen neuen OIDC-Client anlegen:
 
 `OIDC_ISSUER` ist die Basis-URL von Pocket ID, `OIDC_CLIENT_ID` die generierte Client-ID.
 
+## 2a. Hinweis: Raspberry Pi / ARM64
+
+Das Image wird als Multi-Arch-Manifest gebaut (`linux/amd64` + `linux/arm64`) —
+`docker compose pull` zieht auf einem Pi 5 automatisch die passende Variante,
+kein Extra-Schritt nötig. Zwei Punkte trotzdem beachten:
+
+- **`--profile ai` (lokales Ollama) nicht auf dem Pi nutzen.** Ohne GPU ist
+  Inferenz für ein 12B-Modell (`gemma3:12b`) auf einem Pi 5 unbrauchbar
+  langsam. Stattdessen `OPENAI_BASE_URL` entweder auf die Gemini API oder auf
+  einen bestehenden Ollama-Host im Netzwerk (z. B. die RTX-5070-Ti-Maschine)
+  zeigen lassen — der Pi ist dann nur der leichte App-Server, die KI läuft
+  woanders.
+- **`--profile postgres`** (offizielles `postgres:16-alpine`) läuft nativ auf
+  ARM64, keine Einschränkung.
+
 ## 3. Server vorbereiten
 
 Docker + Compose-Plugin vorausgesetzt — das Image ist öffentlich, ein
