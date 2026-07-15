@@ -815,6 +815,15 @@
               funktionieren). Besuche werden zu Events, Bewegungen zu Routen auf der Karte.
               Mehrfach-Import erzeugt keine Duplikate (Segment-Hash).</div>
           </div>
+          <div class="action-row">
+            <button class="btn secondary" id="btn-resolve-names" style="flex-shrink:0; min-width:215px; text-align:left">📍 Ortsnamen auflösen</button>
+            <div class="action-desc"><b>Adressen für importierte Besuche nachschlagen.</b><br>
+              Der Google-Geräte-Export enthält keine Ortsnamen — Besuche heißen daher
+              „Ort (53.49, 10.00)". Dieser Lauf holt die Adressen per Reverse-Geocoding
+              (OpenStreetMap/Nominatim, 1 Anfrage/Sekunde) und benennt Orte und Besuchs-Events um.
+              Läuft in Etappen und kann jederzeit fortgesetzt werden; manuell umbenannte
+              Einträge bleiben unangetastet.</div>
+          </div>
         </div>
 
         <div class="admin-only">
@@ -2107,8 +2116,11 @@ document.getElementById('timeline-file').addEventListener('change', async ev => 
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
     });
     const range = r.date_min ? `\nZeitraum: ${r.date_min.slice(0,10)} bis ${r.date_max.slice(0,10)}` : '';
+    const names = r.locations_unnamed
+      ? `\n\n📍 ${r.locations_unnamed} Orte haben noch keinen Namen — unten „Ortsnamen auflösen" ausführen.`
+      : (r.names_resolved ? `\n${r.names_resolved} Ortsnamen direkt aufgelöst.` : '');
     alert(`Timeline-Import fertig:\n${r.visits_created} Besuche als Events, ${r.tracks_created} Routen (Tracks).`
-      + `\n${r.skipped_duplicates} Dubletten übersprungen.${range}`);
+      + `\n${r.skipped_duplicates} Dubletten übersprungen.${range}${names}`);
     trackCache.clear();
     await refreshAll();
   } catch (err) {
@@ -2117,6 +2129,31 @@ document.getElementById('timeline-file').addEventListener('change', async ev => 
     btn.disabled = false; btn.textContent = '🛰️ Google Timeline importieren';
     showLoading(false);
     ev.target.value = '';
+  }
+});
+
+// Ortsnamen auflösen (Reverse-Geocoding) — in Etappen, bis nichts mehr offen ist
+document.getElementById('btn-resolve-names').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-resolve-names');
+  btn.disabled = true;
+  let total = 0, failed = 0;
+  try {
+    while (true) {
+      btn.textContent = total ? `… ${total} aufgelöst, läuft` : '… läuft (1 Anfrage/s)';
+      const r = await api('/api/import/timeline/resolve-names?limit=25', { method: 'POST' });
+      total += r.resolved; failed = r.failed;
+      if (r.remaining === 0) { alert(`Fertig: ${total} Ortsnamen aufgelöst.`); break; }
+      if (r.resolved === 0) {
+        alert(`${total} Ortsnamen aufgelöst; ${r.remaining} nicht auflösbar (${failed} Fehler im letzten Lauf — später erneut versuchen).`);
+        break;
+      }
+      btn.textContent = `… ${total} aufgelöst, noch ${r.remaining}`;
+    }
+    await refreshAll();
+  } catch (err) {
+    alert('Ortsnamen auflösen fehlgeschlagen: ' + err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '📍 Ortsnamen auflösen';
   }
 });
 

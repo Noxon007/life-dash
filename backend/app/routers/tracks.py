@@ -18,6 +18,7 @@ import json
 import logging
 import math
 import re
+import time
 from datetime import datetime
 
 from dateutil import parser as dateparser
@@ -25,6 +26,7 @@ from fastapi import APIRouter, Body, Depends
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
+from app.config import settings
 from app.database import get_db
 from app.models import (
     ConfirmState,
@@ -37,9 +39,16 @@ from app.models import (
     Track,
     User,
 )
-from app.schemas import TimelineImportResult, TrackRead
+from app.schemas import PlaceNameResolveResult, TimelineImportResult, TrackRead
+from app.services import geocode as geocode_svc
 
 log = logging.getLogger("lifedash.timeline")
+
+# Nominatim-Policy: max. 1 Anfrage/Sekunde (Modul-Konstante -> in Tests patchbar)
+NOMINATIM_DELAY_S = 1.0
+# Beim Import nur kleine Mengen NEUER Orte direkt auflösen — große Erstimporte
+# laufen über den Admin-Button „Ortsnamen auflösen" (sonst dauert der Upload Minuten)
+AUTO_RESOLVE_MAX = 30
 
 router = APIRouter(prefix="/api", tags=["Tracks & Timeline-Import"])
 
@@ -253,6 +262,30 @@ def _annotate_paths(moves: list[dict]) -> list[dict]:
     return paths + remaining
 
 
+def _apply_resolved_name(db: Session, loc: Location, user_id: str) -> bool:
+    """Reverse-geocodet eine Koordinaten-Location („Ort (lat, lng)") und zieht
+    die Titel der verknüpften Besuchs-Events nach. Manuell umbenannte Events
+    (title in field_overrides) bleiben unangetastet."""
+    hit = geocode_svc.reverse_geocode(loc.lat, loc.lng)
+    if not hit:
+        return False
+    loc.name = hit["name"]
+    if hit.get("type"):
+        loc.type = hit["type"]
+    short = hit["name"].split(",")[0].strip()
+    linked = (
+        db.query(Event)
+        .filter(Event.user_id == user_id, Event.location_id == loc.id,
+                Event.title.like("Besuch: Ort (%"))
+        .all()
+    )
+    for ev in linked:
+        if (ev.field_overrides or {}).get("title"):
+            continue
+        ev.title = f"Besuch: {short}"
+    return True
+
+
 # --------------------------------------------------------------------------- #
 # Import-Endpoint
 # --------------------------------------------------------------------------- #
@@ -290,6 +323,7 @@ def import_timeline(
 
     # Orte wiederverwenden: pro placeId bzw. gerundeter Koordinate eine Location
     loc_cache: dict[str, Location] = {}
+    new_locations: list[Location] = []
 
     def _resolve_visit_location(v: dict) -> Location:
         lat, lng = v["latlng"]
@@ -309,6 +343,7 @@ def import_timeline(
         db.add(loc)
         db.flush()
         loc_cache[key] = loc
+        new_locations.append(loc)
         return loc
 
     created_visits = skipped = 0
@@ -353,9 +388,24 @@ def import_timeline(
         ))
         created_tracks += 1
 
+    # Vorschlag 2: kleine Mengen NEUER Orte direkt reverse-geocoden — Namen
+    # statt „Ort (lat, lng)". Große Erstimporte laufen über den Button.
+    names_resolved = 0
+    unnamed_new = [l for l in new_locations if l.name.startswith("Ort (")]
+    if settings.geocoding_enabled and 0 < len(unnamed_new) <= AUTO_RESOLVE_MAX:
+        for i, loc in enumerate(unnamed_new):
+            if i:
+                time.sleep(NOMINATIM_DELAY_S)
+            if _apply_resolved_name(db, loc, user.id):
+                names_resolved += 1
+
     db.commit()
-    log.info("Timeline-Import: %d Besuche, %d Tracks, %d Dubletten übersprungen",
-             created_visits, created_tracks, skipped)
+    locations_unnamed = (db.query(Location)
+                         .filter(Location.user_id == user.id, Location.name.like("Ort (%"))
+                         .count())
+    log.info("Timeline-Import: %d Besuche, %d Tracks, %d Dubletten übersprungen, "
+             "%d Ortsnamen aufgelöst (%d offen)",
+             created_visits, created_tracks, skipped, names_resolved, locations_unnamed)
     return TimelineImportResult(
         visits_created=created_visits,
         tracks_created=created_tracks,
@@ -363,7 +413,43 @@ def import_timeline(
         skipped_invalid=max(0, invalid),
         date_min=min(all_dates) if all_dates else None,
         date_max=max(all_dates) if all_dates else None,
+        names_resolved=names_resolved,
+        locations_unnamed=locations_unnamed,
     )
+
+
+@router.post("/import/timeline/resolve-names", response_model=PlaceNameResolveResult)
+def resolve_place_names(
+    limit: int = 25,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> PlaceNameResolveResult:
+    """Löst Koordinaten-Ortsnamen („Ort (lat, lng)") per Reverse-Geocoding auf.
+
+    Arbeitet einen Batch (max. `limit`, gedrosselt auf 1 Anfrage/s wegen
+    Nominatim-Policy) ab und meldet, wie viele Orte noch offen sind — das
+    Frontend ruft so lange nach, bis nichts mehr offen ist. Fortschritt wird
+    pro Ort committet.
+    """
+    limit = max(1, min(limit, 100))
+    locs = (db.query(Location)
+            .filter(Location.user_id == user.id,
+                    Location.name.like("Ort (%"),
+                    Location.lat.isnot(None))
+            .limit(limit).all())
+    resolved = failed = 0
+    for i, loc in enumerate(locs):
+        if i:
+            time.sleep(NOMINATIM_DELAY_S)
+        if _apply_resolved_name(db, loc, user.id):
+            resolved += 1
+            db.commit()
+        else:
+            failed += 1
+    remaining = (db.query(Location)
+                 .filter(Location.user_id == user.id, Location.name.like("Ort (%"))
+                 .count())
+    return PlaceNameResolveResult(resolved=resolved, failed=failed, remaining=remaining)
 
 
 # --------------------------------------------------------------------------- #

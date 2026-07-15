@@ -13,6 +13,7 @@ import urllib.parse
 import urllib.request
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
+NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse"
 USER_AGENT = "life-dash/0.1 (self-hosted life database)"
 
 
@@ -44,3 +45,27 @@ def geocode(query: str) -> dict | None:
         }
     except (KeyError, ValueError, TypeError):
         return None
+
+
+def reverse_geocode(lat: float, lng: float) -> dict | None:
+    """Koordinate -> Adresse ({name, type}) — für importierte Timeline-Besuche,
+    deren Geräte-Export keine Ortsnamen enthält. zoom=17 ≈ Gebäude/Straße.
+
+    Achtung Nominatim-Policy: max. 1 Anfrage/Sekunde — Aufrufer drosselt.
+    """
+    params = urllib.parse.urlencode(
+        {"lat": lat, "lon": lng, "format": "jsonv2", "zoom": 17, "addressdetails": 1}
+    )
+    req = urllib.request.Request(
+        f"{NOMINATIM_REVERSE_URL}?{params}",
+        headers={"User-Agent": USER_AGENT, "Accept-Language": "de"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError):
+        return None
+    name = data.get("display_name")
+    if not name:
+        return None
+    return {"name": name, "type": data.get("type")}

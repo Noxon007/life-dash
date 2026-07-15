@@ -138,6 +138,17 @@ class TimelineImportResult(BaseModel):
     skipped_invalid: int
     date_min: datetime | None = None
     date_max: datetime | None = None
+    # Reverse-Geocoding: direkt beim Import aufgelöste neue Orte bzw.
+    # verbleibende Koordinaten-Namen (-> Button „Ortsnamen auflösen")
+    names_resolved: int = 0
+    locations_unnamed: int = 0
+
+
+class PlaceNameResolveResult(BaseModel):
+    """Ergebnis eines „Ortsnamen auflösen"-Batchlaufs."""
+    resolved: int
+    failed: int
+    remaining: int
 
 
 # --------------------------------------------------------------------------- #

@@ -22,6 +22,12 @@ jedem `MINOR` vorkommen.
 - **Routen als Karten-Layer:** Timeline-Routen erscheinen auf der Karte als
   farbige Linien nach Aktivität (zu Fuß/Rad/Auto/Transit), zuschaltbar über
   den Chip „🛰️ Timeline-Routen", gefiltert auf den angezeigten Zeitraum.
+- **Ortsnamen für importierte Besuche:** Der Geräte-Export enthält keine
+  Ortsnamen — neuer Button „📍 Ortsnamen auflösen" (Admin → Meine Daten) holt
+  Adressen per Reverse-Geocoding (Nominatim, 1 Anfrage/s, etappenweise
+  fortsetzbar) und benennt Orte samt Besuchs-Events um; manuell geänderte
+  Titel bleiben geschützt. Kleine Folge-Importe (≤ 30 neue Orte) lösen Namen
+  direkt beim Import auf.
 - **P2.3 — Unscharfe-Zeiten-Review:** Admin-Bereich listet alle Events mit
   grober Zeitangabe (Jahreszeit/Jahr/Jahrzehnt/ohne Datum); Klick öffnet die
   Schnellbearbeitung.
