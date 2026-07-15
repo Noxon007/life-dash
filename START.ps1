@@ -18,18 +18,27 @@ if (-not (Test-Path $py)) {
 Write-Host "Pruefe Abhaengigkeiten..." -ForegroundColor Cyan
 & $py -m pip install -q -r (Join-Path $backend "requirements.txt")
 
-# Laeuft schon etwas auf Port 8000?
+# Noch laufende Instanzen auf Port 8000 stoppen (sauberer Neustart)
 $listening = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
-if (-not $listening) {
-    Write-Host "Starte Backend (uvicorn) auf http://127.0.0.1:8000 ..." -ForegroundColor Cyan
-    # --reload: Codeaenderungen werden ohne manuellen Neustart uebernommen
-    Start-Process -FilePath $py `
-        -ArgumentList "-m","uvicorn","app.main:app","--host","127.0.0.1","--port","8000","--reload" `
-        -WorkingDirectory $backend -WindowStyle Minimized
-    Start-Sleep -Seconds 4
-} else {
-    Write-Host "Backend laeuft bereits auf Port 8000." -ForegroundColor Green
+if ($listening) {
+    Write-Host "Stoppe laufende Instanz(en) auf Port 8000..." -ForegroundColor Yellow
+    foreach ($procId in ($listening.OwningProcess | Sort-Object -Unique)) {
+        # uvicorn --reload: der Listener ist ein Kindprozess — den Eltern-uvicorn
+        # mit beenden, sonst startet der Reloader den Listener sofort neu
+        $proc   = Get-CimInstance Win32_Process -Filter "ProcessId=$procId" -ErrorAction SilentlyContinue
+        $parent = if ($proc) { Get-CimInstance Win32_Process -Filter "ProcessId=$($proc.ParentProcessId)" -ErrorAction SilentlyContinue } else { $null }
+        $rootPid = if ($parent -and $parent.CommandLine -match "uvicorn") { $parent.ProcessId } else { $procId }
+        & taskkill /PID $rootPid /T /F 2>$null | Out-Null
+    }
+    Start-Sleep -Seconds 1
 }
+
+Write-Host "Starte Backend (uvicorn) auf http://127.0.0.1:8000 ..." -ForegroundColor Cyan
+# --reload: Codeaenderungen werden ohne manuellen Neustart uebernommen
+Start-Process -FilePath $py `
+    -ArgumentList "-m","uvicorn","app.main:app","--host","127.0.0.1","--port","8000","--reload" `
+    -WorkingDirectory $backend -WindowStyle Minimized
+Start-Sleep -Seconds 4
 
 # Health-Check
 try {
