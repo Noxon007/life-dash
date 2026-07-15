@@ -373,13 +373,21 @@ def import_timeline(
 def list_tracks(
     start: datetime | None = None,
     end: datetime | None = None,
+    limit: int = 1000,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[TrackRead]:
-    """Tracks des Nutzers, optional auf einen Zeitraum eingegrenzt (Überlappung)."""
+    """Tracks des Nutzers, optional auf einen Zeitraum eingegrenzt (Überlappung).
+
+    `limit` (Default 1000, hart gedeckelt) schützt vor Riesen-Antworten bei
+    weiten Zeiträumen — nach einem Timeline-Import liegen schnell >20k Tracks
+    mit vollen Punktlisten in der DB. Neueste zuerst.
+    """
+    limit = max(1, min(limit, 5000))
     q = db.query(Track).filter(Track.user_id == user.id)
     if start:
         q = q.filter(Track.date_end >= start)
     if end:
         q = q.filter(Track.date_start <= end)
-    return [TrackRead.model_validate(t) for t in q.order_by(Track.date_start).all()]
+    rows = q.order_by(Track.date_start.desc()).limit(limit).all()
+    return [TrackRead.model_validate(t) for t in reversed(rows)]

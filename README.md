@@ -11,8 +11,8 @@ Konzerte & mehr als responsive PWA mit KI-gestützter Erfassung und Suche.
 ## Schnellstart
 
 ```bash
-cp .env.example .env      # OIDC_ISSUER, OIDC_CLIENT_ID, SESSION_SECRET setzen
-docker compose up -d      # Image: ghcr.io/noxon007/life-dash
+cp .env.example .env      # OIDC_*, SESSION_SECRET, POSTGRES_PASSWORD setzen
+docker compose up -d      # App + PostgreSQL; Image: ghcr.io/noxon007/life-dash
 ```
 
 Frontend/PWA: `http://<host>:8000/` · API-Docs: `/docs` · Health: `/health`

@@ -34,6 +34,23 @@ jedem `MINOR` vorkommen.
   vor KI-Neuberechnungen geschützt.
 
 ### Geändert
+- **PostgreSQL ist jetzt der Compose-Standard** (kein `--profile postgres`
+  mehr): `docker compose up -d` startet App + DB, `POSTGRES_PASSWORD` in
+  `.env` genügt. **Migration von SQLite:** JSON-Export ziehen, `DATABASE_URL`
+  aus `.env` entfernen, `up -d`, Export importieren (docs/DEPLOY.md Kap. 6).
+  SQLite bleibt via `DATABASE_URL`-Override + `up -d --no-deps app` möglich.
+- **Performance für importierte Massendaten** (>10k Timeline-Events):
+  - `/api/events` lädt Verknüpfungen jetzt eager (Sammel-Queries statt
+    N+1-Lazy-Loading): 11,7k Events in 0,7 s statt 4,4 s.
+  - Timeline, Karte, Statistik und Unscharfe-Zeiten teilen sich **einen**
+    Events-Abruf (vorher 4 × mehrere MB).
+  - Timeline rendert pro Zeitgruppe zunächst 25 Karten („▼ weitere anzeigen"),
+    statt 10k+ DOM-Knoten auf einmal.
+  - Importierte Google-Besuche sind im Zeitstrahl standardmäßig ausgeblendet
+    (Toggle „🛰️ Besuche") — auf der Karte bleiben sie immer sichtbar.
+  - Karte deckelt Marker/Stopp-Liste bei 300 pro Zeitraum; Timeline-Routen
+    werden nur bis Monats-Zoom gezeichnet; `/api/tracks` hat ein Server-Limit
+    (Default 1000, max. 5000).
 - Datenexport/-import und „Alle Daten löschen" erfassen jetzt auch Tracks;
   Schema-Migration ergänzt `events.external_id` in Bestands-DBs automatisch.
 

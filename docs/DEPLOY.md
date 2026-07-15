@@ -72,6 +72,7 @@ PUBLIC_BASE_URL=https://life.example.com
 OIDC_ISSUER=https://id.example.com
 OIDC_CLIENT_ID=<aus Pocket ID>
 SESSION_SECRET=<python -c "import secrets; print(secrets.token_urlsafe(48))">
+POSTGRES_PASSWORD=<eigenes DB-Passwort — PostgreSQL ist der Standard>
 # KI über Gemini (Standardweg) — Key von https://aistudio.google.com/apikey:
 AI_PROVIDER=openai
 OPENAI_API_KEY=<Gemini-Key>
@@ -115,19 +116,27 @@ Scheme/Client-IP stimmen.
   2. Auf dem Server einloggen und die Datei über **Einstellungen → Import**
      bzw. `POST /api/data/import` einspielen.
 
-## 6. Optional: PostgreSQL statt SQLite
+## 6. Datenbank: PostgreSQL (Standard) & Migration von SQLite
 
-SQLite (Default) reicht für den Start. Umstieg später ohne Dump-Konvertierung
-über denselben Export/Import-Weg:
+**PostgreSQL ist der Standard** — `docker compose up -d` startet App + DB,
+das Schema wird beim ersten Start automatisch angelegt. Es genügt,
+`POSTGRES_PASSWORD` in `.env` zu setzen; die `DATABASE_URL` baut die Compose
+daraus selbst.
 
-1. JSON-Export ziehen (wie oben).
-2. In `.env`:
-   ```ini
-   DATABASE_URL=postgresql+psycopg2://lifedash:<passwort>@db:5432/lifedash
-   POSTGRES_PASSWORD=<passwort>
-   ```
-3. `docker compose --profile postgres up -d` — Schema wird beim Start angelegt.
-4. Einloggen (wieder: erster Login = Admin) und JSON importieren.
+**Bestehende SQLite-Installation migrieren** (ohne Dump-Konvertierung, über
+den JSON-Export):
+
+1. Vor dem Update: einloggen und JSON-Export ziehen (**Einstellungen → Export**).
+2. In `.env`: `POSTGRES_PASSWORD` setzen und eine eventuell vorhandene
+   `DATABASE_URL=sqlite:...`-Zeile **entfernen** (sonst bleibt SQLite aktiv).
+3. `docker compose pull && docker compose up -d` — Postgres startet, Schema
+   wird angelegt, die App wartet auf den DB-Healthcheck.
+4. Einloggen (erster Login in der leeren DB = Admin) und den JSON-Export
+   importieren. Das alte SQLite-Volume `lifedash-data` bleibt als Rückfall
+   erhalten, bis du es löschst.
+
+**SQLite weiterhin nutzen** (Minimal-Setup): `DATABASE_URL=sqlite:////data/lifedash.db`
+in `.env` lassen und mit `docker compose up -d --no-deps app` nur die App starten.
 
 ## 7. Betrieb
 
@@ -137,6 +146,6 @@ docker compose ps                 # Health-Status (Container hat HEALTHCHECK)
 docker compose pull && docker compose up -d   # Update auf neuen Tag
 ```
 
-Backup-Minimum: das Volume `lifedash-data` (SQLite-DB) bzw. `lifedash-pg`
-sichern — oder regelmäßig den JSON-Export ziehen, der ist vollständig und
-versionsunabhängig.
+Backup-Minimum: das Volume `lifedash-pg` (PostgreSQL) bzw. `lifedash-data`
+(SQLite) sichern — oder regelmäßig den JSON-Export ziehen, der ist vollständig
+und versionsunabhängig.

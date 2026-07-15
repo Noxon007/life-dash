@@ -501,7 +501,10 @@
           <div class="zoom-btn active" data-zoom="year">Jahr</div>
           <div class="zoom-btn" data-zoom="decade">Jahrzehnt</div>
         </div>
-        <div class="filter-chips" id="tl-filters" style="margin:-8px 0 20px"></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:-8px 0 20px">
+          <div class="filter-chips" id="tl-filters" style="margin:0"></div>
+          <span class="filter-chip off" id="tl-visits-toggle" title="Importierte Timeline-Besuche (Google) im Zeitstrahl anzeigen — auf der Karte sind sie immer sichtbar">🛰️ Besuche</span>
+        </div>
         <div id="tl-search-note" class="hint" style="display:none"></div>
         <div class="timeline" id="timeline-list"></div>
       </div>
@@ -935,7 +938,7 @@ function eventChips(e) {
 
 // ---------- TIMELINE ----------
 const MONTHS_LONG = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
-const tl = { zoom: 'year', query: '', events: [], catFilter: new Set(FILTER_CATS) };
+const tl = { zoom: 'year', query: '', events: [], catFilter: new Set(FILTER_CATS), showVisits: false };
 
 function isoWeek(d) {
   const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -960,11 +963,19 @@ function tlGroup(e) {
   }
 }
 
+// Gemeinsamer Events-Abruf: Timeline, Karte, Statistik und Unscharfe-Zeiten
+// teilen sich EINE Antwort (bei 10k+ Events sonst 4x mehrere MB).
+// refreshAll() invalidiert den Cache nach jeder Änderung.
+let _eventsPromise = null;
+function fetchEvents(force = false) {
+  if (force || !_eventsPromise) _eventsPromise = api('/api/events');
+  return _eventsPromise;
+}
 async function loadTimeline() {
   // Suche nutzt den hybriden Such-Endpoint (Volltext + semantisch)
   tl.events = tl.query
     ? await api(`/api/search?q=${encodeURIComponent(tl.query)}`)
-    : await api("/api/events");
+    : await fetchEvents();
   renderTimeline();
 }
 function renderTimeline() {
@@ -982,10 +993,20 @@ function renderTimeline() {
   } else note.style.display = 'none';
   renderTimelineList();
 }
+// DOM-Schutz: pro Zeitgruppe zunächst nur TL_GROUP_CAP Karten rendern —
+// nach einem Timeline-Import (10k+ Events) friert der Browser sonst ein.
+const TL_GROUP_CAP = 25;
 function renderTimelineList() {
   const el = document.getElementById('timeline-list');
   el.style.display = '';
-  const filtered = tl.events.filter(e => passesFilter(e, tl.catFilter));
+  let filtered = tl.events.filter(e => passesFilter(e, tl.catFilter));
+  // Importierte Google-Besuche standardmäßig ausblenden (Kontext für die
+  // Karte, nicht für den Zeitstrahl) — Toggle „🛰️ Besuche" blendet sie ein
+  const visits = filtered.filter(e => e.source === 'google_timeline').length;
+  if (!tl.showVisits) filtered = filtered.filter(e => e.source !== 'google_timeline');
+  const toggle = document.getElementById('tl-visits-toggle');
+  toggle.style.display = visits ? '' : 'none';
+  toggle.textContent = `🛰️ ${visits} Besuche`;
   if (!filtered.length) {
     el.innerHTML = '<div class="hint">Keine Events. Leg unter „Eingabe" eins an — oder Suche/Filter zurücksetzen.</div>';
     return;
@@ -997,11 +1018,20 @@ function renderTimelineList() {
     groups[g.key].items.push(e);
   });
   const ordered = Object.values(groups).sort((a,b) => b.sort - a.sort);
-  el.innerHTML = ordered.map(g => `
+  el.innerHTML = ordered.map((g, gi) => `
     <div class="tl-year">
-      <div class="tl-year-label">${esc(g.label)}</div>
-      ${g.items.map(eventCard).join('')}
+      <div class="tl-year-label">${esc(g.label)}${g.items.length > TL_GROUP_CAP ? ` <span class="stat-label">(${g.items.length})</span>` : ''}</div>
+      ${g.items.slice(0, TL_GROUP_CAP).map(eventCard).join('')}
+      ${g.items.length > TL_GROUP_CAP
+        ? `<div class="hint" data-tl-more="${gi}" style="cursor:pointer">▼ ${g.items.length - TL_GROUP_CAP} weitere anzeigen</div>`
+        : ''}
     </div>`).join('');
+  // „mehr anzeigen": restliche Karten der Gruppe nachrendern
+  el.querySelectorAll('[data-tl-more]').forEach(btn =>
+    btn.addEventListener('click', () => {
+      const g = ordered[+btn.dataset.tlMore];
+      btn.outerHTML = g.items.slice(TL_GROUP_CAP).map(eventCard).join('');
+    }));
 }
 const EVENT_CACHE = {};   // id -> Event (für den Bearbeiten-Dialog)
 function eventCard(e) {
@@ -1025,6 +1055,12 @@ function eventCard(e) {
     </div>`;
 }
 
+document.getElementById('tl-visits-toggle').addEventListener('click', function () {
+  tl.showVisits = !tl.showVisits;
+  this.classList.toggle('active', tl.showVisits);
+  this.classList.toggle('off', !tl.showVisits);
+  renderTimeline();
+});
 document.querySelectorAll('#tl-zoom [data-zoom]').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('#tl-zoom [data-zoom]').forEach(b => b.classList.remove('active'));
@@ -1175,7 +1211,7 @@ document.querySelectorAll('#view-stats .stat-card[data-event-slot]').forEach(car
 // ---------- STATISTIK ----------
 async function loadStats() {
   const [events, animals, countries, artists] = await Promise.all([
-    api("/api/events"),
+    fetchEvents(),
     api("/api/compendium/animal").catch(() => []),
     api("/api/compendium/country").catch(() => []),
     api("/api/compendium/artist").catch(() => []),
@@ -1287,7 +1323,7 @@ async function loadFuzzyDates() {
   const el = document.getElementById('fuzzy-list');
   if (!el) return;
   let events = [];
-  try { events = await api('/api/events'); } catch { return; }
+  try { events = await fetchEvents(); } catch { return; }
   const fuzzy = events
     .filter(e => !e.date_start || PRECISION_LABELS[e.date_precision])
     .sort((a, b) => (a.date_start || '9999') < (b.date_start || '9999') ? -1 : 1);
@@ -1690,7 +1726,7 @@ function mpJumpToDate(dateStr) {
   renderPeriod();
 }
 async function openMapView() {
-  mp.located = (await api("/api/events")).filter(e => e.location && e.location.lat != null && e.date_start);
+  mp.located = (await fetchEvents()).filter(e => e.location && e.location.lat != null && e.date_start);
   if (!mapObj) {
     mapObj = L.map('map').setView([50, 6], 4);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
@@ -1734,6 +1770,9 @@ function keyRange(key) {
 async function drawTracks(key) {
   mapTracks.clearLayers();
   if (!mp.showTracks) return;
+  // Routen nur bis Monats-Zoom — bei Jahr/Jahrzehnt/Alles wären es nach einem
+  // Timeline-Import zehntausende Polylinien (Browser friert ein)
+  if (!['day', 'week', 'month'].includes(mp.mode)) return;
   const cacheKey = mp.mode + ':' + key;
   let tracks = trackCache.get(cacheKey);
   if (!tracks) {
@@ -1768,8 +1807,12 @@ function renderPeriod() {
   const key = mp.periods[mp.index];
   label.textContent = periodLabel(key);
   drawTracks(key); // async — zeichnet die Timeline-Routen, sobald geladen
-  const items = mpFiltered().filter(e => periodKey(e) === key)
+  const all = mpFiltered().filter(e => periodKey(e) === key)
     .sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
+  // DOM-/Leaflet-Schutz: Marker & Stopp-Liste deckeln (Jahr/Alles-Modus
+  // kann nach einem Timeline-Import tausende Events enthalten)
+  const MP_MAX = 300;
+  const items = all.slice(0, MP_MAX);
   // Datepicker mit dem angezeigten Zeitraum synchron halten
   const dateInput = document.getElementById('mp-date');
   if (dateInput) dateInput.value = items.length ? items[0].date_start.slice(0, 10) : '';
@@ -1790,7 +1833,8 @@ function renderPeriod() {
   if (latlngs.length) {
     try { mapObj.fitBounds(L.latLngBounds(latlngs).pad(0.35)); } catch (_) {}
   }
-  stops.innerHTML = `<h3>${items.length} Stopp${items.length===1?'':'s'} · ${periodLabel(key)}</h3>`
+  stops.innerHTML = `<h3>${all.length} Stopp${all.length===1?'':'s'} · ${periodLabel(key)}</h3>`
+    + (all.length > MP_MAX ? `<div class="hint">Zeige die ersten ${MP_MAX} — feinere Zoomstufe wählen für alle.</div>` : '')
     + items.map((e, i) => {
       const w = weatherOf(e);
       return `<div style="padding:10px 0; border-bottom:1px solid var(--border)">
@@ -1968,6 +2012,7 @@ document.querySelectorAll('#comp-tabs .zoom-btn').forEach(tab => {
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function isAdmin() { return AUTH.user && AUTH.user.role === 'admin'; }
 async function refreshAll() {
+  fetchEvents(true); // Cache invalidieren — alle Ansichten teilen sich den neuen Abruf
   await Promise.all([loadTimeline(), loadModQueue(), loadFuzzyDates()]);
 }
 

@@ -2,16 +2,24 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.models import Event, User
+from app.models import Event, EventEntityLink, User
 from app.routers._serialize import event_to_read
 from app.schemas import EventManualCreate, EventRead
 from app.services.ingestion import create_manual_event
 
 router = APIRouter(prefix="/api/events", tags=["Events"])
+
+# Verknüpfungen in wenigen Sammel-Queries vorladen statt lazy pro Event
+# (bei 10k+ importierten Events wird das N+1-Lazy-Loading sonst zur Bremse)
+_EAGER = (
+    selectinload(Event.entity_links).selectinload(EventEntityLink.entity),
+    selectinload(Event.metrics),
+    selectinload(Event.location),
+)
 
 
 @router.post("", response_model=EventRead, status_code=201)
@@ -36,7 +44,7 @@ def list_events(
     q: str | None = Query(None, description="Volltextsuche in Titel/Beschreibung"),
 ) -> list[EventRead]:
     """Liste der eigenen Events, optional gefiltert (für Timeline & Karte)."""
-    query = db.query(Event).filter(Event.user_id == user.id)
+    query = db.query(Event).options(*_EAGER).filter(Event.user_id == user.id)
     if category:
         query = query.filter(Event.category == category)
     if confirmed_only:
@@ -56,6 +64,7 @@ def list_map_events(
     db: Session = Depends(get_db), user: User = Depends(get_current_user)
 ) -> list[EventRead]:
     """Nur verortete eigene Events (mit Koordinaten) — für die Karte."""
-    events = db.query(Event).filter(Event.user_id == user.id).join(Event.location).all()
+    events = (db.query(Event).options(*_EAGER)
+              .filter(Event.user_id == user.id).join(Event.location).all())
     result = [event_to_read(e) for e in events if e.location and e.location.lat is not None]
     return result

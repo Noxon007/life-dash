@@ -39,8 +39,8 @@ Beim ersten Start werden im Dev-Modus Beispieldaten geseedet (`SEED_DEMO=true`).
 ## Docker (Homelab)
 
 ```bash
-cp .env.example .env   # OIDC_ISSUER, OIDC_CLIENT_ID, SESSION_SECRET setzen
-docker compose up -d   # SQLite; --profile postgres optional
+cp .env.example .env   # OIDC_*, SESSION_SECRET, POSTGRES_PASSWORD setzen
+docker compose up -d   # App + PostgreSQL (SQLite: DATABASE_URL überschreiben)
 ```
 
 Vollständiges Server-Deployment (GHCR-Image, Pangolin/Traefik, Pocket ID,

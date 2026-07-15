@@ -6,8 +6,9 @@
 #   Lokaler Build aus dem Quell-Checkout:
 #     docker compose build && docker compose up -d
 #
-#   Optional PostgreSQL statt SQLite:
-#     docker compose --profile postgres up -d
+# Datenbank: PostgreSQL (Standard, eigener Service "db"). SQLite geht weiter
+# für Minimal-Setups: DATABASE_URL=sqlite:////data/lifedash.db in .env setzen
+# und nur die App starten (docker compose up -d --no-deps app).
 #
 # KI läuft über die Gemini API (OpenAI-kompatibler Endpoint) — kein lokaler
 # LLM-Dienst im Stack. Konfiguration über .env (siehe .env.example).
@@ -40,18 +41,20 @@ services:
       OPENAI_EMBED_API_KEY: ${OPENAI_EMBED_API_KEY:-}
       SEMANTIC_MIN_SIMILARITY: ${SEMANTIC_MIN_SIMILARITY:-0.6}
       GEOCODING_ENABLED: ${GEOCODING_ENABLED:-true}
-      # --- DB: SQLite (Default) oder Postgres (Profil "postgres") ---
-      DATABASE_URL: ${DATABASE_URL:-sqlite:////data/lifedash.db}
+      # --- DB: PostgreSQL (Default) — SQLite via DATABASE_URL-Override ---
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://lifedash:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD in .env setzen}@db:5432/lifedash}
       SEED_DEMO: ${SEED_DEMO:-false}
+    depends_on:
+      db:
+        condition: service_healthy
 
   db:
     image: postgres:16-alpine
-    profiles: ["postgres"]
     restart: unless-stopped
     environment:
       POSTGRES_DB: lifedash
       POSTGRES_USER: lifedash
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lifedash}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD in .env setzen}
     volumes:
       - lifedash-pg:/var/lib/postgresql/data
     healthcheck:
