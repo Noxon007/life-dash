@@ -1,6 +1,6 @@
 # Life-Dash — Konzept & MVP
 
-> **Status:** In Umsetzung — P0 & P1 fertig, P2.2–P2.7 umgesetzt (siehe Kap. 14)
+> **Status:** In Betrieb — P0 & P1 fertig, D1 live im Homelab, P2.2–P2.7 umgesetzt (siehe Kap. 14)
 > **Dokumenttyp:** Architektur- & Produktkonzept
 > **Zielumgebung:** Self-hosted / Homelab (Docker-basiert)
 > **Letzte Aktualisierung:** 2026-07-16
@@ -132,6 +132,7 @@ Re-Extraktion/Vergleiche. Legitim ist allenfalls ein manuelles Aufräumen
 - *Als Nutzer* diktiere ich per Sprache „Sommer 2002 Urlaub in Frankreich", damit ein Event mit Zeitangabe (Sommer 2002, als `unconfirmed` markiert), Ort (Frankreich) und Kategorie „Reise" entsteht.
 - *Als Nutzer* moderiere ich KI-Vorschläge: Ich sehe, welche Werte `unconfirmed` sind, und bestätige/korrigiere sie, bevor sie als Fakt gelten.
 - *Als Nutzer* möchte ich bei mehrdeutigen Eingaben eine Rückfrage/Vorschau bekommen, bevor der Datensatz übernommen wird.
+- *Als Nutzer* schreibe ich zu einem Reisetag einen **formatierten Tagebucheintrag** (Markdown) — als Tages-Zusammenfassung über den Einzel-Events, damit Life-Dash auch als Reisetagebuch mit eigener Stimme funktioniert (→ Paket F1). Die KI fasst den Text nie an.
 
 ### Ansichten
 - *Als Nutzer* zoome ich im Zeitstrahl von der Dekaden- auf die Tagesebene, um Ereignisdichte und Details zu sehen.
@@ -587,14 +588,15 @@ Ziel des MVP: **Der Kernloop über alle drei Stufen funktioniert** — Fragment 
 
 ## 14. Roadmap & Umsetzungsstand
 
-### 14.1 Was bereits läuft (Stand 2026-07-15)
+### 14.1 Was bereits läuft (Stand 2026-07-16)
 
-**P0 + P1 vollständig**, dazu vorgezogene Teile aus P2/P3/P5:
+**P0 + P1 vollständig, D1 (Deployment) live**, dazu P2.2–P2.7:
 
 | Bereich | Umgesetzt |
 |---|---|
-| **Fundament** | Drei-Stufen-Datenmodell mit `user_id`, `confirmed`, `field_overrides`; Fragment→Event-Pipeline; Mini-Migration (`migrate.py`); Docker-Setup (Compose ungetestet, da lokal kein Docker). |
-| **Auth** | OIDC (Pocket ID, Code Flow + PKCE), JIT-Provisioning, erster Nutzer = Admin + Altdaten-Adoption, Dev-Modus. *Noch nicht gegen die echte Pocket-ID-Instanz getestet.* |
+| **Fundament** | Drei-Stufen-Datenmodell mit `user_id`, `confirmed`, `field_overrides`; Fragment→Event-Pipeline; Mini-Migration (`migrate.py`). |
+| **Deployment (D1, live)** | Läuft produktiv im Homelab: Raspberry Pi 5 (ARM64), Multi-Arch-Image aus GHCR (GitHub Actions), Reverse Proxy Pangolin (Traefik), Pocket ID live (`AUTH_MODE=oidc`), PostgreSQL 18 als Compose-Standard, alle Daten als Bind-Mounts neben der Compose (`./db`, `./data`), Runbook docs/DEPLOY.md. |
+| **Auth** | OIDC (Pocket ID, Code Flow + PKCE), JIT-Provisioning, erster Nutzer = Admin + Altdaten-Adoption, Dev-Modus für lokale Entwicklung. Läuft live hinter dem Reverse Proxy. |
 | **KI** | Provider-Abstraktion (Mock / OpenAI-kompatibel); aktuell **Gemini** (`gemini-3.5-flash` + `gemini-embedding-2`); ausgearbeiteter Prompt mit Few-Shot-Beispielen; Retry mit Backoff; Quota-Schutz (Batch bricht sauber ab, Capture-first-Fallback beim Einzel-Ingest). |
 | **Ansichten** | Timeline (Zoom Tag→Jahrzehnt, Kategorie-Filter); Karte (Modi Tag→Alles, Kategorie-Filter, Kalender-Sprung, Tagesrouten); Statistik (12 Kacheln inkl. Alter/Umzüge/heißester/kältester Tag, 4 Charts); Kompendium (Zähler, Detailseite mit Karte + **Wikipedia-Beschreibung** via Wikidata-Konzeptsuche). |
 | **Eingabe & Moderation** | KI-Vorschau mit Korrektur; **manuelle Eingabe** (Formular, sofort bestätigt); **Bearbeiten-Dialog** an jeder Event-Karte (inkl. Ort→Geocoding bis Hausnummer, Kommentarfeld); Moderations-Queue; Bestätigen zieht verknüpfte Entities mit. |
@@ -603,42 +605,45 @@ Ziel des MVP: **Der Kernloop über alle drei Stufen funktioniert** — Fragment 
 | **Lebensdatenbank-Werkzeuge** (2026-07-16) | **P2.5** Bulk-Bestätigen mit Filter (Kategorie/Quelle/Confidence/Zeitraum) + Pflicht-Vorschau; **P2.6** Invarianten-Tests „Bestätigtes ist unantastbar" (`backend/tests/`, pytest, offline); **P2.7** Bestätigungs-Provenienz `confirmed_at`/`confirmed_by` (manuell/bulk/import) inkl. Bestandsdaten-Migration, sichtbar im Bearbeiten-Dialog; **P2.4** Auto-Wetter direkt nach Eingabe/KI-Analyse, Wetter-Nachzug bei Zeit-/Ort-Korrektur durch den Nutzer. |
 | **Module** | trip, animal, country, artist (Konzerte), food (Mahlzeiten), milestone (Lebensereignisse). |
 
-### 14.2 Nächste Arbeitspakete (zur Auswahl)
+### 14.2 Fahrplan (Stand 2026-07-16)
+
+**Prinzip:** Zwei Gruppen — **A: notwendig/sinnvoll für die allgemeine
+Nutzung** (Betrieb, Bedienbarkeit, Datensicherheit) und **B: neue Features**.
+**Der Fokus liegt auf Gruppe A**; Features aus B kommen danach oder als
+bewusste Ausnahme dazwischen.
 
 Aufwand: S = Stunden · M = ~1 Tag · L = mehrere Tage. Kein Paket blockiert ein anderes, außer wo vermerkt.
 
+**Bereits erledigt** (Details in 14.1): D1 Deployment · P2.2 Timeline-Import ·
+P2.3 Unscharfe-Zeiten-Review · P2.4 Auto-Enrichment · P2.5 Bulk-Bestätigen ·
+P2.6 Invarianten-Test · P2.7 Bestätigungs-Provenienz.
+
+#### Gruppe A — Notwendig & sinnvoll für die Nutzung (Fokus)
+
 | Nr. | Paket | Aufwand | Inhalt | Nutzen |
 |---|---|---|---|---|
-| **D1** | **Deployment ins Homelab** | M | Docker-Build testen, Compose auf Server, Postgres-Umstieg (Daten via Export/Import), Pocket-ID-Client anlegen, Reverse Proxy/HTTPS, `AUTH_MODE=oidc` live. | App läuft „echt": vom Handy erreichbar, PWA installierbar, Multi-User real. **Voraussetzung für alles Mobile.** |
-| **P2.1** | **Immich-Connector** | M | Immich-URL/API-Key pro Nutzer (Einstellungen), Assets nach Zeit+Geo zu Events verknüpfen (`MediaRef`), Thumbnail-Proxy, Fotos in Event-Karte/Detail, Re-Enrichment-Button. | Fotos erscheinen automatisch an Erinnerungen — größter „Wow"-Effekt. Sinnvoll erst nach/mit D1 (Server-zu-Server im Homelab). |
-| **P2.2** | **Google-Timeline-Import** | L | Upload des Geräte-Exports (JSON), `Track`-Tabelle, Besuche→Events, Routen als Karten-Layer, Dubletten-Schutz (Segment-Hash). | Lückenlose Orts-Historie + echte Routen auf der Karte. |
-| **P2.3** | **Unscharfe-Zeiten-Review** | S | Admin-Bereich, der alle Events mit grober Präzision (`decade`/`year`/`season`) listet + Schnellbearbeitung (aus Frage 1). | Datenqualität gezielt verbessern. |
-| **P2.4** | **Auto-Re-Enrichment** | S | Nach Ingest/Import automatisch Wetter + Embeddings für neue Events (statt Admin-Knopf). | Weniger Handarbeit, immer aktuelle Stufe 3. |
-| **P2.5** | **Bulk-Bestätigen** | S–M | In der Moderations-Queue „alle bestätigen" mit Filter (Zeitraum, Kategorie, Mindest-Confidence, Quelle); Vorschau der betroffenen Events vor dem Bestätigen. | Das Werkzeug, um die Lebensdatenbank (Kap. 3.1) schnell wachsen zu lassen — hunderte korrekte KI-Vorschläge nicht einzeln abnicken müssen. |
-| **P2.6** | **Invarianten-Test „Bestätigtes ist unantastbar"** | S | Automatischer Test, der alle Recompute-/Enrichment-/Import-Pfade gegen die Invariante aus Kap. 3.1 prüft (Maschinen ändern `confirmed`-Daten nie, nur additive Ergänzungen; `field_overrides` respektiert; dokumentierte Ausnahme Ortsnamen-Auflösung). | Die zentrale Garantie der Lebensdatenbank überlebt künftige Code-Änderungen nachweisbar. |
-| **P2.7** | **Bestätigungs-Provenienz (`confirmed_at` + `confirmed_by`)** | S | Zeitpunkt (und Quelle: manuell / Bulk / Import-Automatik) der Bestätigung am Event speichern und im Detail anzeigen; Migration für Bestandsdaten. | Lebensdatenbank wird auditierbar: „Wann habe ich das als wahr markiert?" — nützlich auch für spätere Reviews (was wurde per Bulk statt bewusst bestätigt). |
-| **P3.1** | **Deklarative Statistik-Widgets** | M | Widgets aus Modul-YAML (`count`, `count_distinct`, `timeseries`) generisch rendern statt hart codiert. | Neue Module bringen ihre Statistik automatisch mit. |
-| **P3.2** | **Dekaden-Aggregation Timeline & Besuchs-Verdichtung** | M | Heat-/Dichte-Darstellung auf Jahrzehnt-/Jahres-Ebene statt langer Kartenlisten. Dazu Verdichtung importierter Timeline-Besuche: wiederholte Besuche desselben Orts gruppiert darstellen („59× Besuch: X"), Alltagsorte (Zuhause/Arbeit) optional beim Import überspringen oder zusammenfassen. | Übersicht bei vielen Events — der Timeline-Import (P2.2, umgesetzt) bringt zehntausende Besuchs-Events mit. |
+| **A1** | **UI-Dialoge statt Browser-Popups** | S–M | Alle `alert()`/`confirm()`/`prompt()` (weiße System-Dialoge nach Export, Import, Batch-Läufen, Löschen …) durch Komponenten im Frontend-Stil ersetzen: Toasts für Erfolge, Modal (wie `edit-modal`) für Bestätigungen. ~20 Stellen in `index.html`. | Die App fühlt sich fertig an — gerade auf dem Handy wirken native Popups gebrochen. |
+| **A2** | **Fortschrittsanzeige Import/Export** | S–M | Ladebalken statt unbestimmtem Spinner, v. a. beim Google-Timeline-Import (großes JSON, Tausende Inserts). Ansatz: Verarbeitung in Etappen wie bei den Batch-Läufen (`remaining`-Muster) oder Fortschritts-Endpoint pollen; minimal „Segmente x/y". | Lange Importe sind nachvollziehbar statt „hängt es?". |
+| **A3** | **Versionsnummer im UI** | S | Version unten links in der Sidebar (`sidebar-foot`, beim Nutzernamen). Backend kennt seine Version als Konstante/Build-Arg und liefert sie über einen kleinen Endpoint (`/api/meta`). | Man sieht sofort, welche Version läuft — Basis für Support & Update-Kontrolle. |
+| **A4** | **DB-Rohansicht absichern** | M | Rohes Ändern/Löschen im Admin bekommt Leitplanken: (a) Schreibpfade wo möglich durch bestehende Endpoints (Moderation-PATCH) statt rohem UPDATE; (b) sonst Validierung von Enums/JSON; (c) Folge-Neuberechnungen anstoßen/anzeigen — Titel/Beschreibung → Embedding neu, Ort/Datum → Wetter neu (Pfad existiert seit P2.4), Entity gelöscht → verwaiste Links aufräumen; (d) Fragment-Löschen sperren oder doppelt bestätigen (Eingang = Beweisarchiv, Kap. 3.1). | Admin-Eingriffe können die Invarianten nicht mehr still verletzen. |
+| **A5** | **Dekaden-Aggregation & Besuchs-Verdichtung** *(vorher P3.2)* | M | Heat-/Dichte-Darstellung auf Jahrzehnt-/Jahres-Ebene statt langer Kartenlisten; wiederholte Besuche desselben Orts gruppieren („59× Besuch: X"), Alltagsorte (Zuhause/Arbeit) optional zusammenfassen. | Übersicht trotz zehntausender Timeline-Events — aktuell die größte Nutzungs-Bremse. |
+| **A6** | **Nutzerverwaltungs-UI** *(vorher P5.3)* | S | Nutzerliste, Rollen ändern, Nutzer löschen (Admin-Panel). | Komfort für den realen Multi-User-Betrieb. |
+| **A7** | **Modul-Vollausbau** *(aus Frage 3, entschieden)* | M | Kategorie-Label/Farbe/Emoji aus dem Modul-YAML ins Frontend durchreichen, Modul-Regeln automatisch in den KI-Prompt einspeisen. Danach ist ein neues Modul wirklich „nur eine YAML-Datei" (statt heute drei Stellen: YAML, Prompt, Frontend). | Neue Kategorien ohne Code-Änderung — senkt die Hürde, das System wachsen zu lassen. |
+
+**Empfohlene Reihenfolge in A:** A3 → A1 → A2 (schnelle, sichtbare
+Qualität), dann A5 (Übersichts-Problem), dann A4 → A6 → A7.
+
+#### Gruppe B — Neue Features (nach A bzw. als bewusste Ausnahme)
+
+| Nr. | Paket | Aufwand | Inhalt | Nutzen |
+|---|---|---|---|---|
+| **P2.1** | **Immich-Connector** | M | Immich-URL/API-Key pro Nutzer (Einstellungen), Assets nach Zeit+Geo zu Events verknüpfen (`MediaRef`), Thumbnail-Proxy, Fotos in Event-Karte/Detail, Re-Enrichment-Button. | Fotos erscheinen automatisch an Erinnerungen — größter „Wow"-Effekt. Erster Kandidat aus B, sobald A steht. |
+| **F1** | **Reisetagebuch (formatierter Text)** | M–L | Ausbau des Kommentar-Gedankens (`note`-Feld existiert, wird nie von der KI angefasst) zu echten Tagebucheinträgen: **formatierter Text (Markdown)** statt einzeiliger Notiz, längere Texte pro Event; dazu **Tagesebene** — ein Journal-Eintrag pro Tag (z. B. eigene Kategorie `journal` mit `date_precision=day`, passt ohne Schema-Umbau ins Event-Modell), in der Timeline als Tageskopf über den Einzel-Events gerendert. Optional später: KI schlägt eine Tages-Zusammenfassung aus den Events des Tages vor (landet als Vorschlag im Vorschlagsraum, Kap. 3.1). Markdown wird sanitisiert gerendert. | Aus der Faktensammlung wird ein echtes Reisetagebuch — Erinnerungen mit eigener Stimme statt nur strukturierter Daten. |
+| **P3.1** | **Deklarative Statistik-Widgets** | M | Widgets aus Modul-YAML (`count`, `count_distinct`, `timeseries`) generisch rendern statt hart codiert. Baut sinnvoll auf A7 auf. | Neue Module bringen ihre Statistik automatisch mit. |
 | **P4.1** | **Health-Connect-Import** | M | Upload des Health-Connect-Exports, Schritte/HF/Workouts → `Metric`, Workout-GPS → `Track`. | Fitness-Kontext an Events. |
 | **P4.2** | **PSN-Connector** | M | NPSSO-Token pro Nutzer, Sync via `psnawp`: Spiele→`game`-Entities, Trophäen/Spielzeit→Metrics. | Gaming-Historie im Kompendium. Braucht `game`-Modul (S, inklusive). |
-| **P5.1** | **Offline-Capture + Share-Target** | M | PWA: Fragmente offline puffern & synchronisieren; Teilen aus anderen Apps → Fragment. | Erfassen unterwegs ohne Netz. Erst nach D1 sinnvoll. |
+| **P5.1** | **Offline-Capture + Share-Target** | M | PWA: Fragmente offline puffern & synchronisieren; Teilen aus anderen Apps → Fragment. | Erfassen unterwegs ohne Netz. |
 | **P5.2** | **Whisper-Sprach-Eingabe** | M | Serverseitiges Speech-to-Text (statt Browser-API), auch für Sprachmemos als Datei. | Bessere Diktat-Qualität, unabhängig vom Browser. |
-| **P5.3** | **Nutzerverwaltungs-UI** | S | Nutzerliste, Rollen ändern, Nutzer löschen (Admin-Panel). | Komfort für Multi-User-Betrieb. |
-
-**Umgesetzt (Stand 2026-07-16):** P2.2–P2.7 — Timeline-Import, Unscharfe-Zeiten-Review, Auto-Enrichment, Bulk-Bestätigen, Invarianten-Test, Bestätigungs-Provenienz. Das Vier-Schichten-Modell (Kap. 3.1) ist damit operativ verankert und testbewehrt.
-**Empfohlene Reihenfolge der offenen Pakete:** **D1 → P2.1** (Deployment zuerst, weil Immich-Anbindung und Handy-Nutzung davon abhängen; dann Fotos).
-
-### 14.3 Ideen-Sammlung (UX & Admin, noch nicht eingeplant)
-
-Kleinere Verbesserungen, gesammelt 2026-07-16 — bei Gelegenheit als
-Lückenfüller umsetzen oder zu Paketen bündeln:
-
-| Nr. | Idee | Notizen zur Umsetzung |
-|---|---|---|
-| **I1** | **Ladebalken für Import/Export** | Besonders der Google-Timeline-Import kann lange dauern (großes JSON, Parsing + Tausende Inserts). Heute gibt es nur den Spinner-Overlay ohne Fortschritt. Ansatz: Upload in Etappen verarbeiten (wie die Batch-Läufe mit `remaining`) oder serverseitig einen Fortschritts-Endpoint pollen; minimal: Fortschritt „Segmente x/y" statt unbestimmtem Spinner. |
-| **I2** | **Native Browser-Popups ersetzen** | `alert()`/`confirm()`/`prompt()` (weiße System-Dialoge nach Export, Import, Batch-Läufen, Löschen …) durch saubere UI-Komponenten im Frontend-Stil ersetzen: Toast-Meldungen für Erfolge, Modal (wie `edit-modal`) für Bestätigungen. Zieht sich durch die ganze `index.html` (~20 Stellen). |
-| **I3** | **DB-Rohansicht: sicheres Ändern/Löschen** | Die Admin-Tabellenansicht kann heute schon roh editieren/löschen — aber ohne Leitplanken. Sauber heißt: (a) Schreibpfade durch die bestehenden Endpoints (Moderation-PATCH) statt rohem UPDATE, wo möglich; (b) sonst Validierung von Enums/JSON-Feldern; (c) **Folge-Neuberechnungen anzeigen/auslösen**: Titel/Beschreibung geändert → Embedding neu; Ort/Datum geändert → Wetter neu (Pfad existiert seit P2.4); Entity gelöscht → verwaiste Links aufräumen; Event gelöscht → Metriken/Media kaskadieren (macht die DB), aber Statistik-Cache im Frontend invalidieren. Löschen von Fragmenten bewusst sperren oder doppelt bestätigen (Eingang = Beweisarchiv, Kap. 3.1). |
-| **I4** | **Versionsnummer im UI** | Unten links in der Sidebar (beim Nutzernamen im `sidebar-foot`) die laufende Version anzeigen. Backend kennt seine Version bisher nicht — z. B. als Konstante/`LIFEDASH_VERSION`-Env im Image mitgeben und über einen kleinen Endpoint (`/api/meta` o. Ä.) ausliefern; hilft beim Support („welche Version läuft bei dir?"). |
 
 ---
 
@@ -672,9 +677,11 @@ Lückenfüller umsetzen oder zu Paketen bündeln:
 11. ✅ **Track-Speicherung:** **Gar nicht vereinfachen** — Routen werden in voller Punktdichte gespeichert; erst bei Performance-Problemen wird nachjustiert.
 12. ✅ **PSN-Sync:** „Zuletzt gespielt" + Trophäen-Zeitstempel **reichen** als Ereignisquelle.
 
+**Beantwortet am 2026-07-16** (Empfehlungen angenommen):
+3. ✅ **Modul-Definition (YAML vs. Python-Plugin):** **Gestuft — YAML bleibt der Standard.** Schema, Keywords und Statistik sind dort gut aufgehoben. Was noch fehlt (Kategorie-Label/Farbe/Emoji aus dem YAML ins Frontend, Modul-Regeln automatisch in den KI-Prompt), wird als Paket **A7 „Modul-Vollausbau"** umgesetzt — danach ist ein neues Modul wirklich „nur eine YAML-Datei". Python-Plugins erst, wenn ein Modul eigene Logik braucht (z. B. eigener Import-Parser); das ist faktisch der Connector-Layer und bleibt dort.
+4. ✅ **Frontend-Framework:** **Vanilla-JS bleibt**, solange es trägt — kein Build-Schritt, eine Datei, PWA funktioniert, bewusst wenig bewegliche Teile im Homelab. Ein Framework-Rewrite lohnt erst, wenn die UI-Komplexität spürbar wächst; falls doch: Svelte (schlank, nah am jetzigen Stil) oder React (größtes Ökosystem). Die API bleibt identisch — die Entscheidung ist jederzeit nachholbar und blockiert nichts.
+
 **Noch offen / zu entscheiden:**
-3. **Modul-Definition (YAML vs. Python-Plugin):** *Empfehlung nach bisheriger Erfahrung:* **gestuft — YAML bleibt der Standard**, denn Schema, Keywords und Statistik sind dort gut aufgehoben. Was heute noch fehlt: Kategorie-Label/Farbe/Emoji aus dem YAML ins Frontend durchreichen und Modul-Regeln automatisch in den KI-Prompt einspeisen — dann ist ein neues Modul wirklich „nur eine YAML-Datei". Python-Plugins erst dann, wenn ein Modul eigene Logik braucht (z. B. eigener Import-Parser); das ist faktisch der Connector-Layer und kann dort bleiben. → Konkretes Paket wäre „Modul-Vollausbau" (M).
-4. **Frontend-Framework:** *Empfehlung:* **beim jetzigen Vanilla-JS-Frontend bleiben**, solange es trägt — kein Build-Schritt, eine Datei, PWA funktioniert, bewusst wenig bewegliche Teile im Homelab. Ein Framework-Rewrite lohnt erst, wenn die UI-Komplexität spürbar wächst (z. B. mit Timeline-Import und Track-Layern). Falls Rewrite: **Svelte** (schlank, nah am jetzigen Stil) oder **React** (größtes Ökosystem für Timeline-/Karten-Komponenten). Die API bleibt identisch — die Entscheidung ist jederzeit nachholbar und blockiert nichts.
 6. **Neuberechnungs-Granularität & Kosten:** Bleibt offen — hängt vom endgültigen Modell ab (lokal = Laufzeit, API = Kontingent/Kosten). Der Quota-Schutz (Abbruch mit Erhalt des Altbestands) ist umgesetzt; einzelne Fragmente gezielt neu verarbeiten wäre der nächste Schritt, wenn die Datenmenge wächst.
 
 ---
