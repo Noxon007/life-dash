@@ -7,6 +7,9 @@ backend/.env
 *.db
 *.db.bak*
 *.sqlite3
+# Compose-Bind-Mounts (App-Daten + PostgreSQL-Datenverzeichnis)
+/data/
+/db/
 
 # Python
 __pycache__/

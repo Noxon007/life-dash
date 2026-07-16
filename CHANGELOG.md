@@ -79,9 +79,13 @@ jedem `MINOR` vorkommen.
 - **PostgreSQL ist jetzt der Compose-Standard** (kein `--profile postgres`
   mehr): `docker compose up -d` startet App + DB, `POSTGRES_PASSWORD` in
   `.env` genügt. Version: **`postgres:18-alpine`** (Support bis Nov. 2030,
-  Async-I/O). Achtung Image-Eigenheit ab 18: Das Daten-Volume zeigt auf
+  Async-I/O). Achtung Image-Eigenheit ab 18: Der Daten-Mount zeigt auf
   `/var/lib/postgresql` (nicht mehr `…/data`) — Upgrade von einer
-  bestehenden 16er-DB via JSON-Export (docs/DEPLOY.md Kap. 6). **Migration von SQLite:** JSON-Export ziehen, `DATABASE_URL`
+  bestehenden 16er-DB via JSON-Export (docs/DEPLOY.md Kap. 6).
+- **Daten liegen als Ordner neben der Compose-Datei** (Bind-Mounts statt
+  Docker-Volumes): `./db` = PostgreSQL-Datenverzeichnis, `./data` =
+  App-Daten (SQLite beim Minimal-Setup). Backup = Ordner sichern oder
+  `pg_dump`; bestehende Volume-Installationen ziehen per JSON-Export um. **Migration von SQLite:** JSON-Export ziehen, `DATABASE_URL`
   aus `.env` entfernen, `up -d`, Export importieren (docs/DEPLOY.md Kap. 6).
   SQLite bleibt via `DATABASE_URL`-Override + `up -d --no-deps app` möglich.
 - **Performance für importierte Massendaten** (>10k Timeline-Events):

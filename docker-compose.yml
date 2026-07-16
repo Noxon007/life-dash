@@ -10,6 +10,11 @@
 # für Minimal-Setups: DATABASE_URL=sqlite:////data/lifedash.db in .env setzen
 # und nur die App starten (docker compose up -d --no-deps app).
 #
+# Alle Daten liegen als Bind-Mounts NEBEN dieser Datei (kein docker volume):
+#   ./data  -> App-Daten (SQLite-DB, falls genutzt)
+#   ./db    -> PostgreSQL-Datenverzeichnis
+# Backup = diese Ordner sichern (bzw. der JSON-Export aus der App).
+#
 # KI läuft über die Gemini API (OpenAI-kompatibler Endpoint) — kein lokaler
 # LLM-Dienst im Stack. Konfiguration über .env (siehe .env.example).
 # Details: docs/DEPLOY.md
@@ -21,7 +26,8 @@ services:
     ports:
       - "${LIFEDASH_PORT:-8000}:8000"
     volumes:
-      - lifedash-data:/data
+      # App-Daten (z. B. SQLite-DB beim Minimal-Setup)
+      - ./data:/data
     environment:
       TZ: ${TZ:-Europe/Berlin}
       # --- Auth (Pocket ID) ---
@@ -61,16 +67,14 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD in .env setzen}
     volumes:
       # Ab postgres:18 liegt PGDATA versioniert unter /var/lib/postgresql/<major>/;
-      # das Volume MUSS deshalb aufs Elternverzeichnis zeigen (nicht mehr .../data),
-      # sonst landen die Daten außerhalb des Volumes (Datenverlust beim Recreate).
-      # Bonus: künftige Major-Upgrades können pg_upgrade --link im selben Volume nutzen.
-      - lifedash-pg:/var/lib/postgresql
+      # der Mount MUSS deshalb aufs Elternverzeichnis zeigen (nicht mehr .../data),
+      # sonst landen die Daten außerhalb des Mounts (Datenverlust beim Recreate).
+      # Bonus: künftige Major-Upgrades können pg_upgrade --link im selben Ordner nutzen.
+      # Der Ordner gehört nach dem ersten Start dem Container-User (uid 70) —
+      # fürs Backup daher mit sudo lesen (tar/rsync als root).
+      - ./db:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U lifedash -d lifedash"]
       interval: 10s
       timeout: 5s
       retries: 5
-
-volumes:
-  lifedash-data:
-  lifedash-pg:

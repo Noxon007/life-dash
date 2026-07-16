@@ -123,6 +123,12 @@ das Schema wird beim ersten Start automatisch angelegt. Es genügt,
 `POSTGRES_PASSWORD` in `.env` zu setzen; die `DATABASE_URL` baut die Compose
 daraus selbst.
 
+**Alle Daten liegen als Ordner neben der `docker-compose.yml`** (Bind-Mounts,
+keine Docker-Volumes): `./db` ist das PostgreSQL-Datenverzeichnis, `./data`
+sind die App-Daten (SQLite-DB beim Minimal-Setup). Die Ordner entstehen beim
+ersten Start automatisch; `./db` gehört danach dem Container-User (uid 70) —
+Lesen/Sichern also mit `sudo`.
+
 **Bestehende SQLite-Installation migrieren** (ohne Dump-Konvertierung, über
 den JSON-Export):
 
@@ -132,22 +138,25 @@ den JSON-Export):
 3. `docker compose pull && docker compose up -d` — Postgres startet, Schema
    wird angelegt, die App wartet auf den DB-Healthcheck.
 4. Einloggen (erster Login in der leeren DB = Admin) und den JSON-Export
-   importieren. Das alte SQLite-Volume `lifedash-data` bleibt als Rückfall
-   erhalten, bis du es löschst.
+   importieren. Die alte SQLite-DB (`./data/lifedash.db` bzw. das frühere
+   Docker-Volume `lifedash-data`) bleibt als Rückfall erhalten, bis du sie
+   löschst.
 
 **SQLite weiterhin nutzen** (Minimal-Setup): `DATABASE_URL=sqlite:////data/lifedash.db`
 in `.env` lassen und mit `docker compose up -d --no-deps app` nur die App starten.
 
-**Upgrade von `postgres:16` auf `postgres:18`** (falls schon eine 16er-DB
-läuft): Postgres-Datenverzeichnisse sind nicht major-versions-kompatibel, und
-ab Image-Version 18 zeigt das Volume auf `/var/lib/postgresql` statt
-`.../data`. Der einfache Weg läuft über den JSON-Export:
+**Upgrade von einem älteren Setup** (postgres:16 und/oder Docker-Volumes
+statt Ordner): Postgres-Datenverzeichnisse sind nicht major-versions-
+kompatibel, und ab Image-Version 18 zeigt der Mount auf `/var/lib/postgresql`
+statt `.../data`. Der einfache Weg läuft über den JSON-Export:
 
 1. Einloggen, JSON-Export ziehen (**Einstellungen → Export**).
-2. `docker compose down db` und das alte Volume löschen:
-   `docker volume rm life-dash_lifedash-pg`.
+2. `docker compose down` und Altbestand entfernen: früheres Docker-Volume
+   mit `docker volume rm life-dash_lifedash-pg` (bzw. einen schon
+   vorhandenen `./db`-Ordner mit `sudo rm -rf ./db`).
 3. Aktualisierte `docker-compose.yml` deployen, `docker compose up -d` —
-   Postgres 18 startet mit leerer DB, Schema wird angelegt.
+   Postgres 18 startet mit leerer DB im neuen Ordner `./db`, Schema wird
+   angelegt.
 4. Einloggen (erster Login = Admin) und den JSON-Export importieren.
 
 ## 7. Betrieb
@@ -158,6 +167,8 @@ docker compose ps                 # Health-Status (Container hat HEALTHCHECK)
 docker compose pull && docker compose up -d   # Update auf neuen Tag
 ```
 
-Backup-Minimum: das Volume `lifedash-pg` (PostgreSQL) bzw. `lifedash-data`
-(SQLite) sichern — oder regelmäßig den JSON-Export ziehen, der ist vollständig
-und versionsunabhängig.
+Backup-Minimum: die Ordner `./db` (PostgreSQL, mit `sudo` — gehört uid 70)
+bzw. `./data` (SQLite) neben der Compose-Datei sichern — oder regelmäßig den
+JSON-Export ziehen, der ist vollständig und versionsunabhängig. Sauberer ist
+ein Dump statt des rohen Ordners:
+`docker compose exec db pg_dump -U lifedash lifedash > backup.sql`.
