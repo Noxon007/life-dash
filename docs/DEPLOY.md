@@ -49,7 +49,7 @@ kein Extra-Schritt nötig.
 
 Die KI läuft ohnehin über die **Gemini API** (kein LLM-Dienst im Stack), der Pi
 ist also nur der leichte App-Server — für FastAPI + SQLite/Postgres reicht er
-locker. `--profile postgres` (offizielles `postgres:16-alpine`) läuft nativ auf
+locker. Der `db`-Service (offizielles `postgres:18-alpine`) läuft nativ auf
 ARM64, keine Einschränkung.
 
 ## 3. Server vorbereiten
@@ -137,6 +137,18 @@ den JSON-Export):
 
 **SQLite weiterhin nutzen** (Minimal-Setup): `DATABASE_URL=sqlite:////data/lifedash.db`
 in `.env` lassen und mit `docker compose up -d --no-deps app` nur die App starten.
+
+**Upgrade von `postgres:16` auf `postgres:18`** (falls schon eine 16er-DB
+läuft): Postgres-Datenverzeichnisse sind nicht major-versions-kompatibel, und
+ab Image-Version 18 zeigt das Volume auf `/var/lib/postgresql` statt
+`.../data`. Der einfache Weg läuft über den JSON-Export:
+
+1. Einloggen, JSON-Export ziehen (**Einstellungen → Export**).
+2. `docker compose down db` und das alte Volume löschen:
+   `docker volume rm life-dash_lifedash-pg`.
+3. Aktualisierte `docker-compose.yml` deployen, `docker compose up -d` —
+   Postgres 18 startet mit leerer DB, Schema wird angelegt.
+4. Einloggen (erster Login = Admin) und den JSON-Export importieren.
 
 ## 7. Betrieb
 

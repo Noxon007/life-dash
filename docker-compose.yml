@@ -49,14 +49,22 @@ services:
         condition: service_healthy
 
   db:
-    image: postgres:16-alpine
+    # PG 18: Support bis Nov. 2030, Async-I/O (schnellere Reads auf dem Pi);
+    # pgvector/PostGIS (geplant) unterstützen 18 inkl. ARM64.
+    # Achtung: Major-Wechsel auf bestehendem Volume braucht Dump/Restore
+    # (JSON-Export -> Volume leeren -> Import, docs/DEPLOY.md Kap. 6).
+    image: postgres:18-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: lifedash
       POSTGRES_USER: lifedash
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD in .env setzen}
     volumes:
-      - lifedash-pg:/var/lib/postgresql/data
+      # Ab postgres:18 liegt PGDATA versioniert unter /var/lib/postgresql/<major>/;
+      # das Volume MUSS deshalb aufs Elternverzeichnis zeigen (nicht mehr .../data),
+      # sonst landen die Daten außerhalb des Volumes (Datenverlust beim Recreate).
+      # Bonus: künftige Major-Upgrades können pg_upgrade --link im selben Volume nutzen.
+      - lifedash-pg:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U lifedash -d lifedash"]
       interval: 10s
