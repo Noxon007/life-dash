@@ -10,6 +10,46 @@ jedem `MINOR` vorkommen.
 
 ## [Unreleased]
 
+## [0.7.0] – 2026-07-16
+
+### Hinzugefügt
+- **A9 — Logging & Beobachtbarkeit:** Zentrale Logging-Konfiguration
+  (`lifedash.*`-Logger, einheitliches Format mit Zeitstempel), steuerbar über
+  `LOG_LEVEL` (.env / Compose). Geloggt werden jetzt u. a. App-Start (Version,
+  Auth-/KI-/DB-Modus), Export/Import mit Zeilenzahlen, Admin-Aktionen
+  (Neuberechnung, Wetter-/Embedding-Batches, Rohansicht-Änderungen,
+  Daten-Wipe), Geocoding-/Open-Meteo-Fehler und die Ortsnamen-Auflösung.
+  Docker Compose bekommt Log-Rotation (`max-size: 10m`, `max-file: 5`).
+- **A10 — Ortsnamen konsequent auf Deutsch/Latein:** Nominatim wird mit
+  Sprach-Fallback `de,en` angefragt; liefert OSM keinen deutschen Namen,
+  kommt die englische/lateinische Umschrift statt Lokalschrift (z. B.
+  Griechisch). Zusätzlich bevorzugt `namedetails` den besten lateinischen
+  Namen. Neue Admin-Aktion **„Fremdschrift-Namen eindeutschen"** löst
+  bestehende Orte mit nicht-lateinischer Schrift erneut auf
+  (`resolve-names?scope=nonlatin`); Besuchs-Events werden mit umbenannt,
+  manuell umbenannte Einträge bleiben unangetastet.
+- **A13 — Uhrzeiten anzeigen & bearbeiten:** Events mit `date_precision =
+  exact` zeigen jetzt Datum **und Uhrzeit** („12.07.2026, 14:30–16:05") —
+  damit werden importierte Timeline-Besuche als Tagesablauf lesbar. Der
+  Bearbeiten-Dialog bekommt optionale Uhrzeit-Felder und die Präzision
+  „Tag + Uhrzeit"; eine eingegebene Uhrzeit hebt die Präzision automatisch
+  auf `exact`. Uhrzeiten bleiben lokale Wanduhrzeit („wie erlebt", keine
+  UTC-Umrechnung).
+- **A5 (Karten-Teil) — Marker-Clustering statt 300er-Deckel:** Die Karte
+  zeigt jetzt **alle** Punkte eines Zeitraums. Bis 300 Stopps bleibt die
+  nummerierte Tagesroute; darüber werden die Marker gebündelt
+  (Leaflet.markercluster) statt abgeschnitten. Die Stopp-Liste bleibt als
+  DOM-Schutz gedeckelt und sagt das dazu.
+- **A8 — Export-Rückmeldung:** Der Daten-Export meldet Erfolg per Toast
+  (Anzahl Events/Fragmente/Objekte/Orte/Routen/Metriken, Dateigröße,
+  Dateiname) bzw. Fehler als Fehler-Toast; der Button ist während des
+  Exports deaktiviert.
+
+### Behoben
+- **Stiller Präzisions-Downgrade beim Bearbeiten:** Der Bearbeiten-Dialog
+  stufte `exact`-Events beim Speichern unbemerkt auf `day` herab (die
+  Uhrzeit ging verloren). Jetzt bleibt `exact` erhalten und ist wählbar.
+
 ## [0.6.0] – 2026-07-16
 
 ### Hinzugefügt

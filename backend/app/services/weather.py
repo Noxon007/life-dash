@@ -7,9 +7,12 @@ Nur Standardbibliothek.
 from __future__ import annotations
 
 import json
+import logging
 import urllib.parse
 import urllib.request
 from datetime import date, datetime
+
+log = logging.getLogger("lifedash.weather")
 
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 
@@ -46,7 +49,8 @@ def fetch_weather(lat: float, lng: float, day: datetime | date) -> dict | None:
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError):
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+        log.warning("Open-Meteo nicht erreichbar (%s, %s): %s", iso, (lat, lng), exc)
         return None
 
     daily = data.get("daily") or {}

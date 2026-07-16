@@ -7,6 +7,7 @@ als Backup/Restore und für Umzüge zwischen Instanzen.
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Any
 
@@ -28,6 +29,8 @@ from app.models import (
     Track,
     User,
 )
+
+log = logging.getLogger("lifedash.data")
 
 router = APIRouter(prefix="/api/data", tags=["Export & Import"])
 
@@ -77,6 +80,9 @@ def export_data(
     media = [m for m in db.query(MediaRef).all() if m.event_id in event_ids]
     metrics = [m for m in db.query(Metric).all() if m.event_id in event_ids]
 
+    log.info("Export: %d Fragmente, %d Orte, %d Entities, %d Events, %d Tracks "
+             "(user=%s)", len(fragments), len(locations), len(entities),
+             len(events), len(tracks), user.email or user.id)
     return {
         "format": "lifedash-export",
         "version": EXPORT_VERSION,
@@ -130,5 +136,9 @@ def import_data(
         db.flush()
         imported[key] = count
     db.commit()
+    log.info("Import: %d Zeilen neu (%s), %d übersprungen (user=%s)",
+             sum(imported.values()),
+             ", ".join(f"{k}={v}" for k, v in imported.items() if v) or "nichts",
+             skipped, user.email or user.id)
     return {"imported": imported, "skipped_existing": skipped,
             "total": sum(imported.values())}

@@ -263,8 +263,9 @@ def _annotate_paths(moves: list[dict]) -> list[dict]:
 
 
 def _apply_resolved_name(db: Session, loc: Location, user_id: str) -> bool:
-    """Reverse-geocodet eine Koordinaten-Location („Ort (lat, lng)") und zieht
-    die Titel der verknüpften Besuchs-Events nach. Manuell umbenannte Events
+    """Reverse-geocodet eine Location und zieht die Titel der verknüpften
+    Besuchs-Events („Besuch: …") nach — deckt Koordinaten-Namen („Ort (lat,
+    lng)") ebenso ab wie Fremdschrift-Namen (A10). Manuell umbenannte Events
     (title in field_overrides) bleiben unangetastet."""
     hit = geocode_svc.reverse_geocode(loc.lat, loc.lng)
     if not hit:
@@ -276,7 +277,7 @@ def _apply_resolved_name(db: Session, loc: Location, user_id: str) -> bool:
     linked = (
         db.query(Event)
         .filter(Event.user_id == user_id, Event.location_id == loc.id,
-                Event.title.like("Besuch: Ort (%"))
+                Event.title.like("Besuch:%"))
         .all()
     )
     for ev in linked:
@@ -284,6 +285,15 @@ def _apply_resolved_name(db: Session, loc: Location, user_id: str) -> bool:
             continue
         ev.title = f"Besuch: {short}"
     return True
+
+
+def _nonlatin_locations(db: Session, user_id: str) -> list[Location]:
+    """Verortete Locations des Nutzers, deren Name Fremdschrift enthält
+    (z. B. Griechisch) — Kandidaten für die Neu-Auflösung auf Deutsch (A10)."""
+    rows = (db.query(Location)
+            .filter(Location.user_id == user_id, Location.lat.isnot(None))
+            .all())
+    return [l for l in rows if geocode_svc.NON_LATIN_RE.search(l.name or "")]
 
 
 # --------------------------------------------------------------------------- #
@@ -428,10 +438,15 @@ def import_timeline(
 @router.post("/import/timeline/resolve-names", response_model=PlaceNameResolveResult)
 def resolve_place_names(
     limit: int = 25,
+    scope: str = "unnamed",
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> PlaceNameResolveResult:
-    """Löst Koordinaten-Ortsnamen („Ort (lat, lng)") per Reverse-Geocoding auf.
+    """Löst Ortsnamen per Reverse-Geocoding auf.
+
+    scope="unnamed" (Default): Koordinaten-Namen („Ort (lat, lng)").
+    scope="nonlatin": Fremdschrift-Namen (z. B. Griechisch) erneut auflösen,
+    jetzt mit deutsch/englischer Sprach-Fallback-Kette (A10).
 
     Arbeitet einen Batch (max. `limit`, gedrosselt auf 1 Anfrage/s wegen
     Nominatim-Policy) ab und meldet, wie viele Orte noch offen sind — das
@@ -439,23 +454,39 @@ def resolve_place_names(
     pro Ort committet.
     """
     limit = max(1, min(limit, 100))
-    locs = (db.query(Location)
-            .filter(Location.user_id == user.id,
-                    Location.name.like("Ort (%"),
-                    Location.lat.isnot(None))
-            .limit(limit).all())
+
+    def _candidates() -> list[Location]:
+        if scope == "nonlatin":
+            return _nonlatin_locations(db, user.id)
+        return (db.query(Location)
+                .filter(Location.user_id == user.id,
+                        Location.name.like("Ort (%"),
+                        Location.lat.isnot(None))
+                .all())
+
+    locs = _candidates()[:limit]
     resolved = failed = 0
     for i, loc in enumerate(locs):
         if i:
             time.sleep(NOMINATIM_DELAY_S)
-        if _apply_resolved_name(db, loc, user.id):
-            resolved += 1
+        ok = _apply_resolved_name(db, loc, user.id)
+        if ok:
             db.commit()
+        # Bleibt der Name trotz Auflösung fremdschriftlich (OSM kennt keinen
+        # de/en-Namen), ist das kein Fortschritt — sonst liefe der Batch-Lauf
+        # endlos über dieselben Orte.
+        if ok and scope == "nonlatin" and geocode_svc.NON_LATIN_RE.search(loc.name or ""):
+            ok = False
+        if ok:
+            resolved += 1
         else:
             failed += 1
-    remaining = (db.query(Location)
-                 .filter(Location.user_id == user.id, Location.name.like("Ort (%"))
-                 .count())
+    # Fremdschrift-Auflösung kann am selben Namen scheitern (kein de/en-Name
+    # in OSM) — Fehlschläge nicht als "offen" zählen, sonst dreht das
+    # Frontend Endlosrunden über dieselben Orte.
+    remaining = max(0, len(_candidates()) - failed)
+    log.info("Ortsnamen-Auflösung (%s): %d aufgelöst, %d fehlgeschlagen, %d offen",
+             scope, resolved, failed, remaining)
     return PlaceNameResolveResult(resolved=resolved, failed=failed, remaining=remaining)
 
 

@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     seed_demo: bool = True
     confidence_review_threshold: float = 0.75
 
+    # Log-Level für den lifedash.*-Logger-Baum (DEBUG | INFO | WARNING | ERROR)
+    log_level: str = "INFO"
+
     # Geocoding (Nominatim) für präzise Adressen bis Straße/Hausnummer
     geocoding_enabled: bool = True
 

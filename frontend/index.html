@@ -9,6 +9,8 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 <style>
   :root {
     --bg: #0f1420;
@@ -471,11 +473,12 @@
       <div class="field-row"><div class="field-key">Beschreibung</div>
         <div class="field-val"><input id="ed-desc" style="max-width:none"></div></div>
       <div class="field-row"><div class="field-key">Datum von</div>
-        <div class="field-val"><input id="ed-date-start" type="date"></div></div>
+        <div class="field-val" style="display:flex; gap:6px"><input id="ed-date-start" type="date"><input id="ed-time-start" type="time" title="Uhrzeit (optional)"></div></div>
       <div class="field-row"><div class="field-key">Datum bis</div>
-        <div class="field-val"><input id="ed-date-end" type="date"></div></div>
+        <div class="field-val" style="display:flex; gap:6px"><input id="ed-date-end" type="date"><input id="ed-time-end" type="time" title="Uhrzeit (optional)"></div></div>
       <div class="field-row"><div class="field-key">Präzision</div>
         <div class="field-val"><select id="ed-precision" class="mf-select">
+          <option value="exact">Tag + Uhrzeit</option>
           <option value="day">Tag (genau)</option>
           <option value="month">Monat</option>
           <option value="season">Jahreszeit</option>
@@ -898,6 +901,14 @@
               Läuft in Etappen und kann jederzeit fortgesetzt werden; manuell umbenannte
               Einträge bleiben unangetastet.</div>
           </div>
+          <div class="action-row">
+            <button class="btn secondary" id="btn-resolve-nonlatin" style="flex-shrink:0; min-width:215px; text-align:left">🌍 Fremdschrift-Namen eindeutschen</button>
+            <div class="action-desc"><b>Ortsnamen in Lokalschrift (z. B. Griechisch) neu auflösen.</b><br>
+              Löst bestehende Orte, deren Name nicht-lateinische Schrift enthält, erneut auf —
+              jetzt mit Sprach-Fallback Deutsch → Englisch (lateinische Umschrift). Besuchs-Events
+              werden mit umbenannt; manuell umbenannte Einträge bleiben unangetastet. Orte ohne
+              deutschen/englischen Namen in OpenStreetMap behalten ihre Lokalschrift.</div>
+          </div>
         </div>
 
         <div class="admin-only">
@@ -917,6 +928,7 @@
   </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
 // ========================================================================
 //  Life-Dash Frontend — responsive PWA, same-origin an das Backend gebunden
@@ -1051,7 +1063,19 @@ function fmtDate(e) {
   const d = new Date(e.date_start), y = d.getFullYear(), m = d.getMonth();
   const pad = n => String(n).padStart(2,'0');
   switch (e.date_precision) {
-    case "exact":
+    case "exact": {
+      // A13: exakte Events zeigen die Uhrzeit (Wanduhrzeit "wie erlebt") —
+      // 00:00 gilt als "keine Uhrzeit bekannt" und bleibt unsichtbar
+      const base = `${pad(d.getDate())}.${pad(m+1)}.${y}`;
+      if (!d.getHours() && !d.getMinutes()) return base;
+      let t = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      if (e.date_end) {
+        const de = new Date(e.date_end);
+        if (de.toDateString() === d.toDateString() && (de.getHours() || de.getMinutes()))
+          t += `–${pad(de.getHours())}:${pad(de.getMinutes())}`;
+      }
+      return `${base}, ${t}`;
+    }
     case "day":   return `${pad(d.getDate())}.${pad(m+1)}.${y}`;
     case "month": return `${MONTHS_SHORT[m]} ${y}`;
     case "season": {
@@ -1715,7 +1739,11 @@ function openEventEdit(id) {
   document.getElementById('ed-desc').value = e.description || '';
   document.getElementById('ed-date-start').value = e.date_start ? e.date_start.slice(0, 10) : '';
   document.getElementById('ed-date-end').value = e.date_end ? e.date_end.slice(0, 10) : '';
-  document.getElementById('ed-precision').value = e.date_precision === 'exact' ? 'day' : e.date_precision;
+  // A13: Uhrzeiten anzeigen/bearbeiten — 00:00 gilt als "keine Uhrzeit"
+  const timeOf = iso => (iso && iso.slice(11, 16) !== '00:00') ? iso.slice(11, 16) : '';
+  document.getElementById('ed-time-start').value = timeOf(e.date_start);
+  document.getElementById('ed-time-end').value = timeOf(e.date_end);
+  document.getElementById('ed-precision').value = e.date_precision;
   document.getElementById('ed-category').value = FILTER_CATS.includes(e.category) ? e.category : 'event';
   document.getElementById('ed-location').value = e.location ? e.location.name : '';
   document.getElementById('ed-note').value = e.note || '';
@@ -1757,10 +1785,17 @@ document.getElementById('ed-save').addEventListener('click', async () => {
   const val = id => document.getElementById(id).value;
   if (val('ed-title').trim() !== (e.title || '')) changes.title = val('ed-title').trim();
   if (val('ed-desc').trim() !== (e.description || '')) changes.description = val('ed-desc').trim();
+  // A13: Datum + optionale Uhrzeit zu einem Zeitstempel kombinieren
   const ds = val('ed-date-start'), de = val('ed-date-end');
-  if (ds !== (e.date_start ? e.date_start.slice(0, 10) : '')) changes.date_start = ds ? ds + 'T00:00:00' : null;
-  if (de !== (e.date_end ? e.date_end.slice(0, 10) : '')) changes.date_end = de ? de + 'T00:00:00' : null;
-  if (val('ed-precision') !== e.date_precision) changes.date_precision = val('ed-precision');
+  const ts = val('ed-time-start'), te = val('ed-time-end');
+  const newStart = ds ? `${ds}T${ts || '00:00'}:00` : null;
+  const newEnd = de ? `${de}T${te || '00:00'}:00` : null;
+  if ((newStart || '') !== (e.date_start ? e.date_start.slice(0, 19) : '')) changes.date_start = newStart;
+  if ((newEnd || '') !== (e.date_end ? e.date_end.slice(0, 19) : '')) changes.date_end = newEnd;
+  // Uhrzeit eingegeben, aber Präzision noch "Tag"? Dann ist es jetzt exakt.
+  let prec = val('ed-precision');
+  if ((ts || te) && prec === 'day') prec = 'exact';
+  if (prec !== e.date_precision) changes.date_precision = prec;
   if (val('ed-category') !== e.category) changes.category = val('ed-category');
   if (val('ed-location').trim() !== (e.location ? e.location.name : '')) changes.location_name = val('ed-location').trim();
   if (val('ed-note').trim() !== (e.note || '')) changes.note = val('ed-note').trim();
@@ -1886,7 +1921,7 @@ function startVoice() {
 }
 
 // ---------- KARTE ----------
-let mapObj = null, mapMarkers = null, mapRoute = null, mapTracks = null;
+let mapObj = null, mapMarkers = null, mapCluster = null, mapRoute = null, mapTracks = null;
 const mp = { mode: 'day', periods: [], index: 0, showRoute: true, showTracks: true, located: [], catFilter: new Set(FILTER_CATS) };
 // Nur Events, die den aktiven Kategorie-Filter passieren
 function mpFiltered() { return mp.located.filter(e => passesFilter(e, mp.catFilter)); }
@@ -1960,6 +1995,12 @@ async function openMapView() {
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
       { attribution: '© OpenStreetMap © CARTO', maxZoom: 19 }).addTo(mapObj);
     mapMarkers = L.layerGroup().addTo(mapObj);
+    // A5: Cluster-Layer für große Mengen — alle Punkte statt 300er-Deckel.
+    // Fallback auf layerGroup, falls das Plugin (CDN) nicht geladen wurde.
+    mapCluster = (typeof L.markerClusterGroup === 'function')
+      ? L.markerClusterGroup({ showCoverageOnHover: false, chunkedLoading: true, maxClusterRadius: 45 })
+      : null;
+    if (mapCluster) mapCluster.addTo(mapObj);
     mapRoute = L.layerGroup().addTo(mapObj);
     mapTracks = L.layerGroup().addTo(mapObj);
     // Auf Mobil ändert sich die Höhe beim Drehen / Ein-/Ausblenden der Adressleiste
@@ -2023,6 +2064,7 @@ async function drawTracks(key) {
 
 function renderPeriod() {
   mapMarkers.clearLayers();
+  if (mapCluster) mapCluster.clearLayers();
   mapRoute.clearLayers();
   const label = document.getElementById('mp-period-label');
   const stops = document.getElementById('mp-stops');
@@ -2037,32 +2079,40 @@ function renderPeriod() {
   drawTracks(key); // async — zeichnet die Timeline-Routen, sobald geladen
   const all = mpFiltered().filter(e => periodKey(e) === key)
     .sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
-  // DOM-/Leaflet-Schutz: Marker & Stopp-Liste deckeln (Jahr/Alles-Modus
-  // kann nach einem Timeline-Import tausende Events enthalten)
+  // A5: Bis MP_MAX Stopps gibt es die nummerierte Tagesroute; darüber werden
+  // ALLE Punkte geclustert dargestellt statt abgeschnitten (Nummern & Route
+  // wären bei tausenden Stopps ohnehin bedeutungslos). Die Stopp-Liste bleibt
+  // als DOM-Schutz gedeckelt. Ohne Cluster-Plugin (CDN offline): alter Deckel.
   const MP_MAX = 300;
+  const clustered = all.length > MP_MAX && !!mapCluster;
   const items = all.slice(0, MP_MAX);
+  const markerTarget = clustered ? mapCluster : mapMarkers;
   // Datepicker mit dem angezeigten Zeitraum synchron halten
   const dateInput = document.getElementById('mp-date');
   if (dateInput) dateInput.value = items.length ? items[0].date_start.slice(0, 10) : '';
   const latlngs = [];
-  items.forEach((e, i) => {
+  (clustered ? all : items).forEach((e, i) => {
     const ll = [e.location.lat, e.location.lng];
     latlngs.push(ll);
     const w = weatherOf(e);
-    L.marker(ll).addTo(mapMarkers).bindPopup(
-      `<b>${i+1}. ${esc(e.title)}</b><br>${fmtDate(e)}<br>${esc(e.location.name)}`
+    const num = clustered ? '' : `${i+1}. `;
+    L.marker(ll).addTo(markerTarget).bindPopup(
+      `<b>${num}${esc(e.title)}</b><br>${fmtDate(e)}<br>${esc(e.location.name)}`
       + (w ? `<br>🌤️ ${esc(w)}` : ''));
-    L.circleMarker(ll, { radius: 13, fillColor: catColor(e.category), color: '#fff', weight: 2, fillOpacity: .9 })
-      .addTo(mapMarkers).bindTooltip(String(i+1), { permanent: true, direction: 'center', className: 'route-num' });
+    if (!clustered)
+      L.circleMarker(ll, { radius: 13, fillColor: catColor(e.category), color: '#fff', weight: 2, fillOpacity: .9 })
+        .addTo(mapMarkers).bindTooltip(String(i+1), { permanent: true, direction: 'center', className: 'route-num' });
   });
-  if (mp.showRoute && latlngs.length > 1) {
+  if (!clustered && mp.showRoute && latlngs.length > 1) {
     L.polyline(latlngs, { color: '#5b8cff', weight: 3, opacity: .8, dashArray: '6 6' }).addTo(mapRoute);
   }
   if (latlngs.length) {
     try { mapObj.fitBounds(L.latLngBounds(latlngs).pad(0.35)); } catch (_) {}
   }
   stops.innerHTML = `<h3>${all.length} Stopp${all.length===1?'':'s'} · ${periodLabel(key)}</h3>`
-    + (all.length > MP_MAX ? `<div class="hint">Zeige die ersten ${MP_MAX} — feinere Zoomstufe wählen für alle.</div>` : '')
+    + (all.length > MP_MAX ? `<div class="hint">${clustered
+        ? `Karte zeigt alle ${all.length} Punkte (gebündelt) — Liste zeigt die ersten ${MP_MAX}.`
+        : `Zeige die ersten ${MP_MAX} — feinere Zoomstufe wählen für alle.`}</div>` : '')
     + items.map((e, i) => {
       const w = weatherOf(e);
       return `<div style="padding:10px 0; border-bottom:1px solid var(--border)">
@@ -2340,14 +2390,29 @@ document.getElementById('btn-embed').addEventListener('click', e =>
   }));
 
 // ---------- EXPORT / IMPORT ----------
-document.getElementById('btn-export').addEventListener('click', async () => {
-  const data = await api('/api/data/export');
-  const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `lifedash-export-${new Date().toISOString().slice(0,10)}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
+// A8: Export mit Rückmeldung — vorher lud der Button still herunter.
+document.getElementById('btn-export').addEventListener('click', async ev => {
+  const btn = ev.target;
+  btn.disabled = true; btn.textContent = '… exportiere';
+  try {
+    const data = await api('/api/data/export');
+    const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `lifedash-export-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    const parts = [
+      [data.events, 'Events'], [data.fragments, 'Fragmente'], [data.entities, 'Objekte'],
+      [data.locations, 'Orte'], [data.tracks, 'Routen'], [data.metrics, 'Metriken'],
+    ].filter(([arr]) => arr && arr.length).map(([arr, label]) => `${arr.length} ${label}`);
+    const size = blob.size > 1048576 ? `${(blob.size/1048576).toFixed(1)} MB` : `${Math.ceil(blob.size/1024)} kB`;
+    toast(`✓ Export erstellt (${size}):\n${parts.join(', ') || 'keine Daten'}\n→ ${a.download}`, 'ok', 9000);
+  } catch (err) {
+    toast('Export fehlgeschlagen: ' + err.message, 'error', 8000);
+  } finally {
+    btn.disabled = false; btn.textContent = '📦 Daten exportieren';
+  }
 });
 document.getElementById('btn-import').addEventListener('click', () =>
   document.getElementById('import-file').click());
@@ -2476,6 +2541,17 @@ document.getElementById('btn-resolve-names').addEventListener('click', e =>
     },
     unit: 'Nominatim-Anfragen',
     doneMsg: n => `Fertig: ${n} Ortsnamen aufgelöst.`,
+  }));
+
+// Fremdschrift-Ortsnamen erneut auflösen (A10) — gleiche Mechanik, scope=nonlatin
+document.getElementById('btn-resolve-nonlatin').addEventListener('click', e =>
+  runBatchedAdmin(e.target, {
+    step: async () => {
+      const r = await api('/api/import/timeline/resolve-names?limit=10&scope=nonlatin', { method: 'POST' });
+      return { done: r.resolved, remaining: r.remaining };
+    },
+    unit: 'Nominatim-Anfragen',
+    doneMsg: n => `Fertig: ${n} Ortsnamen eingedeutscht.`,
   }));
 
 // Alle Daten löschen — mit doppelter Sicherheitsabfrage

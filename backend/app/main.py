@@ -1,6 +1,7 @@
 """FastAPI-App: Setup, Startup (Migration, Module laden, Demo-Seed), Frontend-Auslieferung."""
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -16,9 +17,21 @@ from app.routers import admin, auth, data, events, ingest, moderation, modules, 
 from app.seed import seed_demo
 from app.version import APP_VERSION
 
+# Zentrales Logging (A9): ein Format für alle lifedash.*-Logger, Level per
+# LOG_LEVEL steuerbar. uvicorn behält seine eigenen Handler (Access-Log).
+logging.basicConfig(
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
+    format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+log = logging.getLogger("lifedash")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    log.info("Life-Dash %s startet — auth=%s, ai=%s, db=%s, log_level=%s",
+             APP_VERSION, settings.auth_mode, settings.ai_provider,
+             settings.database_url.split("://")[0], settings.log_level.upper())
     # Module aus YAML laden
     load_modules()
     # Bestehende Tabellen um neue Spalten ergänzen (user_id, embedding)

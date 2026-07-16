@@ -20,7 +20,7 @@
 # Details: docs/DEPLOY.md
 services:
   app:
-    image: ghcr.io/noxon007/life-dash:${LIFEDASH_VERSION:-0.6.0}
+    image: ghcr.io/noxon007/life-dash:${LIFEDASH_VERSION:-0.7.0}
     build: .  # greift nur bei `docker compose build` im Quell-Checkout
     restart: unless-stopped
     ports:
@@ -28,8 +28,16 @@ services:
     volumes:
       # App-Daten (z. B. SQLite-DB beim Minimal-Setup)
       - ./data:/data
+    # Log-Rotation: `docker logs` bleibt nutzbar, ohne die SD-Karte zu füllen
+    logging: &default-logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     environment:
       TZ: ${TZ:-Europe/Berlin}
+      # Ausführlichkeit der App-Logs: DEBUG | INFO | WARNING | ERROR (A9)
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       # --- Auth (Pocket ID) ---
       AUTH_MODE: ${AUTH_MODE:-oidc}
       OIDC_ISSUER: ${OIDC_ISSUER:?OIDC_ISSUER in .env setzen (Pocket ID URL)}
@@ -61,6 +69,7 @@ services:
     # (JSON-Export -> Volume leeren -> Import, docs/DEPLOY.md Kap. 6).
     image: postgres:18-alpine
     restart: unless-stopped
+    logging: *default-logging
     environment:
       POSTGRES_DB: lifedash
       POSTGRES_USER: lifedash

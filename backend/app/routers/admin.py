@@ -2,6 +2,7 @@
 und Stufe-2/3-Neuberechnung."""
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -11,6 +12,8 @@ from app.auth import require_admin
 from app.database import SessionLocal, engine
 from app.services.enrichment import enrich_weather
 from app.services.ingestion import reprocess_pending, reset_reprocess
+
+log = logging.getLogger("lifedash.admin")
 
 # Alle Admin-Endpoints erfordern die Admin-Rolle (Rohdaten-Ansicht ist
 # nutzerübergreifend — bewusst nur für den Administrator).
@@ -98,6 +101,7 @@ def update_row(
         )
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Zeile nicht gefunden")
+        log.info("Rohansicht: UPDATE %s id=%s Spalten=%s", name, row_id, sorted(updates))
         row = conn.execute(
             text(f'SELECT * FROM "{name}" WHERE "id" = :_row_id'), {"_row_id": row_id}
         ).mappings().first()
@@ -116,6 +120,7 @@ def delete_row(name: str, row_id: str) -> None:
         )
     if result.rowcount == 0:
         raise HTTPException(status_code=404, detail="Zeile nicht gefunden")
+    log.info("Rohansicht: DELETE %s id=%s", name, row_id)
 
 
 # --------------------------------------------------------------------------- #
@@ -131,6 +136,7 @@ def recompute_events_reset() -> dict:
         total = reset_reprocess(db)
     finally:
         db.close()
+    log.info("Neuberechnung vorbereitet: %d Fragmente markiert", total)
     return {"total": total}
 
 
@@ -142,6 +148,8 @@ def recompute_events(limit: int = Query(5, ge=1, le=50)) -> dict:
         processed, remaining, aborted = reprocess_pending(db, limit=limit)
     finally:
         db.close()
+    log.info("Neuberechnungs-Batch: %d verarbeitet, %d offen%s",
+             processed, remaining, " (abgebrochen: Quota)" if aborted else "")
     return {"processed": processed, "remaining": remaining, "aborted": aborted}
 
 
@@ -153,6 +161,7 @@ def enrich_weather_endpoint(limit: int = Query(25, ge=1, le=200)) -> dict:
         enriched, remaining = enrich_weather(db, limit=limit)
     finally:
         db.close()
+    log.info("Wetter-Batch: %d Events angereichert, %d offen", enriched, remaining)
     return {"enriched_events": enriched, "remaining": remaining}
 
 
@@ -175,6 +184,9 @@ def wipe_data() -> dict:
         for table in order:
             result = conn.execute(text(f'DELETE FROM "{table}"'))
             deleted[table] = result.rowcount or 0
+    log.warning("ALLE Lebensdaten gelöscht: %d Zeilen (%s)",
+                sum(deleted.values()),
+                ", ".join(f"{k}={v}" for k, v in deleted.items() if v))
     return {"deleted": deleted, "total": sum(deleted.values())}
 
 
@@ -191,6 +203,7 @@ def reset_embeddings() -> dict:
         db.commit()
     finally:
         db.close()
+    log.info("Embeddings zurückgesetzt: %d Events", total)
     return {"total": total}
 
 
@@ -222,4 +235,5 @@ def reindex_embeddings(limit: int = Query(25, ge=1, le=200)) -> dict:
         remaining = db.query(Event).filter(Event.embedding.is_(None)).count()
     finally:
         db.close()
+    log.info("Embedding-Batch: %d indexiert, %d offen", count, remaining)
     return {"indexed_events": count, "remaining": remaining}
