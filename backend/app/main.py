@@ -37,6 +37,12 @@ logging.basicConfig(
 )
 log = logging.getLogger("lifedash")
 
+# A17: Ring-Puffer für die Log-Ansicht im Admin-Panel — hängt am
+# "lifedash"-Logger und fängt damit alle lifedash.*-Meldungen
+from app.logbuffer import ring  # noqa: E402
+
+logging.getLogger("lifedash").addHandler(ring)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

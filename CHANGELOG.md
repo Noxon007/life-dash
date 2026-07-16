@@ -10,6 +10,23 @@ jedem `MINOR` vorkommen.
 
 ## [Unreleased]
 
+## [0.10.0] – 2026-07-16
+
+### Hinzugefügt
+- **A14 — Verwaltung mit Reitern statt Scroll-Seite:** Die frühere
+  „Admin & Moderation"-Seite heißt jetzt **„Verwaltung"** und ist in Reiter
+  gegliedert: **📋 Moderation** (Queue, Bulk-Bestätigen, unscharfe Zeiten),
+  **📦 Meine Daten** (Export/Import, Ortsnamen-Aktionen, Anzeige-Format),
+  **⏱️ Jobs** — für alle Nutzer; **⚙️ System** (Drei-Schichten-Erklärung,
+  Neuberechnung/Wetter/Embeddings, Daten-Wipe), **👥 Nutzer**,
+  **🗄️ Datenbank** und **📜 Logs** nur für Admins. Jeder Reiter lädt seine
+  Daten beim Öffnen.
+- **A17 — Log-Ansicht in der UI:** Neuer Admin-Reiter „Logs" zeigt die
+  letzten App-Log-Zeilen (Ring-Puffer im Speicher, max. 500 seit
+  Prozessstart) mit Mindest-Level-Filter (DEBUG–ERROR) und Aktualisieren-
+  Knopf (`GET /api/admin/logs`). Kein Datei-Zugriff, nichts wird
+  persistiert — `docker logs` bleibt die vollständige Quelle.
+
 ## [0.9.0] – 2026-07-16
 
 ### Hinzugefügt

@@ -20,7 +20,7 @@
 # Details: docs/DEPLOY.md
 services:
   app:
-    image: ghcr.io/noxon007/life-dash:${LIFEDASH_VERSION:-0.9.0}
+    image: ghcr.io/noxon007/life-dash:${LIFEDASH_VERSION:-0.10.0}
     build: .  # greift nur bei `docker compose build` im Quell-Checkout
     restart: unless-stopped
     ports:

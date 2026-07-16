@@ -354,6 +354,23 @@ def reindex_embeddings(limit: int = Query(25, ge=1, le=200)) -> dict:
 
 
 # --------------------------------------------------------------------------- #
+# Log-Ansicht (A17) — letzte Log-Zeilen aus dem Ring-Puffer
+# --------------------------------------------------------------------------- #
+@router.get("/logs")
+def read_logs(
+    level: str = "INFO",
+    limit: int = Query(300, ge=1, le=500),
+) -> list[dict]:
+    """Letzte App-Log-Zeilen (seit Prozessstart, max. 500). `level` filtert
+    auf Mindest-Schwere. Nur Admin — Logs sind nutzerübergreifend."""
+    from app.logbuffer import ring
+
+    min_no = getattr(logging, level.upper(), logging.INFO)
+    rows = [r for r in ring.buffer if r["levelno"] >= min_no]
+    return rows[-limit:]
+
+
+# --------------------------------------------------------------------------- #
 # Nutzerverwaltung (A6) — Nutzerliste, Rollen ändern, Nutzer löschen
 # --------------------------------------------------------------------------- #
 @router.get("/users")
