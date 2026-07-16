@@ -197,6 +197,10 @@ Strukturierte Sammlungen von Entities, gruppiert nach Typ.
 ### 5.6 Admin-Panel & Moderation
 Zentrale Steuerungsoberfläche für das gesamte System.
 
+> **Geplante Aufteilung (A14):** „Verwaltung" (jeder Nutzer — Moderation,
+> Jobs, Export/Import, Tracking-Auswahl) und „Admin" (nur Rolle admin —
+> Nutzerverwaltung, System, DB-Rohansicht, Logs), jeweils mit Reitern.
+
 - **Moderations-Queue:** Alle `unconfirmed` Stufe-2-Einträge sichten, bestätigen, korrigieren, verwerfen, zusammenführen.
 - **Modul-Verwaltung:** Trackables aktivieren/definieren, Schemas, Icons, Statistik-Widgets.
 - **KI-Konfiguration:** Provider/Modell wählen, Prompts anpassen, Confidence-Schwellen setzen.
@@ -640,20 +644,29 @@ Nutzerverwaltungs-UI.
 | **A7** | **Modul-Vollausbau** *(aus Frage 3, entschieden)* | M | Kategorie-Label/Farbe/Emoji aus dem Modul-YAML ins Frontend durchreichen, Modul-Regeln automatisch in den KI-Prompt einspeisen. Danach ist ein neues Modul wirklich „nur eine YAML-Datei" (statt heute drei Stellen: YAML, Prompt, Frontend). | Neue Kategorien ohne Code-Änderung — senkt die Hürde, das System wachsen zu lassen. |
 | **A11** | **Job-Übersicht & Gleichzeitigkeit** *(Frage 17)* | M | Lang laufende Admin-Aktionen (Wetter ergänzen, Neuberechnen, Embeddings, Ortsnamen auflösen, große Importe) als **Jobs** registrieren: Job-Tabelle (Typ, Status, Fortschritt, gestartet von/wann, Ergebnis), **ein Lock pro Job-Typ** — startet eine zweite Instanz denselben Job, bekommt sie „läuft bereits" statt eines Doppel-Laufs. Dazu DB-seitiger Dubletten-Schutz (Wetter-Metrik pro Event+Quelle einmalig). Neuer Admin-Reiter **„Jobs"** zeigt laufende und letzte Läufe. | Zwei offene Browser/Rechner können keine doppelten Anreicherungen, Duplikate oder doppelte API-Kosten mehr erzeugen. |
 | **A12** | ✅ **Timeline-Import: semantische Orte → echte Adressen** *(Fragen 19+20; fertig v0.8.0)* | S–M | Der Geräte-Export kennt keine Ortsnamen, nur `semanticType` — der Import setzte Labels („Zuhause", „Arbeit", „Gesuchte Adresse"), die **nie** reverse-geocodet wurden (die Auflösung griff nur bei „Ort (lat, lng)"). Umgesetzt: auch semantische Orte werden aufgelöst — Label bleibt als Präfix erhalten („Zuhause — Musterstraße 1, Detmold"; `type=home` bleibt, mehrere Wohnorte im Lebenslauf bleiben durch getrennte `place_id`s getrennt). Bestandsdaten zieht „Ortsnamen auflösen" mit. Dazu der Import-Filter nach Mindest-`probability` (Eingabefeld am Import), um unsichere Ortszuordnungen (häufig bei „Gesuchte Adresse") auszusortieren. | Besuche zeigen echte Adressen statt generischer Labels. |
+| **A14** | **Admin aufteilen: „Verwaltung" + „Admin", mit Reitern** *(Anmerkung 23)* | M | Die heutige „Admin & Moderation"-Seite ist ein langer Mischmasch. Neu: zwei Bereiche mit **Reitern** statt einer Scroll-Seite. **„Verwaltung"** (jeder Nutzer, alles nutzergebunden): Moderations-Queue + Bulk-Bestätigen, unscharfe Zeiten, Export/Import, Ortsnamen-Aktionen + Ortsnamen-Format, eigene Anreicherungs-Läufe/Jobs (Reiter „Jobs" aus A11), Tracking-Auswahl (A15). **„Admin"** (nur Rolle admin, übergeordnet): Nutzerverwaltung (A6), KI-Provider/Systemstatus, Daten-Wipe, DB-Rohansicht, Log-Ansicht (A17). *Festgelegt:* Die DB-Rohansicht bleibt im Admin-Bereich — sie ist nutzerübergreifend; nutzereigene Korrekturen laufen weiter über Bearbeiten-Dialog/Moderation (Leitplanken → A4). | Übersicht statt Scroll-Wüste; normale Nutzer bekommen ihre Werkzeuge, ohne Systemthemen zu sehen. |
+| **A15** | **Tracking-Auswahl durch den Nutzer** *(Anmerkung 24)* | S–M | Der Nutzer entscheidet, was in Kompendium und Statistik auftaucht: Beim **ersten Start** eine Frage „Was möchtest du tracken?" (Auswahl aus der Modul-Registry: Tiere, Länder, Künstler, Essen, Filme, Spiele, Bücher …), danach jederzeit änderbar unter Verwaltung (A14). Abwahl blendet Kompendium-Reiter, Statistik-Widgets und Formular-Optionen aus (Daten bleiben erhalten, nur Anzeige); die KI-Prompt-Regeln nicht gewählter Module entfallen (baut auf A7 auf). Gespeichert in `User.settings` (wie `place_name_parts`). | Das UI zeigt nur, was einen interessiert — statt fester Modul-Liste für alle. |
+| **A16** | **Monats-Präzision zählt als unscharf** *(Anmerkung 25, Bugfix)* | S | „Juni Urlaub Dänemark" wird korrekt als `month` (01.06.–30.06.) gespeichert, taucht aber **nicht** in der Unscharfe-Zeiten-Liste auf — die filtert nur `season`/`year`/`decade`/ohne Datum (P2.3-Lücke). Fix: `month` in die Liste aufnehmen (Frontend-Filter + Label); Grundsatz aus Kap. 6.2 gilt unverändert (unscharfe KI-Zeiten sind `unconfirmed`, bis der Nutzer sie bestätigt oder konkretisiert). | Monatsgenaue Events landen in der Nachschärf-Liste, wie es das Konzept vorsieht. |
+| **A17** | **Log-Ansicht in der UI** *(Anmerkung 29, entschieden: ja)* | S–M | Die zentralen `lifedash.*`-Logs (A9) zusätzlich in einem **Ring-Puffer** halten (z. B. letzte 500 Zeilen, In-Memory-Logging-Handler) und als Admin-Reiter anzeigen: Level-Filter (DEBUG–ERROR), Logger-Filter (Import, Geocoding, Wetter, KI …), Auto-Refresh. Kein Persistieren, kein Log-File-Zugriff — `docker logs` bleibt die vollständige Quelle. Leitplanke: Logs enthalten keine Secrets (gilt bereits) und sind nur für Admins sichtbar (Logs sind nutzerübergreifend). | Was das System gerade tut (Importe, Batch-Läufe, Fehler) ist ohne SSH/Docker-Zugriff sichtbar. |
+| **A18** | **Karten-Clustering erst ab Schwelle** *(Anmerkung 26)* | S | Marker-Cluster bündeln heute schon bei kleinen Mengen, sobald Punkte nah beieinander liegen. Neu: Clustering erst aktivieren, wenn der Zeitraum **mehr als ~50 Punkte** enthält; darunter Einzelmarker (Schwelle als Konstante, ggf. später einstellbar). Gilt für die normale und die gebündelte Ansicht (A5). | Kleine Zeiträume zeigen sofort echte Marker statt Zahlenblasen. |
 
 **Empfohlene Reihenfolge in A** (A1–A3, A5, A6, A8–A10, A12, A13 sind
-erledigt): Es verbleiben **A4** (DB-Rohansicht absichern) und **A11**
-(Job-Übersicht & Gleichzeitigkeit) — Vorschlag: A4 zuerst, dann A11 → A7.
+erledigt): **A16** (Bugfix, klein) und **A18** (klein) zuerst, dann
+**A4** (DB-Rohansicht absichern) → **A11** (Jobs) → **A14** (Verwaltung/Admin-
+Aufteilung, nimmt den Jobs-Reiter aus A11 gleich mit auf) → **A7** →
+**A15** (braucht A7) → **A17**.
 
 #### Gruppe B — Neue Features (nach A bzw. als bewusste Ausnahme)
 
 | Nr. | Paket | Aufwand | Inhalt | Nutzen |
 |---|---|---|---|---|
-| **P2.1** | **Immich-Connector** | M | Immich-URL/API-Key pro Nutzer (Einstellungen), Assets nach Zeit+Geo zu Events verknüpfen (`MediaRef`), Thumbnail-Proxy, Fotos in Event-Karte/Detail, Re-Enrichment-Button. | Fotos erscheinen automatisch an Erinnerungen — größter „Wow"-Effekt. Erster Kandidat aus B, sobald A steht. |
+| **P2.1** | **Immich-Connector** | M | Immich-URL/API-Key pro Nutzer (Einstellungen), Assets nach Zeit+Geo zu Events verknüpfen (`MediaRef`), Thumbnail-Proxy, Fotos in Event-Karte/Detail, Re-Enrichment-Button. **Ausbaustufe 2 (Anmerkung 30): Immich als Ereignis-QUELLE,** nicht nur Anreicherung — (a) Foto-Cluster nach Datum+Ort zu Event-**Vorschlägen** verdichten („34 Fotos am 12.07. in Detmold" → Vorschlag im Vorschlagsraum, `unconfirmed`, Kap. 3.1); (b) **Alben analysieren**: Album-Name + Zeitspanne + Orte der enthaltenen Fotos → Reise-/Ereignis-Vorschlag (Album „Dänemark 2024" → `trip`). Dubletten-Schutz über Asset-/Album-IDs als `external_id`; nichts wird automatisch bestätigt. | Fotos erscheinen automatisch an Erinnerungen — größter „Wow"-Effekt. Erster Kandidat aus B, sobald A steht. |
 | **F1** | **Reisetagebuch (formatierter Text)** | M–L | Ausbau des Kommentar-Gedankens (`note`-Feld existiert, wird nie von der KI angefasst) zu echten Tagebucheinträgen: **formatierter Text (Markdown)** statt einzeiliger Notiz, längere Texte pro Event; dazu **Tagesebene** — ein Journal-Eintrag pro Tag (z. B. eigene Kategorie `journal` mit `date_precision=day`, passt ohne Schema-Umbau ins Event-Modell), in der Timeline als Tageskopf über den Einzel-Events gerendert. Optional später: KI schlägt eine Tages-Zusammenfassung aus den Events des Tages vor (landet als Vorschlag im Vorschlagsraum, Kap. 3.1). Markdown wird sanitisiert gerendert. | Aus der Faktensammlung wird ein echtes Reisetagebuch — Erinnerungen mit eigener Stimme statt nur strukturierter Daten. |
 | **F2** | **Handy-Standort beim Erfassen übernehmen (optional)** | S–M | Beim Quick-Capture (KI-Analyse **und** manuelle Eingabe) den aktuellen Gerätestandort per Geolocation-API anbieten: Knopf „📍 Standort verwenden" bzw. opt-in Toggle — **nie automatisch** (Standort ist sensibel, und Einträge betreffen oft die Vergangenheit oder andere Orte). Koordinaten → Reverse-Geocoding (Nominatim, vorhanden) → Ortsvorschlag im Vorschau-/Formularfeld, vom Nutzer überschreibbar; nennt der Text selbst einen Ort, hat der Text Vorrang. Ins Fragment (S1) wandern die Roh-Koordinaten mit, damit Re-Processing sie kennt. Braucht HTTPS (liegt hinter dem Reverse Proxy vor). | Unterwegs entfällt das Eintippen des Orts — der häufigste Capture-Fall („bin gerade hier und sehe X") wird ein Zwei-Tap-Eintrag. |
 | **F3** | **Wetter-Logik verfeinern** *(Frage 18)* | S–M | Heute: `temperature_c` = Mittel aus Tagesmax/-min, `weather` = **signifikantester Wettercode des Tages** (Open-Meteo-Tagesarchiv — 1 Std. Morgenregen überdeckt einen sonnigen Tag). Neu: `temp_min_c`/`temp_max_c` als eigene Metriken (Statistik „heißester/kältester Tag" wird ehrlicher), Bedingung aus **Stundendaten** ableiten (dominantes Wetter tagsüber, z. B. 8–20 Uhr), optional Niederschlagssumme/-stunden. Bestandsdaten per Re-Enrichment additiv ergänzbar (Wetter bleibt Fakten-Anreicherung, Kap. 3.1). | Das angezeigte Wetter entspricht dem gefühlten Tag; präzisere Statistik. |
 | **F4** | **Import füttert das Kompendium (Länder)** *(Frage 21)* | M | Der Timeline-Import erzeugt heute nur Events + Locations — **keine Entities/Links**, daher bleiben Länder-Kompendium und Länder-Statistik von Importen unberührt. Neu: Beim (Reverse-)Geocoding das Land aus den `addressdetails` mitnehmen (werden bereits angefragt, aber verworfen), an der `Location` speichern und je Besuchsland eine `country`-Entity anlegen/verknüpfen — als Teil der Ortsauflösung, rückwirkend über „Ortsnamen auflösen". Baut auf A10/A12 auf. Später erweiterbar auf Städte/Orte als eigene Kompendium-Typen (`place`-Modul). | „In wie vielen Ländern war ich?" stimmt endlich — gespeist aus echten Bewegungsdaten. |
+| **F5** | **Welt-Reiter: Länder-Karte & Kontinente-Checkliste** *(Anmerkung 27)* | M | Neuer Reiter (unter Statistik oder eigenständig): **Weltkarte mit eingefärbten besuchten Ländern** (Choropleth über Leaflet + Länder-GeoJSON, gespeist aus den `country`-Entities) und **Checklisten**: Kontinente (7/7?), Länder pro Kontinent, „zuletzt neu besucht". Braucht F4 (Import erzeugt Länder-Entities), sonst bleibt die Karte bei Import-Daten leer. | „Wo war ich schon?" auf einen Blick — motiviert, Lücken zu füllen. |
+| **F6** | **Achievements (Bronze/Silber/Gold/Platin)** *(Anmerkung 28)* | M | Neuer Reiter mit Erfolgen in vier Stufen, **deklarativ aus den Modul-YAMLs** (baut auf A7/P3.1 auf): je Achievement eine Metrik + Schwellwerte, z. B. „Tier-Sammler" (5/25/100/500 Arten gesehen), „Weltenbummler" (Länder), „Konzertgänger", „Feinschmecker". Berechnet aus Stufe 2 (Schicht-4-Ableitung, jederzeit neu berechenbar, kein eigener Datenbestand außer optional „erreicht am"). Anzeige mit Fortschrittsbalken zur nächsten Stufe. | Spielerischer Anreiz, Erlebnisse zu erfassen — macht die Lebensdatenbank „belohnend". |
 | **P3.1** | **Deklarative Statistik-Widgets** | M | Widgets aus Modul-YAML (`count`, `count_distinct`, `timeseries`) generisch rendern statt hart codiert. Baut sinnvoll auf A7 auf. | Neue Module bringen ihre Statistik automatisch mit. |
 | **P4.1** | **Health-Connect-Import** | M | Upload des Health-Connect-Exports, Schritte/HF/Workouts → `Metric`, Workout-GPS → `Track`. | Fitness-Kontext an Events. |
 | **P4.2** | **PSN-Connector** | M | NPSSO-Token pro Nutzer, Sync via `psnawp`: Spiele→`game`-Entities, Trophäen/Spielzeit→Metrics. | Gaming-Historie im Kompendium. Braucht `game`-Modul (S, inklusive). |
@@ -709,6 +722,41 @@ erledigt): Es verbleiben **A4** (DB-Rohansicht absichern) und **A11**
 20. ✅ **„Gesuchte Adresse" — was ist das?** Keine Suchhistorie: Der Import erzeugt Events ausschließlich aus `visit`-Segmenten, also **echten Aufenthalten laut Gerät**. `SEARCHED_ADDRESS` beschreibt nur, *wie* Google den Aufenthaltsort erkannt hat (Match auf eine früher gesuchte Adresse). Diese Besuche bleiben deshalb drin — aber sie bekommen echte Adressen (A12), und ein optionaler Import-Filter nach Mindest-`probability` sortiert unsichere Zuordnungen aus (die `probability` wird bereits als `confidence` gespeichert).
 21. ✅ **Kompendium/Länder bleiben leer:** Stimmt — der Import erzeugt nur Events + Locations, keine Entities/Links. Entscheidung: Land beim (Reverse-)Geocoding mitnehmen und `country`-Entities anlegen/verknüpfen → Paket **F4** (Gruppe B, baut auf A10/A12 auf).
 22. ✅ **Uhrzeiten:** Ja, der Export liefert exakte Start-/Endzeiten; sie werden als lokale Wanduhrzeit mit `date_precision=exact` gespeichert — aber nirgends angezeigt (`exact` rendert wie `day`). Grundsatz-Entscheidung zum Umgang mit Uhrzeiten: **Wanduhrzeit „wie erlebt"** (keine UTC-Umrechnung); `exact` zeigt Datum+Uhrzeit, `day` bleibt Standard für manuelle Eingaben; KI darf `exact` setzen, wenn der Text eine Uhrzeit nennt → Paket **A13**.
+
+**Feedback-Runde 2026-07-16 — Anmerkungen aus der Nutzung (23–30):**
+23. ✅ **Admin-Seite unübersichtlich → aufteilen:** Entscheidung: Trennung in
+    **„Verwaltung"** (jeder Nutzer: Moderation, Jobs/Anreicherung, Export/Import,
+    Ortsnamen, Tracking-Auswahl) und **„Admin"** (nur Rolle admin: Nutzer, System,
+    DB-Rohansicht, Logs), beides mit Reitern → Paket **A14**. Präzisierung zur
+    Anmerkung „Verwaltung … auch DB anpassen": Die **rohe** DB-Ansicht bleibt
+    Admin-Sache (sie ist nutzerübergreifend und umgeht die Invarianten-Leitplanken,
+    Kap. 3.1/A4); normale Nutzer ändern ihre Daten über Bearbeiten-Dialog,
+    Moderation und Bulk-Aktionen — das deckt denselben Bedarf nutzergebunden ab.
+24. ✅ **Was getrackt wird, entscheidet der Nutzer:** Onboarding-Frage beim ersten
+    Start + Einstellmöglichkeit unter Verwaltung, Auswahl aus der Modul-Registry;
+    Abwahl blendet aus (löscht nie Daten) → Paket **A15** (baut auf A7 auf).
+25. ✅ **„Juni Urlaub Dänemark" fehlt bei den unscharfen Zeiten:** Die Speicherung
+    ist korrekt (`month`, 01.06.–30.06., `unconfirmed`) — aber die
+    Unscharfe-Zeiten-Liste (P2.3) filtert nur `season`/`year`/`decade`/ohne Datum
+    und übersieht `month`. Bugfix → Paket **A16**.
+26. ✅ **Karten-Clustering zu aggressiv:** Cluster erst aktivieren, wenn der
+    Zeitraum mehr als **~50 Punkte** enthält; darunter Einzelmarker → Paket **A18**.
+27. ✅ **Besuchte Kontinente/Länder sichtbar machen:** Neuer Welt-Reiter mit
+    eingefärbter Länderkarte + Kontinente-/Länder-Checkliste → Paket **F5**
+    (braucht F4, damit Importe Länder-Entities liefern).
+28. ✅ **Achievements:** Erfolge in Bronze/Silber/Gold/Platin („Tier-Sammler":
+    5/25/100/500 Arten …), deklarativ aus Modul-YAML, eigener Reiter,
+    reine Schicht-4-Ableitung → Paket **F6**.
+29. ✅ **Logs in der UI — sollte man das machen?** Ja: Als Admin-Reiter mit
+    Ring-Puffer (letzte ~500 Zeilen, Level-/Logger-Filter) ist es fürs Homelab
+    echter Mehrwert (kein SSH nötig) und billig umzusetzen; `docker logs` bleibt
+    die vollständige Quelle. Nur für Admins, da Logs nutzerübergreifend sind
+    → Paket **A17**.
+30. ✅ **Immich-Ausbau:** Über die reine Foto-Anreicherung (P2.1) hinaus sollen
+    Datum+Ort aus Bildern **Event-Vorschläge** erzeugen und **Alben** als
+    Reise-/Ereignis-Vorschläge analysiert werden (Name, Zeitspanne, Orte).
+    Wichtig: landet als `unconfirmed` im Vorschlagsraum, nie automatisch
+    bestätigt → in Paket **P2.1** als Ausbaustufe 2 aufgenommen.
 
 **Noch offen / zu entscheiden:**
 6. **Neuberechnungs-Granularität & Kosten:** Bleibt offen — hängt vom endgültigen Modell ab (lokal = Laufzeit, API = Kontingent/Kosten). Der Quota-Schutz (Abbruch mit Erhalt des Altbestands) ist umgesetzt; einzelne Fragmente gezielt neu verarbeiten wäre der nächste Schritt, wenn die Datenmenge wächst.
