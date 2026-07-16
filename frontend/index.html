@@ -585,7 +585,7 @@
               <span class="filter-chip active" id="mp-route-toggle">🧭 Route verbinden</span>
               <span class="filter-chip active" id="mp-tracks-toggle">🛰️ Timeline-Routen</span>
               <span class="filter-chip active" id="mp-group-toggle" title="Ab Monats-Ansicht: wiederholte Besuche desselben Orts zu einem Eintrag bündeln">🔁 Orte bündeln</span>
-              <label class="stat-label" style="display:flex; align-items:center; gap:6px" title="Unter dieser Punktzahl werden Einzelmarker gezeigt; darüber wird gebündelt (10–300, schützt die Performance)">
+              <label class="stat-label" style="display:flex; align-items:center; gap:6px" title="Hat der Zeitraum höchstens so viele Punkte, gibt es Einzelmarker + nummerierte Route. Darüber schaltet die Karte in den Cluster-Modus — dort bündeln sich nahe Punkte je nach Zoom (Klick/Zoom teilt Bubbles auf). Rahmen 10–300 schützt die Performance.">
                 Cluster ab
                 <input id="mp-cluster-min" type="number" min="10" max="300" step="10" value="50"
                        style="width:64px; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:4px 6px; color:var(--text)">
@@ -2150,8 +2150,10 @@ async function openMapView() {
     mapMarkers = L.layerGroup().addTo(mapObj);
     // A5: Cluster-Layer für große Mengen — alle Punkte statt 300er-Deckel.
     // Fallback auf layerGroup, falls das Plugin (CDN) nicht geladen wurde.
+    // 0.10.1: weniger aggressiv bündeln — kleinerer Radius erzeugt mehr,
+    // dafür aussagekräftigere Bubbles (keine 3er-Bubbles über halbe Kontinente)
     mapCluster = (typeof L.markerClusterGroup === 'function')
-      ? L.markerClusterGroup({ showCoverageOnHover: false, chunkedLoading: true, maxClusterRadius: 45 })
+      ? L.markerClusterGroup({ showCoverageOnHover: false, chunkedLoading: true, maxClusterRadius: 30 })
       : null;
     if (mapCluster) mapCluster.addTo(mapObj);
     mapRoute = L.layerGroup().addTo(mapObj);

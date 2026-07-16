@@ -758,6 +758,28 @@ braucht A7). Danach ist Gruppe A abgeschlossen → **P2.1 (Immich)**.
     Wichtig: landet als `unconfirmed` im Vorschlagsraum, nie automatisch
     bestätigt → in Paket **P2.1** als Ausbaustufe 2 aufgenommen.
 
+**Lizenz & Monetarisierung (Anmerkung 31, 2026-07-16 — Vorschlag):**
+31. **Das Repo hat keine LICENSE-Datei** — damit gilt rechtlich „alle Rechte
+    vorbehalten": öffentlich sichtbar, aber niemand darf den Code legal
+    nutzen, forken oder weiterverbreiten. Für ein Self-Hosted-Tool, dessen
+    Wert auf Vertrauen und Community beruht, ist das die schlechteste
+    Variante. **Vorschlag: AGPL-3.0.**
+    - **AGPL-3.0 (empfohlen):** Copyleft, das auch bei *Netzwerk-Nutzung*
+      greift — wer Life-Dash als Dienst hostet (auch verändert), muss den
+      Quellcode offenlegen. Verhindert, dass Dritte kommerzielles Hosting
+      auf dem Projekt aufbauen, ohne zurückzugeben. Der **Rechteinhaber
+      selbst** bleibt frei: Dual-Licensing, eigener Managed-Service oder
+      Hosting-Beteiligungen (z. B. PikaPods) bleiben jederzeit möglich,
+      solange alle Beiträge vom Autor stammen (kein CLA nötig, solange
+      Solo-Projekt; ab externen Contributors CLA/DCO erwägen).
+    - *Alternativen, bewusst nicht empfohlen:* **MIT/Apache-2.0** = maximale
+      Verbreitung, aber jeder Hoster darf kommerzialisieren ohne Gegenleistung;
+      **BSL/„fair source"** = kommerzieller Schutz, aber kein Open Source im
+      OSI-Sinn — kostet genau das Community-Vertrauen, von dem Adoption lebt.
+    - *Umsetzung:* `LICENSE`-Datei (AGPL-3.0-Volltext) ins Repo, Lizenz-Hinweis
+      in README + `pyproject`/Docker-Labels; gilt ab dem Commit der Aufnahme
+      (rückwirkend bleiben alte Stände „all rights reserved").
+
 **Noch offen / zu entscheiden:**
 6. **Neuberechnungs-Granularität & Kosten:** Bleibt offen — hängt vom endgültigen Modell ab (lokal = Laufzeit, API = Kontingent/Kosten). Der Quota-Schutz (Abbruch mit Erhalt des Altbestands) ist umgesetzt; einzelne Fragmente gezielt neu verarbeiten wäre der nächste Schritt, wenn die Datenmenge wächst.
 

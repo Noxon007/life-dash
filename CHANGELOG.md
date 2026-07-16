@@ -10,6 +10,19 @@ jedem `MINOR` vorkommen.
 
 ## [Unreleased]
 
+## [0.10.1] – 2026-07-16
+
+### Geändert
+- **Karten-Clustering weniger aggressiv:** Cluster-Radius von 45 auf 30 px
+  gesenkt — nahe Punkte bündeln sich erst, wenn sie sich wirklich drängen;
+  Mini-Bubbles („3") über halbe Kontinente werden deutlich seltener.
+  Dazu erklärt der Tooltip an „Cluster ab N Punkten" jetzt die Semantik:
+  Die Schwelle schaltet zwischen Einzelmarker/Route und Cluster-Modus um;
+  innerhalb des Cluster-Modus bündelt die Karte zoomabhängig (Klick/Zoom
+  teilt Bubbles auf).
+- **Konzept:** Lizenz-Vorschlag ergänzt (Kap. 15, Anmerkung 31) — Empfehlung
+  **AGPL-3.0** (Repo hat bisher keine LICENSE = „alle Rechte vorbehalten").
+
 ## [0.10.0] – 2026-07-16
 
 ### Hinzugefügt
