@@ -22,6 +22,12 @@ jedem `MINOR` vorkommen.
 - **Routen als Karten-Layer:** Timeline-Routen erscheinen auf der Karte als
   farbige Linien nach Aktivität (zu Fuß/Rad/Auto/Transit), zuschaltbar über
   den Chip „🛰️ Timeline-Routen", gefiltert auf den angezeigten Zeitraum.
+- **Vier-Schichten-Modell präzisiert** (KONZEPT Kap. 3.1): Eingang →
+  Vorschlagsraum → **Lebensdatenbank (fix)** → Ableitungen. Harte Invariante:
+  Maschinen ändern Bestätigtes nie, nur additiv ergänzen. Konsequenz:
+  **Wetter ist Fakten-Anreicherung** — der Knopf „Stufe 3 neu berechnen"
+  (der Wetter verwarf und neu holte) ist entfernt; Wetter wird nur noch
+  ergänzt, wo es fehlt. Embeddings bleiben als Ableitung neu berechenbar.
 - **Stopp-Knopf & Anfragen-Ticker für alle Admin-Läufe:** Stufe-2-Neuberechnung,
   Stufe 3, Wetter, Embeddings und Ortsnamen laufen jetzt in Etappen — der
   Aktions-Knopf zeigt live die verbrauchten Anfragen („⏹ Stoppen — 120

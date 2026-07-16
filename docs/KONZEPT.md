@@ -89,6 +89,39 @@ flowchart LR
 | **Sicherheit** | Keine stille Datenkorruption: Roh-Input ist immer die Rückfallebene. |
 | **Moderation** | Der Nutzer hat volle Kontrolle über Stufe 2, ohne die Rohdaten zu verlieren. |
 
+### 3.1 Präzisierung: Vier Schichten (Entscheidung 2026-07-15)
+
+Die „Stufe 2" vermischt begrifflich zwei Dinge, die getrennt gedacht werden
+müssen. Konzeptionell besteht das System aus **vier Schichten** (über
+denselben Tabellen — der `confirmed`-Status ist die Trennlinie, kein
+DB-Umbau nötig):
+
+| Schicht | Was | Lebensdauer |
+|---|---|---|
+| **1 · Eingang** | Rohe Fragmente (Text, Sprache, Import-Zusammenfassungen). | Unveränderlich, dauerhaft. Beweisarchiv. |
+| **2 · Vorschlagsraum** | Unbestätigte KI-Ableitungen (`confirmed = unconfirmed`). *Behauptungen, keine Wahrheit.* | Wegwerfbar — wird bei Neuberechnung verworfen und neu erzeugt. |
+| **3 · Lebensdatenbank** | Bestätigte Events/Entities/Locations (`confirmed`) **plus faktische Anreicherungen**: Wetter, Medien-Referenzen, Tracks. Fakten ändern sich nicht — einmal geholt, für immer wahr. | **Fix.** Das eigentliche Ziel des Systems. |
+| **4 · Ableitungen** | Ansichten, Statistik, Aggregationen, **Embeddings** (modellabhängig). | Jederzeit wegwerfbar und neu berechenbar; kein Backup nötig. |
+
+**Die harte Invariante:** *Bestätigte Daten werden von Maschinen nie
+verändert, nur additiv ergänzt (Metriken, Medien-Referenzen).* Neuberechnung
+betrifft ausschließlich Schicht 2 und 4. Bestätigen ist der Übergang 2 → 3
+(dieselbe Zeile, Status kippt); `field_overrides` schützt zusätzlich einzelne
+manuell korrigierte Felder.
+*Dokumentierte Ausnahme:* „Ortsnamen auflösen" ersetzt generierte
+Koordinaten-Titel („Besuch: Ort (53.49…)") auch an bestätigten
+Import-Besuchen — das ist eine nutzergestartete Datenverbesserung, keine
+KI-Neubewertung; manuell umbenannte Titel bleiben geschützt.
+
+**Verknüpfung & Löschbarkeit:** Jede Schicht-2/3-Zeile referenziert ihr
+Eingangs-Fragment (`origin_fragment_id`, n:1 — ein Fragment kann mehrere
+Events erzeugen). Der Vorschlagsraum räumt sich selbst (Bestätigen wandelt
+um, Verwerfen löscht). Der **Eingang wird bewusst nicht gelöscht**, auch
+wenn alles bestätigt ist: Er kostet fast nichts (Text), ist der
+Herkunftsnachweis der Lebensdatenbank und die einzige Quelle für spätere
+Re-Extraktion/Vergleiche. Legitim ist allenfalls ein manuelles Aufräumen
+*verwaister* Fragmente (alle Events verworfen) — nie automatisch.
+
 ---
 
 ## 4. Nutzer-Szenarien (User Stories)
@@ -611,6 +644,7 @@ Aufwand: S = Stunden · M = ~1 Tag · L = mehrere Tage. Kein Paket blockiert ein
 - ✅ **OIDC-Provider: Pocket ID** — läuft bereits im Homelab. Life-Dash nutzt den Authorization Code Flow mit PKCE (Public Client möglich); Redirect-URI: `<PUBLIC_BASE_URL>/api/auth/callback`. *(Damit ist Frage 8 beantwortet; P0+P1 sind seit 2026-07-14 umgesetzt — siehe backend/README.md.)*
 
 **Beantwortet am 2026-07-15:**
+0. ✅ **Vier-Schichten-Präzisierung** (siehe Kap. 3.1): Eingang → Vorschlagsraum → **Lebensdatenbank (fix, inkl. Fakten-Anreicherung wie Wetter)** → Ableitungen (wegwerfbar, inkl. Embeddings). Konsequenz: Wetter wird nicht mehr bei „Stufe 3 neu berechnen" verworfen, sondern nur ergänzt, wo es fehlt; Eingang wird nie automatisch gelöscht.
 1. ✅ **Datums-Granularität:** Die Stufen `exact/day/month/season/year/decade` **reichen**. Angaben wie „Anfang der 90er" werden als `decade` gespeichert und mit einem Hinweis „Zeit nicht genau genug" versehen; ein eigener Admin-Bereich listet alle grob datierten Events zur Nachbearbeitung (→ Paket **P2.3**).
 2. ✅ **Entity-Dubletten:** **Kein automatisches Zusammenführen.** Dubletten („Seeadler"/„Adler") werden manuell über die vorhandene Bearbeitung aufgelöst.
 5. ✅ **UI für Unsicherheit:** Die umgesetzten Badges reichen — „⚠ unbestätigt · XX %" (orange) vs. „✓ bestätigt" (grün).

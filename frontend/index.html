@@ -716,21 +716,21 @@
       <div class="view" id="view-admin">
         <div class="stages">
           <div class="stage">
-            <div class="stage-num">STUFE 1</div>
+            <div class="stage-num">EINGANG</div>
             <h4>Roh-Input</h4>
-            <p>Unveränderliche Fragmente (Text, Sprache, Import). Die Quelle der Wahrheit — wird nie überschrieben.</p>
+            <p>Unveränderliche Fragmente (Text, Sprache, Import). Beweisarchiv — wird nie überschrieben oder automatisch gelöscht.</p>
           </div>
           <div class="stage-arrow">→</div>
           <div class="stage">
-            <div class="stage-num">STUFE 2</div>
-            <h4>Struktur (moderiert)</h4>
-            <p>KI-erzeugte Events &amp; Entities mit Confidence. Gelten erst als Fakt, wenn du sie bestätigst.</p>
+            <div class="stage-num">VORSCHLAG → WAHRHEIT</div>
+            <h4>Lebensdatenbank</h4>
+            <p>KI-Vorschläge (unbestätigt, wegwerfbar) werden durch dein Bestätigen zur fixen Lebensdatenbank — inkl. Fakten wie Wetter, Fotos, Routen. Maschinen ändern Bestätigtes nie.</p>
           </div>
           <div class="stage-arrow">→</div>
           <div class="stage">
-            <div class="stage-num">STUFE 3</div>
-            <h4>Ansichten &amp; Anreicherung</h4>
-            <p>Timeline, Karte, Statistik + Wetter und Such-Embeddings. Berechnet — jederzeit gefahrlos neu erzeugbar.</p>
+            <div class="stage-num">ABLEITUNGEN</div>
+            <h4>Ansichten &amp; Suche</h4>
+            <p>Timeline, Karte, Statistik, Such-Embeddings. Berechnet — jederzeit gefahrlos verwerfbar und neu erzeugbar.</p>
           </div>
         </div>
 
@@ -752,25 +752,18 @@
                 KI-Kontingent sauber ab (bereits Berechnetes bleibt erhalten).</div>
             </div>
             <div class="action-row">
-              <button class="btn secondary" id="btn-recompute-3">🔄 Stufe 3 neu berechnen</button>
-              <div class="action-desc"><b>Alle Anreicherungen komplett neu.</b><br>
-                Berechnet Wetter (für alle verorteten, datierten Events) <i>und</i> Such-Embeddings (für alle Events)
-                von Grund auf neu. Ändert nichts an Stufe 1/2 — nur abgeleitete Daten. Nach einem Wechsel des
-                KI- oder Embedding-Modells einmal ausführen.</div>
-            </div>
-            <div class="action-row">
               <button class="btn secondary" id="btn-enrich">🌤️ Wetter ergänzen</button>
-              <div class="action-desc"><b>Nur fehlendes Wetter nachtragen.</b><br>
-                Holt historisches Wetter (Temperatur, Bedingungen via Open-Meteo) nur für Events, die noch
-                <i>keins</i> haben — z. B. nach neuen Einträgen. Schneller und sparsamer als die volle
-                Stufe-3-Neuberechnung.</div>
+              <div class="action-desc"><b>Fehlendes Wetter nachtragen (Fakten-Anreicherung).</b><br>
+                Holt historisches Wetter (Temperatur, Bedingungen via Open-Meteo) für Events, die noch
+                <i>keins</i> haben — z. B. nach neuen Einträgen oder Importen. Einmal geholt = dauerhaft:
+                Wetter gehört zur Lebensdatenbank und wird nie verworfen oder neu berechnet.</div>
             </div>
             <div class="action-row">
               <button class="btn secondary" id="btn-embed">🧠 Embeddings berechnen</button>
-              <div class="action-desc"><b>Semantische Suche neu indexieren.</b><br>
-                Berechnet die Vektoren aller Events neu (aktuelles Embedding-Modell). Nötig nach jedem Wechsel
-                des Embedding-Modells, sonst findet die „Bedeutungs-Suche" nichts oder Falsches.
-                Zeigt 0, wenn kein Embedding-Modell konfiguriert ist.</div>
+              <div class="action-desc"><b>Semantische Suche neu aufbauen (Ableitung).</b><br>
+                Verwirft die Vektoren aller Events und berechnet sie mit dem aktuellen Embedding-Modell neu.
+                Nötig nach jedem Modellwechsel, sonst findet die „Bedeutungs-Suche" nichts oder Falsches.
+                Bricht ohne Fortschritt ab, wenn kein Embedding-Modell konfiguriert ist.</div>
             </div>
             <div class="action-row" style="border-top:1px solid var(--danger)">
               <button class="btn danger" id="btn-wipe">🗑️ Alle Daten löschen</button>
@@ -2101,19 +2094,6 @@ document.getElementById('btn-recompute-2').addEventListener('click', e =>
     },
     unit: 'KI-Anfragen',
     doneMsg: n => `Stufe 2 neu berechnet: ${n} Fragment(e) verarbeitet.`,
-  }));
-// Stufe 3 = ALLE Anreicherungen neu: erst Reset, dann Wetter- und Embedding-Batches
-document.getElementById('btn-recompute-3').addEventListener('click', e =>
-  runBatchedAdmin(e.target, {
-    reset: async () => { await api('/api/admin/reset-stage3', { method: 'POST' }); return null; },
-    step: async () => {
-      const w = await api('/api/admin/enrich-weather?limit=25', { method: 'POST' });
-      if (w.enriched_events || w.remaining) return { done: w.enriched_events, remaining: w.remaining + 1 }; // +1: Embeddings folgen noch
-      const emb = await api('/api/admin/reindex-embeddings?limit=25', { method: 'POST' });
-      return { done: emb.indexed_events, remaining: emb.remaining };
-    },
-    unit: 'Anfragen',
-    doneMsg: n => `Stufe 3 neu berechnet (${n} Anfragen: Wetter + Embeddings).`,
   }));
 document.getElementById('btn-enrich').addEventListener('click', e =>
   runBatchedAdmin(e.target, {

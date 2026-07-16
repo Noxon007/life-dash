@@ -9,7 +9,7 @@ from sqlalchemy import inspect, text
 
 from app.auth import require_admin
 from app.database import SessionLocal, engine
-from app.services.enrichment import enrich_weather, reset_weather
+from app.services.enrichment import enrich_weather
 from app.services.ingestion import reprocess_pending, reset_reprocess
 
 # Alle Admin-Endpoints erfordern die Admin-Rolle (Rohdaten-Ansicht ist
@@ -156,21 +156,9 @@ def enrich_weather_endpoint(limit: int = Query(25, ge=1, le=200)) -> dict:
     return {"enriched_events": enriched, "remaining": remaining}
 
 
-@router.post("/reset-stage3")
-def reset_stage3() -> dict:
-    """Verwirft alle Stufe-3-Ableitungen (Wetter + Embeddings) für eine volle
-    Neuberechnung über die Batch-Endpoints."""
-    from app.models import Event
-
-    db = SessionLocal()
-    try:
-        weather = reset_weather(db)
-        embeddings = db.query(Event).update({Event.embedding: None},
-                                            synchronize_session=False)
-        db.commit()
-    finally:
-        db.close()
-    return {"weather_reset": weather, "embeddings_reset": embeddings}
+# Hinweis: Wetter ist FAKTEN-Anreicherung (Schicht 3, KONZEPT Kap. 3.1) —
+# historisches Wetter ändert sich nicht. Es gibt daher bewusst keinen
+# „Wetter neu berechnen"-Endpoint mehr, nur das Ergänzen fehlender Werte.
 
 
 @router.post("/wipe-data")

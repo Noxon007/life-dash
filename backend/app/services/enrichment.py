@@ -29,20 +29,12 @@ def _weather_candidates(db: Session) -> list[Event]:
     return out
 
 
-def reset_weather(db: Session) -> int:
-    """Entfernt alle Wetter-Metriken (Vorbereitung einer vollen Neuberechnung)."""
-    count = (db.query(Metric)
-             .filter(Metric.source == Source.weather)
-             .delete(synchronize_session=False))
-    db.commit()
-    return count
-
-
 def enrich_weather(db: Session, limit: int | None = None) -> tuple[int, int]:
     """Hängt Temperatur + Bedingung an Events ohne Wetter (Batch fürs Admin-UI).
 
-    Gibt (angereichert, verbleibend) zurück. Volle Neuberechnung: vorher
-    reset_weather() — danach sind alle Kandidaten wieder „ohne Wetter".
+    Gibt (angereichert, verbleibend) zurück. Wetter ist Fakten-Anreicherung
+    (KONZEPT Kap. 3.1): einmal geholt = dauerhaft; es wird nur ergänzt,
+    nie verworfen und neu berechnet.
     """
     candidates = _weather_candidates(db)
     batch = candidates if limit is None else candidates[:limit]
