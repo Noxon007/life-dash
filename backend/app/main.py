@@ -14,6 +14,7 @@ from app.migrate import ensure_schema
 from app.modules.registry import load_modules
 from app.routers import admin, auth, data, events, ingest, moderation, modules, search, tracks
 from app.seed import seed_demo
+from app.version import APP_VERSION
 
 
 @asynccontextmanager
@@ -36,7 +37,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Life-Dash API",
-    version="0.2.0",
+    version=APP_VERSION,
     description="Durchsuchbare Lebensdatenbank — Drei-Stufen-Architektur (Roh → Struktur → Ansichten).",
     lifespan=lifespan,
 )
@@ -70,6 +71,7 @@ app.include_router(admin.router)
 def health() -> dict:
     return {
         "status": "ok",
+        "version": APP_VERSION,
         "ai_provider": settings.ai_provider,
         "auth_mode": settings.auth_mode,
         "database": settings.database_url.split("://")[0],

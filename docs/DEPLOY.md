@@ -67,7 +67,7 @@ cp .env.example .env
 `.env` ausfüllen — Minimum:
 
 ```ini
-LIFEDASH_VERSION=0.5.0
+LIFEDASH_VERSION=0.6.0
 PUBLIC_BASE_URL=https://life.example.com
 OIDC_ISSUER=https://id.example.com
 OIDC_CLIENT_ID=<aus Pocket ID>

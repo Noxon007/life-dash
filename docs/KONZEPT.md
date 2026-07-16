@@ -603,6 +603,7 @@ Ziel des MVP: **Der Kernloop über alle drei Stufen funktioniert** — Fragment 
 | **Stufe 3** | Wetter-Enrichment (Open-Meteo, on-demand + force); Embeddings + hybride Suche (Volltext + semantisch); Admin-Aktionen mit Beschreibungen. |
 | **Datenkontrolle** | **Export/Import** (JSON, idempotent, pro Nutzer) = Backup/Restore/Umzug; „Alle Daten löschen" mit doppelter Nachfrage. |
 | **Lebensdatenbank-Werkzeuge** (2026-07-16) | **P2.5** Bulk-Bestätigen mit Filter (Kategorie/Quelle/Confidence/Zeitraum) + Pflicht-Vorschau; **P2.6** Invarianten-Tests „Bestätigtes ist unantastbar" (`backend/tests/`, pytest, offline); **P2.7** Bestätigungs-Provenienz `confirmed_at`/`confirmed_by` (manuell/bulk/import) inkl. Bestandsdaten-Migration, sichtbar im Bearbeiten-Dialog; **P2.4** Auto-Wetter direkt nach Eingabe/KI-Analyse, Wetter-Nachzug bei Zeit-/Ort-Korrektur durch den Nutzer. |
+| **UX & Betrieb (A1–A3, v0.6.0)** | Toasts + Bestätigungs-Modal im App-Stil statt nativer Browser-Popups (alle ~20 Stellen, inkl. Tipp-Bestätigung beim Daten-Wipe); Fortschrittsbalken für Timeline-/JSON-Import (Etappen-Import, idempotent, `auto_resolve`-Param); Versionsnummer aus `backend/app/version.py` in Sidebar, `/health` und OpenAPI. |
 | **Module** | trip, animal, country, artist (Konzerte), food (Mahlzeiten), milestone (Lebensereignisse). |
 
 ### 14.2 Fahrplan (Stand 2026-07-16)
@@ -616,22 +617,21 @@ Aufwand: S = Stunden · M = ~1 Tag · L = mehrere Tage. Kein Paket blockiert ein
 
 **Bereits erledigt** (Details in 14.1): D1 Deployment · P2.2 Timeline-Import ·
 P2.3 Unscharfe-Zeiten-Review · P2.4 Auto-Enrichment · P2.5 Bulk-Bestätigen ·
-P2.6 Invarianten-Test · P2.7 Bestätigungs-Provenienz.
+P2.6 Invarianten-Test · P2.7 Bestätigungs-Provenienz · **A1–A3 (v0.6.0):**
+UI-Dialoge/Toasts statt Browser-Popups, Fortschrittsbalken bei großen
+Importen (Etappen-Import, idempotent), Versionsnummer in Sidebar + `/health`.
 
 #### Gruppe A — Notwendig & sinnvoll für die Nutzung (Fokus)
 
 | Nr. | Paket | Aufwand | Inhalt | Nutzen |
 |---|---|---|---|---|
-| **A1** | **UI-Dialoge statt Browser-Popups** | S–M | Alle `alert()`/`confirm()`/`prompt()` (weiße System-Dialoge nach Export, Import, Batch-Läufen, Löschen …) durch Komponenten im Frontend-Stil ersetzen: Toasts für Erfolge, Modal (wie `edit-modal`) für Bestätigungen. ~20 Stellen in `index.html`. | Die App fühlt sich fertig an — gerade auf dem Handy wirken native Popups gebrochen. |
-| **A2** | **Fortschrittsanzeige Import/Export** | S–M | Ladebalken statt unbestimmtem Spinner, v. a. beim Google-Timeline-Import (großes JSON, Tausende Inserts). Ansatz: Verarbeitung in Etappen wie bei den Batch-Läufen (`remaining`-Muster) oder Fortschritts-Endpoint pollen; minimal „Segmente x/y". | Lange Importe sind nachvollziehbar statt „hängt es?". |
-| **A3** | **Versionsnummer im UI** | S | Version unten links in der Sidebar (`sidebar-foot`, beim Nutzernamen). Backend kennt seine Version als Konstante/Build-Arg und liefert sie über einen kleinen Endpoint (`/api/meta`). | Man sieht sofort, welche Version läuft — Basis für Support & Update-Kontrolle. |
 | **A4** | **DB-Rohansicht absichern** | M | Rohes Ändern/Löschen im Admin bekommt Leitplanken: (a) Schreibpfade wo möglich durch bestehende Endpoints (Moderation-PATCH) statt rohem UPDATE; (b) sonst Validierung von Enums/JSON; (c) Folge-Neuberechnungen anstoßen/anzeigen — Titel/Beschreibung → Embedding neu, Ort/Datum → Wetter neu (Pfad existiert seit P2.4), Entity gelöscht → verwaiste Links aufräumen; (d) Fragment-Löschen sperren oder doppelt bestätigen (Eingang = Beweisarchiv, Kap. 3.1). | Admin-Eingriffe können die Invarianten nicht mehr still verletzen. |
 | **A5** | **Dekaden-Aggregation & Besuchs-Verdichtung** *(vorher P3.2)* | M | Heat-/Dichte-Darstellung auf Jahrzehnt-/Jahres-Ebene statt langer Kartenlisten; wiederholte Besuche desselben Orts gruppieren („59× Besuch: X"), Alltagsorte (Zuhause/Arbeit) optional zusammenfassen. | Übersicht trotz zehntausender Timeline-Events — aktuell die größte Nutzungs-Bremse. |
 | **A6** | **Nutzerverwaltungs-UI** *(vorher P5.3)* | S | Nutzerliste, Rollen ändern, Nutzer löschen (Admin-Panel). | Komfort für den realen Multi-User-Betrieb. |
 | **A7** | **Modul-Vollausbau** *(aus Frage 3, entschieden)* | M | Kategorie-Label/Farbe/Emoji aus dem Modul-YAML ins Frontend durchreichen, Modul-Regeln automatisch in den KI-Prompt einspeisen. Danach ist ein neues Modul wirklich „nur eine YAML-Datei" (statt heute drei Stellen: YAML, Prompt, Frontend). | Neue Kategorien ohne Code-Änderung — senkt die Hürde, das System wachsen zu lassen. |
 
-**Empfohlene Reihenfolge in A:** A3 → A1 → A2 (schnelle, sichtbare
-Qualität), dann A5 (Übersichts-Problem), dann A4 → A6 → A7.
+**Empfohlene Reihenfolge in A** (A1–A3 sind erledigt): **A5**
+(Übersichts-Problem), dann A4 → A6 → A7.
 
 #### Gruppe B — Neue Features (nach A bzw. als bewusste Ausnahme)
 

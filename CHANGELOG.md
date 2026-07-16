@@ -10,6 +10,27 @@ jedem `MINOR` vorkommen.
 
 ## [Unreleased]
 
+## [0.6.0] – 2026-07-16
+
+### Hinzugefügt
+- **A1 — Saubere UI-Dialoge statt Browser-Popups:** Alle nativen
+  `alert()`/`confirm()`/`prompt()`-Dialoge (~20 Stellen: Export, Import,
+  Batch-Läufe, Löschen …) ersetzt durch **Toasts** im App-Stil (Erfolg /
+  Warnung / Fehler, Klick schließt) und ein **Bestätigungs-Modal** — inkl.
+  Tipp-Bestätigung („LÖSCHEN") beim Daten-Wipe. Auf Mobil erscheinen Toasts
+  über der Bottom-Navigation.
+- **A2 — Fortschrittsbalken bei großen Importen:** Google-Timeline-Import
+  und JSON-Restore laufen bei großen Dateien in Etappen mit echtem
+  Fortschritt („12.000 / 48.500 Segmente") statt unbestimmtem Spinner —
+  gefahrlos, weil beide Importe idempotent sind. Beim Etappen-Import wird
+  das automatische Reverse-Geocoding übersprungen (neuer Query-Param
+  `auto_resolve=false`); Chunk-Grenzen halten zusammengehörige
+  Geräte-Export-Segmente (Route + Aktivität) beieinander.
+- **A3 — Versionsnummer im UI:** Die Sidebar zeigt unten links die laufende
+  Version (z. B. „Life-Dash v0.6.0"). Eine Quelle der Wahrheit:
+  `backend/app/version.py` speist UI, `/health` und die OpenAPI-Doku
+  (dort stand bis jetzt fälschlich 0.2.0).
+
 ## [0.5.0] – 2026-07-16
 
 ### Hinzugefügt

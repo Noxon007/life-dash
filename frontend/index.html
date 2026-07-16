@@ -353,6 +353,29 @@
   }
   .loading-overlay .loading-text { color: var(--text); font-size: 14px; font-weight: 600; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  /* Fortschrittsbalken im Lade-Overlay (A2) */
+  .loading-bar {
+    width: min(340px, 80vw); height: 8px; border-radius: 6px;
+    background: var(--bg-elev); overflow: hidden; display: none;
+  }
+  .loading-bar-fill { height: 100%; width: 0%; background: var(--accent); border-radius: 6px; transition: width .2s; }
+
+  /* ---------- Toasts (A1) — Ersatz für alert() ---------- */
+  .toast-wrap {
+    position: fixed; right: 16px; bottom: 16px; z-index: 3000;
+    display: flex; flex-direction: column; gap: 8px;
+    max-width: min(380px, calc(100vw - 32px));
+  }
+  .toast {
+    background: var(--bg-panel); border: 1px solid var(--border);
+    border-left: 3px solid var(--accent); border-radius: 10px;
+    padding: 10px 14px; font-size: 13px; color: var(--text); line-height: 1.5;
+    box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    white-space: pre-line; animation: toast-in .25s ease; cursor: pointer;
+  }
+  .toast.error { border-left-color: var(--danger); }
+  .toast.warn  { border-left-color: #f5a623; }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
 
   /* ============ MOBILE (Bottom-Navigation, PWA) ============ */
   @media (max-width: 860px) {
@@ -370,6 +393,8 @@
       flex-shrink: 0;
     }
     .logo, .sidebar-foot { display: none; }
+    /* Toasts über der Bottom-Navigation einblenden */
+    .toast-wrap { left: 8px; right: 8px; bottom: calc(74px + env(safe-area-inset-bottom)); max-width: none; }
     .nav-item {
       flex-direction: column;
       gap: 3px;
@@ -415,6 +440,23 @@
   <div class="loading-overlay" id="loading-overlay">
     <div class="spinner"></div>
     <div class="loading-text" id="loading-text">🤖 KI analysiert…</div>
+    <div class="loading-bar" id="loading-bar"><div class="loading-bar-fill" id="loading-bar-fill"></div></div>
+  </div>
+
+  <!-- Toasts (A1) -->
+  <div class="toast-wrap" id="toast-wrap"></div>
+
+  <!-- Bestätigungs-Dialog (A1) — Ersatz für confirm()/prompt() -->
+  <div class="modal-overlay" id="confirm-modal" style="z-index:2600">
+    <div class="modal-box" style="width:min(440px,100%)">
+      <h3 id="cf-title">Bestätigen</h3>
+      <div id="cf-text" style="color:var(--text-dim); font-size:13px; line-height:1.6; white-space:pre-line; margin-top:8px"></div>
+      <input id="cf-input" style="display:none; margin-top:14px; width:100%; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:8px 10px; color:var(--text); font-size:13px">
+      <div class="btn-row" style="margin-top:20px">
+        <button class="btn" id="cf-ok">OK</button>
+        <button class="btn secondary" id="cf-cancel">Abbrechen</button>
+      </div>
+    </div>
   </div>
 
   <!-- EVENT BEARBEITEN (Modal) -->
@@ -477,7 +519,7 @@
     <div class="nav-item" data-view="compendium"><span class="ico">📚</span> <span class="lbl">Kompendium</span></div>
     <div class="nav-item" data-view="admin"><span class="ico">⚙️</span> <span class="lbl">Admin</span> <span class="nav-badge" style="display:none">0</span></div>
     <div class="sidebar-foot" id="sidebar-foot">
-      <b>Life-Dash</b><br>
+      <b>Life-Dash</b> <span id="foot-version"></span><br>
       <span id="foot-user">…</span><br>
       <a href="#" id="logout-link" style="display:none">Abmelden</a>
     </div>
@@ -912,10 +954,68 @@ function clearBanner() {
 function showLoading(text) {
   const ov = document.getElementById('loading-overlay');
   if (!ov) return;
+  document.getElementById('loading-bar').style.display = 'none'; // Balken nur via showProgress
   if (text === false) { ov.classList.remove('show'); return; }
   if (typeof text === 'string') document.getElementById('loading-text').textContent = text;
   ov.classList.add('show');
 }
+// Lade-Overlay mit Fortschrittsbalken (A2) — für Importe mit bekannter Gesamtmenge
+function showProgress(done, total, text) {
+  showLoading(text);
+  const bar = document.getElementById('loading-bar');
+  bar.style.display = '';
+  document.getElementById('loading-bar-fill').style.width =
+    (total ? Math.min(100, Math.round(done / total * 100)) : 0) + '%';
+}
+
+// ---------- Toasts & Dialoge (A1) — Ersatz für alert()/confirm()/prompt() ----------
+function toast(msg, type = 'ok', ms = 5000) {
+  const el = document.createElement('div');
+  el.className = 'toast' + (type !== 'ok' ? ' ' + type : '');
+  el.textContent = msg;
+  el.addEventListener('click', () => el.remove());
+  document.getElementById('toast-wrap').appendChild(el);
+  setTimeout(() => el.remove(), ms);
+}
+// Modal-Dialog; löst mit true/false (Bestätigung) bzw. String/null (Eingabe) auf.
+function uiDialog(text, opts = {}) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('confirm-modal');
+    const input = document.getElementById('cf-input');
+    const ok = document.getElementById('cf-ok');
+    const cancel = document.getElementById('cf-cancel');
+    document.getElementById('cf-title').textContent = opts.title || 'Bestätigen';
+    document.getElementById('cf-text').textContent = text;
+    const wantsInput = !!opts.input;
+    input.style.display = wantsInput ? '' : 'none';
+    input.value = '';
+    input.placeholder = opts.placeholder || '';
+    ok.textContent = opts.okLabel || 'OK';
+    ok.className = 'btn' + (opts.danger ? ' danger' : '');
+    const done = val => { modal.classList.remove('show'); cleanup(); resolve(val); };
+    const onOk = () => done(wantsInput ? input.value : true);
+    const onCancel = () => done(wantsInput ? null : false);
+    const onKey = ev => {
+      if (ev.key === 'Escape') onCancel();
+      if (ev.key === 'Enter' && wantsInput) onOk();
+    };
+    const onBackdrop = ev => { if (ev.target === modal) onCancel(); };
+    function cleanup() {
+      ok.removeEventListener('click', onOk);
+      cancel.removeEventListener('click', onCancel);
+      modal.removeEventListener('click', onBackdrop);
+      document.removeEventListener('keydown', onKey);
+    }
+    ok.addEventListener('click', onOk);
+    cancel.addEventListener('click', onCancel);
+    modal.addEventListener('click', onBackdrop);
+    document.addEventListener('keydown', onKey);
+    modal.classList.add('show');
+    if (wantsInput) input.focus();
+  });
+}
+const uiConfirm = (text, opts = {}) => uiDialog(text, opts);
+const uiPrompt = (text, opts = {}) => uiDialog(text, { ...opts, input: true });
 
 // ---------- Kategorien ----------
 const catLabels = { trip:"Reise", sighting:"Sichtung", sport:"Aktivität", concert:"Konzert", meal:"Mahlzeit", milestone:"Meilenstein", event:"Ereignis", home:"Wohnort", media:"Medien", country:"Land" };
@@ -1475,7 +1575,8 @@ async function bulkPreview() {
   }
 }
 async function bulkConfirmRun() {
-  if (!confirm(`${bulkTotal} Event(s) bestätigen?\n\nSie werden damit Teil der fixen Lebensdatenbank (inkl. ihrer verknüpften Objekte).`)) return;
+  if (!(await uiConfirm(`${bulkTotal} Event(s) werden damit Teil der fixen Lebensdatenbank (inkl. ihrer verknüpften Objekte).`,
+    { title: `${bulkTotal} Event(s) bestätigen?`, okLabel: '✓ Bestätigen' }))) return;
   const btn = document.getElementById('bulk-confirm-btn');
   btn.disabled = true; btn.textContent = '… bestätige';
   try {
@@ -1485,10 +1586,10 @@ async function bulkConfirmRun() {
     });
     document.getElementById('bulk-result').innerHTML = '';
     btn.style.display = 'none';
-    alert(`${r.confirmed} Event(s) bestätigt.`);
+    toast(`✓ ${r.confirmed} Event(s) bestätigt.`);
     await refreshAll();
   } catch (err) {
-    alert('Fehler: ' + err.message);
+    toast('Fehler: ' + err.message, 'error');
   } finally {
     btn.disabled = false;
   }
@@ -1679,7 +1780,7 @@ document.getElementById('ed-save').addEventListener('click', async () => {
     closeEventEdit();
     await refreshAll();
   } catch (err) {
-    alert('Fehler beim Speichern: ' + err.message);
+    toast('Fehler beim Speichern: ' + err.message, 'error');
   } finally {
     btn.disabled = false; btn.textContent = '💾 Speichern';
   }
@@ -1687,7 +1788,8 @@ document.getElementById('ed-save').addEventListener('click', async () => {
 document.getElementById('ed-delete').addEventListener('click', async () => {
   const e = editingEvent;
   if (!e) return;
-  if (!confirm(`„${e.title}" wirklich löschen? Der Roh-Text (Stufe 1) bleibt erhalten.`)) return;
+  if (!(await uiConfirm(`Der Roh-Text (Stufe 1) bleibt erhalten.`,
+    { title: `„${e.title}" löschen?`, okLabel: '🗑️ Löschen', danger: true }))) return;
   await api(`/api/moderation/${e.id}`, { method: 'DELETE' });
   closeEventEdit();
   await refreshAll();
@@ -1733,7 +1835,7 @@ function clearManualForm() {
 document.getElementById('mf-clear').addEventListener('click', clearManualForm);
 document.getElementById('mf-save').addEventListener('click', async () => {
   const title = document.getElementById('mf-title').value.trim();
-  if (!title) { alert('Bitte mindestens einen Titel eintragen.'); return; }
+  if (!title) { toast('Bitte mindestens einen Titel eintragen.', 'warn'); return; }
   const ds = document.getElementById('mf-date-start').value;
   const de = document.getElementById('mf-date-end').value || ds;
   const btn = document.getElementById('mf-save');
@@ -1757,7 +1859,7 @@ document.getElementById('mf-save').addEventListener('click', async () => {
     await refreshAll();
     gotoView('timeline');
   } catch (err) {
-    if (!String(err.message).startsWith('401')) alert('Fehler beim Speichern: ' + err.message);
+    if (!String(err.message).startsWith('401')) toast('Fehler beim Speichern: ' + err.message, 'error');
   } finally {
     btn.disabled = false; btn.textContent = '💾 Speichern';
   }
@@ -1768,7 +1870,7 @@ function startVoice() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const ta = document.getElementById('input-text');
   const btn = document.getElementById('voice-btn');
-  if (!SR) { alert('Spracheingabe wird von diesem Browser nicht unterstützt.\nNutze Chrome oder Edge (oder tippe den Text).'); return; }
+  if (!SR) { toast('Spracheingabe wird von diesem Browser nicht unterstützt.\nNutze Chrome oder Edge (oder tippe den Text).', 'warn'); return; }
   const rec = new SR();
   rec.lang = 'de-DE'; rec.interimResults = true; rec.continuous = false;
   const base = ta.value ? ta.value + ' ' : '';
@@ -2091,7 +2193,8 @@ function renderDbTable() {
 
   t.querySelectorAll('.db-del').forEach(btn => btn.addEventListener('click', async e => {
     const tr = e.target.closest('tr'), id = tr.dataset.id;
-    if (!confirm(`Zeile ${id} aus „${data.table}" wirklich löschen?`)) return;
+    if (!(await uiConfirm(`Die Zeile wird direkt aus der Datenbank entfernt.`,
+      { title: `Zeile ${id} aus „${data.table}" löschen?`, okLabel: '🗑️ Löschen', danger: true }))) return;
     await api(`/api/admin/tables/${data.table}/${encodeURIComponent(id)}`, { method: 'DELETE' });
     await loadDbTable(data.table);
     refreshAll();
@@ -2156,10 +2259,10 @@ async function runAdmin(btn, fn, doneMsg) {
   btn.disabled = true; btn.textContent = '… läuft';
   try {
     const res = await fn();
-    alert(doneMsg(res));
+    toast(doneMsg(res));
     await Promise.all([loadTimeline(), loadModQueue(), loadDbTables()]);
   } catch (err) {
-    alert('Fehler: ' + err.message);
+    toast('Fehler: ' + err.message, 'error');
   } finally {
     btn.disabled = false; btn.textContent = label;
   }
@@ -2190,16 +2293,16 @@ async function runBatchedAdmin(btn, { reset, step, unit, doneMsg }) {
       const r = await step();
       total += r.done;
       remaining = r.remaining;
-      if (r.aborted) { alert(`Abgebrochen (KI nicht erreichbar): ${total} ${unit} verarbeitet, ${remaining} offen — später erneut starten.`); break; }
-      if (remaining === 0) { alert(doneMsg(total)); break; }
-      if (r.done === 0) { alert(`Kein Fortschritt mehr: ${total} ${unit} verarbeitet, ${remaining} nicht verarbeitbar (Konfiguration/Netz prüfen).`); break; }
+      if (r.aborted) { toast(`Abgebrochen (KI nicht erreichbar): ${total} ${unit} verarbeitet, ${remaining} offen — später erneut starten.`, 'warn', 8000); break; }
+      if (remaining === 0) { toast(doneMsg(total)); break; }
+      if (r.done === 0) { toast(`Kein Fortschritt mehr: ${total} ${unit} verarbeitet, ${remaining} nicht verarbeitbar (Konfiguration/Netz prüfen).`, 'warn', 8000); break; }
       ticker();
     }
-    if (op.stop) alert(`Gestoppt: ${total} ${unit} verarbeitet, ${remaining ?? '?'} offen — derselbe Knopf setzt fort.`);
+    if (op.stop) toast(`Gestoppt: ${total} ${unit} verarbeitet, ${remaining ?? '?'} offen — derselbe Knopf setzt fort.`, 'warn');
     await refreshAll();
     if (isAdmin()) loadDbTables();
   } catch (err) {
-    alert('Fehler: ' + err.message);
+    toast('Fehler: ' + err.message, 'error');
   } finally {
     delete runningOps[btn.id];
     btn.textContent = label;
@@ -2255,21 +2358,59 @@ document.getElementById('import-file').addEventListener('change', async ev => {
   btn.disabled = true; btn.textContent = '… importiere';
   try {
     const payload = JSON.parse(await file.text());
-    const r = await api('/api/data/import', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-    });
-    if (r.error) { alert(r.error); return; }
-    alert(`Import fertig: ${r.total} Zeilen neu, ${r.skipped_existing} bereits vorhanden.`);
+    if (payload.format !== 'lifedash-export') { toast('Kein Life-Dash-Export (format-Feld fehlt/falsch).', 'error'); return; }
+    // Etappen-Import (A2): Tabellen in FK-Reihenfolge, je max. IMPORT_CHUNK
+    // Zeilen pro Request. Gefahrlos, weil der Import idempotent ist
+    // (vorhandene IDs werden übersprungen) — und der Balken zeigt Fortschritt.
+    const TABLES = ['locations', 'fragments', 'entities', 'events',
+                    'event_entity_links', 'media_refs', 'metrics', 'tracks'];
+    const IMPORT_CHUNK = 1000;
+    const total = TABLES.reduce((n, t) => n + (payload[t] || []).length, 0);
+    const big = total > IMPORT_CHUNK;
+    let done = 0, imported = 0, skipped = 0;
+    for (const table of TABLES) {
+      const rows = payload[table] || [];
+      for (let i = 0; i < rows.length; i += IMPORT_CHUNK) {
+        if (big) showProgress(done, total, `📥 Import — ${done.toLocaleString('de-DE')} / ${total.toLocaleString('de-DE')} Zeilen`);
+        const r = await api('/api/data/import', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ format: payload.format, version: payload.version,
+                                 [table]: rows.slice(i, i + IMPORT_CHUNK) }),
+        });
+        if (r.error) { toast(r.error, 'error'); return; }
+        imported += r.total; skipped += r.skipped_existing;
+        done += Math.min(IMPORT_CHUNK, rows.length - i);
+      }
+    }
+    toast(`✓ Import fertig: ${imported} Zeilen neu, ${skipped} bereits vorhanden.`);
     await refreshAll();
   } catch (err) {
-    alert('Import fehlgeschlagen: ' + err.message);
+    toast('Import fehlgeschlagen: ' + err.message, 'error', 8000);
   } finally {
     btn.disabled = false; btn.textContent = '📥 Daten importieren';
+    showLoading(false);
     ev.target.value = '';
   }
 });
 
-// Google-Timeline-Import (P2.2): Geräte-Export oder Takeout-JSON hochladen
+// Google-Timeline-Import (P2.2): Geräte-Export oder Takeout-JSON hochladen.
+// Große Dateien laufen in Etappen mit Fortschrittsbalken (A2) — gefahrlos,
+// weil der Import idempotent ist (Segment-Hash). Chunk-Grenzen werden so
+// verschoben, dass zeitlich überlappende Geschwister-Segmente (timelinePath +
+// activity im Geräte-Export) zusammenbleiben — sonst verlöre die Route ihren Typ.
+const TL_CHUNK = 1500;
+function tlChunks(segs) {
+  const overlaps = (a, b) => !!(a && b && a.endTime && b.startTime && b.startTime < a.endTime);
+  const chunks = [];
+  let i = 0;
+  while (i < segs.length) {
+    let end = Math.min(i + TL_CHUNK, segs.length);
+    while (end < segs.length && overlaps(segs[end - 1], segs[end])) end++;
+    chunks.push(segs.slice(i, end));
+    i = end;
+  }
+  return chunks;
+}
 document.getElementById('btn-timeline-import').addEventListener('click', () =>
   document.getElementById('timeline-file').click());
 document.getElementById('timeline-file').addEventListener('change', async ev => {
@@ -2280,23 +2421,45 @@ document.getElementById('timeline-file').addEventListener('change', async ev => 
   showLoading('🛰️ Timeline wird importiert…');
   try {
     const payload = JSON.parse(await file.text());
-    if (!payload.semanticSegments && !payload.timelineObjects) {
-      alert('Kein Google-Timeline-Export: Datei enthält weder "semanticSegments" (Geräte-Export) noch "timelineObjects" (Takeout).');
+    const key = payload.semanticSegments ? 'semanticSegments'
+              : (payload.timelineObjects ? 'timelineObjects' : null);
+    if (!key) {
+      toast('Kein Google-Timeline-Export: Datei enthält weder "semanticSegments" (Geräte-Export) noch "timelineObjects" (Takeout).', 'error', 8000);
       return;
     }
-    const r = await api('/api/import/timeline', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-    });
-    const range = r.date_min ? `\nZeitraum: ${r.date_min.slice(0,10)} bis ${r.date_max.slice(0,10)}` : '';
-    const names = r.locations_unnamed
-      ? `\n\n📍 ${r.locations_unnamed} Orte haben noch keinen Namen — unten „Ortsnamen auflösen" ausführen.`
-      : (r.names_resolved ? `\n${r.names_resolved} Ortsnamen direkt aufgelöst.` : '');
-    alert(`Timeline-Import fertig:\n${r.visits_created} Besuche als Events, ${r.tracks_created} Routen (Tracks).`
-      + `\n${r.skipped_duplicates} Dubletten übersprungen.${range}${names}`);
+    const segs = payload[key] || [];
+    const chunks = segs.length > TL_CHUNK ? tlChunks(segs) : [segs];
+    const sum = { visits: 0, tracks: 0, dupes: 0, resolved: 0,
+                  unnamed: 0, min: null, max: null };
+    let done = 0;
+    for (const chunk of chunks) {
+      if (chunks.length > 1) {
+        showProgress(done, segs.length,
+          `🛰️ Timeline-Import — ${done.toLocaleString('de-DE')} / ${segs.length.toLocaleString('de-DE')} Segmente`);
+      }
+      // Bei Etappen kein Auto-Geocoding pro Etappe (Nominatim: 1 Anfrage/s) —
+      // dafür gibt es nach dem Import den Button „Ortsnamen auflösen".
+      const r = await api(`/api/import/timeline${chunks.length > 1 ? '?auto_resolve=false' : ''}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: chunk }),
+      });
+      sum.visits += r.visits_created; sum.tracks += r.tracks_created;
+      sum.dupes += r.skipped_duplicates; sum.resolved += r.names_resolved || 0;
+      sum.unnamed = r.locations_unnamed || 0; // Gesamtstand, nicht summieren
+      if (r.date_min && (!sum.min || r.date_min < sum.min)) sum.min = r.date_min;
+      if (r.date_max && (!sum.max || r.date_max > sum.max)) sum.max = r.date_max;
+      done += chunk.length;
+    }
+    const range = sum.min ? `\nZeitraum: ${sum.min.slice(0,10)} bis ${sum.max.slice(0,10)}` : '';
+    const names = sum.unnamed
+      ? `\n\n📍 ${sum.unnamed} Orte haben noch keinen Namen — unten „Ortsnamen auflösen" ausführen.`
+      : (sum.resolved ? `\n${sum.resolved} Ortsnamen direkt aufgelöst.` : '');
+    toast(`✓ Timeline-Import fertig:\n${sum.visits} Besuche als Events, ${sum.tracks} Routen (Tracks).`
+      + `\n${sum.dupes} Dubletten übersprungen.${range}${names}`, 'ok', 12000);
     trackCache.clear();
     await refreshAll();
   } catch (err) {
-    alert('Timeline-Import fehlgeschlagen: ' + err.message);
+    toast('Timeline-Import fehlgeschlagen: ' + err.message, 'error', 8000);
   } finally {
     btn.disabled = false; btn.textContent = '🛰️ Google Timeline importieren';
     showLoading(false);
@@ -2317,9 +2480,11 @@ document.getElementById('btn-resolve-names').addEventListener('click', e =>
 
 // Alle Daten löschen — mit doppelter Sicherheitsabfrage
 document.getElementById('btn-wipe').addEventListener('click', async e => {
-  if (!confirm('⚠️ Wirklich ALLE Daten löschen?\n\nFragmente, Events, Entities, Orte, Wetter, Embeddings — alles wird unwiderruflich entfernt.')) return;
-  const typed = prompt('Zur Bestätigung bitte LÖSCHEN eingeben:');
-  if (typed !== 'LÖSCHEN') { alert('Abgebrochen — es wurde nichts gelöscht.'); return; }
+  if (!(await uiConfirm('Fragmente, Events, Entities, Orte, Wetter, Embeddings — alles wird unwiderruflich entfernt.',
+    { title: '⚠️ Wirklich ALLE Daten löschen?', okLabel: 'Weiter …', danger: true }))) return;
+  const typed = await uiPrompt('Zur Bestätigung bitte LÖSCHEN eingeben:',
+    { title: 'Letzte Sicherheitsabfrage', okLabel: '🗑️ Endgültig löschen', danger: true, placeholder: 'LÖSCHEN' });
+  if (typed !== 'LÖSCHEN') { toast('Abgebrochen — es wurde nichts gelöscht.', 'warn'); return; }
   await runAdmin(e.target, () => api('/api/admin/wipe-data', { method: 'POST' }),
     r => `Alle Daten gelöscht (${r.total} Zeilen). Die Datenbank ist leer.`);
 });
@@ -2372,6 +2537,7 @@ document.getElementById('logout-link').addEventListener('click', async ev => {
   try {
     const h = await api("/health");
     clearBanner();
+    if (h.version) document.getElementById('foot-version').textContent = `v${h.version}`;
     const chip = document.getElementById('ki-provider');
     if (chip) chip.textContent = ` ${h.ai_provider}`;
     await loadTimeline();

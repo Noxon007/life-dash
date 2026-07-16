@@ -292,10 +292,15 @@ def _apply_resolved_name(db: Session, loc: Location, user_id: str) -> bool:
 @router.post("/import/timeline", response_model=TimelineImportResult)
 def import_timeline(
     payload: dict = Body(...),
+    auto_resolve: bool = True,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> TimelineImportResult:
-    """Importiert einen Google-Timeline-Export (Geräte-Export oder Takeout)."""
+    """Importiert einen Google-Timeline-Export (Geräte-Export oder Takeout).
+
+    auto_resolve=false unterdrückt das direkte Reverse-Geocoding kleiner
+    Ortsmengen — das Frontend setzt es beim Etappen-Import großer Dateien
+    (A2), damit nicht jede Etappe an der Nominatim-Drossel (1 req/s) hängt."""
     visits, moves = _normalize(payload)
     moves = _annotate_paths(moves)
     invalid = (len(payload.get("semanticSegments") or []) + len(payload.get("timelineObjects") or [])
@@ -394,7 +399,7 @@ def import_timeline(
     # statt „Ort (lat, lng)". Große Erstimporte laufen über den Button.
     names_resolved = 0
     unnamed_new = [l for l in new_locations if l.name.startswith("Ort (")]
-    if settings.geocoding_enabled and 0 < len(unnamed_new) <= AUTO_RESOLVE_MAX:
+    if auto_resolve and settings.geocoding_enabled and 0 < len(unnamed_new) <= AUTO_RESOLVE_MAX:
         for i, loc in enumerate(unnamed_new):
             if i:
                 time.sleep(NOMINATIM_DELAY_S)
