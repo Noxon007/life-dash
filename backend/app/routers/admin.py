@@ -6,10 +6,23 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect, select, text
+from sqlalchemy.orm import Session
 
 from app.auth import require_admin
-from app.database import SessionLocal, engine
+from app.database import SessionLocal, engine, get_db
+from app.models import (
+    Entity,
+    Event,
+    EventEntityLink,
+    Fragment,
+    Location,
+    MediaRef,
+    Metric,
+    Track,
+    User,
+    UserRole,
+)
 from app.services.enrichment import enrich_weather
 from app.services.ingestion import reprocess_pending, reset_reprocess
 
@@ -194,8 +207,6 @@ def wipe_data() -> dict:
 def reset_embeddings() -> dict:
     """Setzt alle Event-Embeddings auf NULL (Vorbereitung der Neuberechnung,
     z. B. nach einem Modellwechsel)."""
-    from app.models import Event
-
     db = SessionLocal()
     try:
         total = db.query(Event).update({Event.embedding: None},
@@ -216,7 +227,6 @@ def reindex_embeddings(limit: int = Query(25, ge=1, le=200)) -> dict:
     `remaining` > 0 heißt: Embedding-Modell nicht konfiguriert/erreichbar.
     """
     from app.ai import get_provider
-    from app.models import Event
 
     provider = get_provider()
     db = SessionLocal()
@@ -237,3 +247,89 @@ def reindex_embeddings(limit: int = Query(25, ge=1, le=200)) -> dict:
         db.close()
     log.info("Embedding-Batch: %d indexiert, %d offen", count, remaining)
     return {"indexed_events": count, "remaining": remaining}
+
+
+# --------------------------------------------------------------------------- #
+# Nutzerverwaltung (A6) — Nutzerliste, Rollen ändern, Nutzer löschen
+# --------------------------------------------------------------------------- #
+@router.get("/users")
+def list_users(db: Session = Depends(get_db)) -> list[dict]:
+    """Alle Nutzer mit Rolle und Datenumfang (fürs Admin-Panel).
+    Neue Nutzer entstehen weiterhin nur durch OIDC-Login (JIT-Provisioning)."""
+    return [
+        {
+            "id": u.id,
+            "email": u.email,
+            "display_name": u.display_name,
+            "role": u.role.value,
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+            "events": db.query(Event).filter(Event.user_id == u.id).count(),
+            "fragments": db.query(Fragment).filter(Fragment.user_id == u.id).count(),
+        }
+        for u in db.query(User).order_by(User.created_at).all()
+    ]
+
+
+@router.patch("/users/{user_id}")
+def update_user_role(
+    user_id: str,
+    role: UserRole = Body(..., embed=True),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Ändert die Rolle eines Nutzers. Der letzte Admin kann nicht
+    herabgestuft werden — sonst sperrt sich das System selbst aus."""
+    target = db.get(User, user_id)
+    if not target:
+        raise HTTPException(404, "Nutzer nicht gefunden")
+    if (target.role == UserRole.admin and role != UserRole.admin
+            and db.query(User).filter(User.role == UserRole.admin).count() <= 1):
+        raise HTTPException(400, "Der letzte Admin kann nicht herabgestuft werden")
+    target.role = role
+    db.commit()
+    log.info("Nutzerverwaltung: Rolle von %s -> %s",
+             target.email or user_id, role.value)
+    return {"id": target.id, "role": target.role.value}
+
+
+@router.delete("/users/{user_id}")
+def delete_user(
+    user_id: str,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Löscht einen Nutzer MITSAMT all seinen Lebensdaten (Stufe 1–3).
+    Das eigene Konto ist gesperrt — so bleibt immer mindestens ein Admin."""
+    if user_id == admin.id:
+        raise HTTPException(400, "Das eigene Konto kann nicht gelöscht werden")
+    target = db.get(User, user_id)
+    if not target:
+        raise HTTPException(404, "Nutzer nicht gefunden")
+
+    event_ids = select(Event.id).where(Event.user_id == user_id).scalar_subquery()
+    deleted: dict[str, int] = {}
+    # Kinder zuerst (Fremdschlüssel): Metriken/Medien/Links hängen an Events
+    deleted["metrics"] = (db.query(Metric)
+                          .filter(Metric.event_id.in_(event_ids))
+                          .delete(synchronize_session=False))
+    deleted["media_refs"] = (db.query(MediaRef)
+                             .filter(MediaRef.event_id.in_(event_ids))
+                             .delete(synchronize_session=False))
+    deleted["event_entity_links"] = (db.query(EventEntityLink)
+                                     .filter(EventEntityLink.event_id.in_(event_ids))
+                                     .delete(synchronize_session=False))
+    deleted["tracks"] = (db.query(Track).filter(Track.user_id == user_id)
+                         .delete(synchronize_session=False))
+    deleted["events"] = (db.query(Event).filter(Event.user_id == user_id)
+                         .delete(synchronize_session=False))
+    deleted["entities"] = (db.query(Entity).filter(Entity.user_id == user_id)
+                           .delete(synchronize_session=False))
+    deleted["locations"] = (db.query(Location).filter(Location.user_id == user_id)
+                            .delete(synchronize_session=False))
+    deleted["fragments"] = (db.query(Fragment).filter(Fragment.user_id == user_id)
+                            .delete(synchronize_session=False))
+    db.delete(target)
+    db.commit()
+    log.warning("Nutzer gelöscht: %s (%d Datenzeilen: %s)",
+                target.email or user_id, sum(deleted.values()),
+                ", ".join(f"{k}={v}" for k, v in deleted.items() if v))
+    return {"deleted": deleted, "total": sum(deleted.values())}

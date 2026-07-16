@@ -139,6 +139,8 @@ class TimelineImportResult(BaseModel):
     tracks_created: int
     skipped_duplicates: int
     skipped_invalid: int
+    # A12: Besuche unterhalb der Mindest-Ortssicherheit (min_probability)
+    skipped_low_probability: int = 0
     date_min: datetime | None = None
     date_max: datetime | None = None
     # Reverse-Geocoding: direkt beim Import aufgelöste neue Orte bzw.

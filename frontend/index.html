@@ -580,10 +580,11 @@
             </div>
           </div>
           <div class="filter-group">
-            <label>Route</label>
+            <label>Darstellung</label>
             <div class="filter-chips">
               <span class="filter-chip active" id="mp-route-toggle">🧭 Route verbinden</span>
               <span class="filter-chip active" id="mp-tracks-toggle">🛰️ Timeline-Routen</span>
+              <span class="filter-chip active" id="mp-group-toggle" title="Ab Monats-Ansicht: wiederholte Besuche desselben Orts zu einem Eintrag bündeln">🔁 Orte bündeln</span>
             </div>
           </div>
           <div class="filter-group" style="flex-basis:100%">
@@ -890,16 +891,24 @@
               Importiert den Timeline-Export vom Smartphone (Android: Einstellungen → Standort →
               Standortdienste → Zeitachse → „Zeitachsendaten exportieren"; auch alte Takeout-Exporte
               funktionieren). Besuche werden zu Events, Bewegungen zu Routen auf der Karte.
-              Mehrfach-Import erzeugt keine Duplikate (Segment-Hash).</div>
+              Mehrfach-Import erzeugt keine Duplikate (Segment-Hash).<br>
+              <label class="stat-label" style="display:inline-flex; align-items:center; gap:6px; margin-top:8px">
+                Besuche mit Ortssicherheit unter
+                <input id="tl-minprob" type="number" min="0" max="100" step="5" value="0"
+                       style="width:60px; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:4px 6px; color:var(--text)">
+                % überspringen (0 = alle importieren — betrifft v. a. „Gesuchte Adresse")
+              </label></div>
           </div>
           <div class="action-row">
             <button class="btn secondary" id="btn-resolve-names" style="flex-shrink:0; min-width:215px; text-align:left">📍 Ortsnamen auflösen</button>
             <div class="action-desc"><b>Adressen für importierte Besuche nachschlagen.</b><br>
               Der Google-Geräte-Export enthält keine Ortsnamen — Besuche heißen daher
-              „Ort (53.49, 10.00)". Dieser Lauf holt die Adressen per Reverse-Geocoding
-              (OpenStreetMap/Nominatim, 1 Anfrage/Sekunde) und benennt Orte und Besuchs-Events um.
-              Läuft in Etappen und kann jederzeit fortgesetzt werden; manuell umbenannte
-              Einträge bleiben unangetastet.</div>
+              „Ort (53.49, 10.00)" oder tragen nur ein Label wie „Zuhause"/„Arbeit".
+              Dieser Lauf holt die Adressen per Reverse-Geocoding (OpenStreetMap/Nominatim,
+              1 Anfrage/Sekunde) und benennt Orte und Besuchs-Events um; Labels bleiben
+              als Präfix erhalten („Zuhause — Musterstraße 1, Detmold"). Läuft in Etappen
+              und kann jederzeit fortgesetzt werden; manuell umbenannte Einträge bleiben
+              unangetastet.</div>
           </div>
           <div class="action-row">
             <button class="btn secondary" id="btn-resolve-nonlatin" style="flex-shrink:0; min-width:215px; text-align:left">🌍 Fremdschrift-Namen eindeutschen</button>
@@ -908,6 +917,18 @@
               jetzt mit Sprach-Fallback Deutsch → Englisch (lateinische Umschrift). Besuchs-Events
               werden mit umbenannt; manuell umbenannte Einträge bleiben unangetastet. Orte ohne
               deutschen/englischen Namen in OpenStreetMap behalten ihre Lokalschrift.</div>
+          </div>
+        </div>
+
+        <div class="admin-only">
+          <div class="section-title">Nutzer</div>
+          <div class="hint" style="margin-bottom:14px">
+            👥 Konten entstehen automatisch beim ersten OIDC-Login (Pocket ID).
+            Hier lassen sich Rollen ändern und Nutzer <b>mitsamt all ihren Daten</b> löschen.
+            Das eigene Konto ist geschützt — so bleibt immer ein Admin übrig.
+          </div>
+          <div style="overflow-x:auto">
+            <table class="db-table" id="users-table"></table>
           </div>
         </div>
 
@@ -1182,11 +1203,17 @@ function renderTimelineList() {
     if (!groups[g.key]) groups[g.key] = { label: g.label, sort: g.sort, items: [] };
     groups[g.key].items.push(e);
   });
+  // A5 (Besuchs-Verdichtung): Wiederholte Google-Besuche desselben Orts
+  // innerhalb einer Zeitgruppe zu EINER Sammelkarte bündeln („59× Besuch: X")
+  // — sonst füllen Alltagsorte (Zuhause/Arbeit) die 25er-Kappe komplett.
+  VISIT_GROUPS.length = 0;
+  Object.values(groups).forEach(g => { g.items = compressVisits(g.items); });
+  const renderItem = x => x.visitGroup ? visitGroupCard(x) : eventCard(x);
   const ordered = Object.values(groups).sort((a,b) => b.sort - a.sort);
   el.innerHTML = ordered.map((g, gi) => `
     <div class="tl-year">
       <div class="tl-year-label">${esc(g.label)}${g.items.length > TL_GROUP_CAP ? ` <span class="stat-label">(${g.items.length})</span>` : ''}</div>
-      ${g.items.slice(0, TL_GROUP_CAP).map(eventCard).join('')}
+      ${g.items.slice(0, TL_GROUP_CAP).map(renderItem).join('')}
       ${g.items.length > TL_GROUP_CAP
         ? `<div class="hint" data-tl-more="${gi}" style="cursor:pointer">▼ ${g.items.length - TL_GROUP_CAP} weitere anzeigen</div>`
         : ''}
@@ -1195,9 +1222,47 @@ function renderTimelineList() {
   el.querySelectorAll('[data-tl-more]').forEach(btn =>
     btn.addEventListener('click', () => {
       const g = ordered[+btn.dataset.tlMore];
-      btn.outerHTML = g.items.slice(TL_GROUP_CAP).map(eventCard).join('');
+      btn.outerHTML = g.items.slice(TL_GROUP_CAP).map(renderItem).join('');
     }));
 }
+// Besuchs-Verdichtung (A5): gleiche Besuchs-Titel (google_timeline) einer
+// Zeitgruppe zusammenfassen; andere Events bleiben einzeln in ihrer Position.
+function compressVisits(items) {
+  const out = [], byTitle = new Map();
+  items.forEach(e => {
+    if (e.source !== 'google_timeline') { out.push(e); return; }
+    let g = byTitle.get(e.title);
+    if (!g) { g = { visitGroup: true, items: [] }; byTitle.set(e.title, g); out.push(g); }
+    g.items.push(e);
+  });
+  return out.map(x => (x.visitGroup && x.items.length === 1) ? x.items[0] : x);
+}
+const VISIT_GROUPS = [];  // Index -> Events der Sammelkarte (zum Aufklappen)
+function visitGroupCard(g) {
+  const idx = VISIT_GROUPS.push(g.items) - 1;
+  const day = iso => iso ? iso.slice(0, 10).split('-').reverse().join('.') : '';
+  const dates = g.items.map(e => e.date_start).sort();
+  const range = dates[0].slice(0, 10) === dates[dates.length - 1].slice(0, 10)
+    ? day(dates[0]) : `${day(dates[0])} – ${day(dates[dates.length - 1])}`;
+  return `
+    <div class="event-card ${catClass(g.items[0].category)}" data-visit-group="${idx}" title="Klicken zum Aufklappen">
+      <div class="ev-head">
+        <span class="ev-title">🔁 ${g.items.length}× ${esc(g.items[0].title)}</span>
+        <span class="ev-date">${range}</span>
+      </div>
+      <div class="ev-meta">
+        <span class="chip">🛰️ Besuche gebündelt</span>
+        <span class="chip">▼ einzeln anzeigen</span>
+      </div>
+    </div>`;
+}
+// Sammelkarte aufklappen -> Einzelkarten an Ort und Stelle
+document.getElementById('timeline-list').addEventListener('click', ev => {
+  const card = ev.target.closest('[data-visit-group]');
+  if (!card) return;
+  const items = VISIT_GROUPS[+card.dataset.visitGroup] || [];
+  card.outerHTML = items.map(eventCard).join('');
+});
 const EVENT_CACHE = {};   // id -> Event (für den Bearbeiten-Dialog)
 function eventCard(e) {
   EVENT_CACHE[e.id] = e;
@@ -1922,7 +1987,7 @@ function startVoice() {
 
 // ---------- KARTE ----------
 let mapObj = null, mapMarkers = null, mapCluster = null, mapRoute = null, mapTracks = null;
-const mp = { mode: 'day', periods: [], index: 0, showRoute: true, showTracks: true, located: [], catFilter: new Set(FILTER_CATS) };
+const mp = { mode: 'day', periods: [], index: 0, showRoute: true, showTracks: true, groupPlaces: true, located: [], catFilter: new Set(FILTER_CATS) };
 // Nur Events, die den aktiven Kategorie-Filter passieren
 function mpFiltered() { return mp.located.filter(e => passesFilter(e, mp.catFilter)); }
 
@@ -2079,6 +2144,13 @@ function renderPeriod() {
   drawTracks(key); // async — zeichnet die Timeline-Routen, sobald geladen
   const all = mpFiltered().filter(e => periodKey(e) === key)
     .sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
+  // A5 (Besuchs-Verdichtung): Ab Monats-Ansicht wiederholte Besuche desselben
+  // Orts bündeln — ein Marker + eine Listenzeile je Ort („59× Zuhause — …")
+  // statt langer Kartenlisten. In Tag/Woche bleibt die nummerierte Route.
+  if (mp.groupPlaces && !['day', 'week'].includes(mp.mode) && all.length) {
+    renderGroupedPeriod(all, key, stops);
+    return;
+  }
   // A5: Bis MP_MAX Stopps gibt es die nummerierte Tagesroute; darüber werden
   // ALLE Punkte geclustert dargestellt statt abgeschnitten (Nummern & Route
   // wären bei tausenden Stopps ohnehin bedeutungslos). Die Stopp-Liste bleibt
@@ -2125,6 +2197,50 @@ function renderPeriod() {
       </div>`;
     }).join('');
 }
+// A5: Gebündelte Darstellung eines Zeitraums — Events nach Ort gruppiert.
+// Alltagsorte (Zuhause/Arbeit) fallen damit automatisch zu je einer Zeile
+// zusammen. Marker wandern in den Cluster-Layer (Dichte-Darstellung).
+function renderGroupedPeriod(all, key, stops) {
+  const day = iso => iso ? iso.slice(0, 10).split('-').reverse().join('.') : '';
+  const byLoc = new Map();
+  all.forEach(e => {
+    const k = e.location.id || `${e.location.lat},${e.location.lng}`;
+    if (!byLoc.has(k)) byLoc.set(k, { loc: e.location, items: [] });
+    byLoc.get(k).items.push(e); // `all` ist chronologisch sortiert
+  });
+  const groups = [...byLoc.values()].sort((a, b) => b.items.length - a.items.length);
+  const markerTarget = mapCluster || mapMarkers;
+  const latlngs = [];
+  const rows = groups.map(g => {
+    const n = g.items.length;
+    const first = g.items[0], last = g.items[n - 1];
+    const range = first === last ? day(first.date_start)
+      : `${day(first.date_start)} – ${day(last.date_start)}`;
+    const short = first.title.replace(/^Besuch: /, '') || g.loc.name.split(',')[0];
+    const ll = [g.loc.lat, g.loc.lng];
+    latlngs.push(ll);
+    L.marker(ll).addTo(markerTarget).bindPopup(
+      `<b>${n > 1 ? `${n}× ` : ''}${esc(short)}</b><br>${range}<br>${esc(g.loc.name)}`);
+    return { n, range, short, loc: g.loc };
+  });
+  const dateInput = document.getElementById('mp-date');
+  if (dateInput) dateInput.value = all[0].date_start.slice(0, 10);
+  if (latlngs.length) {
+    try { mapObj.fitBounds(L.latLngBounds(latlngs).pad(0.35)); } catch (_) {}
+  }
+  const MP_MAX = 300;
+  stops.innerHTML = `<h3>${all.length} Besuch${all.length === 1 ? '' : 'e'} an `
+    + `${groups.length} Ort${groups.length === 1 ? '' : 'en'} · ${periodLabel(key)}</h3>`
+    + (groups.length > MP_MAX ? `<div class="hint">Liste zeigt die ${MP_MAX} meistbesuchten Orte — Karte zeigt alle.</div>` : '')
+    + rows.slice(0, MP_MAX).map(r => `
+      <div style="padding:10px 0; border-bottom:1px solid var(--border)">
+        <div style="display:flex; gap:8px; align-items:baseline">
+          <span style="color:var(--accent); font-weight:700">${r.n}×</span>
+          <b style="font-size:14px">${esc(r.short)}</b>
+        </div>
+        <div class="stat-label" style="margin-top:3px">${r.range} · ${esc(r.loc.name)}</div>
+      </div>`).join('');
+}
 function mpGo(delta) {
   if (!mp.periods.length) return;
   mp.index = Math.min(mp.periods.length - 1, Math.max(0, mp.index + delta));
@@ -2151,6 +2267,13 @@ document.getElementById('mp-tracks-toggle').addEventListener('click', function (
   mp.showTracks = !mp.showTracks;
   this.classList.toggle('active', mp.showTracks);
   this.classList.toggle('off', !mp.showTracks);
+  renderPeriod();
+});
+// A5: Besuchs-Verdichtung ein/aus (greift ab Monats-Ansicht)
+document.getElementById('mp-group-toggle').addEventListener('click', function () {
+  mp.groupPlaces = !mp.groupPlaces;
+  this.classList.toggle('active', mp.groupPlaces);
+  this.classList.toggle('off', !mp.groupPlaces);
   renderPeriod();
 });
 document.querySelectorAll('[data-mode]').forEach(chip => {
@@ -2188,7 +2311,62 @@ function gotoView(v) {
   if (v === 'map') setTimeout(openMapView, 40);
   if (v === 'stats') loadStats();
   if (v === 'compendium') loadCompendium(document.querySelector('#comp-tabs .zoom-btn.active').dataset.type);
-  if (v === 'admin') { loadModQueue(); loadFuzzyDates(); if (isAdmin()) loadDbTables(); }
+  if (v === 'admin') { loadModQueue(); loadFuzzyDates(); if (isAdmin()) { loadUsers(); loadDbTables(); } }
+}
+
+// ---------- NUTZERVERWALTUNG (A6, nur Admin) ----------
+async function loadUsers() {
+  const t = document.getElementById('users-table');
+  let users;
+  try { users = await api('/api/admin/users'); }
+  catch { t.innerHTML = ''; return; }
+  t.innerHTML = '<thead><tr><th>Nutzer</th><th>Rolle</th><th>Daten</th><th>Dabei seit</th><th></th></tr></thead><tbody>'
+    + users.map(u => {
+      const self = AUTH.user && u.id === AUTH.user.id;
+      return `<tr data-uid="${esc(u.id)}">
+        <td><b>${esc(u.display_name || '—')}</b>${self ? ' <span class="chip">das bist du</span>' : ''}<br>
+          <span class="stat-label">${esc(u.email || u.id)}</span></td>
+        <td><select class="mf-select" data-role ${self ? 'disabled title="Die eigene Rolle kann nicht geändert werden"' : ''}>
+          <option value="user" ${u.role === 'user' ? 'selected' : ''}>Nutzer</option>
+          <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+        </select></td>
+        <td class="stat-label">${u.events} Events · ${u.fragments} Fragmente</td>
+        <td class="stat-label">${u.created_at ? u.created_at.slice(0, 10) : '—'}</td>
+        <td>${self ? '' : '<button class="btn small danger" data-del>🗑️ löschen</button>'}</td>
+      </tr>`;
+    }).join('') + '</tbody>';
+
+  t.querySelectorAll('select[data-role]:not([disabled])').forEach(sel =>
+    sel.addEventListener('change', async () => {
+      const uid = sel.closest('tr').dataset.uid;
+      try {
+        const r = await api(`/api/admin/users/${uid}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: sel.value }),
+        });
+        toast(`✓ Rolle geändert: ${r.role === 'admin' ? 'Admin' : 'Nutzer'}.`);
+      } catch (err) {
+        toast('Rolle ändern fehlgeschlagen: ' + err.message, 'error');
+        loadUsers(); // Anzeige zurücksetzen
+      }
+    }));
+  t.querySelectorAll('button[data-del]').forEach(btn =>
+    btn.addEventListener('click', async () => {
+      const row = btn.closest('tr');
+      const u = users.find(x => x.id === row.dataset.uid);
+      const who = u.display_name || u.email || u.id;
+      if (!(await uiConfirm(
+        `„${who}" wird mitsamt ALLEN Daten gelöscht: ${u.events} Events, ${u.fragments} Fragmente, `
+        + `dazu Orte, Objekte, Routen und Wetter. Das ist unwiderruflich.`,
+        { title: '⚠️ Nutzer löschen?', okLabel: '🗑️ Endgültig löschen', danger: true }))) return;
+      try {
+        const r = await api(`/api/admin/users/${row.dataset.uid}`, { method: 'DELETE' });
+        toast(`✓ Nutzer „${who}" gelöscht (${r.total} Datenzeilen).`);
+        loadUsers();
+      } catch (err) {
+        toast('Löschen fehlgeschlagen: ' + err.message, 'error');
+      }
+    }));
 }
 
 // ---------- DATENBANK-ROHANSICHT (nur Admin) ----------
@@ -2494,8 +2672,10 @@ document.getElementById('timeline-file').addEventListener('change', async ev => 
     }
     const segs = payload[key] || [];
     const chunks = segs.length > TL_CHUNK ? tlChunks(segs) : [segs];
-    const sum = { visits: 0, tracks: 0, dupes: 0, resolved: 0,
+    const sum = { visits: 0, tracks: 0, dupes: 0, lowprob: 0, resolved: 0,
                   unnamed: 0, min: null, max: null };
+    // A12: optionaler Filter — Besuche mit unsicherer Ortszuordnung überspringen
+    const minProb = Math.max(0, Math.min(100, +document.getElementById('tl-minprob').value || 0)) / 100;
     let done = 0;
     for (const chunk of chunks) {
       if (chunks.length > 1) {
@@ -2504,23 +2684,29 @@ document.getElementById('timeline-file').addEventListener('change', async ev => 
       }
       // Bei Etappen kein Auto-Geocoding pro Etappe (Nominatim: 1 Anfrage/s) —
       // dafür gibt es nach dem Import den Button „Ortsnamen auflösen".
-      const r = await api(`/api/import/timeline${chunks.length > 1 ? '?auto_resolve=false' : ''}`, {
+      const params = new URLSearchParams();
+      if (chunks.length > 1) params.set('auto_resolve', 'false');
+      if (minProb > 0) params.set('min_probability', String(minProb));
+      const qs = params.toString() ? `?${params}` : '';
+      const r = await api(`/api/import/timeline${qs}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [key]: chunk }),
       });
       sum.visits += r.visits_created; sum.tracks += r.tracks_created;
       sum.dupes += r.skipped_duplicates; sum.resolved += r.names_resolved || 0;
+      sum.lowprob += r.skipped_low_probability || 0;
       sum.unnamed = r.locations_unnamed || 0; // Gesamtstand, nicht summieren
       if (r.date_min && (!sum.min || r.date_min < sum.min)) sum.min = r.date_min;
       if (r.date_max && (!sum.max || r.date_max > sum.max)) sum.max = r.date_max;
       done += chunk.length;
     }
     const range = sum.min ? `\nZeitraum: ${sum.min.slice(0,10)} bis ${sum.max.slice(0,10)}` : '';
+    const lowprob = sum.lowprob ? `\n${sum.lowprob} Besuche unter ${Math.round(minProb*100)} % Ortssicherheit übersprungen.` : '';
     const names = sum.unnamed
-      ? `\n\n📍 ${sum.unnamed} Orte haben noch keinen Namen — unten „Ortsnamen auflösen" ausführen.`
+      ? `\n\n📍 ${sum.unnamed} Orte haben noch keinen echten Namen — unten „Ortsnamen auflösen" ausführen.`
       : (sum.resolved ? `\n${sum.resolved} Ortsnamen direkt aufgelöst.` : '');
     toast(`✓ Timeline-Import fertig:\n${sum.visits} Besuche als Events, ${sum.tracks} Routen (Tracks).`
-      + `\n${sum.dupes} Dubletten übersprungen.${range}${names}`, 'ok', 12000);
+      + `\n${sum.dupes} Dubletten übersprungen.${lowprob}${range}${names}`, 'ok', 12000);
     trackCache.clear();
     await refreshAll();
   } catch (err) {

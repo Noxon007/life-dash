@@ -10,6 +10,39 @@ jedem `MINOR` vorkommen.
 
 ## [Unreleased]
 
+## [0.8.0] – 2026-07-16
+
+### Hinzugefügt
+- **A5 (Rest) — Besuchs-Verdichtung:** Wiederholte Besuche desselben Orts
+  werden gebündelt statt einzeln gelistet. **Karte:** ab Monats-Ansicht ein
+  Marker + eine Listenzeile je Ort („59× Zuhause — …", mit Zeitspanne),
+  Alltagsorte fallen damit automatisch zusammen; abschaltbar über den neuen
+  Chip **„🔁 Orte bündeln"**. In Tag/Woche bleibt die nummerierte Route.
+  **Timeline:** gleiche Google-Besuche einer Zeitgruppe erscheinen als eine
+  Sammelkarte („🔁 59× Besuch: X"), die per Klick zu Einzelkarten aufklappt —
+  vorher füllten Alltagsorte die 25-Karten-Kappe der Gruppen komplett.
+- **A12 — Timeline-Import: semantische Orte → echte Adressen:** Orte, die der
+  Geräte-Export nur als Label kennt („Zuhause", „Arbeit", „Gesuchte
+  Adresse" …), werden jetzt mit reverse-geocodet — das Label bleibt als
+  Präfix erhalten („Zuhause — Musterstraße 1, Detmold"); Ort-Typ (z. B.
+  `home`) und getrennte `place_id`s (mehrere Wohnorte im Lebenslauf) bleiben
+  unverändert. Gilt beim Import (Auto-Auflösung kleiner Mengen) und
+  rückwirkend über „Ortsnamen auflösen". Dazu ein optionaler Import-Filter
+  **Mindest-Ortssicherheit** (`min_probability`): Besuche mit unsicherer
+  Ortszuordnung (häufig bei „Gesuchte Adresse") lassen sich beim Import
+  überspringen; der Ergebnis-Toast weist sie aus.
+- **A6 — Nutzerverwaltungs-UI:** Neuer Admin-Bereich „Nutzer": Liste aller
+  Konten (Name, E-Mail, Rolle, Datenumfang, dabei seit), Rolle per Auswahl
+  ändern, Nutzer **mitsamt all ihren Daten** löschen (mit Sicherheitsabfrage).
+  Leitplanken: das eigene Konto kann weder gelöscht noch herabgestuft werden,
+  der letzte Admin bleibt immer erhalten
+  (`GET/PATCH/DELETE /api/admin/users`).
+
+### Tests
+- Neue Offline-Tests für A12 (Label-Präfix, Idempotenz, `field_overrides`-
+  Schutz, `min_probability`) und A6 (Letzter-Admin-Guard, Löschen inkl.
+  Datenzeilen, Selbstlösch-Sperre) in `backend/tests/`.
+
 ## [0.7.0] – 2026-07-16
 
 ### Hinzugefügt

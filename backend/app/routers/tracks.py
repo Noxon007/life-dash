@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 
 from dateutil import parser as dateparser
 from fastapi import APIRouter, Body, Depends
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
@@ -69,6 +70,10 @@ _SEMANTIC_NAMES = {
     "work": "Arbeit", "inferred work": "Arbeit (vermutet)",
     "searched address": "Gesuchte Adresse", "aliased location": "Gespeicherter Ort",
 }
+# A12: Semantische Labels sind KEINE echten Ortsnamen — sie zählen wie
+# Koordinaten-Namen als "unaufgelöst" und werden reverse-geocodet; das Label
+# bleibt dabei als Präfix erhalten ("Zuhause — Musterstraße 1, Detmold").
+SEMANTIC_LABELS = frozenset(_SEMANTIC_NAMES.values())
 
 _LATLNG_RE = re.compile(r"(-?\d+(?:\.\d+)?)\s*°?\s*,\s*(-?\d+(?:\.\d+)?)")
 
@@ -262,18 +267,37 @@ def _annotate_paths(moves: list[dict]) -> list[dict]:
     return paths + remaining
 
 
+def _semantic_label(name: str | None) -> str | None:
+    """Semantisches Label eines Ortsnamens ("Zuhause", "Arbeit — Musterstr. 1"
+    -> "Arbeit"), sonst None. Erkennt auch bereits aufgelöste Namen mit
+    Label-Präfix, damit z. B. die Fremdschrift-Auflösung das Label behält."""
+    if not name:
+        return None
+    first = name.split(" — ", 1)[0].strip()
+    return first if first in SEMANTIC_LABELS else None
+
+
 def _apply_resolved_name(db: Session, loc: Location, user_id: str) -> bool:
     """Reverse-geocodet eine Location und zieht die Titel der verknüpften
     Besuchs-Events („Besuch: …") nach — deckt Koordinaten-Namen („Ort (lat,
-    lng)") ebenso ab wie Fremdschrift-Namen (A10). Manuell umbenannte Events
-    (title in field_overrides) bleiben unangetastet."""
+    lng)"), semantische Labels („Zuhause", A12) und Fremdschrift-Namen (A10)
+    ab. Semantische Labels bleiben als Präfix erhalten („Zuhause — Adresse");
+    der Location-Typ (z. B. home) bleibt dabei unverändert, und getrennte
+    place_ids (z. B. mehrere Wohnorte im Lebenslauf) bleiben getrennte Orte.
+    Manuell umbenannte Events (title in field_overrides) bleiben unangetastet."""
+    label = _semantic_label(loc.name)
     hit = geocode_svc.reverse_geocode(loc.lat, loc.lng)
     if not hit:
         return False
-    loc.name = hit["name"]
-    if hit.get("type"):
-        loc.type = hit["type"]
+    if label:
+        loc.name = f"{label} — {hit['name']}"
+    else:
+        loc.name = hit["name"]
+        if hit.get("type"):
+            loc.type = hit["type"]
     short = hit["name"].split(",")[0].strip()
+    if label:
+        short = f"{label} — {short}"
     linked = (
         db.query(Event)
         .filter(Event.user_id == user_id, Event.location_id == loc.id,
@@ -285,6 +309,12 @@ def _apply_resolved_name(db: Session, loc: Location, user_id: str) -> bool:
             continue
         ev.title = f"Besuch: {short}"
     return True
+
+
+def _unresolved_name_filter():
+    """SQL-Filter für Orte ohne echten Namen: Koordinaten-Platzhalter
+    („Ort (lat, lng)") und semantische Labels ohne Adresse (A12)."""
+    return or_(Location.name.like("Ort (%"), Location.name.in_(SEMANTIC_LABELS))
 
 
 def _nonlatin_locations(db: Session, user_id: str) -> list[Location]:
@@ -303,6 +333,7 @@ def _nonlatin_locations(db: Session, user_id: str) -> list[Location]:
 def import_timeline(
     payload: dict = Body(...),
     auto_resolve: bool = True,
+    min_probability: float = 0.0,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> TimelineImportResult:
@@ -310,11 +341,21 @@ def import_timeline(
 
     auto_resolve=false unterdrückt das direkte Reverse-Geocoding kleiner
     Ortsmengen — das Frontend setzt es beim Etappen-Import großer Dateien
-    (A2), damit nicht jede Etappe an der Nominatim-Drossel (1 req/s) hängt."""
+    (A2), damit nicht jede Etappe an der Nominatim-Drossel (1 req/s) hängt.
+
+    min_probability (0..1, A12): Besuche, deren Ortszuordnung laut Google
+    unsicherer ist (häufig bei „Gesuchte Adresse"), werden übersprungen.
+    0 = alle importieren (Default)."""
+    min_probability = max(0.0, min(min_probability, 1.0))
     visits, moves = _normalize(payload)
     moves = _annotate_paths(moves)
     invalid = (len(payload.get("semanticSegments") or []) + len(payload.get("timelineObjects") or [])
                - len(visits) - len(moves))
+    skipped_lowprob = 0
+    if min_probability > 0:
+        kept = [v for v in visits if v["probability"] >= min_probability]
+        skipped_lowprob = len(visits) - len(kept)
+        visits = kept
 
     # Vorhandene Import-Schlüssel des Nutzers -> idempotenter Re-Import
     have_events = {x[0] for x in db.query(Event.external_id)
@@ -406,9 +447,11 @@ def import_timeline(
         created_tracks += 1
 
     # Vorschlag 2: kleine Mengen NEUER Orte direkt reverse-geocoden — Namen
-    # statt „Ort (lat, lng)". Große Erstimporte laufen über den Button.
+    # statt „Ort (lat, lng)" bzw. echte Adressen hinter semantischen Labels
+    # (A12). Große Erstimporte laufen über den Button.
     names_resolved = 0
-    unnamed_new = [l for l in new_locations if l.name.startswith("Ort (")]
+    unnamed_new = [l for l in new_locations
+                   if l.name.startswith("Ort (") or l.name in SEMANTIC_LABELS]
     if auto_resolve and settings.geocoding_enabled and 0 < len(unnamed_new) <= AUTO_RESOLVE_MAX:
         for i, loc in enumerate(unnamed_new):
             if i:
@@ -418,16 +461,19 @@ def import_timeline(
 
     db.commit()
     locations_unnamed = (db.query(Location)
-                         .filter(Location.user_id == user.id, Location.name.like("Ort (%"))
+                         .filter(Location.user_id == user.id, _unresolved_name_filter())
                          .count())
     log.info("Timeline-Import: %d Besuche, %d Tracks, %d Dubletten übersprungen, "
+             "%d unsichere Besuche gefiltert (min_probability=%.2f), "
              "%d Ortsnamen aufgelöst (%d offen)",
-             created_visits, created_tracks, skipped, names_resolved, locations_unnamed)
+             created_visits, created_tracks, skipped, skipped_lowprob,
+             min_probability, names_resolved, locations_unnamed)
     return TimelineImportResult(
         visits_created=created_visits,
         tracks_created=created_tracks,
         skipped_duplicates=skipped,
         skipped_invalid=max(0, invalid),
+        skipped_low_probability=skipped_lowprob,
         date_min=min(all_dates) if all_dates else None,
         date_max=max(all_dates) if all_dates else None,
         names_resolved=names_resolved,
@@ -444,7 +490,9 @@ def resolve_place_names(
 ) -> PlaceNameResolveResult:
     """Löst Ortsnamen per Reverse-Geocoding auf.
 
-    scope="unnamed" (Default): Koordinaten-Namen („Ort (lat, lng)").
+    scope="unnamed" (Default): Koordinaten-Namen („Ort (lat, lng)") und
+    semantische Labels ohne Adresse („Zuhause", „Arbeit" … — A12; das Label
+    bleibt als Präfix erhalten).
     scope="nonlatin": Fremdschrift-Namen (z. B. Griechisch) erneut auflösen,
     jetzt mit deutsch/englischer Sprach-Fallback-Kette (A10).
 
@@ -460,7 +508,7 @@ def resolve_place_names(
             return _nonlatin_locations(db, user.id)
         return (db.query(Location)
                 .filter(Location.user_id == user.id,
-                        Location.name.like("Ort (%"),
+                        _unresolved_name_filter(),
                         Location.lat.isnot(None))
                 .all())
 
