@@ -911,6 +911,23 @@
               unangetastet.</div>
           </div>
           <div class="action-row">
+            <button class="btn secondary" id="btn-reformat-names" style="flex-shrink:0; min-width:215px; text-align:left">📐 Adressen kürzen</button>
+            <div class="action-desc"><b>Anzeige-Format für Ortsnamen.</b><br>
+              Aufgelöste Adressen werden aus diesen Bausteinen zusammengesetzt — statt der langen
+              Nominatim-Adresse mit Verwaltungsregionen und Postleitzahl („…, Gemeinde Korfu-Mitte
+              und Inseln, Regionalbezirk Korfu, …, 491 00, Griechenland"):<br>
+              <span id="fmt-parts" style="display:inline-flex; gap:14px; flex-wrap:wrap; margin:8px 0">
+                <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="road" checked> Straße</label>
+                <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="suburb" checked> Ortsteil</label>
+                <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="city" checked> Stadt</label>
+                <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="country" checked> Land</label>
+              </span><br>
+              Benannte Orte (Restaurant, Museum …) behalten ihren Eigennamen immer vorn. Die Auswahl
+              gilt sofort für alle neuen Auflösungen; der Knopf formatiert <b>bestehende</b> lange
+              Adressen nach diesem Muster um (Reverse-Geocoding, 1 Anfrage/Sekunde — Besuchs-Events
+              werden mit umbenannt, manuell umbenannte bleiben unangetastet).</div>
+          </div>
+          <div class="action-row">
             <button class="btn secondary" id="btn-resolve-nonlatin" style="flex-shrink:0; min-width:215px; text-align:left">🌍 Fremdschrift-Namen eindeutschen</button>
             <div class="action-desc"><b>Ortsnamen in Lokalschrift (z. B. Griechisch) neu auflösen.</b><br>
               Löst bestehende Orte, deren Name nicht-lateinische Schrift enthält, erneut auf —
@@ -2311,7 +2328,7 @@ function gotoView(v) {
   if (v === 'map') setTimeout(openMapView, 40);
   if (v === 'stats') loadStats();
   if (v === 'compendium') loadCompendium(document.querySelector('#comp-tabs .zoom-btn.active').dataset.type);
-  if (v === 'admin') { loadModQueue(); loadFuzzyDates(); if (isAdmin()) { loadUsers(); loadDbTables(); } }
+  if (v === 'admin') { loadModQueue(); loadFuzzyDates(); loadPlaceFormat(); if (isAdmin()) { loadUsers(); loadDbTables(); } }
 }
 
 // ---------- NUTZERVERWALTUNG (A6, nur Admin) ----------
@@ -2738,6 +2755,44 @@ document.getElementById('btn-resolve-nonlatin').addEventListener('click', e =>
     },
     unit: 'Nominatim-Anfragen',
     doneMsg: n => `Fertig: ${n} Ortsnamen eingedeutscht.`,
+  }));
+
+// Ortsnamen-Format: Bausteine (Straße/Ortsteil/Stadt/Land) pro Nutzer gespeichert
+async function loadPlaceFormat() {
+  try {
+    const s = await api('/api/auth/me/settings');
+    document.querySelectorAll('#fmt-parts [data-part]').forEach(cb =>
+      cb.checked = s.place_name_parts.includes(cb.dataset.part));
+  } catch (_) { /* Standard-Häkchen bleiben */ }
+}
+document.querySelectorAll('#fmt-parts [data-part]').forEach(cb =>
+  cb.addEventListener('change', async () => {
+    const parts = [...document.querySelectorAll('#fmt-parts [data-part]:checked')].map(c => c.dataset.part);
+    if (!parts.length) {
+      cb.checked = true;
+      toast('Mindestens ein Baustein muss gewählt bleiben.', 'warn');
+      return;
+    }
+    try {
+      await api('/api/auth/me/settings', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ place_name_parts: parts }),
+      });
+      toast('✓ Ortsnamen-Format gespeichert — gilt für alle neuen Auflösungen.');
+    } catch (err) {
+      toast('Speichern fehlgeschlagen: ' + err.message, 'error');
+      loadPlaceFormat();
+    }
+  }));
+// Bestehende lange Adressen aufs gewählte Format bringen — scope=verbose
+document.getElementById('btn-reformat-names').addEventListener('click', e =>
+  runBatchedAdmin(e.target, {
+    step: async () => {
+      const r = await api('/api/import/timeline/resolve-names?limit=10&scope=verbose', { method: 'POST' });
+      return { done: r.resolved, remaining: r.remaining };
+    },
+    unit: 'Nominatim-Anfragen',
+    doneMsg: n => `Fertig: ${n} Adressen gekürzt.`,
   }));
 
 // Alle Daten löschen — mit doppelter Sicherheitsabfrage

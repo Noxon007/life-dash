@@ -7,7 +7,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -17,6 +17,7 @@ from app.config import settings
 from app.database import get_db
 from app.models import User
 from app.schemas import AuthConfig, UserRead
+from app.services import geocode as geocode_svc
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
@@ -34,6 +35,38 @@ def auth_config() -> AuthConfig:
 @router.get("/me", response_model=UserRead)
 def me(user: User = Depends(get_current_user)) -> UserRead:
     return UserRead.model_validate(user)
+
+
+# --------------------------------------------------------------------------- #
+# Unkritische UI-Einstellungen des eigenen Kontos. Bewusst eine Whitelist —
+# User.settings wird später auch Secrets (Immich-Key, PSN-Token) enthalten,
+# die NIE ans Frontend gehen.
+# --------------------------------------------------------------------------- #
+@router.get("/me/settings")
+def my_settings(user: User = Depends(get_current_user)) -> dict:
+    """Anzeige-Einstellungen: Bausteine für aufgelöste Ortsnamen."""
+    return {"place_name_parts": geocode_svc.parts_for(user)}
+
+
+@router.patch("/me/settings")
+def update_my_settings(
+    payload: dict = Body(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Ändert Anzeige-Einstellungen (nur Whitelist-Schlüssel)."""
+    if "place_name_parts" in payload:
+        raw = payload["place_name_parts"]
+        if (not isinstance(raw, list)
+                or not any(p in geocode_svc.PLACE_NAME_PARTS for p in raw)):
+            raise HTTPException(
+                400, "place_name_parts: mindestens ein gültiger Baustein "
+                     f"aus {list(geocode_svc.PLACE_NAME_PARTS)}")
+        prefs = dict(user.settings or {})
+        prefs["place_name_parts"] = geocode_svc.sanitize_parts(raw)
+        user.settings = prefs
+        db.commit()
+    return {"place_name_parts": geocode_svc.parts_for(user)}
 
 
 @router.get("/login")

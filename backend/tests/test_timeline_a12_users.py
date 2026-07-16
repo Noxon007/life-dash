@@ -8,7 +8,9 @@ from fastapi import HTTPException
 from app.models import ConfirmState, Event, Location, User, UserRole
 from app.routers import tracks as tracks_router
 from app.routers.admin import delete_user, list_users, update_user_role
+from app.routers.auth import my_settings, update_my_settings
 from app.routers.tracks import import_timeline, resolve_place_names
+from app.services.geocode import sanitize_parts, short_name
 
 
 # --------------------------------------------------------------------------- #
@@ -37,9 +39,20 @@ def fake_reverse(monkeypatch):
     monkeypatch.setattr(tracks_router, "NOMINATIM_DELAY_S", 0)
     monkeypatch.setattr(
         tracks_router.geocode_svc, "reverse_geocode",
-        lambda lat, lng: {"name": "Musterstraße 1, 32756 Detmold, Deutschland",
-                          "type": "house"},
+        lambda lat, lng: {
+            "name": ("Musterstraße, Mantouki, Detmold, Kreis Lippe, "
+                     "Nordrhein-Westfalen, 32756, Deutschland"),
+            "type": "house",
+            "poi": None,
+            "address": {"road": "Musterstraße", "house_number": "1",
+                        "suburb": "Mantouki", "city": "Detmold",
+                        "postcode": "32756", "country": "Deutschland"},
+        },
     )
+
+
+# Kurzform aus obiger fake_reverse-Adresse (Default-Bausteine)
+SHORT = "Musterstraße 1, Mantouki, Detmold, Deutschland"
 
 
 # --------------------------------------------------------------------------- #
@@ -83,10 +96,10 @@ def test_resolve_semantic_keeps_label_prefix(db, user, fake_reverse):
     assert result.resolved == 1 and result.remaining == 0
 
     loc = db.query(Location).one()
-    assert loc.name == "Zuhause — Musterstraße 1, 32756 Detmold, Deutschland"
+    assert loc.name == f"Zuhause — {SHORT}"
     assert loc.type == "home"  # Typ wird vom Geocoder NICHT überschrieben
     ev = db.query(Event).one()
-    assert ev.title == "Besuch: Zuhause — Musterstraße 1"
+    assert ev.title == f"Besuch: Zuhause — {SHORT}"
 
 
 def test_resolve_is_idempotent(db, user, fake_reverse):
@@ -118,9 +131,100 @@ def test_resolve_coordinate_names_unchanged_behaviour(db, user, fake_reverse):
 
     resolve_place_names(limit=10, scope="unnamed", db=db, user=user)
     db.refresh(loc)
-    assert loc.name == "Musterstraße 1, 32756 Detmold, Deutschland"
+    assert loc.name == SHORT
     assert loc.type == "house"  # ohne Label übernimmt der Geocoder-Typ
-    assert db.query(Event).one().title == "Besuch: Musterstraße 1"
+    assert db.query(Event).one().title == f"Besuch: {SHORT}"
+
+
+# --------------------------------------------------------------------------- #
+# Ortsnamen-Format: short_name-Bausteine + Nutzer-Einstellung + scope=verbose
+# --------------------------------------------------------------------------- #
+CORFU_HIT = {
+    "name": ("Ελευθερίου Βενιζέλου, Tenedos, Ag. Pateres, Mantouki, Korfu, "
+             "Gemeinde Korfu-Mitte und Inseln, Regionalbezirk Korfu, "
+             "Region der Ionischen Inseln, Peloponnes, Westgriechenland und "
+             "Ionische Inseln, 491 00, Griechenland"),
+    "type": "residential",
+    "poi": "Ελευθερίου Βενιζέλου",  # Straßenobjekt: Eigenname == road
+    "address": {"road": "Ελευθερίου Βενιζέλου", "suburb": "Mantouki",
+                "city": "Korfu", "postcode": "491 00",
+                "country": "Griechenland"},
+}
+
+
+def test_short_name_default_parts():
+    assert short_name(CORFU_HIT) == "Ελευθερίου Βενιζέλου, Mantouki, Korfu, Griechenland"
+
+
+def test_short_name_selected_parts():
+    assert short_name(CORFU_HIT, ["road", "city"]) == "Ελευθερίου Βενιζέλου, Korfu"
+    assert short_name(CORFU_HIT, ["city", "country"]) == "Korfu, Griechenland"
+
+
+def test_short_name_poi_stays_in_front():
+    hit = {"poi": "Adlerwarte Berlebeck",
+           "address": {"road": "Hangsteinstraße", "city": "Detmold",
+                       "country": "Deutschland"}}
+    assert short_name(hit, ["city"]) == "Adlerwarte Berlebeck, Detmold"
+
+
+def test_short_name_house_number_and_fallback():
+    hit = {"address": {"road": "Musterstraße", "house_number": "1",
+                       "city": "Detmold"}}
+    assert short_name(hit, ["road", "city"]) == "Musterstraße 1, Detmold"
+    # Ohne Adressfelder: erste zwei display_name-Segmente
+    assert short_name({"name": "A, B, C, D", "address": {}}) == "A, B"
+
+
+def test_sanitize_parts():
+    assert sanitize_parts(["city", "road", "bogus"]) == ["road", "city"]  # kanonische Reihenfolge
+    assert sanitize_parts([]) == ["road", "suburb", "city", "country"]
+    assert sanitize_parts(None) == ["road", "suburb", "city", "country"]
+
+
+def test_resolve_respects_user_parts(db, user, fake_reverse):
+    import_timeline(_device_payload(), auto_resolve=False, db=db, user=user)
+    user.settings = {"place_name_parts": ["road", "city"]}
+    db.commit()
+
+    resolve_place_names(limit=10, scope="unnamed", db=db, user=user)
+    loc = db.query(Location).one()
+    assert loc.name == "Zuhause — Musterstraße 1, Detmold"
+    assert db.query(Event).one().title == "Besuch: Zuhause — Musterstraße 1, Detmold"
+
+
+def test_verbose_scope_reformats_existing_addresses(db, user, fake_reverse):
+    """Bestehende lange Nominatim-Adressen werden aufs Format gekürzt,
+    Besuchs-Events mit umbenannt; danach ist nichts mehr offen."""
+    loc = Location(user_id=user.id, name=CORFU_HIT["name"],
+                   lat=39.62, lng=19.91, type="road")
+    db.add(loc)
+    db.flush()
+    db.add(Event(user_id=user.id, title=f"Besuch: {CORFU_HIT['name']}"[:255],
+                 location_id=loc.id))
+    db.commit()
+
+    result = resolve_place_names(limit=10, scope="verbose", db=db, user=user)
+    assert result.resolved == 1 and result.remaining == 0
+    db.refresh(loc)
+    assert loc.name == SHORT
+    assert db.query(Event).one().title == f"Besuch: {SHORT}"
+
+    again = resolve_place_names(limit=10, scope="verbose", db=db, user=user)
+    assert again.resolved == 0 and again.remaining == 0
+
+
+def test_settings_endpoint_roundtrip(db, user):
+    assert my_settings(user=user) == {
+        "place_name_parts": ["road", "suburb", "city", "country"]}
+    result = update_my_settings(
+        payload={"place_name_parts": ["country", "city", "bogus"]}, db=db, user=user)
+    assert result == {"place_name_parts": ["city", "country"]}
+    assert db.get(User, user.id).settings["place_name_parts"] == ["city", "country"]
+
+    with pytest.raises(HTTPException) as exc:
+        update_my_settings(payload={"place_name_parts": ["bogus"]}, db=db, user=user)
+    assert exc.value.status_code == 400
 
 
 # --------------------------------------------------------------------------- #

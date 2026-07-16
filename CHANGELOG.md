@@ -31,6 +31,19 @@ jedem `MINOR` vorkommen.
   **Mindest-Ortssicherheit** (`min_probability`): Besuche mit unsicherer
   Ortszuordnung (häufig bei „Gesuchte Adresse") lassen sich beim Import
   überspringen; der Ergebnis-Toast weist sie aus.
+- **Kompakte Ortsnamen (konfigurierbar):** Aufgelöste Adressen werden nicht
+  mehr als volle Nominatim-Kette gespeichert („…, Gemeinde Korfu-Mitte und
+  Inseln, Regionalbezirk Korfu, …, 491 00, Griechenland"), sondern aus
+  strukturierten Bausteinen zusammengesetzt: **Straße · Ortsteil · Stadt ·
+  Land** — per Checkboxen im Admin-Bereich pro Nutzer wählbar
+  (`GET/PATCH /api/auth/me/settings`, Whitelist). Benannte Orte (Restaurant,
+  Museum, Bahnhof …) behalten ihren Eigennamen immer vorn. Gilt für
+  Timeline-Auflösung **und** Vorwärts-Geocoding (KI-Pipeline, manuelle
+  Eingabe, Bearbeiten-Dialog). Neue Aktion **„📐 Adressen kürzen"**
+  formatiert bestehende lange Adressen nach (`resolve-names?scope=verbose`,
+  Batch-Lauf mit Stopp-Knopf); Besuchs-Events werden mit umbenannt, manuell
+  umbenannte bleiben unangetastet. Besuchs-Titel tragen jetzt das volle
+  Kurzformat (vorher nur das erste Adress-Segment ohne Stadt).
 - **A6 — Nutzerverwaltungs-UI:** Neuer Admin-Bereich „Nutzer": Liste aller
   Konten (Name, E-Mail, Rolle, Datenumfang, dabei seit), Rolle per Auswahl
   ändern, Nutzer **mitsamt all ihren Daten** löschen (mit Sicherheitsabfrage).
@@ -38,10 +51,18 @@ jedem `MINOR` vorkommen.
   der letzte Admin bleibt immer erhalten
   (`GET/PATCH/DELETE /api/admin/users`).
 
+### Behoben
+- **Import-Auto-Auflösung benannte frische Besuchs-Events nicht um:** Beim
+  direkten Reverse-Geocoding kleiner Ortsmengen im Import wurden die gerade
+  angelegten Events nicht gefunden (Session ohne Autoflush) — ihre Titel
+  blieben „Besuch: Ort (lat, lng)", obwohl der Ort aufgelöst war.
+
 ### Tests
 - Neue Offline-Tests für A12 (Label-Präfix, Idempotenz, `field_overrides`-
-  Schutz, `min_probability`) und A6 (Letzter-Admin-Guard, Löschen inkl.
-  Datenzeilen, Selbstlösch-Sperre) in `backend/tests/`.
+  Schutz, `min_probability`), A6 (Letzter-Admin-Guard, Löschen inkl.
+  Datenzeilen, Selbstlösch-Sperre) und das Ortsnamen-Format (`short_name`-
+  Bausteine, POI-Eigenname, Nutzer-Einstellung, `scope=verbose`,
+  Settings-Whitelist) in `backend/tests/`.
 
 ## [0.7.0] – 2026-07-16
 

@@ -277,27 +277,30 @@ def _semantic_label(name: str | None) -> str | None:
     return first if first in SEMANTIC_LABELS else None
 
 
-def _apply_resolved_name(db: Session, loc: Location, user_id: str) -> bool:
+def _apply_resolved_name(db: Session, loc: Location, user_id: str,
+                         parts: list[str] | None = None) -> bool:
     """Reverse-geocodet eine Location und zieht die Titel der verknüpften
     Besuchs-Events („Besuch: …") nach — deckt Koordinaten-Namen („Ort (lat,
     lng)"), semantische Labels („Zuhause", A12) und Fremdschrift-Namen (A10)
-    ab. Semantische Labels bleiben als Präfix erhalten („Zuhause — Adresse");
-    der Location-Typ (z. B. home) bleibt dabei unverändert, und getrennte
-    place_ids (z. B. mehrere Wohnorte im Lebenslauf) bleiben getrennte Orte.
-    Manuell umbenannte Events (title in field_overrides) bleiben unangetastet."""
+    ab. Gespeichert wird der kompakte Anzeige-Name aus den gewählten
+    Bausteinen (`parts`, z. B. Straße/Ortsteil/Stadt/Land) statt der langen
+    Nominatim-Adresse. Semantische Labels bleiben als Präfix erhalten
+    („Zuhause — Adresse"); der Location-Typ (z. B. home) bleibt dabei
+    unverändert, und getrennte place_ids (z. B. mehrere Wohnorte im
+    Lebenslauf) bleiben getrennte Orte. Manuell umbenannte Events (title in
+    field_overrides) bleiben unangetastet."""
     label = _semantic_label(loc.name)
     hit = geocode_svc.reverse_geocode(loc.lat, loc.lng)
     if not hit:
         return False
-    if label:
-        loc.name = f"{label} — {hit['name']}"
-    else:
-        loc.name = hit["name"]
-        if hit.get("type"):
-            loc.type = hit["type"]
-    short = hit["name"].split(",")[0].strip()
+    short = geocode_svc.short_name(hit, parts)
+    if not short:
+        return False
     if label:
         short = f"{label} — {short}"
+    loc.name = short[:255]
+    if not label and hit.get("type"):
+        loc.type = hit["type"]
     linked = (
         db.query(Event)
         .filter(Event.user_id == user_id, Event.location_id == loc.id,
@@ -307,7 +310,7 @@ def _apply_resolved_name(db: Session, loc: Location, user_id: str) -> bool:
     for ev in linked:
         if (ev.field_overrides or {}).get("title"):
             continue
-        ev.title = f"Besuch: {short}"
+        ev.title = f"Besuch: {short}"[:255]
     return True
 
 
@@ -324,6 +327,17 @@ def _nonlatin_locations(db: Session, user_id: str) -> list[Location]:
             .filter(Location.user_id == user_id, Location.lat.isnot(None))
             .all())
     return [l for l in rows if geocode_svc.NON_LATIN_RE.search(l.name or "")]
+
+
+def _verbose_locations(db: Session, user_id: str, parts: list[str]) -> list[Location]:
+    """Verortete Locations, deren Name länger ist, als das gewählte Format
+    zulässt (mehr Komma-Segmente als Bausteine) — alte, voll ausgeschriebene
+    Nominatim-Adressen. Kandidaten fürs Nachformatieren (scope=verbose)."""
+    max_commas = len(parts) - 1
+    rows = (db.query(Location)
+            .filter(Location.user_id == user_id, Location.lat.isnot(None))
+            .all())
+    return [l for l in rows if (l.name or "").count(",") > max_commas]
 
 
 # --------------------------------------------------------------------------- #
@@ -409,11 +423,11 @@ def import_timeline(
             continue
         have_events.add(v["hash"])
         loc = _resolve_visit_location(v)
-        # Lange Adressen aufs erste Segment kürzen — Koordinaten-Namen ganz lassen
-        short = loc.name if loc.name.startswith("Ort (") else loc.name.split(",")[0]
+        # Ortsnamen sind kompakt (short_name); alte lange Adressen heilt
+        # die Aktion „Adressen kürzen" (scope=verbose) nachträglich mit.
         db.add(Event(
             user_id=user.id,
-            title=f"Besuch: {short}",
+            title=f"Besuch: {loc.name}"[:255],
             date_start=v["start"], date_end=v["end"],
             date_precision=DatePrecision.exact,
             category="event",
@@ -453,10 +467,14 @@ def import_timeline(
     unnamed_new = [l for l in new_locations
                    if l.name.startswith("Ort (") or l.name in SEMANTIC_LABELS]
     if auto_resolve and settings.geocoding_enabled and 0 < len(unnamed_new) <= AUTO_RESOLVE_MAX:
+        # Neue Events erst in die DB schreiben (autoflush ist aus), sonst
+        # findet die Titel-Nachführung in _apply_resolved_name sie nicht
+        db.flush()
+        parts = geocode_svc.parts_for(user)
         for i, loc in enumerate(unnamed_new):
             if i:
                 time.sleep(NOMINATIM_DELAY_S)
-            if _apply_resolved_name(db, loc, user.id):
+            if _apply_resolved_name(db, loc, user.id, parts):
                 names_resolved += 1
 
     db.commit()
@@ -495,6 +513,8 @@ def resolve_place_names(
     bleibt als Präfix erhalten).
     scope="nonlatin": Fremdschrift-Namen (z. B. Griechisch) erneut auflösen,
     jetzt mit deutsch/englischer Sprach-Fallback-Kette (A10).
+    scope="verbose": Bestehende lange Nominatim-Adressen aufs gewählte
+    Anzeige-Format (place_name_parts) nachformatieren.
 
     Arbeitet einen Batch (max. `limit`, gedrosselt auf 1 Anfrage/s wegen
     Nominatim-Policy) ab und meldet, wie viele Orte noch offen sind — das
@@ -502,10 +522,13 @@ def resolve_place_names(
     pro Ort committet.
     """
     limit = max(1, min(limit, 100))
+    parts = geocode_svc.parts_for(user)
 
     def _candidates() -> list[Location]:
         if scope == "nonlatin":
             return _nonlatin_locations(db, user.id)
+        if scope == "verbose":
+            return _verbose_locations(db, user.id, parts)
         return (db.query(Location)
                 .filter(Location.user_id == user.id,
                         _unresolved_name_filter(),
@@ -517,13 +540,17 @@ def resolve_place_names(
     for i, loc in enumerate(locs):
         if i:
             time.sleep(NOMINATIM_DELAY_S)
-        ok = _apply_resolved_name(db, loc, user.id)
+        ok = _apply_resolved_name(db, loc, user.id, parts)
         if ok:
             db.commit()
         # Bleibt der Name trotz Auflösung fremdschriftlich (OSM kennt keinen
         # de/en-Namen), ist das kein Fortschritt — sonst liefe der Batch-Lauf
         # endlos über dieselben Orte.
         if ok and scope == "nonlatin" and geocode_svc.NON_LATIN_RE.search(loc.name or ""):
+            ok = False
+        # Gleiches Prinzip fürs Nachformatieren: bleibt der Name länger als
+        # das Format (kein addressdetails-Treffer), zählt er als Fehlschlag.
+        if ok and scope == "verbose" and (loc.name or "").count(",") > len(parts) - 1:
             ok = False
         if ok:
             resolved += 1

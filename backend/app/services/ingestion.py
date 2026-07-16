@@ -23,7 +23,7 @@ from app.ai.base import ExtractedEvent, ProviderUnavailable
 
 log = logging.getLogger("lifedash.ingestion")
 from app.config import settings
-from app.services.geocode import geocode
+from app.services.geocode import geocode, parts_for, short_name
 from app.models import (
     ConfirmState,
     DatePrecision,
@@ -34,6 +34,7 @@ from app.models import (
     FragmentStatus,
     Location,
     Source,
+    User,
 )
 
 
@@ -234,7 +235,10 @@ def _resolve_location(db: Session, ex: ExtractedEvent, user_id: str | None) -> L
         geo = geocode(ex.location_name)
         if geo:
             lat, lng, ltype = geo["lat"], geo["lng"], geo.get("type")
-            name = geo["name"]  # vollständige Adresse aus Nominatim
+            # Kompakter Anzeige-Name aus den gewählten Bausteinen statt der
+            # vollen Nominatim-Adresse mit Verwaltungskette
+            user = db.get(User, user_id) if user_id else None
+            name = short_name(geo, parts_for(user)) or geo["name"]
 
     location = Location(user_id=user_id, name=name, lat=lat, lng=lng, type=ltype)
     db.add(location)

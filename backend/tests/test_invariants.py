@@ -243,7 +243,7 @@ def test_ortsnamen_aufloesung_respektiert_manuell_umbenannte_titel(db, user, mon
     db.commit()
 
     assert loc.name == "Hermannsdenkmal, Detmold"
-    assert auto.title == "Besuch: Hermannsdenkmal"           # generierter Titel folgt
+    assert auto.title == "Besuch: Hermannsdenkmal, Detmold"  # generierter Titel folgt
     assert manual.title == "Besuch: Ort (51.9375, 8.8797)"   # Override bleibt geschützt
 
 
