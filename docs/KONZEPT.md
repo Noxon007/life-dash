@@ -613,6 +613,9 @@ Aufwand: S = Stunden · M = ~1 Tag · L = mehrere Tage. Kein Paket blockiert ein
 | **P2.2** | **Google-Timeline-Import** | L | Upload des Geräte-Exports (JSON), `Track`-Tabelle, Besuche→Events, Routen als Karten-Layer, Dubletten-Schutz (Segment-Hash). | Lückenlose Orts-Historie + echte Routen auf der Karte. |
 | **P2.3** | **Unscharfe-Zeiten-Review** | S | Admin-Bereich, der alle Events mit grober Präzision (`decade`/`year`/`season`) listet + Schnellbearbeitung (aus Frage 1). | Datenqualität gezielt verbessern. |
 | **P2.4** | **Auto-Re-Enrichment** | S | Nach Ingest/Import automatisch Wetter + Embeddings für neue Events (statt Admin-Knopf). | Weniger Handarbeit, immer aktuelle Stufe 3. |
+| **P2.5** | **Bulk-Bestätigen** | S–M | In der Moderations-Queue „alle bestätigen" mit Filter (Zeitraum, Kategorie, Mindest-Confidence, Quelle); Vorschau der betroffenen Events vor dem Bestätigen. | Das Werkzeug, um die Lebensdatenbank (Kap. 3.1) schnell wachsen zu lassen — hunderte korrekte KI-Vorschläge nicht einzeln abnicken müssen. |
+| **P2.6** | **Invarianten-Test „Bestätigtes ist unantastbar"** | S | Automatischer Test, der alle Recompute-/Enrichment-/Import-Pfade gegen die Invariante aus Kap. 3.1 prüft (Maschinen ändern `confirmed`-Daten nie, nur additive Ergänzungen; `field_overrides` respektiert; dokumentierte Ausnahme Ortsnamen-Auflösung). | Die zentrale Garantie der Lebensdatenbank überlebt künftige Code-Änderungen nachweisbar. |
+| **P2.7** | **Bestätigungs-Provenienz (`confirmed_at` + `confirmed_by`)** | S | Zeitpunkt (und Quelle: manuell / Bulk / Import-Automatik) der Bestätigung am Event speichern und im Detail anzeigen; Migration für Bestandsdaten. | Lebensdatenbank wird auditierbar: „Wann habe ich das als wahr markiert?" — nützlich auch für spätere Reviews (was wurde per Bulk statt bewusst bestätigt). |
 | **P3.1** | **Deklarative Statistik-Widgets** | M | Widgets aus Modul-YAML (`count`, `count_distinct`, `timeseries`) generisch rendern statt hart codiert. | Neue Module bringen ihre Statistik automatisch mit. |
 | **P3.2** | **Dekaden-Aggregation Timeline & Besuchs-Verdichtung** | M | Heat-/Dichte-Darstellung auf Jahrzehnt-/Jahres-Ebene statt langer Kartenlisten. Dazu Verdichtung importierter Timeline-Besuche: wiederholte Besuche desselben Orts gruppiert darstellen („59× Besuch: X"), Alltagsorte (Zuhause/Arbeit) optional beim Import überspringen oder zusammenfassen. | Übersicht bei vielen Events — der Timeline-Import (P2.2, umgesetzt) bringt zehntausende Besuchs-Events mit. |
 | **P4.1** | **Health-Connect-Import** | M | Upload des Health-Connect-Exports, Schritte/HF/Workouts → `Metric`, Workout-GPS → `Track`. | Fitness-Kontext an Events. |
@@ -621,7 +624,7 @@ Aufwand: S = Stunden · M = ~1 Tag · L = mehrere Tage. Kein Paket blockiert ein
 | **P5.2** | **Whisper-Sprach-Eingabe** | M | Serverseitiges Speech-to-Text (statt Browser-API), auch für Sprachmemos als Datei. | Bessere Diktat-Qualität, unabhängig vom Browser. |
 | **P5.3** | **Nutzerverwaltungs-UI** | S | Nutzerliste, Rollen ändern, Nutzer löschen (Admin-Panel). | Komfort für Multi-User-Betrieb. |
 
-**Empfohlene Reihenfolge:** **D1 → P2.1 → P2.2** (Deployment zuerst, weil Immich-Anbindung und Handy-Nutzung davon abhängen; dann Fotos; dann Orts-Historie). P2.3/P2.4 sind kleine Lückenfüller für zwischendurch.
+**Empfohlene Reihenfolge:** **D1 → P2.1 → P2.2** (Deployment zuerst, weil Immich-Anbindung und Handy-Nutzung davon abhängen; dann Fotos; dann Orts-Historie). P2.3/P2.4 sind kleine Lückenfüller für zwischendurch. **P2.5–P2.7** setzen das Vier-Schichten-Modell (Kap. 3.1) operativ um — sinnvoll als Paar P2.5+P2.6, sobald viele KI-Vorschläge auf Bestätigung warten.
 
 ---
 
@@ -644,7 +647,7 @@ Aufwand: S = Stunden · M = ~1 Tag · L = mehrere Tage. Kein Paket blockiert ein
 - ✅ **OIDC-Provider: Pocket ID** — läuft bereits im Homelab. Life-Dash nutzt den Authorization Code Flow mit PKCE (Public Client möglich); Redirect-URI: `<PUBLIC_BASE_URL>/api/auth/callback`. *(Damit ist Frage 8 beantwortet; P0+P1 sind seit 2026-07-14 umgesetzt — siehe backend/README.md.)*
 
 **Beantwortet am 2026-07-15:**
-0. ✅ **Vier-Schichten-Präzisierung** (siehe Kap. 3.1): Eingang → Vorschlagsraum → **Lebensdatenbank (fix, inkl. Fakten-Anreicherung wie Wetter)** → Ableitungen (wegwerfbar, inkl. Embeddings). Konsequenz: Wetter wird nicht mehr bei „Stufe 3 neu berechnen" verworfen, sondern nur ergänzt, wo es fehlt; Eingang wird nie automatisch gelöscht.
+0. ✅ **Vier-Schichten-Präzisierung** (siehe Kap. 3.1): Eingang → Vorschlagsraum → **Lebensdatenbank (fix, inkl. Fakten-Anreicherung wie Wetter)** → Ableitungen (wegwerfbar, inkl. Embeddings). Konsequenz: Wetter wird nicht mehr bei „Stufe 3 neu berechnen" verworfen, sondern nur ergänzt, wo es fehlt; Eingang wird nie automatisch gelöscht. Operative Folgepakete: **P2.5** (Bulk-Bestätigen), **P2.6** (Invarianten-Test), **P2.7** (Bestätigungs-Provenienz).
 1. ✅ **Datums-Granularität:** Die Stufen `exact/day/month/season/year/decade` **reichen**. Angaben wie „Anfang der 90er" werden als `decade` gespeichert und mit einem Hinweis „Zeit nicht genau genug" versehen; ein eigener Admin-Bereich listet alle grob datierten Events zur Nachbearbeitung (→ Paket **P2.3**).
 2. ✅ **Entity-Dubletten:** **Kein automatisches Zusammenführen.** Dubletten („Seeadler"/„Adler") werden manuell über die vorhandene Bearbeitung aufgelöst.
 5. ✅ **UI für Unsicherheit:** Die umgesetzten Badges reichen — „⚠ unbestätigt · XX %" (orange) vs. „✓ bestätigt" (grün).
