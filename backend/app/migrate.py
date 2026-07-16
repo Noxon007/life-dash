@@ -52,7 +52,27 @@ def ensure_schema(engine: Engine) -> list[str]:
                 if backfill:
                     conn.execute(text(backfill))
             applied.append(f"{table}.{col}")
+    if "metrics" in existing_tables:
+        ensure_weather_unique_index(engine)
     return applied
+
+
+def ensure_weather_unique_index(engine: Engine) -> None:
+    """DB-seitiger Dubletten-Schutz (A11): pro Event höchstens EINE
+    Wetter-Metrik je Kennzahl. Räumt vorhandene Dubletten auf (älteste Zeile
+    gewinnt) und legt dann einen partiellen Unique-Index an — damit können
+    auch zwei parallele Anreicherungs-Läufe keine Doppel-Zeilen erzeugen.
+    Syntax ist in SQLite und PostgreSQL identisch."""
+    with engine.begin() as conn:
+        conn.execute(text(
+            "DELETE FROM metrics WHERE source = 'weather' AND id NOT IN ("
+            "SELECT MIN(id) FROM metrics WHERE source = 'weather' "
+            "GROUP BY event_id, \"key\")"
+        ))
+        conn.execute(text(
+            'CREATE UNIQUE INDEX IF NOT EXISTS ux_metrics_weather '
+            'ON metrics (event_id, "key") WHERE source = \'weather\''
+        ))
 
 
 def adopt_orphan_rows(engine: Engine, user_id: str) -> int:

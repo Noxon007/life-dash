@@ -1,16 +1,22 @@
-"""Admin-Endpoints: Datenbank-Rohansicht (pgAdmin-artig), Zeilen bearbeiten
-und Stufe-2/3-Neuberechnung."""
+"""Admin-Endpoints: Datenbank-Rohansicht (pgAdmin-artig, mit Leitplanken —
+A4), Zeilen bearbeiten und Stufe-2/3-Neuberechnung."""
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
+from dateutil import parser as dateparser
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
-from sqlalchemy import inspect, select, text
+from sqlalchemy import DateTime as SADateTime
+from sqlalchemy import Enum as SAEnum
+from sqlalchemy import Float as SAFloat
+from sqlalchemy import Integer as SAInteger
+from sqlalchemy import Table, func, select
 from sqlalchemy.orm import Session
 
 from app.auth import require_admin
-from app.database import SessionLocal, engine, get_db
+from app.database import Base, SessionLocal, engine, get_db
 from app.models import (
     Entity,
     Event,
@@ -19,11 +25,12 @@ from app.models import (
     Location,
     MediaRef,
     Metric,
+    Source,
     Track,
     User,
     UserRole,
 )
-from app.services.enrichment import enrich_weather
+from app.services.enrichment import auto_enrich_events, enrich_weather
 from app.services.ingestion import reprocess_pending, reset_reprocess
 
 log = logging.getLogger("lifedash.admin")
@@ -35,24 +42,30 @@ router = APIRouter(
 )
 
 
-def _require_table(name: str) -> list[str]:
-    """Prüft, dass die Tabelle existiert, und liefert ihre Spaltennamen."""
-    insp = inspect(engine)
-    if name not in insp.get_table_names():
+def _require_table(name: str) -> Table:
+    """Liefert die Modell-Tabelle — nur bekannte Tabellen, keine SQL-Injection."""
+    table = Base.metadata.tables.get(name)
+    if table is None:
         raise HTTPException(status_code=404, detail="Tabelle nicht gefunden")
-    return [c["name"] for c in insp.get_columns(name)]
+    return table
+
+
+def _clean(v: Any) -> Any:
+    """Wert JSON-serialisierbar machen (datetime, dict etc. -> str)."""
+    if v is None or isinstance(v, (int, float, bool, str)):
+        return v
+    if isinstance(v, (dict, list)):
+        return json.dumps(v, ensure_ascii=False)
+    return str(v)
 
 
 @router.get("/tables")
-def list_tables() -> list[dict]:
+def list_tables(db: Session = Depends(get_db)) -> list[dict]:
     """Alle Tabellen mit Zeilenanzahl."""
-    insp = inspect(engine)
-    out: list[dict] = []
-    with engine.connect() as conn:
-        for name in insp.get_table_names():
-            count = conn.execute(text(f'SELECT COUNT(*) FROM "{name}"')).scalar()
-            out.append({"name": name, "rows": count})
-    return out
+    return [
+        {"name": t.name, "rows": db.execute(select(func.count()).select_from(t)).scalar()}
+        for t in Base.metadata.sorted_tables
+    ]
 
 
 @router.get("/tables/{name}")
@@ -60,29 +73,15 @@ def read_table(
     name: str,
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
 ) -> dict:
-    """Rohe Zeilen einer Tabelle (read-only). Tabellenname wird gegen die
-    real existierenden Tabellen geprüft -> keine SQL-Injection möglich."""
-    columns = _require_table(name)
-    with engine.connect() as conn:
-        total = conn.execute(text(f'SELECT COUNT(*) FROM "{name}"')).scalar()
-        rows = (
-            conn.execute(
-                text(f'SELECT * FROM "{name}" LIMIT :limit OFFSET :offset'),
-                {"limit": limit, "offset": offset},
-            )
-            .mappings()
-            .all()
-        )
-    # Werte JSON-serialisierbar machen (datetime, dict etc. -> str)
-    def _clean(v):
-        if v is None or isinstance(v, (int, float, bool, str)):
-            return v
-        return str(v)
-
+    """Rohe Zeilen einer Tabelle (read-only)."""
+    table = _require_table(name)
+    total = db.execute(select(func.count()).select_from(table)).scalar()
+    rows = db.execute(select(table).limit(limit).offset(offset)).mappings().all()
     return {
         "table": name,
-        "columns": columns,
+        "columns": [c.name for c in table.columns],
         "total": total,
         "limit": limit,
         "offset": offset,
@@ -90,50 +89,155 @@ def read_table(
     }
 
 
+def _coerce_value(table: str, col, raw: Any) -> Any:
+    """Validiert/normalisiert einen Roh-Wert aus der UI für die Spalte (A4).
+
+    Enums nur mit gültigen Werten, JSON muss parsen, Zeiten müssen Zeiten
+    sein, Zahlen Zahlen — sonst 400 statt stiller Datenkorruption."""
+    if raw == "" or raw is None:
+        if not col.nullable:
+            raise HTTPException(400, f"{table}.{col.name} darf nicht leer sein")
+        return None
+    if isinstance(col.type, SAEnum):
+        allowed = list(col.type.enums)
+        if str(raw) not in allowed:
+            raise HTTPException(400, f"{table}.{col.name}: ungültiger Wert {raw!r} "
+                                     f"— erlaubt: {', '.join(allowed)}")
+        return str(raw)
+    if isinstance(col.type, SADateTime):
+        try:
+            return dateparser.isoparse(str(raw))
+        except (ValueError, OverflowError):
+            raise HTTPException(400, f"{table}.{col.name}: keine gültige Zeitangabe "
+                                     f"({raw!r}, erwartet ISO, z. B. 2026-07-12T14:30:00)")
+    if isinstance(col.type, SAFloat):
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            raise HTTPException(400, f"{table}.{col.name}: keine Zahl ({raw!r})")
+    if isinstance(col.type, SAInteger):
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            raise HTTPException(400, f"{table}.{col.name}: keine ganze Zahl ({raw!r})")
+    if col.type.__class__.__name__.upper().startswith("JSON"):
+        if isinstance(raw, (dict, list)):
+            return raw
+        try:
+            return json.loads(raw)
+        except (TypeError, ValueError):
+            raise HTTPException(400, f"{table}.{col.name}: kein gültiges JSON ({raw!r})")
+    return raw
+
+
+def _event_side_effects(db: Session, event_id: str, changed: set[str]) -> list[str]:
+    """Folge-Neuberechnungen nach Roh-Änderungen an einem Event (A4):
+    Titel/Beschreibung -> Embedding neu; Zeit/Ort -> Wetter folgt den neuen
+    Fakten (derselbe Pfad wie bei der Nutzer-Korrektur, P2.4)."""
+    notes: list[str] = []
+    event = db.get(Event, event_id)
+    if not event:
+        return notes
+    if changed & {"title", "description"}:
+        event.embedding = None
+        notes.append("Embedding zurückgesetzt (nächster Embedding-Lauf berechnet neu)")
+    if changed & {"date_start", "date_end", "location_id"}:
+        for m in [m for m in event.metrics if m.source == Source.weather]:
+            event.metrics.remove(m)  # delete-orphan räumt die Zeile ab
+        db.flush()
+        enriched = auto_enrich_events(db, [event])
+        notes.append("Wetter neu geholt" if enriched
+                      else "Wetter entfernt (später über „Wetter ergänzen“ nachtragen)")
+    db.commit()
+    return notes
+
+
 @router.patch("/tables/{name}/{row_id}")
 def update_row(
     name: str,
     row_id: str,
     values: dict[str, Any] = Body(..., description="Spalte -> neuer Wert"),
+    db: Session = Depends(get_db),
 ) -> dict:
-    """Ändert Spalten einer Zeile (per id). Rohe DB-Bearbeitung im Admin-Panel."""
-    columns = _require_table(name)
-    if "id" not in columns:
+    """Ändert Spalten einer Zeile (per id) — mit Typ-/Enum-Validierung und
+    Folge-Neuberechnungen statt stiller Invarianten-Verletzung (A4)."""
+    table = _require_table(name)
+    if "id" not in table.columns:
         raise HTTPException(status_code=400, detail="Tabelle hat keine id-Spalte")
 
-    updates = {k: v for k, v in values.items() if k in columns and k != "id"}
+    updates = {
+        col: _coerce_value(name, table.columns[col], v)
+        for col, v in values.items() if col in table.columns and col != "id"
+    }
     if not updates:
         raise HTTPException(status_code=400, detail="Keine gültigen Spalten zum Ändern")
 
-    set_clause = ", ".join(f'"{col}" = :{col}' for col in updates)
-    params = dict(updates)
-    params["_row_id"] = row_id
-    with engine.begin() as conn:
-        result = conn.execute(
-            text(f'UPDATE "{name}" SET {set_clause} WHERE "id" = :_row_id'), params
-        )
-        if result.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Zeile nicht gefunden")
-        log.info("Rohansicht: UPDATE %s id=%s Spalten=%s", name, row_id, sorted(updates))
-        row = conn.execute(
-            text(f'SELECT * FROM "{name}" WHERE "id" = :_row_id'), {"_row_id": row_id}
-        ).mappings().first()
-    return {"updated": True, "row": {k: (v if v is None or isinstance(v, (int, float, bool, str)) else str(v)) for k, v in dict(row).items()}}
-
-
-@router.delete("/tables/{name}/{row_id}", status_code=204, response_model=None)
-def delete_row(name: str, row_id: str) -> None:
-    """Löscht eine Zeile (per id) aus der Rohansicht."""
-    columns = _require_table(name)
-    if "id" not in columns:
-        raise HTTPException(status_code=400, detail="Tabelle hat keine id-Spalte")
-    with engine.begin() as conn:
-        result = conn.execute(
-            text(f'DELETE FROM "{name}" WHERE "id" = :_row_id'), {"_row_id": row_id}
-        )
+    result = db.execute(
+        table.update().where(table.c.id == row_id).values(**updates)
+    )
     if result.rowcount == 0:
+        db.rollback()
         raise HTTPException(status_code=404, detail="Zeile nicht gefunden")
-    log.info("Rohansicht: DELETE %s id=%s", name, row_id)
+    db.commit()
+    log.info("Rohansicht: UPDATE %s id=%s Spalten=%s", name, row_id, sorted(updates))
+
+    side_effects: list[str] = []
+    if name == "events":
+        side_effects = _event_side_effects(db, row_id, set(updates))
+
+    row = db.execute(select(table).where(table.c.id == row_id)).mappings().first()
+    return {"updated": True,
+            "side_effects": side_effects,
+            "row": {k: _clean(v) for k, v in dict(row).items()}}
+
+
+# Lösch-Leitplanken (A4): Diese Tabellen sind über die Rohansicht gesperrt —
+# mit Begründung und Verweis auf den richtigen Weg.
+_DELETE_BLOCKED = {
+    "fragments": "Fragmente sind das Beweisarchiv (Eingang, Kap. 3.1) und werden "
+                 "nie über die Rohansicht gelöscht.",
+    "users": "Nutzer bitte über die Nutzerverwaltung löschen — die entfernt auch "
+             "alle zugehörigen Daten und schützt den letzten Admin.",
+}
+
+
+@router.delete("/tables/{name}/{row_id}")
+def delete_row(name: str, row_id: str, db: Session = Depends(get_db)) -> dict:
+    """Löscht eine Zeile (per id) aus der Rohansicht — inklusive Aufräumen
+    abhängiger Zeilen, damit keine verwaisten Verweise zurückbleiben (A4)."""
+    table = _require_table(name)
+    if name in _DELETE_BLOCKED:
+        raise HTTPException(status_code=400, detail=_DELETE_BLOCKED[name])
+    if "id" not in table.columns:
+        raise HTTPException(status_code=400, detail="Tabelle hat keine id-Spalte")
+
+    side_effects: list[str] = []
+    if name == "events":
+        for model, label in ((Metric, "Metriken"), (MediaRef, "Medien-Verweise"),
+                             (EventEntityLink, "Objekt-Verknüpfungen")):
+            n = (db.query(model).filter(model.event_id == row_id)
+                 .delete(synchronize_session=False))
+            if n:
+                side_effects.append(f"{n} {label} mitgelöscht")
+    elif name == "entities":
+        n = (db.query(EventEntityLink).filter(EventEntityLink.entity_id == row_id)
+             .delete(synchronize_session=False))
+        if n:
+            side_effects.append(f"{n} Event-Verknüpfungen mitgelöscht")
+    elif name == "locations":
+        n = (db.query(Event).filter(Event.location_id == row_id)
+             .update({Event.location_id: None}, synchronize_session=False))
+        if n:
+            side_effects.append(f"{n} Events sind jetzt ohne Ort")
+
+    result = db.execute(table.delete().where(table.c.id == row_id))
+    if result.rowcount == 0:
+        db.rollback()
+        raise HTTPException(status_code=404, detail="Zeile nicht gefunden")
+    db.commit()
+    log.info("Rohansicht: DELETE %s id=%s (%s)", name, row_id,
+             "; ".join(side_effects) or "keine Folgeänderungen")
+    return {"deleted": True, "side_effects": side_effects}
 
 
 # --------------------------------------------------------------------------- #

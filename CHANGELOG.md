@@ -10,6 +10,53 @@ jedem `MINOR` vorkommen.
 
 ## [Unreleased]
 
+## [0.9.0] – 2026-07-16
+
+### Hinzugefügt
+- **A11 — Jobs mit Sperre + Job-Ansicht:** Lang laufende Aktionen (Wetter,
+  Stufe-2-Neuberechnung, Embeddings, Ortsnamen-Läufe, Timeline-/JSON-Import)
+  sind jetzt als **Jobs** registriert (`/api/jobs`): Typ, Status, Fortschritt,
+  gestartet von/wann, Ergebnis. **Ein Lock pro Job-Typ** — startet eine zweite
+  Instanz denselben Typ (zweiter Browser, zweiter Nutzer), kommt „läuft
+  bereits (gestartet von …)" statt eines Doppel-Laufs mit doppelten
+  API-Kosten. Verwaiste Läufe (Browser zu) blockieren nach 3 Minuten ohne
+  Heartbeat nicht mehr. Neue **Jobs-Tabelle** im Admin-Bereich zeigt laufende
+  und letzte Läufe (alle Nutzer sehen sie — der Lock ist global).
+  Dazu **DB-seitiger Wetter-Dubletten-Schutz**: partieller Unique-Index
+  (`event_id`+`key` für `source=weather`) inkl. einmaliger Bereinigung
+  vorhandener Doppel-Metriken; die Anreicherung committet pro Event und
+  übergeht Kollisionen paralleler Läufe sauber.
+- **A4 — DB-Rohansicht mit Leitplanken:** Rohes Bearbeiten validiert jetzt
+  gegen das Modell (Enums nur mit gültigen Werten, JSON muss parsen, Zeiten/
+  Zahlen typgeprüft, Pflichtspalten nicht leerbar) — 400 mit klarer Meldung
+  statt stiller Datenkorruption. **Folge-Neuberechnungen** laufen automatisch
+  und werden im Toast angezeigt: Titel/Beschreibung geändert → Embedding
+  zurückgesetzt; Zeit/Ort geändert → Wetter folgt den neuen Fakten (P2.4-
+  Pfad). **Lösch-Leitplanken:** Fragmente (Beweisarchiv) und Nutzer (→
+  Nutzerverwaltung) sind in der Rohansicht gesperrt; Event-Löschung räumt
+  Metriken/Medien/Verknüpfungen mit ab, Entity-Löschung ihre Links,
+  Orts-Löschung hängt betroffene Events sauber ab (statt verwaister Verweise).
+- **A18 — Karten-Clustering erst ab Schwelle (einstellbar):** Neues Feld
+  „Cluster ab N Punkten" auf der Karte (Standard 50). Darunter Einzelmarker
+  bzw. die nummerierte Route, darüber Bündelung. Pro Nutzer gespeichert
+  (`map_cluster_min` in den Einstellungen), begrenzt auf **10–300** — die
+  Obergrenze schützt die Performance (mehr Einzelmarker frieren den Browser
+  nach großen Importen ein).
+
+### Behoben
+- **A16 — Monats-Präzision fehlte bei den unscharfen Zeiten:** „Juni Urlaub
+  Dänemark" (korrekt als `month` gespeichert) tauchte nicht in der
+  Unscharfe-Zeiten-Liste auf — sie filterte nur Jahreszeit/Jahr/Jahrzehnt/
+  ohne Datum. `month` zählt jetzt mit.
+- **API-Fehlermeldungen im UI:** Das Frontend zeigt jetzt die Backend-
+  Begründung (`detail`) statt nacktem Statuscode — wichtig für Validierungs-
+  fehler (A4) und „Job läuft bereits" (A11).
+
+### Tests
+- Neue Offline-Tests für A4 (Enum-/JSON-/Zeit-Validierung, Embedding-Reset,
+  Wetter-Nachzug, Lösch-Leitplanken und Aufräumen), A11 (Job-Lock, Stale-
+  Aufräumung, Wetter-Unique-Index) und A18 (Schwellen-Klemmung 10–300).
+
 ## [0.8.0] – 2026-07-16
 
 ### Hinzugefügt

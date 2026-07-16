@@ -13,7 +13,18 @@ from app.config import settings
 from app.database import Base, SessionLocal, engine
 from app.migrate import ensure_schema
 from app.modules.registry import load_modules
-from app.routers import admin, auth, data, events, ingest, moderation, modules, search, tracks
+from app.routers import (
+    admin,
+    auth,
+    data,
+    events,
+    ingest,
+    jobs,
+    moderation,
+    modules,
+    search,
+    tracks,
+)
 from app.seed import seed_demo
 from app.version import APP_VERSION
 
@@ -77,6 +88,7 @@ app.include_router(moderation.router)
 app.include_router(modules.router)
 app.include_router(data.router)
 app.include_router(tracks.router)
+app.include_router(jobs.router)
 app.include_router(admin.router)
 
 

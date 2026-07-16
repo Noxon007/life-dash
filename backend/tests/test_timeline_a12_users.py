@@ -215,11 +215,11 @@ def test_verbose_scope_reformats_existing_addresses(db, user, fake_reverse):
 
 
 def test_settings_endpoint_roundtrip(db, user):
-    assert my_settings(user=user) == {
-        "place_name_parts": ["road", "suburb", "city", "country"]}
+    assert my_settings(user=user)["place_name_parts"] == [
+        "road", "suburb", "city", "country"]
     result = update_my_settings(
         payload={"place_name_parts": ["country", "city", "bogus"]}, db=db, user=user)
-    assert result == {"place_name_parts": ["city", "country"]}
+    assert result["place_name_parts"] == ["city", "country"]
     assert db.get(User, user.id).settings["place_name_parts"] == ["city", "country"]
 
     with pytest.raises(HTTPException) as exc:

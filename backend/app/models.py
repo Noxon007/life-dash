@@ -16,6 +16,7 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    Integer,
     String,
     Text,
 )
@@ -278,6 +279,34 @@ class Track(Base):
         ForeignKey("fragments.id"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class Job(Base):
+    """Lauf-Protokoll für lang laufende Aktionen (A11): Wetter ergänzen,
+    Neuberechnen, Embeddings, Ortsnamen auflösen, große Importe.
+
+    Ein Lock pro Job-Typ: solange ein Job `running` ist (mit frischem
+    Heartbeat in `updated_at`), startet keine zweite Instanz desselben Typs —
+    egal von welchem Browser/Nutzer. Bewusst global, nicht pro Nutzer:
+    Wetter/Neuberechnung arbeiten über den ganzen Bestand, und die
+    Nominatim-Drossel (1 Anfrage/s) gilt pro Server-IP.
+    """
+
+    __tablename__ = "jobs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
+    type: Mapped[str] = mapped_column(String(32), index=True)
+    status: Mapped[str] = mapped_column(String(16), default="running")  # running|done|stopped|error
+    done: Mapped[int] = mapped_column(Integer, default=0)      # verarbeitete Einheiten
+    remaining: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    result: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class Metric(Base):

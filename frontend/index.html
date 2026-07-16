@@ -585,6 +585,12 @@
               <span class="filter-chip active" id="mp-route-toggle">🧭 Route verbinden</span>
               <span class="filter-chip active" id="mp-tracks-toggle">🛰️ Timeline-Routen</span>
               <span class="filter-chip active" id="mp-group-toggle" title="Ab Monats-Ansicht: wiederholte Besuche desselben Orts zu einem Eintrag bündeln">🔁 Orte bündeln</span>
+              <label class="stat-label" style="display:flex; align-items:center; gap:6px" title="Unter dieser Punktzahl werden Einzelmarker gezeigt; darüber wird gebündelt (10–300, schützt die Performance)">
+                Cluster ab
+                <input id="mp-cluster-min" type="number" min="10" max="300" step="10" value="50"
+                       style="width:64px; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:4px 6px; color:var(--text)">
+                Punkten
+              </label>
             </div>
           </div>
           <div class="filter-group" style="flex-basis:100%">
@@ -823,6 +829,18 @@
           </div>
         </div>
 
+        <!-- A11 — Jobs: laufende und letzte Lang-Läufer, mit Sperre pro Typ -->
+        <div class="section-title" style="display:flex; align-items:center; gap:12px">Jobs
+          <button class="btn small secondary" id="jobs-refresh" style="margin-left:auto">↻ Aktualisieren</button>
+        </div>
+        <div class="hint">Lang laufende Aktionen (Wetter, Neuberechnung, Embeddings, Ortsnamen, Importe)
+          sind als <b>Jobs mit Sperre</b> registriert: derselbe Typ kann nicht doppelt laufen — auch
+          nicht aus zwei Browsern oder von zwei Nutzern gleichzeitig (verhindert doppelte
+          API-Kosten und Duplikate).</div>
+        <div style="overflow-x:auto; margin-bottom:24px">
+          <table class="db-table" id="jobs-table"></table>
+        </div>
+
         <div class="section-title" id="mod-queue-title">Moderations-Queue</div>
 
         <!-- P2.5 — Bulk-Bestätigen: erst Vorschau, dann bestätigen -->
@@ -861,7 +879,7 @@
         <div id="mod-queue"></div>
 
         <div class="section-title" id="fuzzy-title" style="margin-top:24px">⏳ Unscharfe Zeiten</div>
-        <div class="hint">Events mit grober Zeitangabe (Jahreszeit, Jahr, Jahrzehnt oder ganz ohne Datum).
+        <div class="hint">Events mit grober Zeitangabe (Monat, Jahreszeit, Jahr, Jahrzehnt oder ganz ohne Datum).
           Anklicken öffnet die Schnellbearbeitung — je konkreter die Daten, desto besser Timeline &amp; Karte.</div>
         <div id="fuzzy-list"></div>
 
@@ -978,7 +996,18 @@ let AUTH = { mode: "dev", user: null };
 async function api(path, opts) {
   const res = await fetch(API + path, Object.assign({ credentials: "same-origin" }, opts));
   if (res.status === 401) { showLogin(); throw new Error("401 nicht angemeldet"); }
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    // Backend-Fehlermeldung (detail) durchreichen — z. B. Validierung (A4)
+    // oder „Job läuft bereits" (A11) — statt nacktem Statuscode
+    let msg = `${res.status} ${res.statusText}`;
+    try {
+      const body = await res.json();
+      if (body && body.detail) msg = typeof body.detail === 'string' ? body.detail : msg;
+    } catch (_) {}
+    const err = new Error(msg);
+    err.status = res.status;
+    throw err;
+  }
   if (res.status === 204) return null;
   return res.json();
 }
@@ -1565,7 +1594,8 @@ function renderBars(id, data, onClick) {
 }
 
 // ---------- UNSCHARFE ZEITEN (P2.3) ----------
-const PRECISION_LABELS = { season: 'Jahreszeit', year: 'Jahr', decade: 'Jahrzehnt' };
+// A16: month zählt mit — „Juni Urlaub Dänemark" ist eine unscharfe Angabe
+const PRECISION_LABELS = { month: 'Monat', season: 'Jahreszeit', year: 'Jahr', decade: 'Jahrzehnt' };
 async function loadFuzzyDates() {
   const el = document.getElementById('fuzzy-list');
   if (!el) return;
@@ -2005,6 +2035,9 @@ function startVoice() {
 // ---------- KARTE ----------
 let mapObj = null, mapMarkers = null, mapCluster = null, mapRoute = null, mapTracks = null;
 const mp = { mode: 'day', periods: [], index: 0, showRoute: true, showTracks: true, groupPlaces: true, located: [], catFilter: new Set(FILTER_CATS) };
+// A18: Cluster-Schwelle — vom Nutzer einstellbar (10–300, in User.settings)
+const SETTINGS = { map_cluster_min: 50 };
+function mpClusterMin() { return SETTINGS.map_cluster_min || 50; }
 // Nur Events, die den aktiven Kategorie-Filter passieren
 function mpFiltered() { return mp.located.filter(e => passesFilter(e, mp.catFilter)); }
 
@@ -2168,12 +2201,13 @@ function renderPeriod() {
     renderGroupedPeriod(all, key, stops);
     return;
   }
-  // A5: Bis MP_MAX Stopps gibt es die nummerierte Tagesroute; darüber werden
-  // ALLE Punkte geclustert dargestellt statt abgeschnitten (Nummern & Route
-  // wären bei tausenden Stopps ohnehin bedeutungslos). Die Stopp-Liste bleibt
-  // als DOM-Schutz gedeckelt. Ohne Cluster-Plugin (CDN offline): alter Deckel.
+  // A5/A18: Bis zur Cluster-Schwelle (einstellbar, max. 300) gibt es die
+  // nummerierte Route; darüber werden ALLE Punkte geclustert statt
+  // abgeschnitten (Nummern & Route wären bei tausenden Stopps ohnehin
+  // bedeutungslos). Die Stopp-Liste bleibt als DOM-Schutz gedeckelt.
+  // Ohne Cluster-Plugin (CDN offline): alter 300er-Deckel.
   const MP_MAX = 300;
-  const clustered = all.length > MP_MAX && !!mapCluster;
+  const clustered = all.length > mpClusterMin() && !!mapCluster;
   const items = all.slice(0, MP_MAX);
   const markerTarget = clustered ? mapCluster : mapMarkers;
   // Datepicker mit dem angezeigten Zeitraum synchron halten
@@ -2226,7 +2260,8 @@ function renderGroupedPeriod(all, key, stops) {
     byLoc.get(k).items.push(e); // `all` ist chronologisch sortiert
   });
   const groups = [...byLoc.values()].sort((a, b) => b.items.length - a.items.length);
-  const markerTarget = mapCluster || mapMarkers;
+  // A18: unterhalb der Schwelle Einzelmarker statt Zahlenblasen
+  const markerTarget = (mapCluster && groups.length > mpClusterMin()) ? mapCluster : mapMarkers;
   const latlngs = [];
   const rows = groups.map(g => {
     const n = g.items.length;
@@ -2293,6 +2328,21 @@ document.getElementById('mp-group-toggle').addEventListener('click', function ()
   this.classList.toggle('off', !mp.groupPlaces);
   renderPeriod();
 });
+// A18: Cluster-Schwelle ändern — sofort anwenden + pro Nutzer speichern
+document.getElementById('mp-cluster-min').addEventListener('change', async ev => {
+  const v = Math.max(10, Math.min(300, +ev.target.value || 50));
+  ev.target.value = v;
+  SETTINGS.map_cluster_min = v;
+  if (mapObj) renderPeriod();
+  try {
+    await api('/api/auth/me/settings', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ map_cluster_min: v }),
+    });
+  } catch (err) {
+    toast('Speichern fehlgeschlagen: ' + err.message, 'error');
+  }
+});
 document.querySelectorAll('[data-mode]').forEach(chip => {
   chip.addEventListener('click', () => {
     // Anker-Datum merken (erstes Event des aktuellen Zeitraums), um nach
@@ -2328,7 +2378,7 @@ function gotoView(v) {
   if (v === 'map') setTimeout(openMapView, 40);
   if (v === 'stats') loadStats();
   if (v === 'compendium') loadCompendium(document.querySelector('#comp-tabs .zoom-btn.active').dataset.type);
-  if (v === 'admin') { loadModQueue(); loadFuzzyDates(); loadPlaceFormat(); if (isAdmin()) { loadUsers(); loadDbTables(); } }
+  if (v === 'admin') { loadModQueue(); loadFuzzyDates(); loadPlaceFormat(); loadJobs(); if (isAdmin()) { loadUsers(); loadDbTables(); } }
 }
 
 // ---------- NUTZERVERWALTUNG (A6, nur Admin) ----------
@@ -2440,7 +2490,15 @@ function renderDbTable() {
     const tr = e.target.closest('tr'), id = tr.dataset.id;
     if (!(await uiConfirm(`Die Zeile wird direkt aus der Datenbank entfernt.`,
       { title: `Zeile ${id} aus „${data.table}" löschen?`, okLabel: '🗑️ Löschen', danger: true }))) return;
-    await api(`/api/admin/tables/${data.table}/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    try {
+      const r = await api(`/api/admin/tables/${data.table}/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      // A4: Aufräum-Folgen anzeigen (mitgelöschte Verknüpfungen etc.)
+      const fx = (r && r.side_effects && r.side_effects.length) ? '\n' + r.side_effects.join('\n') : '';
+      toast('✓ Zeile gelöscht.' + fx, 'ok', fx ? 8000 : 5000);
+    } catch (err) {
+      toast(err.message, 'error', 9000);  // z. B. Leitplanke: Fragmente/Nutzer gesperrt
+      return;
+    }
     await loadDbTable(data.table);
     refreshAll();
   }));
@@ -2464,9 +2522,17 @@ function startDbEdit(tr) {
   actionCell.querySelector('.db-save').addEventListener('click', async () => {
     const values = {};
     tr.querySelectorAll('input[data-col]').forEach(inp => { values[inp.dataset.col] = inp.value; });
-    await api(`/api/admin/tables/${dbData.table}/${encodeURIComponent(id)}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values),
-    });
+    try {
+      const r = await api(`/api/admin/tables/${dbData.table}/${encodeURIComponent(id)}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values),
+      });
+      // A4: Folge-Neuberechnungen anzeigen (Embedding zurückgesetzt, Wetter neu …)
+      const fx = (r.side_effects && r.side_effects.length) ? '\n' + r.side_effects.join('\n') : '';
+      toast('✓ Gespeichert.' + fx, 'ok', fx ? 8000 : 5000);
+    } catch (err) {
+      toast(err.message, 'error', 9000);  // z. B. Enum-/JSON-/Zeit-Validierung
+      return;
+    }
     await loadDbTable(dbData.table);
     refreshAll();
   });
@@ -2498,6 +2564,55 @@ document.getElementById('voice-btn').addEventListener('click', startVoice);
 document.querySelectorAll('.example-chip').forEach(c =>
   c.addEventListener('click', () => { document.getElementById('input-text').value = c.textContent; }));
 
+// ---------- JOBS (A11) ----------
+const JOB_LABELS = { recompute: '🔄 Stufe 2 neu berechnen', weather: '🌤️ Wetter ergänzen',
+                     embeddings: '🧠 Embeddings', resolve_names: '📍 Ortsnamen auflösen/formatieren',
+                     timeline_import: '🛰️ Timeline-Import', data_import: '📥 Daten-Import' };
+const JOB_STATUS = { running: '⏳ läuft', done: '✅ fertig', stopped: '⏹ gestoppt', error: '⚠️ Fehler' };
+async function loadJobs() {
+  const t = document.getElementById('jobs-table');
+  if (!t) return;
+  let jobs;
+  try { jobs = await api('/api/jobs?limit=12'); } catch { t.innerHTML = ''; return; }
+  if (!jobs.length) {
+    t.innerHTML = '<tbody><tr><td class="stat-label" style="padding:10px">Noch keine Jobs gelaufen.</td></tr></tbody>';
+    return;
+  }
+  // Zeiten sind UTC gespeichert -> lokal anzeigen
+  const fmt = iso => iso ? new Date(iso.endsWith('Z') ? iso : iso + 'Z')
+    .toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+  t.innerHTML = '<thead><tr><th>Job</th><th>Status</th><th>Fortschritt</th><th>Gestartet</th><th>Ergebnis</th></tr></thead><tbody>'
+    + jobs.map(j => `<tr>
+        <td><b>${JOB_LABELS[j.type] || esc(j.type)}</b></td>
+        <td style="white-space:nowrap">${JOB_STATUS[j.status] || esc(j.status)}</td>
+        <td class="stat-label">${j.done}${j.unit ? ' ' + esc(j.unit) : ''}${j.status === 'running' && j.remaining != null ? ` · noch ~${j.remaining}` : ''}</td>
+        <td class="stat-label" style="white-space:nowrap">${fmt(j.started_at)}${j.started_by ? `<br>von ${esc(j.started_by)}` : ''}</td>
+        <td class="stat-label">${esc(j.result || '')}</td>
+      </tr>`).join('') + '</tbody>';
+}
+document.getElementById('jobs-refresh').addEventListener('click', loadJobs);
+// Helfer für Nicht-Batch-Läufe (Importe): Job starten/abschließen
+async function startJob(type, unit) {
+  return api('/api/jobs/start', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type, unit }),
+  });
+}
+function jobProgress(job, done, remaining) {
+  if (!job) return;
+  api(`/api/jobs/${job.id}/progress`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ done, remaining }),
+  }).catch(() => {});
+}
+function jobFinish(job, status, result) {
+  if (!job) return;
+  api(`/api/jobs/${job.id}/finish`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status, result: result ? String(result).slice(0, 250) : null }),
+  }).catch(() => {}).then(() => loadJobs());
+}
+
 // Admin-Aktionen (Neuberechnung / Enrichment)
 async function runAdmin(btn, fn, doneMsg) {
   const label = btn.textContent;
@@ -2515,8 +2630,11 @@ async function runAdmin(btn, fn, doneMsg) {
 // Batch-Läufe mit Stopp-Knopf & Anfragen-Ticker: Der Aktions-Button wird
 // während des Laufs zum ⏹-Stopp-Button. step() liefert {done, remaining,
 // aborted?}; gestoppt wird zwischen den Batches, Fortschritt bleibt erhalten.
+// A11: jobType registriert den Lauf serverseitig als Job — läuft derselbe
+// Typ bereits (auch in einem anderen Browser/von einem anderen Nutzer),
+// kommt 409 statt eines Doppel-Laufs.
 const runningOps = {};
-async function runBatchedAdmin(btn, { reset, step, unit, doneMsg }) {
+async function runBatchedAdmin(btn, { reset, step, unit, doneMsg, jobType }) {
   if (runningOps[btn.id]) {                      // zweiter Klick = Stopp anfordern
     runningOps[btn.id].stop = true;
     btn.textContent = '… stoppe nach diesem Batch';
@@ -2524,11 +2642,19 @@ async function runBatchedAdmin(btn, { reset, step, unit, doneMsg }) {
   }
   const op = runningOps[btn.id] = { stop: false };
   const label = btn.textContent;
-  let total = 0, remaining = null;
+  let total = 0, remaining = null, job = null, endState = 'done', endResult = null;
   const ticker = () => {
     btn.textContent = `⏹ Stoppen — ${total} ${unit}` + (remaining != null ? ` · noch ~${remaining}` : '');
   };
   try {
+    if (jobType) {
+      try {
+        job = await startJob(jobType, unit);
+      } catch (err) {
+        toast(err.message, err.status === 409 ? 'warn' : 'error', 9000);
+        return;
+      }
+    }
     if (reset) {
       btn.textContent = '… bereite vor';
       remaining = await reset();
@@ -2538,17 +2664,20 @@ async function runBatchedAdmin(btn, { reset, step, unit, doneMsg }) {
       const r = await step();
       total += r.done;
       remaining = r.remaining;
-      if (r.aborted) { toast(`Abgebrochen (KI nicht erreichbar): ${total} ${unit} verarbeitet, ${remaining} offen — später erneut starten.`, 'warn', 8000); break; }
-      if (remaining === 0) { toast(doneMsg(total)); break; }
-      if (r.done === 0) { toast(`Kein Fortschritt mehr: ${total} ${unit} verarbeitet, ${remaining} nicht verarbeitbar (Konfiguration/Netz prüfen).`, 'warn', 8000); break; }
+      jobProgress(job, total, remaining);  // Heartbeat (best effort)
+      if (r.aborted) { endState = 'stopped'; endResult = 'abgebrochen (KI nicht erreichbar)'; toast(`Abgebrochen (KI nicht erreichbar): ${total} ${unit} verarbeitet, ${remaining} offen — später erneut starten.`, 'warn', 8000); break; }
+      if (remaining === 0) { endResult = doneMsg(total); toast(endResult); break; }
+      if (r.done === 0) { endState = 'stopped'; endResult = `${remaining} nicht verarbeitbar`; toast(`Kein Fortschritt mehr: ${total} ${unit} verarbeitet, ${remaining} nicht verarbeitbar (Konfiguration/Netz prüfen).`, 'warn', 8000); break; }
       ticker();
     }
-    if (op.stop) toast(`Gestoppt: ${total} ${unit} verarbeitet, ${remaining ?? '?'} offen — derselbe Knopf setzt fort.`, 'warn');
+    if (op.stop) { endState = 'stopped'; endResult = 'vom Nutzer gestoppt'; toast(`Gestoppt: ${total} ${unit} verarbeitet, ${remaining ?? '?'} offen — derselbe Knopf setzt fort.`, 'warn'); }
     await refreshAll();
     if (isAdmin()) loadDbTables();
   } catch (err) {
+    endState = 'error'; endResult = err.message.slice(0, 250);
     toast('Fehler: ' + err.message, 'error');
   } finally {
+    jobFinish(job, endState, endResult);
     delete runningOps[btn.id];
     btn.textContent = label;
   }
@@ -2563,6 +2692,7 @@ document.getElementById('btn-recompute-2').addEventListener('click', e =>
     },
     unit: 'KI-Anfragen',
     doneMsg: n => `Stufe 2 neu berechnet: ${n} Fragment(e) verarbeitet.`,
+    jobType: 'recompute',
   }));
 document.getElementById('btn-enrich').addEventListener('click', e =>
   runBatchedAdmin(e.target, {
@@ -2572,6 +2702,7 @@ document.getElementById('btn-enrich').addEventListener('click', e =>
     },
     unit: 'Wetter-Anfragen',
     doneMsg: n => `Wetter ergänzt: ${n} Event(s).`,
+    jobType: 'weather',
   }));
 document.getElementById('btn-embed').addEventListener('click', e =>
   runBatchedAdmin(e.target, {
@@ -2582,6 +2713,7 @@ document.getElementById('btn-embed').addEventListener('click', e =>
     },
     unit: 'KI-Anfragen',
     doneMsg: n => `Embeddings: ${n} Event(s) neu indexiert.`,
+    jobType: 'embeddings',
   }));
 
 // ---------- EXPORT / IMPORT ----------
@@ -2627,21 +2759,36 @@ document.getElementById('import-file').addEventListener('change', async ev => {
     const IMPORT_CHUNK = 1000;
     const total = TABLES.reduce((n, t) => n + (payload[t] || []).length, 0);
     const big = total > IMPORT_CHUNK;
-    let done = 0, imported = 0, skipped = 0;
-    for (const table of TABLES) {
-      const rows = payload[table] || [];
-      for (let i = 0; i < rows.length; i += IMPORT_CHUNK) {
-        if (big) showProgress(done, total, `📥 Import — ${done.toLocaleString('de-DE')} / ${total.toLocaleString('de-DE')} Zeilen`);
-        const r = await api('/api/data/import', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ format: payload.format, version: payload.version,
-                                 [table]: rows.slice(i, i + IMPORT_CHUNK) }),
-        });
-        if (r.error) { toast(r.error, 'error'); return; }
-        imported += r.total; skipped += r.skipped_existing;
-        done += Math.min(IMPORT_CHUNK, rows.length - i);
-      }
+    // A11: Import als Job registrieren — verhindert parallele Doppel-Importe
+    let job = null;
+    try {
+      job = await startJob('data_import', 'Zeilen');
+    } catch (err) {
+      toast(err.message, err.status === 409 ? 'warn' : 'error', 9000);
+      return;
     }
+    let done = 0, imported = 0, skipped = 0;
+    try {
+      for (const table of TABLES) {
+        const rows = payload[table] || [];
+        for (let i = 0; i < rows.length; i += IMPORT_CHUNK) {
+          if (big) showProgress(done, total, `📥 Import — ${done.toLocaleString('de-DE')} / ${total.toLocaleString('de-DE')} Zeilen`);
+          const r = await api('/api/data/import', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ format: payload.format, version: payload.version,
+                                   [table]: rows.slice(i, i + IMPORT_CHUNK) }),
+          });
+          if (r.error) { jobFinish(job, 'error', r.error); toast(r.error, 'error'); return; }
+          imported += r.total; skipped += r.skipped_existing;
+          done += Math.min(IMPORT_CHUNK, rows.length - i);
+          jobProgress(job, done, total - done);
+        }
+      }
+    } catch (err) {
+      jobFinish(job, 'error', err.message);
+      throw err;  // äußerer Catch zeigt den Fehler-Toast
+    }
+    jobFinish(job, 'done', `${imported} Zeilen neu, ${skipped} vorhanden`);
     toast(`✓ Import fertig: ${imported} Zeilen neu, ${skipped} bereits vorhanden.`);
     await refreshAll();
   } catch (err) {
@@ -2691,32 +2838,47 @@ document.getElementById('timeline-file').addEventListener('change', async ev => 
     const chunks = segs.length > TL_CHUNK ? tlChunks(segs) : [segs];
     const sum = { visits: 0, tracks: 0, dupes: 0, lowprob: 0, resolved: 0,
                   unnamed: 0, min: null, max: null };
+    // A11: Import als Job registrieren — verhindert parallele Doppel-Importe
+    let job = null;
+    try {
+      job = await startJob('timeline_import', 'Segmente');
+    } catch (err) {
+      toast(err.message, err.status === 409 ? 'warn' : 'error', 9000);
+      return;
+    }
     // A12: optionaler Filter — Besuche mit unsicherer Ortszuordnung überspringen
     const minProb = Math.max(0, Math.min(100, +document.getElementById('tl-minprob').value || 0)) / 100;
     let done = 0;
-    for (const chunk of chunks) {
-      if (chunks.length > 1) {
-        showProgress(done, segs.length,
-          `🛰️ Timeline-Import — ${done.toLocaleString('de-DE')} / ${segs.length.toLocaleString('de-DE')} Segmente`);
+    try {
+      for (const chunk of chunks) {
+        if (chunks.length > 1) {
+          showProgress(done, segs.length,
+            `🛰️ Timeline-Import — ${done.toLocaleString('de-DE')} / ${segs.length.toLocaleString('de-DE')} Segmente`);
+        }
+        // Bei Etappen kein Auto-Geocoding pro Etappe (Nominatim: 1 Anfrage/s) —
+        // dafür gibt es nach dem Import den Button „Ortsnamen auflösen".
+        const params = new URLSearchParams();
+        if (chunks.length > 1) params.set('auto_resolve', 'false');
+        if (minProb > 0) params.set('min_probability', String(minProb));
+        const qs = params.toString() ? `?${params}` : '';
+        const r = await api(`/api/import/timeline${qs}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [key]: chunk }),
+        });
+        sum.visits += r.visits_created; sum.tracks += r.tracks_created;
+        sum.dupes += r.skipped_duplicates; sum.resolved += r.names_resolved || 0;
+        sum.lowprob += r.skipped_low_probability || 0;
+        sum.unnamed = r.locations_unnamed || 0; // Gesamtstand, nicht summieren
+        if (r.date_min && (!sum.min || r.date_min < sum.min)) sum.min = r.date_min;
+        if (r.date_max && (!sum.max || r.date_max > sum.max)) sum.max = r.date_max;
+        done += chunk.length;
+        jobProgress(job, done, segs.length - done);
       }
-      // Bei Etappen kein Auto-Geocoding pro Etappe (Nominatim: 1 Anfrage/s) —
-      // dafür gibt es nach dem Import den Button „Ortsnamen auflösen".
-      const params = new URLSearchParams();
-      if (chunks.length > 1) params.set('auto_resolve', 'false');
-      if (minProb > 0) params.set('min_probability', String(minProb));
-      const qs = params.toString() ? `?${params}` : '';
-      const r = await api(`/api/import/timeline${qs}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [key]: chunk }),
-      });
-      sum.visits += r.visits_created; sum.tracks += r.tracks_created;
-      sum.dupes += r.skipped_duplicates; sum.resolved += r.names_resolved || 0;
-      sum.lowprob += r.skipped_low_probability || 0;
-      sum.unnamed = r.locations_unnamed || 0; // Gesamtstand, nicht summieren
-      if (r.date_min && (!sum.min || r.date_min < sum.min)) sum.min = r.date_min;
-      if (r.date_max && (!sum.max || r.date_max > sum.max)) sum.max = r.date_max;
-      done += chunk.length;
+    } catch (err) {
+      jobFinish(job, 'error', err.message);
+      throw err;  // äußerer Catch zeigt den Fehler-Toast
     }
+    jobFinish(job, 'done', `${sum.visits} Besuche, ${sum.tracks} Routen, ${sum.dupes} Dubletten`);
     const range = sum.min ? `\nZeitraum: ${sum.min.slice(0,10)} bis ${sum.max.slice(0,10)}` : '';
     const lowprob = sum.lowprob ? `\n${sum.lowprob} Besuche unter ${Math.round(minProb*100)} % Ortssicherheit übersprungen.` : '';
     const names = sum.unnamed
@@ -2744,6 +2906,7 @@ document.getElementById('btn-resolve-names').addEventListener('click', e =>
     },
     unit: 'Nominatim-Anfragen',
     doneMsg: n => `Fertig: ${n} Ortsnamen aufgelöst.`,
+    jobType: 'resolve_names',
   }));
 
 // Fremdschrift-Ortsnamen erneut auflösen (A10) — gleiche Mechanik, scope=nonlatin
@@ -2755,6 +2918,7 @@ document.getElementById('btn-resolve-nonlatin').addEventListener('click', e =>
     },
     unit: 'Nominatim-Anfragen',
     doneMsg: n => `Fertig: ${n} Ortsnamen eingedeutscht.`,
+    jobType: 'resolve_names',  // gleicher Lock: alle Nominatim-Läufe teilen sich die 1-req/s-Drossel
   }));
 
 // Ortsnamen-Format: Bausteine (Straße/Ortsteil/Stadt/Land) pro Nutzer gespeichert
@@ -2793,6 +2957,7 @@ document.getElementById('btn-reformat-names').addEventListener('click', e =>
     },
     unit: 'Nominatim-Anfragen',
     doneMsg: n => `Fertig: ${n} Adressen gekürzt.`,
+    jobType: 'resolve_names',
   }));
 
 // Alle Daten löschen — mit doppelter Sicherheitsabfrage
@@ -2843,6 +3008,13 @@ document.getElementById('logout-link').addEventListener('click', async ev => {
     showBanner(`⚠ Backend nicht erreichbar. Starte es mit <code>uvicorn app.main:app</code> im Ordner <code>backend/</code> und lade neu.`);
     return;
   }
+
+  // Nutzer-Einstellungen (A18: Cluster-Schwelle) — best effort
+  try {
+    const s = await api('/api/auth/me/settings');
+    SETTINGS.map_cluster_min = s.map_cluster_min || 50;
+    document.getElementById('mp-cluster-min').value = SETTINGS.map_cluster_min;
+  } catch (_) {}
 
   // Nutzer-Info + Rollen-Gating
   const who = AUTH.user.display_name || AUTH.user.email || 'angemeldet';

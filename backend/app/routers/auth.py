@@ -42,10 +42,31 @@ def me(user: User = Depends(get_current_user)) -> UserRead:
 # User.settings wird später auch Secrets (Immich-Key, PSN-Token) enthalten,
 # die NIE ans Frontend gehen.
 # --------------------------------------------------------------------------- #
+# Karten-Clustering (A18): ab wie vielen Punkten gebündelt wird. Der Rahmen
+# schützt die Performance — über MAX einzelnen Markern friert der Browser
+# nach großen Timeline-Importen ein (deshalb gab es früher den 300er-Deckel).
+CLUSTER_MIN_FLOOR, CLUSTER_MIN_CEIL, CLUSTER_MIN_DEFAULT = 10, 300, 50
+
+
+def cluster_min_for(user: User) -> int:
+    raw = (user.settings or {}).get("map_cluster_min", CLUSTER_MIN_DEFAULT)
+    try:
+        return max(CLUSTER_MIN_FLOOR, min(CLUSTER_MIN_CEIL, int(raw)))
+    except (TypeError, ValueError):
+        return CLUSTER_MIN_DEFAULT
+
+
+def _settings_view(user: User) -> dict:
+    return {
+        "place_name_parts": geocode_svc.parts_for(user),
+        "map_cluster_min": cluster_min_for(user),
+    }
+
+
 @router.get("/me/settings")
 def my_settings(user: User = Depends(get_current_user)) -> dict:
-    """Anzeige-Einstellungen: Bausteine für aufgelöste Ortsnamen."""
-    return {"place_name_parts": geocode_svc.parts_for(user)}
+    """Anzeige-Einstellungen: Ortsnamen-Bausteine, Karten-Cluster-Schwelle."""
+    return _settings_view(user)
 
 
 @router.patch("/me/settings")
@@ -55,6 +76,7 @@ def update_my_settings(
     user: User = Depends(get_current_user),
 ) -> dict:
     """Ändert Anzeige-Einstellungen (nur Whitelist-Schlüssel)."""
+    prefs = dict(user.settings or {})
     if "place_name_parts" in payload:
         raw = payload["place_name_parts"]
         if (not isinstance(raw, list)
@@ -62,11 +84,19 @@ def update_my_settings(
             raise HTTPException(
                 400, "place_name_parts: mindestens ein gültiger Baustein "
                      f"aus {list(geocode_svc.PLACE_NAME_PARTS)}")
-        prefs = dict(user.settings or {})
         prefs["place_name_parts"] = geocode_svc.sanitize_parts(raw)
+    if "map_cluster_min" in payload:
+        try:
+            wanted = int(payload["map_cluster_min"])
+        except (TypeError, ValueError):
+            raise HTTPException(400, "map_cluster_min: ganze Zahl erwartet")
+        # In den erlaubten Rahmen einpassen statt abzulehnen
+        prefs["map_cluster_min"] = max(CLUSTER_MIN_FLOOR,
+                                       min(CLUSTER_MIN_CEIL, wanted))
+    if prefs != (user.settings or {}):
         user.settings = prefs
         db.commit()
-    return {"place_name_parts": geocode_svc.parts_for(user)}
+    return _settings_view(user)
 
 
 @router.get("/login")

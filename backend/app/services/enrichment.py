@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Event, Metric, Source
@@ -69,6 +70,15 @@ def enrich_weather(db: Session, limit: int | None = None) -> tuple[int, int]:
     """
     candidates = _weather_candidates(db)
     batch = candidates if limit is None else candidates[:limit]
-    enriched = sum(1 for event in batch if _add_weather(db, event))
-    db.commit()
+    # Pro Event committen: der Unique-Index (A11, ux_metrics_weather) weist
+    # Dubletten aus parallelen Läufen ab — dann verliert nur DIESES Event
+    # (bereits angereichert), nicht der ganze Batch.
+    enriched = 0
+    for event in batch:
+        try:
+            if _add_weather(db, event):
+                db.commit()
+                enriched += 1
+        except IntegrityError:
+            db.rollback()  # parallele Instanz war schneller — kein Schaden
     return enriched, len(candidates) - enriched
