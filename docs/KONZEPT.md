@@ -628,6 +628,18 @@ Aufwand: S = Stunden · M = ~1 Tag · L = mehrere Tage. Kein Paket blockiert ein
 **Umgesetzt (Stand 2026-07-16):** P2.2–P2.7 — Timeline-Import, Unscharfe-Zeiten-Review, Auto-Enrichment, Bulk-Bestätigen, Invarianten-Test, Bestätigungs-Provenienz. Das Vier-Schichten-Modell (Kap. 3.1) ist damit operativ verankert und testbewehrt.
 **Empfohlene Reihenfolge der offenen Pakete:** **D1 → P2.1** (Deployment zuerst, weil Immich-Anbindung und Handy-Nutzung davon abhängen; dann Fotos).
 
+### 14.3 Ideen-Sammlung (UX & Admin, noch nicht eingeplant)
+
+Kleinere Verbesserungen, gesammelt 2026-07-16 — bei Gelegenheit als
+Lückenfüller umsetzen oder zu Paketen bündeln:
+
+| Nr. | Idee | Notizen zur Umsetzung |
+|---|---|---|
+| **I1** | **Ladebalken für Import/Export** | Besonders der Google-Timeline-Import kann lange dauern (großes JSON, Parsing + Tausende Inserts). Heute gibt es nur den Spinner-Overlay ohne Fortschritt. Ansatz: Upload in Etappen verarbeiten (wie die Batch-Läufe mit `remaining`) oder serverseitig einen Fortschritts-Endpoint pollen; minimal: Fortschritt „Segmente x/y" statt unbestimmtem Spinner. |
+| **I2** | **Native Browser-Popups ersetzen** | `alert()`/`confirm()`/`prompt()` (weiße System-Dialoge nach Export, Import, Batch-Läufen, Löschen …) durch saubere UI-Komponenten im Frontend-Stil ersetzen: Toast-Meldungen für Erfolge, Modal (wie `edit-modal`) für Bestätigungen. Zieht sich durch die ganze `index.html` (~20 Stellen). |
+| **I3** | **DB-Rohansicht: sicheres Ändern/Löschen** | Die Admin-Tabellenansicht kann heute schon roh editieren/löschen — aber ohne Leitplanken. Sauber heißt: (a) Schreibpfade durch die bestehenden Endpoints (Moderation-PATCH) statt rohem UPDATE, wo möglich; (b) sonst Validierung von Enums/JSON-Feldern; (c) **Folge-Neuberechnungen anzeigen/auslösen**: Titel/Beschreibung geändert → Embedding neu; Ort/Datum geändert → Wetter neu (Pfad existiert seit P2.4); Entity gelöscht → verwaiste Links aufräumen; Event gelöscht → Metriken/Media kaskadieren (macht die DB), aber Statistik-Cache im Frontend invalidieren. Löschen von Fragmenten bewusst sperren oder doppelt bestätigen (Eingang = Beweisarchiv, Kap. 3.1). |
+| **I4** | **Versionsnummer im UI** | Unten links in der Sidebar (beim Nutzernamen im `sidebar-foot`) die laufende Version anzeigen. Backend kennt seine Version bisher nicht — z. B. als Konstante/`LIFEDASH_VERSION`-Env im Image mitgeben und über einen kleinen Endpoint (`/api/meta` o. Ä.) ausliefern; hilft beim Support („welche Version läuft bei dir?"). |
+
 ---
 
 ## 15. Offene Fragen & zu schärfende Entscheidungen
