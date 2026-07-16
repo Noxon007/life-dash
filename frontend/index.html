@@ -422,6 +422,8 @@
     <div class="modal-box">
       <h3>✏️ Eintrag bearbeiten</h3>
       <div class="stat-label" style="margin-bottom:14px">Geänderte Felder werden vor KI-Neuberechnungen geschützt. Speichern bestätigt den Eintrag.</div>
+      <!-- Bestätigungs-Provenienz (P2.7): wann/wodurch wurde das zur Wahrheit? -->
+      <div class="chip badge-confirmed" id="ed-provenance" style="display:none; margin-bottom:14px"></div>
       <div class="field-row"><div class="field-key">Titel</div>
         <div class="field-val"><input id="ed-title" style="max-width:none"></div></div>
       <div class="field-row"><div class="field-key">Beschreibung</div>
@@ -776,6 +778,40 @@
         </div>
 
         <div class="section-title" id="mod-queue-title">Moderations-Queue</div>
+
+        <!-- P2.5 — Bulk-Bestätigen: erst Vorschau, dann bestätigen -->
+        <div class="panel" id="bulk-panel" style="margin-bottom:16px">
+          <div class="hint" style="margin-top:0">Viele korrekte KI-Vorschläge auf einmal in die
+            Lebensdatenbank übernehmen: filtern → <b>Vorschau</b> prüfen → bestätigen.</div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center">
+            <select id="bulk-cat" class="mf-select">
+              <option value="">Alle Kategorien</option>
+              <option value="event">Ereignis</option>
+              <option value="trip">Reise</option>
+              <option value="sighting">Sichtung</option>
+              <option value="sport">Aktivität</option>
+              <option value="concert">Konzert</option>
+              <option value="meal">Mahlzeit</option>
+              <option value="milestone">Meilenstein</option>
+            </select>
+            <select id="bulk-source" class="mf-select">
+              <option value="">Alle Quellen</option>
+              <option value="ai">KI-Extraktion</option>
+              <option value="api">API</option>
+            </select>
+            <label class="stat-label" style="display:flex; align-items:center; gap:6px">Confidence ≥
+              <input id="bulk-conf" type="number" min="0" max="100" step="5" value="80"
+                     style="width:64px; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:5px 8px; color:var(--text)"> %</label>
+            <label class="stat-label" style="display:flex; align-items:center; gap:6px">von
+              <input id="bulk-from" type="date" style="background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:5px 8px; color:var(--text)"></label>
+            <label class="stat-label" style="display:flex; align-items:center; gap:6px">bis
+              <input id="bulk-to" type="date" style="background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:5px 8px; color:var(--text)"></label>
+            <button class="btn small secondary" id="bulk-preview-btn">🔍 Vorschau</button>
+            <button class="btn small" id="bulk-confirm-btn" style="display:none">✓ Alle bestätigen</button>
+          </div>
+          <div id="bulk-result" style="margin-top:10px; max-height:320px; overflow-y:auto"></div>
+        </div>
+
         <div id="mod-queue"></div>
 
         <div class="section-title" id="fuzzy-title" style="margin-top:24px">⏳ Unscharfe Zeiten</div>
@@ -1362,6 +1398,7 @@ async function loadModQueue() {
     `Moderations-Queue — ${queue.length} unbestätigte Einträge`;
   const badge = document.querySelector('.nav-item[data-view="admin"] .nav-badge');
   if (badge) { badge.textContent = queue.length; badge.style.display = queue.length ? '' : 'none'; }
+  document.getElementById('bulk-panel').style.display = queue.length ? '' : 'none';
   if (!queue.length) { el.innerHTML = '<div class="hint">Alles moderiert — keine offenen Einträge. ✓</div>'; return; }
   el.innerHTML = queue.map(e => `
     <div class="mod-item" data-id="${e.id}">
@@ -1390,6 +1427,80 @@ async function loadModQueue() {
     });
   });
 }
+
+// ---------- BULK-BESTÄTIGEN (P2.5) ----------
+// Zweistufig: Vorschau zeigt, was der Filter trifft; erst dann lässt sich
+// bestätigen. Ändert sich ein Filter, verfällt die Vorschau.
+function bulkFilter() {
+  const f = { min_confidence: (parseInt(document.getElementById('bulk-conf').value, 10) || 0) / 100 };
+  const cat = document.getElementById('bulk-cat').value;
+  const src = document.getElementById('bulk-source').value;
+  const from = document.getElementById('bulk-from').value;
+  const to = document.getElementById('bulk-to').value;
+  if (cat) f.category = cat;
+  if (src) f.source = src;
+  if (from) f.date_from = from + 'T00:00:00';
+  if (to) f.date_to = to + 'T23:59:59';
+  return f;
+}
+let bulkTotal = 0;
+async function bulkPreview() {
+  const box = document.getElementById('bulk-result');
+  const confirmBtn = document.getElementById('bulk-confirm-btn');
+  box.innerHTML = '<div class="hint">… prüfe</div>';
+  try {
+    const r = await api('/api/moderation/bulk-confirm/preview', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(bulkFilter()),
+    });
+    bulkTotal = r.total;
+    if (!r.total) {
+      box.innerHTML = '<div class="hint">Kein unbestätigtes Event entspricht diesem Filter.</div>';
+      confirmBtn.style.display = 'none';
+      return;
+    }
+    box.innerHTML =
+      `<div class="hint"><b>${r.total} Event(s)</b> würden bestätigt` +
+      (r.total > r.events.length ? ` — Vorschau der neuesten ${r.events.length}` : '') + ':</div>' +
+      r.events.map(e => `
+        <div class="field-row">
+          <div class="field-key">${Math.round(e.confidence * 100)}%</div>
+          <div class="field-val">${esc(e.title)} <span class="stat-label">· ${fmtDate(e)}${e.location ? ' · ' + esc(e.location.name.split(',')[0]) : ''}</span></div>
+        </div>`).join('');
+    confirmBtn.textContent = `✓ Alle ${r.total} bestätigen`;
+    confirmBtn.style.display = '';
+  } catch (err) {
+    box.innerHTML = `<div class="hint">Fehler: ${esc(err.message)}</div>`;
+    confirmBtn.style.display = 'none';
+  }
+}
+async function bulkConfirmRun() {
+  if (!confirm(`${bulkTotal} Event(s) bestätigen?\n\nSie werden damit Teil der fixen Lebensdatenbank (inkl. ihrer verknüpften Objekte).`)) return;
+  const btn = document.getElementById('bulk-confirm-btn');
+  btn.disabled = true; btn.textContent = '… bestätige';
+  try {
+    const r = await api('/api/moderation/bulk-confirm', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(bulkFilter()),
+    });
+    document.getElementById('bulk-result').innerHTML = '';
+    btn.style.display = 'none';
+    alert(`${r.confirmed} Event(s) bestätigt.`);
+    await refreshAll();
+  } catch (err) {
+    alert('Fehler: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+document.getElementById('bulk-preview-btn').addEventListener('click', bulkPreview);
+document.getElementById('bulk-confirm-btn').addEventListener('click', bulkConfirmRun);
+// Filter geändert -> alte Vorschau gilt nicht mehr
+['bulk-cat', 'bulk-source', 'bulk-conf', 'bulk-from', 'bulk-to'].forEach(id =>
+  document.getElementById(id).addEventListener('change', () => {
+    document.getElementById('bulk-confirm-btn').style.display = 'none';
+    document.getElementById('bulk-result').innerHTML = '';
+  }));
 
 // ---------- DATENEINGABE / KI-VORSCHAU ----------
 let previewEvents = [];
@@ -1507,6 +1618,16 @@ function openEventEdit(id) {
   document.getElementById('ed-category').value = FILTER_CATS.includes(e.category) ? e.category : 'event';
   document.getElementById('ed-location').value = e.location ? e.location.name : '';
   document.getElementById('ed-note').value = e.note || '';
+  // Bestätigungs-Provenienz (P2.7)
+  const prov = document.getElementById('ed-provenance');
+  if (e.confirmed === 'confirmed') {
+    const by = { manual: 'manuell', bulk: 'Sammel-Bestätigung', import: 'Import (Gerätedaten)' }[e.confirmed_by] || e.confirmed_by;
+    const when = e.confirmed_at
+      ? ' am ' + new Date(e.confirmed_at).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
+      : '';
+    prov.textContent = `✓ bestätigt${when}${by ? ' · ' + by : ''}`;
+    prov.style.display = '';
+  } else prov.style.display = 'none';
   const entBox = document.getElementById('ed-entities');
   entBox.innerHTML = '';
   (e.entities || []).forEach(en => entBox.appendChild(edEntityRow(en.type, en.name)));

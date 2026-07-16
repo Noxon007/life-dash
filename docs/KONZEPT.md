@@ -1,9 +1,9 @@
 # Life-Dash — Konzept & MVP
 
-> **Status:** In Umsetzung — P0 & P1 fertig, Teile von P2/P3 bereits umgesetzt (siehe Kap. 14)
+> **Status:** In Umsetzung — P0 & P1 fertig, P2.2–P2.7 umgesetzt (siehe Kap. 14)
 > **Dokumenttyp:** Architektur- & Produktkonzept
 > **Zielumgebung:** Self-hosted / Homelab (Docker-basiert)
-> **Letzte Aktualisierung:** 2026-07-15
+> **Letzte Aktualisierung:** 2026-07-16
 
 ---
 
@@ -600,6 +600,7 @@ Ziel des MVP: **Der Kernloop über alle drei Stufen funktioniert** — Fragment 
 | **Eingabe & Moderation** | KI-Vorschau mit Korrektur; **manuelle Eingabe** (Formular, sofort bestätigt); **Bearbeiten-Dialog** an jeder Event-Karte (inkl. Ort→Geocoding bis Hausnummer, Kommentarfeld); Moderations-Queue; Bestätigen zieht verknüpfte Entities mit. |
 | **Stufe 3** | Wetter-Enrichment (Open-Meteo, on-demand + force); Embeddings + hybride Suche (Volltext + semantisch); Admin-Aktionen mit Beschreibungen. |
 | **Datenkontrolle** | **Export/Import** (JSON, idempotent, pro Nutzer) = Backup/Restore/Umzug; „Alle Daten löschen" mit doppelter Nachfrage. |
+| **Lebensdatenbank-Werkzeuge** (2026-07-16) | **P2.5** Bulk-Bestätigen mit Filter (Kategorie/Quelle/Confidence/Zeitraum) + Pflicht-Vorschau; **P2.6** Invarianten-Tests „Bestätigtes ist unantastbar" (`backend/tests/`, pytest, offline); **P2.7** Bestätigungs-Provenienz `confirmed_at`/`confirmed_by` (manuell/bulk/import) inkl. Bestandsdaten-Migration, sichtbar im Bearbeiten-Dialog; **P2.4** Auto-Wetter direkt nach Eingabe/KI-Analyse, Wetter-Nachzug bei Zeit-/Ort-Korrektur durch den Nutzer. |
 | **Module** | trip, animal, country, artist (Konzerte), food (Mahlzeiten), milestone (Lebensereignisse). |
 
 ### 14.2 Nächste Arbeitspakete (zur Auswahl)
@@ -624,7 +625,8 @@ Aufwand: S = Stunden · M = ~1 Tag · L = mehrere Tage. Kein Paket blockiert ein
 | **P5.2** | **Whisper-Sprach-Eingabe** | M | Serverseitiges Speech-to-Text (statt Browser-API), auch für Sprachmemos als Datei. | Bessere Diktat-Qualität, unabhängig vom Browser. |
 | **P5.3** | **Nutzerverwaltungs-UI** | S | Nutzerliste, Rollen ändern, Nutzer löschen (Admin-Panel). | Komfort für Multi-User-Betrieb. |
 
-**Empfohlene Reihenfolge:** **D1 → P2.1 → P2.2** (Deployment zuerst, weil Immich-Anbindung und Handy-Nutzung davon abhängen; dann Fotos; dann Orts-Historie). P2.3/P2.4 sind kleine Lückenfüller für zwischendurch. **P2.5–P2.7** setzen das Vier-Schichten-Modell (Kap. 3.1) operativ um — sinnvoll als Paar P2.5+P2.6, sobald viele KI-Vorschläge auf Bestätigung warten.
+**Umgesetzt (Stand 2026-07-16):** P2.2–P2.7 — Timeline-Import, Unscharfe-Zeiten-Review, Auto-Enrichment, Bulk-Bestätigen, Invarianten-Test, Bestätigungs-Provenienz. Das Vier-Schichten-Modell (Kap. 3.1) ist damit operativ verankert und testbewehrt.
+**Empfohlene Reihenfolge der offenen Pakete:** **D1 → P2.1** (Deployment zuerst, weil Immich-Anbindung und Handy-Nutzung davon abhängen; dann Fotos).
 
 ---
 
@@ -647,7 +649,7 @@ Aufwand: S = Stunden · M = ~1 Tag · L = mehrere Tage. Kein Paket blockiert ein
 - ✅ **OIDC-Provider: Pocket ID** — läuft bereits im Homelab. Life-Dash nutzt den Authorization Code Flow mit PKCE (Public Client möglich); Redirect-URI: `<PUBLIC_BASE_URL>/api/auth/callback`. *(Damit ist Frage 8 beantwortet; P0+P1 sind seit 2026-07-14 umgesetzt — siehe backend/README.md.)*
 
 **Beantwortet am 2026-07-15:**
-0. ✅ **Vier-Schichten-Präzisierung** (siehe Kap. 3.1): Eingang → Vorschlagsraum → **Lebensdatenbank (fix, inkl. Fakten-Anreicherung wie Wetter)** → Ableitungen (wegwerfbar, inkl. Embeddings). Konsequenz: Wetter wird nicht mehr bei „Stufe 3 neu berechnen" verworfen, sondern nur ergänzt, wo es fehlt; Eingang wird nie automatisch gelöscht. Operative Folgepakete: **P2.5** (Bulk-Bestätigen), **P2.6** (Invarianten-Test), **P2.7** (Bestätigungs-Provenienz).
+0. ✅ **Vier-Schichten-Präzisierung** (siehe Kap. 3.1): Eingang → Vorschlagsraum → **Lebensdatenbank (fix, inkl. Fakten-Anreicherung wie Wetter)** → Ableitungen (wegwerfbar, inkl. Embeddings). Konsequenz: Wetter wird nicht mehr bei „Stufe 3 neu berechnen" verworfen, sondern nur ergänzt, wo es fehlt; Eingang wird nie automatisch gelöscht. Operative Folgepakete: **P2.5** (Bulk-Bestätigen), **P2.6** (Invarianten-Test), **P2.7** (Bestätigungs-Provenienz) — alle drei am 2026-07-16 umgesetzt, ebenso **P2.4** (Auto-Enrichment).
 1. ✅ **Datums-Granularität:** Die Stufen `exact/day/month/season/year/decade` **reichen**. Angaben wie „Anfang der 90er" werden als `decade` gespeichert und mit einem Hinweis „Zeit nicht genau genug" versehen; ein eigener Admin-Bereich listet alle grob datierten Events zur Nachbearbeitung (→ Paket **P2.3**).
 2. ✅ **Entity-Dubletten:** **Kein automatisches Zusammenführen.** Dubletten („Seeadler"/„Adler") werden manuell über die vorhandene Bearbeitung aufgelöst.
 5. ✅ **UI für Unsicherheit:** Die umgesetzten Badges reichen — „⚠ unbestätigt · XX %" (orange) vs. „✓ bestätigt" (grün).

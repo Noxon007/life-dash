@@ -24,6 +24,8 @@ def event_to_read(event: Event) -> EventRead:
         note=event.note,
         confidence=event.confidence,
         confirmed=event.confirmed,
+        confirmed_at=event.confirmed_at,
+        confirmed_by=event.confirmed_by,
         source=event.source,
         location=location,
         origin_fragment_id=event.origin_fragment_id,

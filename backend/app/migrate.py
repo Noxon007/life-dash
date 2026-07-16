@@ -14,8 +14,23 @@ _MISSING_COLUMNS: dict[str, dict[str, str]] = {
     "fragments": {"user_id": "VARCHAR(36)"},
     "locations": {"user_id": "VARCHAR(36)"},
     "events": {"user_id": "VARCHAR(36)", "embedding": "JSON", "note": "TEXT",
-               "external_id": "VARCHAR(64)"},
+               "external_id": "VARCHAR(64)",
+               "confirmed_at": "TIMESTAMP", "confirmed_by": "VARCHAR(16)"},
     "entities": {"user_id": "VARCHAR(36)"},
+}
+
+# Einmalige Nacharbeiten, wenn eine Spalte NEU angelegt wurde (Bestandsdaten).
+# P2.7: bereits bestätigte Events bekommen eine plausible Provenienz —
+# Import-Besuche waren automatisch bestätigt, alles andere war manuell;
+# als Zeitpunkt dient die letzte Änderung (genauer geht es rückwirkend nicht).
+_BACKFILLS: dict[str, str] = {
+    "events.confirmed_by": (
+        "UPDATE events SET "
+        "confirmed_at = updated_at, "
+        "confirmed_by = CASE WHEN source = 'google_timeline' "
+        "THEN 'import' ELSE 'manual' END "
+        "WHERE confirmed = 'confirmed'"
+    ),
 }
 
 
@@ -33,6 +48,9 @@ def ensure_schema(engine: Engine) -> list[str]:
                 continue
             with engine.begin() as conn:
                 conn.execute(text(f'ALTER TABLE "{table}" ADD COLUMN "{col}" {sqltype}'))
+                backfill = _BACKFILLS.get(f"{table}.{col}")
+                if backfill:
+                    conn.execute(text(backfill))
             applied.append(f"{table}.{col}")
     return applied
 

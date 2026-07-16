@@ -7,3 +7,5 @@ pyyaml==6.0.2
 python-dateutil==2.9.0.post0
 # Auth (OIDC / Pocket ID): JWT-Validierung inkl. RS256 (JWKS)
 PyJWT[crypto]==2.10.1
+# Tests (P2.6 — Invarianten-Test "Bestätigtes ist unantastbar")
+pytest==9.1.1

@@ -1,16 +1,36 @@
 """Moderations-Endpoints: unbestätigte Stufe-2-Einträge prüfen."""
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Query as OrmQuery, Session
 
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import ConfirmState, Event, EventEntityLink, User
 from app.routers._serialize import event_to_read
-from app.schemas import EventRead, EventUpdate
+from app.schemas import (
+    BulkConfirmFilter,
+    BulkConfirmPreview,
+    BulkConfirmResult,
+    EventRead,
+    EventUpdate,
+)
 
 router = APIRouter(prefix="/api/moderation", tags=["Moderation"])
+
+
+def mark_confirmed(event: Event, by: str) -> None:
+    """Übergang Vorschlagsraum -> Lebensdatenbank inkl. Provenienz (P2.7).
+
+    by: "manual" | "bulk" | "import". Bei bereits bestätigten Events bleibt
+    die ursprüngliche Provenienz stehen (erneutes Bestätigen/Bearbeiten
+    verfälscht nicht, wann etwas zur Wahrheit wurde)."""
+    if event.confirmed != ConfirmState.confirmed:
+        event.confirmed_at = datetime.now(timezone.utc)
+        event.confirmed_by = by
+    event.confirmed = ConfirmState.confirmed
 
 
 @router.get("/queue", response_model=list[EventRead])
@@ -51,7 +71,7 @@ def confirm_event(
 ) -> EventRead:
     """Bestätigt ein Event (Stufe 2: unconfirmed -> confirmed) inkl. verknüpfter Entities."""
     event = _get_event(db, event_id, user)
-    event.confirmed = ConfirmState.confirmed
+    mark_confirmed(event, "manual")
     _confirm_linked_entities(event)
     db.commit()
     db.refresh(event)
@@ -71,6 +91,8 @@ def correct_event(
     overrides = dict(event.field_overrides or {})
 
     data = payload.model_dump(exclude_unset=True)
+    # Ändern sich die Fakten Zeit/Ort, stimmt angehängtes Wetter nicht mehr
+    facts_changed = bool({"location_name", "date_start", "date_end"} & data.keys())
 
     # Ort separat behandeln: Name/Adresse -> Geocoding -> Location-Zeile
     if "location_name" in data:
@@ -114,11 +136,78 @@ def correct_event(
         overrides[key] = True
 
     event.field_overrides = overrides
-    event.confirmed = ConfirmState.confirmed
+    mark_confirmed(event, "manual")
     _confirm_linked_entities(event)
+
+    # Der NUTZER hat Zeit/Ort korrigiert -> Wetter folgt den neuen Fakten
+    # (keine Maschinen-Änderung an Bestätigtem; vgl. KONZEPT Kap. 3.1).
+    if facts_changed:
+        from app.models import Source
+        from app.services.enrichment import auto_enrich_events
+
+        for m in [m for m in event.metrics if m.source == Source.weather]:
+            event.metrics.remove(m)  # delete-orphan räumt die Zeile ab
+        db.flush()
+        auto_enrich_events(db, [event])
+
     db.commit()
     db.refresh(event)
     return event_to_read(event)
+
+
+# --------------------------------------------------------------------------- #
+# P2.5 — Bulk-Bestätigen: viele korrekte KI-Vorschläge auf einmal in die
+# Lebensdatenbank übernehmen. Immer zweistufig: erst Vorschau, dann Bestätigen
+# (beide Endpoints nutzen exakt dieselbe Filter-Query).
+# --------------------------------------------------------------------------- #
+BULK_PREVIEW_LIMIT = 50
+
+
+def _bulk_query(db: Session, user: User, f: BulkConfirmFilter) -> OrmQuery:
+    query = db.query(Event).filter(
+        Event.user_id == user.id, Event.confirmed == ConfirmState.unconfirmed
+    )
+    if f.category:
+        query = query.filter(Event.category == f.category)
+    if f.source:
+        query = query.filter(Event.source == f.source)
+    if f.min_confidence > 0:
+        query = query.filter(Event.confidence >= f.min_confidence)
+    # Zeitraumfilter greift auf die Ereignis-Zeit; Events ohne Datum fallen
+    # dann bewusst raus (die sollen einzeln moderiert werden).
+    if f.date_from:
+        query = query.filter(Event.date_start >= f.date_from)
+    if f.date_to:
+        query = query.filter(Event.date_start <= f.date_to)
+    return query
+
+
+@router.post("/bulk-confirm/preview", response_model=BulkConfirmPreview)
+def bulk_confirm_preview(
+    payload: BulkConfirmFilter,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> BulkConfirmPreview:
+    """Zeigt, welche Events ein Bulk-Bestätigen mit diesen Filtern träfe."""
+    query = _bulk_query(db, user, payload)
+    total = query.count()
+    sample = query.order_by(Event.created_at.desc()).limit(BULK_PREVIEW_LIMIT).all()
+    return BulkConfirmPreview(total=total, events=[event_to_read(e) for e in sample])
+
+
+@router.post("/bulk-confirm", response_model=BulkConfirmResult)
+def bulk_confirm(
+    payload: BulkConfirmFilter,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> BulkConfirmResult:
+    """Bestätigt alle Events, die den Filtern entsprechen (Provenienz: bulk)."""
+    events = _bulk_query(db, user, payload).all()
+    for event in events:
+        mark_confirmed(event, "bulk")
+        _confirm_linked_entities(event)
+    db.commit()
+    return BulkConfirmResult(confirmed=len(events))
 
 
 @router.delete("/{event_id}", status_code=204, response_model=None)

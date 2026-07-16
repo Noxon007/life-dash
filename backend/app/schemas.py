@@ -72,6 +72,9 @@ class EventRead(BaseModel):
     note: str | None = None
     confidence: float
     confirmed: ConfirmState
+    # Provenienz (P2.7): wann/wodurch bestätigt ("manual" | "bulk" | "import")
+    confirmed_at: datetime | None = None
+    confirmed_by: str | None = None
     source: Source
     location: LocationRead | None = None
     origin_fragment_id: str | None = None
@@ -169,6 +172,29 @@ class EventUpdate(BaseModel):
     # Ersetzt die verknüpften Objekte vollständig (z. B. "Seeadler" -> "Adler").
     # Leere Liste = alle Verknüpfungen entfernen. None = unverändert.
     entities: list[ManualEntity] | None = None
+
+
+# --------------------------------------------------------------------------- #
+# P2.5 — Bulk-Bestätigen (Vorschau + Ausführung nutzen denselben Filter)
+# --------------------------------------------------------------------------- #
+class BulkConfirmFilter(BaseModel):
+    """Filter, welche unbestätigten Events bestätigt werden sollen.
+    Ohne Angaben trifft er ALLE unbestätigten Events des Nutzers."""
+    category: str | None = None
+    source: Source | None = None
+    min_confidence: float = Field(0.0, ge=0.0, le=1.0)
+    date_from: datetime | None = None
+    date_to: datetime | None = None
+
+
+class BulkConfirmPreview(BaseModel):
+    """Vorschau: Anzahl + Stichprobe der Events, die bestätigt würden."""
+    total: int
+    events: list[EventRead]
+
+
+class BulkConfirmResult(BaseModel):
+    confirmed: int
 
 
 # --------------------------------------------------------------------------- #

@@ -19,7 +19,7 @@ import logging
 import math
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 from dateutil import parser as dateparser
 from fastapi import APIRouter, Body, Depends
@@ -363,6 +363,8 @@ def import_timeline(
             category="event",
             confidence=round(min(1.0, v["probability"]), 2),
             confirmed=ConfirmState.confirmed,  # Gerätedaten = Fakt, nicht moderierungspflichtig
+            confirmed_at=datetime.now(timezone.utc),
+            confirmed_by="import",  # Provenienz (P2.7)
             source=Source.google_timeline,
             location=loc,
             origin_fragment=fragment,

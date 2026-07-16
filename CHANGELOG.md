@@ -10,9 +10,35 @@ jedem `MINOR` vorkommen.
 
 ## [Unreleased]
 
-## [0.5.0] – 2026-07-15
+## [0.5.0] – 2026-07-16
 
 ### Hinzugefügt
+- **P2.5 — Bulk-Bestätigen:** Die Moderations-Queue kann viele korrekte
+  KI-Vorschläge auf einmal übernehmen — Filter nach Kategorie, Quelle,
+  Mindest-Confidence und Zeitraum, immer zweistufig: erst **Vorschau** der
+  betroffenen Events, dann Bestätigen. Neue Endpoints
+  `POST /api/moderation/bulk-confirm/preview` und `…/bulk-confirm`.
+- **P2.6 — Invarianten-Test „Bestätigtes ist unantastbar":** Automatische
+  Tests (`backend/tests/`, pytest) fahren alle Recompute-/Enrichment-/
+  Import-Pfade gegen die Invariante aus KONZEPT Kap. 3.1: Neuberechnung
+  verschont bestätigte Fragmente samt Geschwister-Events, Wetter ist additiv
+  und idempotent, Bulk-Bestätigen kippt nur den Status, Re-Import erzeugt
+  keine Duplikate und fasst Bestätigtes nicht an, die Ortsnamen-Auflösung
+  respektiert manuell umbenannte Titel, Embedding-Neuberechnung ändert nur
+  das Embedding.
+- **P2.7 — Bestätigungs-Provenienz:** Jedes Event speichert jetzt, **wann**
+  und **wodurch** es bestätigt wurde (`confirmed_at`, `confirmed_by`:
+  manuell / Sammel-Bestätigung / Import) — sichtbar im Bearbeiten-Dialog.
+  Bestandsdaten werden migriert (Import-Besuche → „Import", Rest → „manuell",
+  Zeitpunkt = letzte Änderung); erneutes Bestätigen/Bearbeiten überschreibt
+  die ursprüngliche Provenienz nicht.
+- **P2.4 — Auto-Enrichment nach der Eingabe:** Neue Events (KI-Analyse und
+  manuelle Eingabe) bekommen ihr Wetter sofort beim Anlegen statt erst über
+  den Admin-Knopf (best effort — schlägt der Abruf fehl, trägt der Admin-Lauf
+  später nach); Embeddings entstehen weiterhin direkt beim Anlegen. Korrigiert
+  der Nutzer Zeit oder Ort eines Events, wird dessen Wetter passend zu den
+  neuen Fakten neu geholt (nutzergestartete Korrektur — keine
+  Maschinen-Änderung an Bestätigtem).
 - **P2.2 — Google-Timeline-Import:** Upload des Timeline-Exports (Geräte-Export
   `semanticSegments` und altes Takeout-Format `timelineObjects`) unter
   Admin → „Meine Daten". Besuche werden zu bestätigten Events

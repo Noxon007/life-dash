@@ -10,8 +10,13 @@ Ablauf:
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 from app.ai import get_provider
 from app.ai.base import ExtractedEvent, ProviderUnavailable
@@ -162,6 +167,8 @@ def create_manual_event(db: Session, user_id: str, payload) -> Event:
         category=payload.category,
         confidence=1.0,
         confirmed=ConfirmState.confirmed,
+        confirmed_at=_utcnow(),
+        confirmed_by="manual",  # Provenienz (P2.7): der Nutzer IST die Quelle
         field_overrides={f: True for f in ("title", "description", "date_start",
                                            "date_end", "date_precision", "category")},
         source=Source.manual,

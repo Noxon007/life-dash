@@ -29,7 +29,10 @@ def create_event(
     user: User = Depends(get_current_user),
 ) -> EventRead:
     """Manuell erfasstes Event (ohne KI) — sofort bestätigt."""
+    from app.services.enrichment import auto_enrich_events
+
     event = create_manual_event(db, user.id, payload)
+    auto_enrich_events(db, [event])  # P2.4: Wetter direkt ergänzen
     db.commit()
     db.refresh(event)
     return event_to_read(event)

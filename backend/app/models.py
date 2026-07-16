@@ -158,6 +158,12 @@ class Event(Base):
     confirmed: Mapped[ConfirmState] = mapped_column(
         Enum(ConfirmState), default=ConfirmState.unconfirmed
     )
+    # Bestätigungs-Provenienz (P2.7): Wann wurde der Übergang Vorschlag ->
+    # Lebensdatenbank vollzogen, und wodurch? confirmed_by:
+    #   "manual" (einzeln moderiert/bearbeitet) | "bulk" (Sammel-Bestätigung)
+    #   | "import" (Gerätedaten, beim Import automatisch bestätigt)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    confirmed_by: Mapped[str | None] = mapped_column(String(16), nullable=True)
     # Welche Felder wurden manuell bestätigt/korrigiert -> vor Re-Processing geschützt
     field_overrides: Mapped[dict] = mapped_column(JSON, default=dict)
     source: Mapped[Source] = mapped_column(Enum(Source), default=Source.ai)
