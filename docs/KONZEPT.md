@@ -758,8 +758,10 @@ braucht A7). Danach ist Gruppe A abgeschlossen → **P2.1 (Immich)**.
     Wichtig: landet als `unconfirmed` im Vorschlagsraum, nie automatisch
     bestätigt → in Paket **P2.1** als Ausbaustufe 2 aufgenommen.
 
-**Lizenz & Monetarisierung (Anmerkung 31, 2026-07-16 — Vorschlag):**
-31. **Das Repo hat keine LICENSE-Datei** — damit gilt rechtlich „alle Rechte
+**Lizenz & Monetarisierung (Anmerkung 31, 2026-07-16 — ✅ entschieden: AGPL-3.0,
+LICENSE-Datei + README-Hinweis sind im Repo; der User ist erklärter Fan von
+echtem Open Source):**
+31. **Das Repo hatte keine LICENSE-Datei** — damit galt rechtlich „alle Rechte
     vorbehalten": öffentlich sichtbar, aber niemand darf den Code legal
     nutzen, forken oder weiterverbreiten. Für ein Self-Hosted-Tool, dessen
     Wert auf Vertrauen und Community beruht, ist das die schlechteste

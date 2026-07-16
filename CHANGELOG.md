@@ -9,6 +9,9 @@ Features erhöhen `MINOR`, Fehlerbehebungen `PATCH`; Breaking Changes können in
 jedem `MINOR` vorkommen.
 
 ## [Unreleased]
+- **Lizenz:** Life-Dash ist jetzt offiziell freie Software unter
+  **AGPL-3.0-or-later** (LICENSE-Datei + README-Abschnitt; vorher keine
+  Lizenz = „alle Rechte vorbehalten"). Entscheidung in KONZEPT Anm. 31.
 
 ## [0.10.1] – 2026-07-16
 

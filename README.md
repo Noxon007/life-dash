@@ -34,3 +34,12 @@ ein Git-Tag `vX.Y.Z`; der Workflow baut daraus das Image mit den Tags
 `X.Y.Z` (exakt), `X.Y` (mitlaufend) und `latest`. Auf dem Server auf eine
 konkrete Version pinnen (`LIFEDASH_VERSION`), nicht `latest`. Änderungen werden
 in [CHANGELOG.md](CHANGELOG.md) gepflegt.
+
+## Lizenz
+
+Life-Dash ist freie Software unter der
+**[GNU Affero General Public License v3.0](LICENSE)** (AGPL-3.0-or-later).
+Du darfst Life-Dash nutzen, verändern und weiterverbreiten — auch als
+gehosteten Dienst —, solange Änderungen unter derselben Lizenz offengelegt
+werden (das Netzwerk-Copyleft der AGPL gilt ausdrücklich auch für
+SaaS-Betrieb). Details: [LICENSE](LICENSE).
