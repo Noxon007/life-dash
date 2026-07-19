@@ -54,7 +54,23 @@ def ensure_schema(engine: Engine) -> list[str]:
             applied.append(f"{table}.{col}")
     if "metrics" in existing_tables:
         ensure_weather_unique_index(engine)
+    if "locations" in existing_tables:
+        cleanup_searched_address_labels(engine)
     return applied
+
+
+def cleanup_searched_address_labels(engine: Engine) -> None:
+    """A19: Das Alt-Label „Gesuchte Adresse — " aus bereits aufgelösten Orten
+    und Besuchs-Titeln entfernen. Idempotent (WHERE greift nach dem REPLACE
+    nicht mehr); nackte „Gesuchte Adresse"-Orte bleiben und laufen über
+    „Ortsnamen auflösen" in reine Adressen."""
+    with engine.begin() as conn:
+        conn.execute(text(
+            "UPDATE locations SET name = REPLACE(name, 'Gesuchte Adresse — ', '') "
+            "WHERE name LIKE 'Gesuchte Adresse — %'"))
+        conn.execute(text(
+            "UPDATE events SET title = REPLACE(title, 'Besuch: Gesuchte Adresse — ', 'Besuch: ') "
+            "WHERE title LIKE 'Besuch: Gesuchte Adresse — %'"))
 
 
 def ensure_weather_unique_index(engine: Engine) -> None:

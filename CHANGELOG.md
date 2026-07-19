@@ -9,9 +9,51 @@ Features erhöhen `MINOR`, Fehlerbehebungen `PATCH`; Breaking Changes können in
 jedem `MINOR` vorkommen.
 
 ## [Unreleased]
-- **Lizenz:** Life-Dash ist jetzt offiziell freie Software unter
-  **AGPL-3.0-or-later** (LICENSE-Datei + README-Abschnitt; vorher keine
-  Lizenz = „alle Rechte vorbehalten"). Entscheidung in KONZEPT Anm. 31.
+
+## [0.12.0] – 2026-07-19
+
+> Ab dieser Version sind Changelog-Einträge in Produktsprache geschrieben —
+> ohne interne Paketkürzel (die leben nur noch im Konzept).
+> Die Version 0.11.0 wurde übersprungen.
+
+### Behoben
+- **Karte auf dem Smartphone war unsichtbar:** Ein CSS-Fehler ließ die
+  Kartenfläche im mobilen Layout auf Höhe 0 zusammenfallen (die kleine
+  Kompendium-Karte war nicht betroffen). Die Karte hat mobil jetzt eine
+  feste Höhe von 55 % des Bildschirms.
+- **Suche ohne Rückmeldung:** Scheiterte die Server-Suche (z. B. weil der
+  KI-Dienst für die Bedeutungssuche nicht erreichbar war), sprang die App
+  zum Zeitstrahl, filterte aber still gar nichts. Jetzt greift in dem Fall
+  eine einfache Textsuche über Titel/Beschreibung/Ort als Ersatz, und ein
+  Hinweis erklärt die Einschränkung.
+- **„Gesuchte Adresse" verschwindet:** Dieses Google-Label beschreibt nur,
+  wie der Aufenthalt erkannt wurde, und hat keinen eigenen Wert. Neue
+  Importe legen solche Besuche als unbenannte Orte an (bekommen beim
+  Auflösen die reine Adresse); vorhandene „Gesuchte Adresse — …"-Namen und
+  Besuchs-Titel werden beim App-Start automatisch bereinigt, nackte
+  „Gesuchte Adresse"-Orte löst „Ortsnamen auflösen" in echte Adressen auf.
+
+### Hinzugefügt
+- **Export mit Auswahl:** Beim Daten-Export lässt sich per Häkchen der
+  komplette Google-Timeline-Anteil weglassen (importierte Besuche, Routen
+  und deren Roh-Belege) — für ein handliches Backup der handgepflegten
+  Einträge ohne zehntausende Import-Zeilen.
+
+### Sonstiges
+- **Lizenz:** Life-Dash ist seit diesem Release offiziell freie Software
+  unter **AGPL-3.0-or-later** (LICENSE-Datei + README-Abschnitt; vorher
+  keine Lizenz = „alle Rechte vorbehalten").
+
+### Geändert
+- **Verständliche Sprache statt Fachjargon:** Die Oberfläche spricht nicht
+  mehr von „Stufe 1/2/3" — stattdessen: **Roh-Eingang** (deine
+  unveränderten Texte), **Vorschläge** (KI-Entwürfe zum Bestätigen),
+  **Lebensdatenbank** (bestätigte Einträge samt Fakten wie Wetter) und
+  **Ansichten** (alles Berechnete). Betrifft u. a. Statistik-Kacheln,
+  Eingabe-Hinweise, Admin-Aktionen und die Datenbank-Ansicht; der Knopf
+  „Stufe 2 neu berechnen" heißt jetzt „KI-Vorschläge neu berechnen".
+
+## [0.10.1] – 2026-07-16
 
 ## [0.10.1] – 2026-07-16
 

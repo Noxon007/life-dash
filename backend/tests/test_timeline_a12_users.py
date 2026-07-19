@@ -274,3 +274,43 @@ def test_delete_own_account_blocked(db, user):
         delete_user(user.id, admin=user, db=db)
     assert exc.value.status_code == 400
     assert db.get(User, user.id) is not None
+
+
+# --------------------------------------------------------------------------- #
+# A19 — „Gesuchte Adresse": kein Label mehr, Bestandsdaten bereinigt
+# --------------------------------------------------------------------------- #
+def test_searched_address_has_no_label(db, user, fake_reverse):
+    import_timeline(_device_payload(semantic="SEARCHED_ADDRESS"),
+                    auto_resolve=False, db=db, user=user)
+    loc = db.query(Location).one()
+    assert loc.name.startswith("Ort (")  # unbenannt statt Label
+
+    resolve_place_names(limit=10, scope="unnamed", db=db, user=user)
+    db.refresh(loc)
+    assert loc.name == SHORT  # reine Adresse, kein Präfix
+
+
+def test_old_searched_address_label_is_resolved_without_prefix(db, user, fake_reverse):
+    loc = Location(user_id=user.id, name="Gesuchte Adresse", lat=51.9, lng=8.9)
+    db.add(loc)
+    db.commit()
+    result = resolve_place_names(limit=10, scope="unnamed", db=db, user=user)
+    assert result.resolved == 1
+    db.refresh(loc)
+    assert loc.name == SHORT  # Alt-Label ersetzt, nicht als Präfix behalten
+
+
+def test_migration_strips_searched_address_prefix(db, user):
+    from app.migrate import cleanup_searched_address_labels
+
+    loc = Location(user_id=user.id, name="Gesuchte Adresse — Musterstraße 1, Detmold",
+                   lat=51.9, lng=8.9)
+    db.add(loc)
+    db.flush()
+    db.add(Event(user_id=user.id, title="Besuch: Gesuchte Adresse — Musterstraße 1",
+                 location_id=loc.id))
+    db.commit()
+    cleanup_searched_address_labels(db.get_bind())
+    db.expire_all()
+    assert db.get(Location, loc.id).name == "Musterstraße 1, Detmold"
+    assert db.query(Event).one().title == "Besuch: Musterstraße 1"

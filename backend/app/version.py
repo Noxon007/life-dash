@@ -3,4 +3,4 @@
 Wird bei jedem Release zusammen mit CHANGELOG.md und dem Git-Tag gepflegt
 (SemVer, siehe CHANGELOG-Kopf). Angezeigt im UI (Sidebar) und in /health.
 """
-APP_VERSION = "0.10.1"
+APP_VERSION = "0.12.0"

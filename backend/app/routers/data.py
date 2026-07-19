@@ -65,14 +65,28 @@ def _dict_to_kwargs(model, data: dict) -> dict:
 
 @router.get("/export")
 def export_data(
+    exclude_source: str = "",
     db: Session = Depends(get_db), user: User = Depends(get_current_user)
 ) -> dict:
-    """Vollständiger Export der eigenen Daten (Stufe 1–3) als JSON."""
-    fragments = db.query(Fragment).filter(Fragment.user_id == user.id).all()
+    """Vollständiger Export der eigenen Daten als JSON.
+
+    exclude_source (Auswahl-Export): Komma-Liste von Quellen, die NICHT
+    exportiert werden — z. B. "google_timeline" lässt importierte Besuche,
+    Routen und deren Roh-Belege weg (handliches Backup der handgepflegten
+    Lebensdatenbank). Metriken/Verknüpfungen folgen ihren Events."""
+    excluded = {s.strip() for s in exclude_source.split(",") if s.strip()}
+
+    def _kept(query, model):
+        rows = query.filter(model.user_id == user.id).all()
+        if not excluded:
+            return rows
+        return [r for r in rows if getattr(r.source, "value", r.source) not in excluded]
+
+    fragments = _kept(db.query(Fragment), Fragment)
     locations = db.query(Location).filter(Location.user_id == user.id).all()
     entities = db.query(Entity).filter(Entity.user_id == user.id).all()
-    events = db.query(Event).filter(Event.user_id == user.id).all()
-    tracks = db.query(Track).filter(Track.user_id == user.id).all()
+    events = _kept(db.query(Event), Event)
+    tracks = _kept(db.query(Track), Track)
     event_ids = {e.id for e in events}
     links = [
         l for l in db.query(EventEntityLink).all() if l.event_id in event_ids

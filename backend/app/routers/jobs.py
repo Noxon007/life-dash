@@ -35,7 +35,7 @@ router = APIRouter(prefix="/api/jobs", tags=["Jobs"])
 STALE_SECONDS = 180
 
 JOB_TYPES = {
-    "recompute": "Stufe 2 neu berechnen",
+    "recompute": "KI-Vorschläge neu berechnen",
     "weather": "Wetter ergänzen",
     "embeddings": "Embeddings berechnen",
     "resolve_names": "Ortsnamen auflösen/formatieren",

@@ -64,16 +64,23 @@ _ACTIVITY_MAP = {
     "in tram": "transit", "in ferry": "transit", "flying": "transit",
 }
 
-# semanticType -> deutscher Ortsname (Geräte-Export kennt keine Ortsnamen)
+# semanticType -> deutscher Ortsname (Geräte-Export kennt keine Ortsnamen).
+# A19: "searched address" bekommt bewusst KEIN Label mehr — es beschreibt nur,
+# wie Google den Aufenthalt erkannt hat, und stiftet keinen Mehrwert. Solche
+# Besuche laufen als unbenannte Orte ("Ort (lat, lng)") in die normale
+# Adress-Auflösung und enden als reine Adresse.
 _SEMANTIC_NAMES = {
     "home": "Zuhause", "inferred home": "Zuhause (vermutet)",
     "work": "Arbeit", "inferred work": "Arbeit (vermutet)",
-    "searched address": "Gesuchte Adresse", "aliased location": "Gespeicherter Ort",
+    "aliased location": "Gespeicherter Ort",
 }
 # A12: Semantische Labels sind KEINE echten Ortsnamen — sie zählen wie
 # Koordinaten-Namen als "unaufgelöst" und werden reverse-geocodet; das Label
 # bleibt dabei als Präfix erhalten ("Zuhause — Musterstraße 1, Detmold").
 SEMANTIC_LABELS = frozenset(_SEMANTIC_NAMES.values())
+# A19: Alt-Label aus früheren Importen — bleibt Auflösungs-Kandidat, wird beim
+# Auflösen aber ERSETZT statt als Präfix behalten (Migration räumt Rest auf).
+DROP_LABELS = frozenset({"Gesuchte Adresse"})
 
 _LATLNG_RE = re.compile(r"(-?\d+(?:\.\d+)?)\s*°?\s*,\s*(-?\d+(?:\.\d+)?)")
 
@@ -274,6 +281,8 @@ def _semantic_label(name: str | None) -> str | None:
     if not name:
         return None
     first = name.split(" — ", 1)[0].strip()
+    if first in DROP_LABELS:  # A19: Label fällt bei der Auflösung weg
+        return None
     return first if first in SEMANTIC_LABELS else None
 
 
@@ -316,8 +325,10 @@ def _apply_resolved_name(db: Session, loc: Location, user_id: str,
 
 def _unresolved_name_filter():
     """SQL-Filter für Orte ohne echten Namen: Koordinaten-Platzhalter
-    („Ort (lat, lng)") und semantische Labels ohne Adresse (A12)."""
-    return or_(Location.name.like("Ort (%"), Location.name.in_(SEMANTIC_LABELS))
+    („Ort (lat, lng)"), semantische Labels ohne Adresse (A12) und
+    Alt-Labels aus früheren Importen (A19)."""
+    return or_(Location.name.like("Ort (%"),
+               Location.name.in_(SEMANTIC_LABELS | DROP_LABELS))
 
 
 def _nonlatin_locations(db: Session, user_id: str) -> list[Location]:

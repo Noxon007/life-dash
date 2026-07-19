@@ -422,7 +422,9 @@
     .event-card::before { left: -20px; }
     .ev-date { margin-left: 0; width: 100%; }
     .map-layout { flex-direction: column; }
-    #map { height: 55vh; width: 100%; }
+    /* Fix (Anm. 34): in Spaltenrichtung kollabiert flex:1 (basis 0) die Höhe
+       auf 0 — Karte war auf dem Handy unsichtbar. Feste Höhe statt flex. */
+    .map-layout #map { flex: 0 0 auto; height: 55vh; width: 100%; }
     #mp-stops { width: 100%; max-height: none; }
     .field-key { width: 96px; }
   }
@@ -607,7 +609,7 @@
       <!-- ===== STATS ===== -->
       <div class="view" id="view-stats">
         <div class="grid cols-4" style="margin-bottom:24px">
-          <div class="stat-card" data-go="timeline:all"><div class="stat-num" id="stat-events">–</div><div class="stat-label">Ereignisse gesamt</div><div class="stat-sub">Stufe 2</div></div>
+          <div class="stat-card" data-go="timeline:all"><div class="stat-num" id="stat-events">–</div><div class="stat-label">Ereignisse gesamt</div><div class="stat-sub">Lebensdatenbank</div></div>
           <div class="stat-card" data-go="comp:country"><div class="stat-num" id="stat-countries">–</div><div class="stat-label">Länder besucht</div><div class="stat-sub">Kompendium</div></div>
           <div class="stat-card" data-go="map"><div class="stat-num" id="stat-places">–</div><div class="stat-label">Orte besucht</div><div class="stat-sub">verortete Events</div></div>
           <div class="stat-card" data-go="comp:animal"><div class="stat-num" id="stat-animals">–</div><div class="stat-label">Tierarten gesehen</div><div class="stat-sub">Kompendium</div></div>
@@ -650,7 +652,7 @@
           </div>
         </div>
         <div class="hint" style="margin-top:24px">
-          💡 Statistiken sind <b>berechnete Stufe-3-Projektionen</b> — jederzeit neu berechenbar. Jedes Modul (Reisen, Tiere …) liefert eigene Widgets.
+          💡 Statistiken sind <b>berechnete Ansichten</b> — jederzeit neu berechenbar. Jedes Modul (Reisen, Tiere …) liefert eigene Widgets.
         </div>
       </div>
 
@@ -678,7 +680,7 @@
 
         <div id="input-ai-section">
         <div class="hint">
-          ✍️ Schreib einfach frei drauflos. Die KI erkennt Datum, Ort, Kategorie und Objekte. Dein Roh-Text wird <b>unverändert als Stufe 1</b> gespeichert.
+          ✍️ Schreib einfach frei drauflos. Die KI erkennt Datum, Ort, Kategorie und Objekte. Dein Roh-Text wird <b>unverändert im Roh-Eingang</b> gespeichert.
         </div>
         <textarea class="input-area" id="input-text" placeholder="z. B. „12.07.2026 war in Detmold und habe einen Adler gesehen&quot;"></textarea>
         <div class="examples">
@@ -694,7 +696,7 @@
         <div class="ai-preview" id="ai-preview">
           <div class="ai-head">
             <span class="pulse"></span>
-            <b>KI-Vorschau (Stufe 2)</b>
+            <b>KI-Vorschau (Vorschlag)</b>
             <span class="chip badge-unconfirmed" style="margin-left:auto">unbestätigt — bitte prüfen</span>
           </div>
           <div id="ai-fields"></div>
@@ -811,9 +813,9 @@
             derselbe Knopf setzt später fort.</div>
           <div class="panel" style="padding:0">
             <div class="action-row">
-              <button class="btn secondary" id="btn-recompute-2">🔄 Stufe 2 neu berechnen</button>
+              <button class="btn secondary" id="btn-recompute-2">🔄 KI-Vorschläge neu berechnen</button>
               <div class="action-desc"><b>KI-Extraktion wiederholen.</b><br>
-                Verwirft alle <i>unbestätigten</i> Events und erzeugt sie neu aus den Roh-Fragmenten (Stufe 1) —
+                Verwirft alle <i>unbestätigten</i> Events und erzeugt sie neu aus dem Roh-Eingang —
                 mit dem aktuellen KI-Modell und Prompt. Bestätigte Events und manuell korrigierte Felder bleiben
                 unangetastet. Sinnvoll nach Modell- oder Prompt-Änderungen. Bricht bei erschöpftem
                 KI-Kontingent sauber ab (bereits Berechnetes bleibt erhalten).</div>
@@ -835,8 +837,8 @@
             <div class="action-row" style="border-top:1px solid var(--danger)">
               <button class="btn danger" id="btn-wipe">🗑️ Alle Daten löschen</button>
               <div class="action-desc"><b style="color:var(--danger)">Unwiderruflich!</b><br>
-                Löscht sämtliche Lebensdaten aller Stufen — Fragmente (Stufe 1), Events &amp; Entities (Stufe 2),
-                Orte, Wetter &amp; Embeddings (Stufe 3). Nutzer-Konten bleiben bestehen. Es gibt eine doppelte
+                Löscht sämtliche Lebensdaten — Roh-Eingang, Ereignisse &amp; Objekte,
+                Orte, Wetter &amp; Embeddings. Nutzer-Konten bleiben bestehen. Es gibt eine doppelte
                 Sicherheitsabfrage; danach ist die Datenbank leer.</div>
             </div>
           </div>
@@ -907,8 +909,12 @@
           <div class="action-row">
             <button class="btn secondary" id="btn-export">📦 Daten exportieren</button>
             <div class="action-desc"><b>Backup als JSON-Datei.</b><br>
-              Lädt alle deine Daten (Stufe 1–3: Roh-Fragmente, Events, Objekte, Orte, Wetter) als eine
-              JSON-Datei herunter. Embeddings sind enthalten. Regelmäßig machen — das ist dein Backup.</div>
+              Lädt alle deine Daten (Roh-Eingang, Ereignisse, Objekte, Orte, Wetter) als eine
+              JSON-Datei herunter. Embeddings sind enthalten. Regelmäßig machen — das ist dein Backup.<br>
+              <label class="stat-label" style="display:inline-flex; align-items:center; gap:6px; margin-top:8px">
+                <input type="checkbox" id="exp-no-timeline">
+                ohne Google-Timeline-Daten (importierte Besuche, Routen &amp; deren Roh-Belege)
+              </label></div>
           </div>
           <div class="action-row">
             <div style="flex-shrink:0; min-width:215px">
@@ -991,8 +997,8 @@
         <div class="admin-tabpane admin-only" data-tabpane="db" style="display:none">
           <div class="section-title">Datenbank — Rohansicht</div>
           <div class="hint" style="margin-bottom:14px">
-            🗄️ Direkter Blick auf die Tabellen (Admin). Stufe 1 = <code>fragments</code>,
-            Stufe 2 = <code>events</code>/<code>entities</code>/<code>locations</code>, Stufe 3 = <code>media_refs</code>/<code>metrics</code>.
+            🗄️ Direkter Blick auf die Tabellen (Admin). Roh-Eingang = <code>fragments</code>,
+            Lebensdatenbank = <code>events</code>/<code>entities</code>/<code>locations</code>, Anreicherungen = <code>media_refs</code>/<code>metrics</code>.
           </div>
           <div class="comp-tabs" id="db-tables"></div>
           <div style="overflow-x:auto">
@@ -1243,9 +1249,22 @@ function fetchEvents(force = false) {
 }
 async function loadTimeline() {
   // Suche nutzt den hybriden Such-Endpoint (Volltext + semantisch)
-  tl.events = tl.query
-    ? await api(`/api/search?q=${encodeURIComponent(tl.query)}`)
-    : await fetchEvents();
+  if (tl.query) {
+    try {
+      tl.events = await api(`/api/search?q=${encodeURIComponent(tl.query)}`);
+    } catch (err) {
+      // Anm. 33: Scheitert die Server-Suche (z. B. Embedding-Dienst), gab es
+      // vorher STILL keine Filterung. Jetzt: einfache lokale Textsuche als
+      // Fallback + sichtbarer Hinweis.
+      const q = tl.query.toLowerCase();
+      tl.events = (await fetchEvents()).filter(e =>
+        `${e.title} ${e.description || ''} ${e.location ? e.location.name : ''}`
+          .toLowerCase().includes(q));
+      toast('Suche eingeschränkt (Server-Suche nicht erreichbar) — zeige einfache Texttreffer.', 'warn', 6000);
+    }
+  } else {
+    tl.events = await fetchEvents();
+  }
   renderTimeline();
 }
 function renderTimeline() {
@@ -1973,7 +1992,7 @@ document.getElementById('ed-save').addEventListener('click', async () => {
 document.getElementById('ed-delete').addEventListener('click', async () => {
   const e = editingEvent;
   if (!e) return;
-  if (!(await uiConfirm(`Der Roh-Text (Stufe 1) bleibt erhalten.`,
+  if (!(await uiConfirm(`Der Roh-Text im Eingang bleibt erhalten.`,
     { title: `„${e.title}" löschen?`, okLabel: '🗑️ Löschen', danger: true }))) return;
   await api(`/api/moderation/${e.id}`, { method: 'DELETE' });
   closeEventEdit();
@@ -2644,7 +2663,7 @@ document.querySelectorAll('.example-chip').forEach(c =>
   c.addEventListener('click', () => { document.getElementById('input-text').value = c.textContent; }));
 
 // ---------- JOBS (A11) ----------
-const JOB_LABELS = { recompute: '🔄 Stufe 2 neu berechnen', weather: '🌤️ Wetter ergänzen',
+const JOB_LABELS = { recompute: '🔄 KI-Vorschläge neu berechnen', weather: '🌤️ Wetter ergänzen',
                      embeddings: '🧠 Embeddings', resolve_names: '📍 Ortsnamen auflösen/formatieren',
                      timeline_import: '🛰️ Timeline-Import', data_import: '📥 Daten-Import' };
 const JOB_STATUS = { running: '⏳ läuft', done: '✅ fertig', stopped: '⏹ gestoppt', error: '⚠️ Fehler' };
@@ -2770,7 +2789,7 @@ document.getElementById('btn-recompute-2').addEventListener('click', e =>
       return { done: r.processed, remaining: r.remaining, aborted: r.aborted };
     },
     unit: 'KI-Anfragen',
-    doneMsg: n => `Stufe 2 neu berechnet: ${n} Fragment(e) verarbeitet.`,
+    doneMsg: n => `KI-Vorschläge neu berechnet: ${n} Fragment(e) verarbeitet.`,
     jobType: 'recompute',
   }));
 document.getElementById('btn-enrich').addEventListener('click', e =>
@@ -2801,7 +2820,9 @@ document.getElementById('btn-export').addEventListener('click', async ev => {
   const btn = ev.target;
   btn.disabled = true; btn.textContent = '… exportiere';
   try {
-    const data = await api('/api/data/export');
+    // Auswahl-Export (Anm. 35): Google-Import optional weglassen
+    const noTl = document.getElementById('exp-no-timeline').checked;
+    const data = await api('/api/data/export' + (noTl ? '?exclude_source=google_timeline' : ''));
     const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
