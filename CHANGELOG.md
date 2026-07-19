@@ -10,6 +10,25 @@ jedem `MINOR` vorkommen.
 
 ## [Unreleased]
 
+## [0.16.0] – 2026-07-19
+
+### Geändert
+- **Karte nutzt den Bildschirm:** Statt fester 520 Pixel wächst die Karte
+  jetzt mit dem Fenster (die Stopp-Liste daneben auch), und ein neuer
+  Umschalter **„⛶ Vollbild"** zeigt sie bildschirmfüllend (Esc beendet).
+- **Ein Ortsnamen-Lauf statt drei Knöpfe:** „Ortsnamen auflösen",
+  „Adressen kürzen" und „Fremdschrift eindeutschen" waren serverseitig
+  schon derselbe Lauf — jetzt gibt es dafür einen Knopf mit Auswahl
+  (Fehlende Namen / Lange Adressen / Fremdschrift). Die Format-Bausteine
+  (Straße/Ortsteil/Stadt/Land) stehen direkt darunter.
+- **„Meine Daten" ist aufgeräumt:** Der Reiter gliedert sich jetzt in
+  klare Blöcke — **Sichern & Zurückspielen**, **Importe**, **Ortsnamen**
+  und **Tracking** — statt einer langen gewachsenen Liste.
+- **Login-Screen ist jetzt allgemeingültig:** Der Anmelde-Text nannte
+  hart „Pocket ID" — jetzt steht dort ein neutraler SSO-Hinweis; wer mag,
+  trägt den Namen seines Anmelde-Dienstes über `OIDC_PROVIDER_NAME` in
+  der `.env` ein.
+
 ## [0.15.2] – 2026-07-19
 
 ### Behoben

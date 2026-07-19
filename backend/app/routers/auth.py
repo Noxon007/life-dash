@@ -29,7 +29,8 @@ def _redirect_uri() -> str:
 @router.get("/config", response_model=AuthConfig)
 def auth_config() -> AuthConfig:
     """Sagt dem Frontend, ob ein Login nötig ist."""
-    return AuthConfig(mode=settings.auth_mode)
+    return AuthConfig(mode=settings.auth_mode,
+                      provider_name=settings.oidc_provider_name)
 
 
 @router.get("/me", response_model=UserRead)

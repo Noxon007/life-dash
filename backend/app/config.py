@@ -64,6 +64,9 @@ class Settings(BaseSettings):
     #   AUTH_MODE=oidc -> Login über den OIDC-Provider (Pocket ID)
     # ------------------------------------------------------------------ #
     auth_mode: str = "dev"  # "dev" | "oidc"
+    # A27: Anzeigename des OIDC-Providers für den Login-Screen (rein
+    # kosmetisch, z. B. "Pocket ID"); leer = neutraler SSO-Text
+    oidc_provider_name: str = ""
     oidc_issuer: str = ""  # z. B. https://id.example.home (Pocket ID Basis-URL)
     oidc_client_id: str = ""
     oidc_client_secret: str = ""  # leer bei Public Client (PKCE reicht)

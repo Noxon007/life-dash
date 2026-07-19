@@ -22,6 +22,8 @@ class UserRead(BaseModel):
 class AuthConfig(BaseModel):
     """Frontend-Info: 'dev' = kein Login nötig, 'oidc' = Login-Redirect."""
     mode: str
+    # A27: optionaler Anzeigename des SSO-Providers (kosmetisch)
+    provider_name: str = ""
 
 
 # --------------------------------------------------------------------------- #
