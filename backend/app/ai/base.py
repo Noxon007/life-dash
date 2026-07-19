@@ -44,7 +44,8 @@ class LLMProvider(ABC):
     """Schnittstelle für alle KI-Provider."""
 
     @abstractmethod
-    def extract(self, raw_text: str) -> list[ExtractedEvent]:
+    def extract(self, raw_text: str,
+                tracked: list[str] | None = None) -> list[ExtractedEvent]:
         """Extrahiert strukturierte Event-Vorschläge aus Roh-Text."""
         raise NotImplementedError
 

@@ -57,9 +57,18 @@ def cluster_min_for(user: User) -> int:
 
 
 def _settings_view(user: User) -> dict:
+    from app.modules.registry import registry
+
+    prefs = user.settings or {}
+    tracked = prefs.get("tracked_modules")
     return {
         "place_name_parts": geocode_svc.parts_for(user),
         "map_cluster_min": cluster_min_for(user),
+        # A15: None/fehlend = noch nie gewählt -> Frontend zeigt Onboarding
+        "tracked_modules": tracked if isinstance(tracked, list) else None,
+        "all_modules": registry.keys(),
+        # A22: Nachtplan pro Job-Typ, z. B. {"weather": {"enabled": true, "hour": 3}}
+        "job_schedule": prefs.get("job_schedule") or {},
     }
 
 
@@ -93,6 +102,29 @@ def update_my_settings(
         # In den erlaubten Rahmen einpassen statt abzulehnen
         prefs["map_cluster_min"] = max(CLUSTER_MIN_FLOOR,
                                        min(CLUSTER_MIN_CEIL, wanted))
+    if "tracked_modules" in payload:
+        from app.modules.registry import registry
+
+        raw = payload["tracked_modules"]
+        if not isinstance(raw, list):
+            raise HTTPException(400, "tracked_modules: Liste von Modul-Keys erwartet")
+        prefs["tracked_modules"] = [k for k in registry.keys() if k in raw]
+    if "job_schedule" in payload:
+        raw = payload["job_schedule"]
+        if not isinstance(raw, dict):
+            raise HTTPException(400, "job_schedule: Objekt erwartet")
+        from app.routers.jobs import SERVER_JOB_TYPES
+
+        sched = {}
+        for jtype, cfg in raw.items():
+            if jtype not in SERVER_JOB_TYPES or not isinstance(cfg, dict):
+                continue
+            try:
+                hour = max(0, min(23, int(cfg.get("hour", 3))))
+            except (TypeError, ValueError):
+                hour = 3
+            sched[jtype] = {"enabled": bool(cfg.get("enabled")), "hour": hour}
+        prefs["job_schedule"] = sched
     if prefs != (user.settings or {}):
         user.settings = prefs
         db.commit()

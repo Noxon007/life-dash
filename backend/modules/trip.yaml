@@ -23,3 +23,9 @@ statistics:
 compendium_view:
   group_by: country
   detail_map: true
+# --- A7: Frontend & KI-Prompt aus dem YAML ---
+emoji: "🧳"
+category_labels:
+  trip: Reise
+prompt_rules: |
+  - Kategorie trip = Reise, Urlaub, Ausflug, Städtetrip.

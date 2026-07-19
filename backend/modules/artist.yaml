@@ -24,3 +24,11 @@ statistics:
     type: timeseries
 compendium_view:
   group_by: name
+# --- A7: Frontend & KI-Prompt aus dem YAML ---
+emoji: "🎤"
+compendium: true
+category_labels:
+  concert: Konzert
+prompt_rules: |
+  - Kategorie concert = Konzert, Festival, Live-Auftritt.
+  - Entity artist: Band oder Künstler bei Konzerten/Festivals ("Die Ärzte", "Rammstein", ...).

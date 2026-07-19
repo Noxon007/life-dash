@@ -1,0 +1,10 @@
+# Modul: Spiele — Kompendium-Entities vom Typ game
+key: game
+label: Spiele
+icon: gamepad
+color: "#60a5fa"
+emoji: "🎮"
+compendium: true
+event_categories: []
+prompt_rules: |
+  - Entity game: konkrete Spieletitel ("Zelda: Tears of the Kingdom", "Elden Ring", ...).

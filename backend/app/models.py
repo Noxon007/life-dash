@@ -302,6 +302,8 @@ class Job(Base):
     status: Mapped[str] = mapped_column(String(16), default="running")  # running|done|stopped|error
     done: Mapped[int] = mapped_column(Integer, default=0)      # verarbeitete Einheiten
     remaining: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # A22: Job-Parameter (z. B. {"scope": "nonlatin"} für Ortsnamen-Läufe)
+    params: Mapped[dict | None] = mapped_column(JSON(none_as_null=True), nullable=True)
     unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
     result: Mapped[str | None] = mapped_column(String(255), nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime, default=_now)

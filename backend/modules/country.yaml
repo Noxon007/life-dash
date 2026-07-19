@@ -24,3 +24,9 @@ statistics:
 compendium_view:
   group_by: name
   detail_map: true
+# --- A7: Frontend & KI-Prompt aus dem YAML ---
+emoji: "🌍"
+compendium: true
+prompt_rules: |
+  - Entity country: JEDES erwähnte Land. Auch ableiten, wenn nur eine Stadt genannt ist
+    und das Land eindeutig ist (Bern -> Schweiz) — dann confidence des Events leicht senken.

@@ -19,10 +19,12 @@ from app.models import User, UserRole  # noqa: E402
 
 @pytest.fixture(autouse=True)
 def safe_settings(monkeypatch):
-    """Tests laufen offline: Mock-KI, kein Geocoding, keine Embeddings."""
+    """Tests laufen offline: Mock-KI, kein Geocoding, keine Embeddings,
+    keine Job-Worker-Threads (in-memory-DB ist nicht thread-tauglich)."""
     monkeypatch.setattr(settings, "ai_provider", "mock")
     monkeypatch.setattr(settings, "geocoding_enabled", False)
     monkeypatch.setattr(settings, "openai_embed_model", "")
+    monkeypatch.setattr("app.routers.jobs.WORKERS_ENABLED", False)
 
 
 @pytest.fixture()

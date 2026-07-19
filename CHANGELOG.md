@@ -10,6 +10,33 @@ jedem `MINOR` vorkommen.
 
 ## [Unreleased]
 
+## [0.13.0] – 2026-07-19
+
+### Hinzugefügt
+- **Du bestimmst, was getrackt wird:** Beim ersten Start fragt Life-Dash,
+  welche Bereiche dich interessieren (Reisen, Tiere, Länder, Künstler,
+  Essen, Meilensteine, Filme, Spiele, Bücher) — jederzeit änderbar unter
+  Verwaltung → Meine Daten. Abgewählte Bereiche verschwinden aus
+  Kompendium, Filtern, Formularen, Statistik **und** aus dem KI-Prompt
+  (die KI schlägt sie nicht mehr vor); vorhandene Daten bleiben erhalten
+  und tauchen nach dem Wieder-Anwählen sofort wieder auf.
+- **Läufe laufen jetzt im Hintergrund auf dem Server:** Wetter ergänzen,
+  KI-Vorschläge neu berechnen, Embeddings und alle Ortsnamen-Läufe laufen
+  weiter, wenn du die Seite schließt. Im Jobs-Reiter gibt es dafür einen
+  **Stopp-Knopf** pro laufendem Job und eine Live-Aktualisierung. Neu:
+  **Nachtplan** — ausgewählte Läufe starten automatisch einmal täglich zur
+  eingestellten Stunde (pro Lauf ein-/ausschaltbar). Datei-Importe bleiben
+  browser-gebunden (die Datei liegt dort).
+- **Drei neue Sammel-Bereiche: Filme, Spiele, Bücher** — die KI erkennt
+  entsprechende Titel und legt Kompendium-Einträge an.
+
+### Geändert
+- **Module sind jetzt vollständig deklarativ:** Farben, Emojis,
+  Kategorie-Namen, Kompendium-Reiter, Formular-Optionen und die
+  KI-Erkennungsregeln kommen aus den Modul-Definitionsdateien — ein neuer
+  Bereich ist damit eine einzige YAML-Datei, ohne Code-Änderung (die drei
+  neuen Bereiche sind genau so entstanden).
+
 ## [0.12.0] – 2026-07-19
 
 > Ab dieser Version sind Changelog-Einträge in Produktsprache geschrieben —

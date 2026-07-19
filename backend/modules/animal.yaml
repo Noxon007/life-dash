@@ -68,3 +68,12 @@ statistics:
 compendium_view:
   group_by: species
   detail_map: true
+# --- A7: Frontend & KI-Prompt aus dem YAML ---
+emoji: "🦅"
+compendium: true
+category_labels:
+  sighting: Sichtung
+prompt_rules: |
+  - Kategorie sighting = ein Tier gesehen/beobachtet.
+  - Entity animal: JEDES erwähnte Tier, egal welche Art — Hai, Adler, Kuh, Qualle ...
+    attributes: {"species": "<Tierart>", "wild": true/false}. Name = die Tierart, nicht "ein Tier".

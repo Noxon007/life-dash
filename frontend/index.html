@@ -610,15 +610,15 @@
       <div class="view" id="view-stats">
         <div class="grid cols-4" style="margin-bottom:24px">
           <div class="stat-card" data-go="timeline:all"><div class="stat-num" id="stat-events">–</div><div class="stat-label">Ereignisse gesamt</div><div class="stat-sub">Lebensdatenbank</div></div>
-          <div class="stat-card" data-go="comp:country"><div class="stat-num" id="stat-countries">–</div><div class="stat-label">Länder besucht</div><div class="stat-sub">Kompendium</div></div>
+          <div class="stat-card" data-go="comp:country" data-req-mod="country"><div class="stat-num" id="stat-countries">–</div><div class="stat-label">Länder besucht</div><div class="stat-sub">Kompendium</div></div>
           <div class="stat-card" data-go="map"><div class="stat-num" id="stat-places">–</div><div class="stat-label">Orte besucht</div><div class="stat-sub">verortete Events</div></div>
-          <div class="stat-card" data-go="comp:animal"><div class="stat-num" id="stat-animals">–</div><div class="stat-label">Tierarten gesehen</div><div class="stat-sub">Kompendium</div></div>
-          <div class="stat-card" data-go="timeline:concert"><div class="stat-num" id="stat-concerts">–</div><div class="stat-label">Konzerte besucht</div><div class="stat-sub">Kategorie concert</div></div>
-          <div class="stat-card" data-go="comp:artist"><div class="stat-num" id="stat-artists">–</div><div class="stat-label">Künstler live</div><div class="stat-sub">Kompendium</div></div>
+          <div class="stat-card" data-go="comp:animal" data-req-mod="animal"><div class="stat-num" id="stat-animals">–</div><div class="stat-label">Tierarten gesehen</div><div class="stat-sub">Kompendium</div></div>
+          <div class="stat-card" data-go="timeline:concert" data-req-mod="artist"><div class="stat-num" id="stat-concerts">–</div><div class="stat-label">Konzerte besucht</div><div class="stat-sub">Kategorie concert</div></div>
+          <div class="stat-card" data-go="comp:artist" data-req-mod="artist"><div class="stat-num" id="stat-artists">–</div><div class="stat-label">Künstler live</div><div class="stat-sub">Kompendium</div></div>
           <div class="stat-card" data-go="timeline:milestone"><div class="stat-num" id="stat-age">–</div><div class="stat-label">Alter</div><div class="stat-sub" id="stat-age-sub">Geburt als Meilenstein eintragen</div></div>
           <div class="stat-card" data-go="timeline:milestone"><div class="stat-num" id="stat-milestones">–</div><div class="stat-label">Meilensteine</div><div class="stat-sub">Hochzeit, Geburt, Umzug …</div></div>
           <div class="stat-card" data-go="timeline:milestone"><div class="stat-num" id="stat-moves">–</div><div class="stat-label">Umzüge</div><div class="stat-sub">aus Meilensteinen</div></div>
-          <div class="stat-card" data-go="timeline:meal"><div class="stat-num" id="stat-meals">–</div><div class="stat-label">Mahlzeiten</div><div class="stat-sub">Kategorie meal</div></div>
+          <div class="stat-card" data-go="timeline:meal" data-req-mod="food"><div class="stat-num" id="stat-meals">–</div><div class="stat-label">Mahlzeiten</div><div class="stat-sub">Kategorie meal</div></div>
           <div class="stat-card" data-go="admin"><div class="stat-num" id="stat-unconfirmed">–</div><div class="stat-label">Unbestätigt</div><div class="stat-sub">zu moderieren</div></div>
         </div>
         <div class="grid cols-2" style="margin-bottom:24px">
@@ -646,7 +646,7 @@
             <h3>Top-Orte</h3>
             <div id="chart-places"></div>
           </div>
-          <div class="panel">
+          <div class="panel" data-req-mod="animal">
             <h3>Meistgesehene Tiere</h3>
             <div id="chart-animals"></div>
           </div>
@@ -808,9 +808,9 @@
             Aktionen
             <span class="chip" style="margin-left:auto; text-transform:none; letter-spacing:0">KI-Provider: <b style="color:var(--text)" id="ki-provider">&nbsp;…</b></span>
           </div>
-          <div class="hint">Alle Läufe arbeiten in Etappen: Der Knopf zeigt während des Laufs die
-            verbrauchten Anfragen und wird zum <b>⏹ Stopp-Knopf</b> — Fortschritt bleibt erhalten,
-            derselbe Knopf setzt später fort.</div>
+          <div class="hint">Diese Läufe starten <b>im Hintergrund auf dem Server</b> — du kannst
+            die Seite schließen. Fortschritt, Stopp-Knopf und Nachtplan findest du im Reiter
+            <b>„Jobs"</b>; Fortschritt bleibt beim Stoppen erhalten, ein Neustart setzt fort.</div>
           <div class="panel" style="padding:0">
             <div class="action-row">
               <button class="btn secondary" id="btn-recompute-2">🔄 KI-Vorschläge neu berechnen</button>
@@ -857,6 +857,13 @@
         <div style="overflow-x:auto; margin-bottom:24px">
           <table class="db-table" id="jobs-table"></table>
         </div>
+
+        <!-- A22 — Nachtplan: Läufe automatisch zur eingestellten Stunde -->
+        <div class="section-title">Nachtplan</div>
+        <div class="hint">Angehakte Läufe starten automatisch einmal täglich zur eingestellten
+          Stunde (Serverzeit) — z. B. nachts, wenn niemand arbeitet. Läuft serverseitig;
+          kein offener Browser nötig.</div>
+        <div class="panel" id="sched-panel" style="display:flex; flex-direction:column; gap:8px"></div>
         </div>
 
         <div class="admin-tabpane" data-tabpane="moderation">
@@ -954,6 +961,15 @@
               unangetastet.</div>
           </div>
           <div class="action-row">
+            <div style="flex-shrink:0; min-width:215px"><b style="font-size:13px">🧩 Was trackst du?</b></div>
+            <div class="action-desc"><b>Module für Kompendium, Statistik &amp; KI wählen.</b><br>
+              Abgewählte Module verschwinden aus Reitern, Filtern, Formularen und dem
+              KI-Prompt — vorhandene Daten bleiben erhalten und tauchen nach dem
+              Wieder-Anwählen sofort wieder auf.
+              <div id="track-settings" style="margin-top:8px; columns:2; max-width:420px"></div>
+            </div>
+          </div>
+          <div class="action-row">
             <button class="btn secondary" id="btn-reformat-names" style="flex-shrink:0; min-width:215px; text-align:left">📐 Adressen kürzen</button>
             <div class="action-desc"><b>Anzeige-Format für Ortsnamen.</b><br>
               Aufgelöste Adressen werden aus diesen Bausteinen zusammengesetzt — statt der langen
@@ -1026,6 +1042,20 @@
 
     </div>
   </div>
+
+<!-- A15 — Onboarding: Tracking-Auswahl beim ersten Start -->
+<div class="modal" id="track-modal">
+  <div class="modal-box">
+    <h3>🧩 Was möchtest du tracken?</h3>
+    <div class="hint" style="margin-top:4px">Wähle die Bereiche, die dich interessieren —
+      sie bestimmen Kompendium, Statistik und was die KI erkennt. Jederzeit änderbar
+      unter Verwaltung → Meine Daten.</div>
+    <div id="track-options" style="columns:2; margin:14px 0"></div>
+    <div style="display:flex; justify-content:flex-end; gap:10px">
+      <button class="btn" id="track-save">✓ Auswahl speichern</button>
+    </div>
+  </div>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
@@ -1141,11 +1171,97 @@ const uiConfirm = (text, opts = {}) => uiDialog(text, opts);
 const uiPrompt = (text, opts = {}) => uiDialog(text, { ...opts, input: true });
 
 // ---------- Kategorien ----------
+// Basis-Werte für Kategorien OHNE Modul (event, sport, home, media) — alles
+// Modulare (A7) kommt zur Laufzeit aus /api/modules und überlagert diese Maps.
 const catLabels = { trip:"Reise", sighting:"Sichtung", sport:"Aktivität", concert:"Konzert", meal:"Mahlzeit", milestone:"Meilenstein", event:"Ereignis", home:"Wohnort", media:"Medien", country:"Land" };
 const catColors = { trip:'#5b8cff', sighting:'#35c4a7', sport:'#ff8f5c', concert:'#ff5c9e', meal:'#ffd166', milestone:'#e85dff', media:'#f5a623', home:'#b07bff', event:'#f5a623' };
 const KNOWN_CATS = ['trip','sighting','sport','concert','meal','milestone','home','media'];
-// Kategorien für Filter-Chips (Timeline + Karte)
-const FILTER_CATS = ['trip','sighting','sport','concert','meal','milestone','event'];
+// Kategorien für Filter-Chips (Timeline + Karte); wird nach dem Modul-Load
+// neu berechnet (A15: nur getrackte Module)
+const FILTER_CATS_BASE = ['trip','sighting','sport','concert','meal','milestone','event'];
+let FILTER_CATS = [...FILTER_CATS_BASE];
+
+// ---------- Module (A7/A15): dynamische Kategorien, Reiter, Tracking ----------
+let MODULES = [];          // aus /api/modules (YAML-getrieben)
+let TRACKED = null;        // Set der getrackten Modul-Keys; null = alle
+function moduleTracked(key) { return !TRACKED || TRACKED.has(key); }
+function applyModules() {
+  // 1) Kategorie-Metadaten (Label/Farbe) aus den Modulen übernehmen + CSS
+  let css = '';
+  MODULES.forEach(m => (m.event_categories || []).forEach(c => {
+    if (m.category_labels && m.category_labels[c]) catLabels[c] = m.category_labels[c];
+    if (m.color) {
+      catColors[c] = m.color;
+      css += `.event-card.cat-${c}{border-left-color:${m.color}}.event-card.cat-${c}::before{background:${m.color}}\n`;
+    }
+    if (!KNOWN_CATS.includes(c)) KNOWN_CATS.push(c);
+  }));
+  let style = document.getElementById('mod-style');
+  if (!style) { style = document.createElement('style'); style.id = 'mod-style'; document.head.appendChild(style); }
+  style.textContent = css;
+  // 2) Sichtbare Kategorien: Basis + Kategorien GETRACKTER Module (A15)
+  const moduleCats = new Set(MODULES.flatMap(m => m.event_categories || []));
+  const trackedCats = new Set(MODULES.filter(m => moduleTracked(m.key))
+    .flatMap(m => m.event_categories || []));
+  FILTER_CATS = FILTER_CATS_BASE.filter(c => !moduleCats.has(c) || trackedCats.has(c))
+    .concat([...trackedCats].filter(c => !FILTER_CATS_BASE.includes(c)));
+  tl.catFilter = new Set(FILTER_CATS);
+  mp.catFilter = new Set(FILTER_CATS);
+  buildCatFilter('tl-filters', tl.catFilter, () => renderTimeline());
+  buildCatFilter('mp-filters', mp.catFilter, () => {
+    const keep = mp.periods.length ? mp.periods[mp.index] : null;
+    rebuildPeriods(keep);
+    renderPeriod();
+  });
+  rebuildCompTabs();
+  rebuildCategorySelects();
+  // 3) Statistik-Kacheln/-Charts abgewählter Module ausblenden
+  document.querySelectorAll('[data-req-mod]').forEach(el =>
+    el.style.display = moduleTracked(el.dataset.reqMod) ? '' : 'none');
+}
+function rebuildCompTabs() {
+  const tabs = document.getElementById('comp-tabs');
+  const mods = MODULES.filter(m => m.compendium && moduleTracked(m.key));
+  if (!mods.length) {
+    tabs.innerHTML = '<div class="hint">Keine Sammel-Module gewählt — unter Verwaltung → Meine Daten auswählen.</div>';
+    return;
+  }
+  tabs.innerHTML = mods.map((m, i) =>
+    `<div class="zoom-btn ${i === 0 ? 'active' : ''}" data-type="${esc(m.key)}">${m.emoji || ''} ${esc(m.label)}</div>`).join('');
+  tabs.querySelectorAll('.zoom-btn').forEach(tab => tab.addEventListener('click', () => {
+    tabs.querySelectorAll('.zoom-btn').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    loadCompendium(tab.dataset.type);
+  }));
+}
+function rebuildCategorySelects() {
+  const opt = c => `<option value="${c}">${esc(catLabels[c] || c)}</option>`;
+  const cats = ['event', ...FILTER_CATS.filter(c => c !== 'event')];
+  const mf = document.getElementById('mf-category');
+  if (mf) { const v = mf.value; mf.innerHTML = cats.map(opt).join(''); mf.value = cats.includes(v) ? v : 'event'; }
+  const bulk = document.getElementById('bulk-cat');
+  if (bulk) bulk.innerHTML = '<option value="">Alle Kategorien</option>' + cats.map(opt).join('');
+  // Bearbeiten-Dialog: ALLE bekannten Kategorien (Bestandsdaten bleiben wählbar)
+  const ed = document.getElementById('ed-category');
+  if (ed) ed.innerHTML = ['event', ...KNOWN_CATS.filter(c => c !== 'event')].map(opt).join('');
+}
+// Tracking-Auswahl (A15): Checkbox-Liste, geteilt von Onboarding + Verwaltung
+function trackChooserHtml(current) {
+  return MODULES.map(m => `
+    <label style="display:flex; gap:10px; align-items:center; padding:5px 0; cursor:pointer">
+      <input type="checkbox" data-track="${esc(m.key)}" ${!current || current.includes(m.key) ? 'checked' : ''}>
+      <span>${m.emoji || '•'} ${esc(m.label)}</span>
+    </label>`).join('');
+}
+async function saveTracked(keys) {
+  const s = await api('/api/auth/me/settings', {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tracked_modules: keys }),
+  });
+  TRACKED = new Set(s.tracked_modules || []);
+  applyModules();
+  renderTimeline();
+}
 
 // Wiederverwendbare Kategorie-Filter-Chips. onChange(activeSet) wird bei jedem Klick gerufen.
 function buildCatFilter(containerId, activeSet, onChange) {
@@ -2436,7 +2552,7 @@ function gotoView(v) {
   document.getElementById('view-sub').textContent = titles[v][1];
   if (v === 'map') setTimeout(openMapView, 40);
   if (v === 'stats') loadStats();
-  if (v === 'compendium') loadCompendium(document.querySelector('#comp-tabs .zoom-btn.active').dataset.type);
+  if (v === 'compendium') { const t = document.querySelector('#comp-tabs .zoom-btn.active'); if (t) loadCompendium(t.dataset.type); }
   if (v === 'admin') loadAdminTab(adminTab);
 }
 
@@ -2445,7 +2561,7 @@ let adminTab = 'moderation';
 function loadAdminTab(t) {
   if (t === 'moderation') { loadModQueue(); loadFuzzyDates(); }
   if (t === 'daten') loadPlaceFormat();
-  if (t === 'jobs') loadJobs();
+  if (t === 'jobs') { loadJobs(); renderSchedule(); }
   if (t === 'nutzer') loadUsers();
   if (t === 'db') loadDbTables();
   if (t === 'logs') loadLogs();
@@ -2638,13 +2754,7 @@ function startDbEdit(tr) {
 document.querySelectorAll('.nav-item').forEach(item =>
   item.addEventListener('click', () => gotoView(item.dataset.view)));
 
-document.querySelectorAll('#comp-tabs .zoom-btn').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('#comp-tabs .zoom-btn').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    loadCompendium(tab.dataset.type);
-  });
-});
+// Kompendium-Reiter werden dynamisch aus den Modulen gebaut (rebuildCompTabs, A7)
 
 // ---------- Sonstiges ----------
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -2667,28 +2777,73 @@ const JOB_LABELS = { recompute: '🔄 KI-Vorschläge neu berechnen', weather: '�
                      embeddings: '🧠 Embeddings', resolve_names: '📍 Ortsnamen auflösen/formatieren',
                      timeline_import: '🛰️ Timeline-Import', data_import: '📥 Daten-Import' };
 const JOB_STATUS = { running: '⏳ läuft', done: '✅ fertig', stopped: '⏹ gestoppt', error: '⚠️ Fehler' };
+let jobsTimer = null;
 async function loadJobs() {
   const t = document.getElementById('jobs-table');
   if (!t) return;
   let jobs;
   try { jobs = await api('/api/jobs?limit=12'); } catch { t.innerHTML = ''; return; }
-  if (!jobs.length) {
-    t.innerHTML = '<tbody><tr><td class="stat-label" style="padding:10px">Noch keine Jobs gelaufen.</td></tr></tbody>';
-    return;
-  }
   // Zeiten sind UTC gespeichert -> lokal anzeigen
   const fmt = iso => iso ? new Date(iso.endsWith('Z') ? iso : iso + 'Z')
     .toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '—';
-  t.innerHTML = '<thead><tr><th>Job</th><th>Status</th><th>Fortschritt</th><th>Gestartet</th><th>Ergebnis</th></tr></thead><tbody>'
+  t.innerHTML = !jobs.length
+    ? '<tbody><tr><td class="stat-label" style="padding:10px">Noch keine Jobs gelaufen.</td></tr></tbody>'
+    : '<thead><tr><th>Job</th><th>Status</th><th>Fortschritt</th><th>Gestartet</th><th>Ergebnis</th><th></th></tr></thead><tbody>'
     + jobs.map(j => `<tr>
         <td><b>${JOB_LABELS[j.type] || esc(j.type)}</b></td>
         <td style="white-space:nowrap">${JOB_STATUS[j.status] || esc(j.status)}</td>
         <td class="stat-label">${j.done}${j.unit ? ' ' + esc(j.unit) : ''}${j.status === 'running' && j.remaining != null ? ` · noch ~${j.remaining}` : ''}</td>
         <td class="stat-label" style="white-space:nowrap">${fmt(j.started_at)}${j.started_by ? `<br>von ${esc(j.started_by)}` : ''}</td>
         <td class="stat-label">${esc(j.result || '')}</td>
+        <td>${j.status === 'running' ? `<button class="btn small danger" data-job-stop="${esc(j.id)}">⏹ Stopp</button>` : ''}</td>
       </tr>`).join('') + '</tbody>';
+  t.querySelectorAll('[data-job-stop]').forEach(btn => btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    try { await api(`/api/jobs/${btn.dataset.jobStop}/stop`, { method: 'POST' }); toast('Stopp angefordert — der Lauf endet nach dem aktuellen Batch.', 'warn'); }
+    catch (err) { toast(err.message, 'error'); }
+    loadJobs();
+  }));
+  // A22: solange etwas läuft und der Jobs-Reiter offen ist, alle 4 s aktualisieren
+  clearTimeout(jobsTimer);
+  const active = document.getElementById('view-admin').classList.contains('active') && adminTab === 'jobs';
+  if (active && jobs.some(j => j.status === 'running' || j.status === 'stopping')) {
+    jobsTimer = setTimeout(loadJobs, 4000);
+  }
 }
 document.getElementById('jobs-refresh').addEventListener('click', loadJobs);
+// A22: Nachtplan-Einstellungen (pro Nutzer)
+const SCHED_TYPES = ['weather', 'embeddings', 'resolve_names', 'recompute'];
+function renderSchedule() {
+  const panel = document.getElementById('sched-panel');
+  if (!panel) return;
+  const sched = SETTINGS.job_schedule || {};
+  panel.innerHTML = SCHED_TYPES.map(tp => {
+    const cfg = sched[tp] || {};
+    return `<label class="stat-label" style="display:flex; align-items:center; gap:10px">
+      <input type="checkbox" data-sched="${tp}" ${cfg.enabled ? 'checked' : ''}>
+      <span style="min-width:230px">${JOB_LABELS[tp] || tp}</span>
+      um <input type="number" min="0" max="23" value="${cfg.hour ?? 3}" data-sched-hour="${tp}"
+        style="width:56px; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:4px 6px; color:var(--text)"> Uhr
+    </label>`;
+  }).join('');
+  panel.querySelectorAll('input').forEach(inp => inp.addEventListener('change', async () => {
+    const out = {};
+    SCHED_TYPES.forEach(tp => {
+      out[tp] = {
+        enabled: panel.querySelector(`[data-sched="${tp}"]`).checked,
+        hour: Math.max(0, Math.min(23, +panel.querySelector(`[data-sched-hour="${tp}"]`).value || 3)),
+      };
+    });
+    try {
+      const s = await api('/api/auth/me/settings', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_schedule: out }),
+      });
+      SETTINGS.job_schedule = s.job_schedule;
+      toast('✓ Nachtplan gespeichert.');
+    } catch (err) { toast('Speichern fehlgeschlagen: ' + err.message, 'error'); }
+  }));
+}
 // Helfer für Nicht-Batch-Läufe (Importe): Job starten/abschließen
 async function startJob(type, unit) {
   return api('/api/jobs/start', {
@@ -2781,38 +2936,29 @@ async function runBatchedAdmin(btn, { reset, step, unit, doneMsg, jobType }) {
   }
 }
 
+// A22: Diese Läufe starten SERVERSEITIG (Background-Thread) — sie laufen
+// weiter, wenn die Seite zu ist. Fortschritt & Stopp im Jobs-Reiter.
+async function startServerJob(btn, type, params) {
+  btn.disabled = true;
+  try {
+    await api('/api/jobs/start', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, params: params || null }),
+    });
+    toast('✓ Gestartet — läuft jetzt im Hintergrund weiter, auch wenn du die Seite schließt.\nFortschritt & Stopp: Reiter „Jobs".');
+    showAdminTab('jobs');
+  } catch (err) {
+    toast(err.message, err.status === 409 ? 'warn' : 'error', 9000);
+  } finally {
+    btn.disabled = false;
+  }
+}
 document.getElementById('btn-recompute-2').addEventListener('click', e =>
-  runBatchedAdmin(e.target, {
-    reset: async () => (await api('/api/admin/recompute-events/reset', { method: 'POST' })).total,
-    step: async () => {
-      const r = await api('/api/admin/recompute-events?limit=5', { method: 'POST' });
-      return { done: r.processed, remaining: r.remaining, aborted: r.aborted };
-    },
-    unit: 'KI-Anfragen',
-    doneMsg: n => `KI-Vorschläge neu berechnet: ${n} Fragment(e) verarbeitet.`,
-    jobType: 'recompute',
-  }));
+  startServerJob(e.target, 'recompute'));
 document.getElementById('btn-enrich').addEventListener('click', e =>
-  runBatchedAdmin(e.target, {
-    step: async () => {
-      const r = await api('/api/admin/enrich-weather?limit=25', { method: 'POST' });
-      return { done: r.enriched_events, remaining: r.remaining };
-    },
-    unit: 'Wetter-Anfragen',
-    doneMsg: n => `Wetter ergänzt: ${n} Event(s).`,
-    jobType: 'weather',
-  }));
+  startServerJob(e.target, 'weather'));
 document.getElementById('btn-embed').addEventListener('click', e =>
-  runBatchedAdmin(e.target, {
-    reset: async () => (await api('/api/admin/reset-embeddings', { method: 'POST' })).total,
-    step: async () => {
-      const r = await api('/api/admin/reindex-embeddings?limit=25', { method: 'POST' });
-      return { done: r.indexed_events, remaining: r.remaining };
-    },
-    unit: 'KI-Anfragen',
-    doneMsg: n => `Embeddings: ${n} Event(s) neu indexiert.`,
-    jobType: 'embeddings',
-  }));
+  startServerJob(e.target, 'embeddings'));
 
 // ---------- EXPORT / IMPORT ----------
 // A8: Export mit Rückmeldung — vorher lud der Button still herunter.
@@ -2997,29 +3143,12 @@ document.getElementById('timeline-file').addEventListener('change', async ev => 
   }
 });
 
-// Ortsnamen auflösen (Reverse-Geocoding) — Batch-Lauf mit Stopp-Knopf
+// Ortsnamen-Läufe (A22): serverseitige Jobs, gleicher Lock-Typ für alle drei
+// (Nominatim-Drossel 1 Anfrage/s gilt pro Server-IP)
 document.getElementById('btn-resolve-names').addEventListener('click', e =>
-  runBatchedAdmin(e.target, {
-    step: async () => {
-      const r = await api('/api/import/timeline/resolve-names?limit=10', { method: 'POST' });
-      return { done: r.resolved, remaining: r.remaining };
-    },
-    unit: 'Nominatim-Anfragen',
-    doneMsg: n => `Fertig: ${n} Ortsnamen aufgelöst.`,
-    jobType: 'resolve_names',
-  }));
-
-// Fremdschrift-Ortsnamen erneut auflösen (A10) — gleiche Mechanik, scope=nonlatin
+  startServerJob(e.target, 'resolve_names', { scope: 'unnamed' }));
 document.getElementById('btn-resolve-nonlatin').addEventListener('click', e =>
-  runBatchedAdmin(e.target, {
-    step: async () => {
-      const r = await api('/api/import/timeline/resolve-names?limit=10&scope=nonlatin', { method: 'POST' });
-      return { done: r.resolved, remaining: r.remaining };
-    },
-    unit: 'Nominatim-Anfragen',
-    doneMsg: n => `Fertig: ${n} Ortsnamen eingedeutscht.`,
-    jobType: 'resolve_names',  // gleicher Lock: alle Nominatim-Läufe teilen sich die 1-req/s-Drossel
-  }));
+  startServerJob(e.target, 'resolve_names', { scope: 'nonlatin' }));
 
 // Ortsnamen-Format: Bausteine (Straße/Ortsteil/Stadt/Land) pro Nutzer gespeichert
 async function loadPlaceFormat() {
@@ -3027,8 +3156,29 @@ async function loadPlaceFormat() {
     const s = await api('/api/auth/me/settings');
     document.querySelectorAll('#fmt-parts [data-part]').forEach(cb =>
       cb.checked = s.place_name_parts.includes(cb.dataset.part));
+    // A15: Tracking-Auswahl in der Verwaltung
+    const box = document.getElementById('track-settings');
+    box.innerHTML = trackChooserHtml(
+      Array.isArray(s.tracked_modules) ? s.tracked_modules : MODULES.map(m => m.key));
+    box.querySelectorAll('[data-track]').forEach(cb => cb.addEventListener('change', async () => {
+      const keys = [...box.querySelectorAll('[data-track]:checked')].map(c => c.dataset.track);
+      try { await saveTracked(keys); toast('✓ Tracking-Auswahl gespeichert.'); }
+      catch (err) { toast('Speichern fehlgeschlagen: ' + err.message, 'error'); loadPlaceFormat(); }
+    }));
   } catch (_) { /* Standard-Häkchen bleiben */ }
 }
+// Onboarding-Modal (A15): Auswahl speichern
+document.getElementById('track-save').addEventListener('click', async () => {
+  const keys = [...document.querySelectorAll('#track-options [data-track]:checked')]
+    .map(c => c.dataset.track);
+  try {
+    await saveTracked(keys);
+    toast('✓ Los geht\'s — die Auswahl ist jederzeit unter Verwaltung änderbar.');
+  } catch (err) {
+    toast('Speichern fehlgeschlagen: ' + err.message, 'error');
+  }
+  document.getElementById('track-modal').classList.remove('show');
+});
 document.querySelectorAll('#fmt-parts [data-part]').forEach(cb =>
   cb.addEventListener('change', async () => {
     const parts = [...document.querySelectorAll('#fmt-parts [data-part]:checked')].map(c => c.dataset.part);
@@ -3050,15 +3200,7 @@ document.querySelectorAll('#fmt-parts [data-part]').forEach(cb =>
   }));
 // Bestehende lange Adressen aufs gewählte Format bringen — scope=verbose
 document.getElementById('btn-reformat-names').addEventListener('click', e =>
-  runBatchedAdmin(e.target, {
-    step: async () => {
-      const r = await api('/api/import/timeline/resolve-names?limit=10&scope=verbose', { method: 'POST' });
-      return { done: r.resolved, remaining: r.remaining };
-    },
-    unit: 'Nominatim-Anfragen',
-    doneMsg: n => `Fertig: ${n} Adressen gekürzt.`,
-    jobType: 'resolve_names',
-  }));
+  startServerJob(e.target, 'resolve_names', { scope: 'verbose' }));
 
 // Alle Daten löschen — mit doppelter Sicherheitsabfrage
 document.getElementById('btn-wipe').addEventListener('click', async e => {
@@ -3109,11 +3251,20 @@ document.getElementById('logout-link').addEventListener('click', async ev => {
     return;
   }
 
-  // Nutzer-Einstellungen (A18: Cluster-Schwelle) — best effort
+  // Nutzer-Einstellungen + Module (A7/A15/A18) — best effort
   try {
     const s = await api('/api/auth/me/settings');
     SETTINGS.map_cluster_min = s.map_cluster_min || 50;
     document.getElementById('mp-cluster-min').value = SETTINGS.map_cluster_min;
+    SETTINGS.job_schedule = s.job_schedule || {};
+    MODULES = await api('/api/modules');
+    TRACKED = Array.isArray(s.tracked_modules) ? new Set(s.tracked_modules) : null;
+    applyModules();
+    // Erster Start (noch nie gewählt): Onboarding-Frage zeigen
+    if (s.tracked_modules === null || s.tracked_modules === undefined) {
+      document.getElementById('track-options').innerHTML = trackChooserHtml(null);
+      document.getElementById('track-modal').classList.add('show');
+    }
   } catch (_) {}
 
   // Nutzer-Info + Rollen-Gating

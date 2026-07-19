@@ -17,6 +17,7 @@ _MISSING_COLUMNS: dict[str, dict[str, str]] = {
                "external_id": "VARCHAR(64)",
                "confirmed_at": "TIMESTAMP", "confirmed_by": "VARCHAR(16)"},
     "entities": {"user_id": "VARCHAR(36)"},
+    "jobs": {"params": "JSON"},
 }
 
 # Einmalige Nacharbeiten, wenn eine Spalte NEU angelegt wurde (Bestandsdaten).

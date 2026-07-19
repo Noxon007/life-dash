@@ -24,3 +24,11 @@ statistics:
     field: entity.name
 compendium_view:
   group_by: name
+# --- A7: Frontend & KI-Prompt aus dem YAML ---
+emoji: "🍽️"
+compendium: true
+category_labels:
+  meal: Mahlzeit
+prompt_rules: |
+  - Kategorie meal = Essen/Mahlzeit (Restaurantbesuch, besonderes Gericht, gekocht).
+  - Entity food: konkretes Gericht oder Essen ("Ramen", "Pizza Margherita", ...).

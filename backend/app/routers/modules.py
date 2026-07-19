@@ -23,6 +23,10 @@ def list_modules() -> list[ModuleRead]:
             key=m.key,
             label=m.label,
             icon=m.icon,
+            color=m.color,
+            emoji=m.emoji,
+            compendium=m.compendium,
+            category_labels=m.category_labels or {},
             event_categories=m.event_categories,
         )
         for m in registry.modules

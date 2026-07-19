@@ -62,6 +62,18 @@ async def lifespan(app: FastAPI):
             seed_demo(db, get_dev_user(db))
         finally:
             db.close()
+    # A22: Nachtplan-Ticker — prüft minütlich, ob geplante Jobs fällig sind
+    import threading
+    import time as _time
+
+    from app.routers.jobs import run_due_schedules
+
+    def _schedule_ticker() -> None:
+        while True:
+            _time.sleep(60)
+            run_due_schedules()
+
+    threading.Thread(target=_schedule_ticker, daemon=True).start()
     yield
 
 

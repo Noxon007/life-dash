@@ -1,0 +1,10 @@
+# Modul: Bücher — Kompendium-Entities vom Typ book
+key: book
+label: Bücher
+icon: book
+color: "#34d399"
+emoji: "📖"
+compendium: true
+event_categories: []
+prompt_rules: |
+  - Entity book: konkrete Buchtitel ("Der Steppenwolf", "Harry Potter", ...).

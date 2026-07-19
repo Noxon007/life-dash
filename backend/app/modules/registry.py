@@ -19,6 +19,11 @@ class Module:
     label: str
     icon: str | None = None
     color: str | None = None
+    # A7: alles Fürs-Frontend-Nötige kommt aus dem YAML — neues Modul = eine Datei
+    emoji: str | None = None
+    category_labels: dict = field(default_factory=dict)  # category -> deutsches Label
+    compendium: bool = False       # eigener Kompendium-Reiter (Entity-Typ = key)
+    prompt_rules: str | None = None  # Regeln für den KI-Extraktions-Prompt
     event_categories: list[str] = field(default_factory=list)
     keywords: list[str] = field(default_factory=list)
     known_entities: dict | list | None = None
@@ -61,6 +66,16 @@ class ModuleRegistry:
             if category in module.event_categories:
                 return module
         return None
+
+    def keys(self) -> list[str]:
+        return list(self._modules.keys())
+
+    def prompt_section(self, tracked: list[str] | None = None) -> str:
+        """A7/A15: Modul-Regeln für den KI-Prompt — nur getrackte Module.
+        tracked=None bedeutet: alle Module aktiv."""
+        mods = [m for m in self.modules
+                if m.prompt_rules and (tracked is None or m.key in tracked)]
+        return "\n".join(m.prompt_rules.strip() for m in mods)
 
 
 registry = ModuleRegistry()

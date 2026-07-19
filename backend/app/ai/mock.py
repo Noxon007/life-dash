@@ -45,7 +45,8 @@ SEASONS = {
 
 
 class MockProvider(LLMProvider):
-    def extract(self, raw_text: str) -> list[ExtractedEvent]:
+    def extract(self, raw_text: str,
+                tracked: list[str] | None = None) -> list[ExtractedEvent]:
         text = raw_text.strip()
         low = text.lower()
 

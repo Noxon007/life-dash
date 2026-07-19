@@ -124,12 +124,29 @@ Output:
 {"events":[{"title":"Pho beim Vietnamesen in Köln","description":"Heute Mittag beim Vietnamesen in Köln eine Pho gegessen","date_start":"2026-07-14","date_end":"2026-07-14","date_precision":"day","category":"meal","confidence":0.9,"location":{"name":"Köln","lat":50.9375,"lng":6.9603},"entities":[{"type":"food","name":"Pho","attributes":{"cuisine":"vietnamesisch"}}]}]}"""
 
 
+def build_system_prompt(tracked: list[str] | None = None) -> str:
+    """A7/A15: Basis-Prompt + Regeln der (getrackten) Module aus den YAMLs.
+    Neue Module bringen ihre Extraktions-Regeln selbst mit (prompt_rules)."""
+    from app.modules.registry import registry
+
+    extra = registry.prompt_section(tracked)
+    prompt = SYSTEM_PROMPT
+    if extra:
+        prompt += ("\n\nAKTIVE MODULE — zusätzliche Regeln (haben Vorrang):\n" + extra)
+    if tracked is not None:
+        prompt += ("\nDer Nutzer trackt nur die oben gelisteten Module. Nutze andere "
+                   "Kategorien/Entity-Typen NICHT — im Zweifel category \"event\" "
+                   "und keine Entity.")
+    return prompt
+
+
 class OpenAICompatProvider(LLMProvider):
-    def extract(self, raw_text: str) -> list[ExtractedEvent]:
+    def extract(self, raw_text: str,
+                tracked: list[str] | None = None) -> list[ExtractedEvent]:
         today = datetime.now().strftime("%Y-%m-%d")
         user = f"Heutiges Datum: {today}\nText: {raw_text}"
         try:
-            content = self._chat(SYSTEM_PROMPT, user)
+            content = self._chat(build_system_prompt(tracked), user)
         except Exception as err:
             log.warning("KI-Provider-Fehler: %s", err)
             raise ProviderUnavailable(str(err)) from err

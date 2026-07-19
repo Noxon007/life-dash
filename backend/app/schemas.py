@@ -206,4 +206,9 @@ class ModuleRead(BaseModel):
     key: str
     label: str
     icon: str | None = None
+    # A7: Frontend-Bausteine direkt aus dem Modul-YAML
+    color: str | None = None
+    emoji: str | None = None
+    compendium: bool = False
+    category_labels: dict = {}
     event_categories: list[str] = []

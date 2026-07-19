@@ -50,7 +50,8 @@ def ingest_fragment(
     """
     provider = get_provider()
     try:
-        extracted = provider.extract(fragment.raw_text)
+        extracted = provider.extract(fragment.raw_text,
+                                     tracked_modules(db, fragment.user_id))
     except ProviderUnavailable as err:
         if not fallback_on_error:
             raise
@@ -216,6 +217,13 @@ def _build_event(db: Session, ex: ExtractedEvent, fragment: Fragment, provider) 
 
     db.flush()
     return event
+
+
+def tracked_modules(db: Session, user_id: str | None) -> list[str] | None:
+    """A15: Gewählte Module des Nutzers (None = alle — Standard)."""
+    user = db.get(User, user_id) if user_id else None
+    tracked = ((user.settings or {}).get("tracked_modules")) if user else None
+    return tracked if isinstance(tracked, list) else None
 
 
 def _resolve_location(db: Session, ex: ExtractedEvent, user_id: str | None) -> Location | None:

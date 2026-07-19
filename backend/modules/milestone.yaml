@@ -30,3 +30,10 @@ statistics:
     type: count
 compendium_view:
   group_by: name
+# --- A7: Frontend & KI-Prompt aus dem YAML ---
+emoji: "⭐"
+category_labels:
+  milestone: Meilenstein
+prompt_rules: |
+  - Kategorie milestone = besonderes Lebensereignis: Hochzeit, Verlobung, Geburt, Umzug,
+    Schul-/Studienabschluss, neuer Job, Taufe, Einschulung.

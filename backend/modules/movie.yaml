@@ -1,0 +1,10 @@
+# Modul: Filme — Kompendium-Entities vom Typ movie
+key: movie
+label: Filme
+icon: film
+color: "#f5a623"
+emoji: "🎬"
+compendium: true
+event_categories: []
+prompt_rules: |
+  - Entity movie: konkrete Filmtitel ("Oppenheimer", "Der Herr der Ringe", ...).
