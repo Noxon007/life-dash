@@ -659,8 +659,14 @@ Nutzerverwaltungs-UI.
 | **A21** | ✅ **Export mit Auswahl** *(Anmerkung 35; fertig v0.12.0 — Häkchen „ohne Google-Timeline-Daten", generischer exclude_source-Parameter)* | S | Vor dem JSON-Export wählen, was hineinkommt: nach **Quelle** (z. B. ohne `google_timeline`-Besuche/Tracks), optional „nur Bestätigtes" und Zeitraum. Voreinstellung bleibt „alles" (Backup-Fall); der Export-Toast zeigt die aktive Auswahl. | Handliche Exporte (z. B. nur die handgepflegte Lebensdatenbank ohne 10k Import-Besuche). |
 | **A22** | ✅ **Jobs serverseitig (Background)** *(Anmerkung 36; fertig v0.13.0 — Worker-Threads für Wetter/Embeddings/Ortsnamen/Neuberechnung, Stopp-Knopf + Auto-Refresh im Jobs-Reiter, Nachtplan pro Typ und Nutzer ein-/ausschaltbar inkl. Uhrzeit; Importe bleiben client-getrieben, die Datei liegt im Browser)* | M–L | Batch-Läufe laufen heute als Browser-Schleife — Seite zu = Lauf stoppt. Neu: Jobs laufen **im Backend** (Background-Task pro Job, Fortschritt in der Job-Tabelle) und damit auch bei geschlossener Seite; der Jobs-Reiter bekommt einen **Stopp-Knopf** je laufendem Job. Dazu optionaler **Zeitplan**: bestimmte Job-Typen (Wetter, Embeddings, Ortsnamen) nachts automatisch laufen lassen — pro Typ vom Nutzer ein-/ausschaltbar inkl. Uhrzeit. Baut auf A11 auf (Lock/Job-Tabelle bleiben). | Lange Läufe (10k Ortsnamen ≈ 3 h wegen Nominatim-Drossel) brauchen keinen offenen Browser mehr. |
 | **A23** | ✅ **Klartext statt Stufen-Jargon im UI** *(Anmerkung 40; fertig v0.12.0)* | S | „Stufe 1/2/3", „S1/S2" etc. verschwinden aus der Oberfläche — stattdessen sprechende Begriffe: **Roh-Eingang**, **Vorschläge**, **Lebensdatenbank**, **Ansichten**. Die Stufen-Terminologie bleibt Konzept-/Entwickler-Sprache (KONZEPT, Code-Kommentare). | Die App ist ohne Lektüre des Konzepts verständlich. |
+| **A24** | **Karte größer & besser** *(Anmerkung 45)* | S–M | Die Karte ist auf großen Bildschirmen zu klein (fix 520 px hoch): Höhe an den Viewport koppeln, dazu ein Vollbild-Umschalter. „Allgemein verbessern" bleibt bewusst offen — Ideen werden erst gesammelt (z. B. Popup-Inhalte, gemerkte Layer-Auswahl, Dichte-Ansicht), bevor hier mehr entschieden wird. | Die Karte nutzt den vorhandenen Platz; das Desktop-Erlebnis zieht mit dem mobilen gleich. |
+| **A25** | **Ein Ortsnamen-Lauf statt drei Knöpfe** *(Anmerkung 46)* | S | „Ortsnamen auflösen", „Adressen kürzen" und „Fremdschrift eindeutschen" sind serverseitig längst EIN Job (`resolve_names` mit drei Scopes) — die UI legt sie zu einem Knopf zusammen (Auswahl oder automatisch alle Scopes nacheinander). Achtung Wechselwirkung F10: Mit umschaltbarer UI-Sprache muss „eindeutschen" ohnehin generisch werden (Accept-Language folgt der App-Sprache statt fest de,en). | Weniger Knöpfe, weniger Erklärtext — ein Lauf räumt alles auf. |
+| **A26** | **„Meine Daten" aufräumen** *(Anmerkung 47)* | S | Der Reiter Verwaltung → Meine Daten ist eine gewachsene Liste — neu gruppieren in klare Blöcke: **Sichern & Zurückspielen** (Export/Import), **Importe** (Google Timeline …), **Ortsnamen** (Lauf aus A25 + Format-Bausteine), **Tracking-Auswahl**. | Der meistgenutzte Verwaltungs-Reiter ist auf einen Blick verständlich. |
+| **A27** | **Allgemeingültigkeits-Audit** *(Anmerkung 48)* | S–M | Life-Dash sollen auch Fremde sauber deployen: Audit über UI-Texte, Docs und Defaults auf Homelab-/Personen-Spezifisches — z. B. nennt der Login-Screen hart „Pocket ID" (generisch „per SSO anmelden", Provider-Name aus der Config), Beschreibungen im UI dürfen keine instanz-spezifischen Annahmen machen, README/DEPLOY auf Übertragbarkeit prüfen, `.env.example` als einzige Setup-Wahrheit. Ergänzt F10 (englische Doku). | Jede fremde Instanz fühlt sich „richtig" an — nichts verweist aufs Ursprungs-Homelab. |
 
-**✅ Gruppe A ist mit v0.13.0 abgeschlossen** (A1–A23). Weiter geht es in
+**✅ Gruppe A ist mit v0.13.0 abgeschlossen** (A1–A23; die Feedback-Runde
+vom 2026-07-19 abends hat mit **A24–A27** vier neue Verbesserungs-Pakete
+nachgelegt, Anmerkungen 43–48). Weiter geht es in
 Gruppe B — **Entscheidung 2026-07-19: erst die Feature-Pakete (F1–F10,
 P3.1, P5.x), neue Import-Quellen (Immich P2.1, Health P4.1, PSN P4.2)
 kommen bewusst ZULETZT**, wenn der Rest fertig ist.
@@ -686,6 +692,8 @@ kommen bewusst ZULETZT**, wenn der Rest fertig ist.
 | **P2.1** | **Immich-Connector** | M | Immich-URL/API-Key pro Nutzer (Einstellungen), Assets nach Zeit+Geo zu Events verknüpfen (`MediaRef`), Thumbnail-Proxy, Fotos in Event-Karte/Detail, Re-Enrichment-Button. **Ausbaustufe 2 (Anmerkung 30): Immich als Ereignis-QUELLE,** nicht nur Anreicherung — (a) Foto-Cluster nach Datum+Ort zu Event-**Vorschlägen** verdichten („34 Fotos am 12.07. in Detmold" → Vorschlag im Vorschlagsraum, `unconfirmed`, Kap. 3.1); (b) **Alben analysieren**: Album-Name + Zeitspanne + Orte der enthaltenen Fotos → Reise-/Ereignis-Vorschlag (Album „Dänemark 2024" → `trip`). Dubletten-Schutz über Asset-/Album-IDs als `external_id`; nichts wird automatisch bestätigt. | Fotos erscheinen automatisch an Erinnerungen — größter „Wow"-Effekt der Import-Quellen. |
 | **P4.1** | **Health-Connect-Import** | M | Upload des Health-Connect-Exports, Schritte/HF/Workouts → `Metric`, Workout-GPS → `Track`. | Fitness-Kontext an Events. |
 | **P4.2** | **PSN-Connector** | M | NPSSO-Token pro Nutzer, Sync via `psnawp`: Spiele→`game`-Entities, Trophäen/Spielzeit→Metrics. | Gaming-Historie im Kompendium (`game`-Modul existiert seit v0.13.0). |
+| **P2.8** | **Live-Standort via OwnTracks/Overland** *(Anmerkung 43, entschieden 2026-07-19)* | M | Eigener OwnTracks-/Overland-kompatibler Empfangs-Endpoint (Token pro Nutzer): Handy-Apps pushen den Standort laufend; daraus entstehen Besuche/Tracks wie beim Timeline-Import (gleiche Verdichtungs- und Dubletten-Regeln) — das manuelle Google-Export-Ritual entfällt perspektivisch. **Dawarich wird bewusst NICHT parallel betrieben** (kein zweiter Dienst, keine doppelte Datenhaltung); es dient als Format-/API-Referenz (AGPL-kompatibel; Ruby → keine direkte Code-Übernahme). | Standort-Historie läuft automatisch ein — ohne Google, ohne Export. |
+| **P2.9** | **Import-Automatisierung** *(Anmerkung 44 — „mitdenken, später umsetzen")* | M | Sobald Connectoren stehen: wiederkehrende Importe ohne Handarbeit — geplante Pulls (Immich, PSN) über den Job-Zeitplan (A22), Watch-Ordner/Upload-Ziel für Datei-Exporte (Health Connect), Live-Push via P2.8. Regel ab sofort: Bei jedem neuen Connector wird die Automatisierbarkeit MITGEDACHT (Voraussetzung idempotente Importe existiert bereits). | Die Lebensdatenbank füllt sich von selbst statt per Erinnerung ans Exportieren. |
 
 ---
 
@@ -824,6 +832,26 @@ echtem Open Source):**
     Deutscher Input bleibt ausdrücklich okay (wird beim Schreiben übersetzt) —
     keine Komplikation, nur die einmalige KONZEPT-Übersetzung und ein
     Begriffs-Glossar sind der Preis → Paket **F10**.
+
+**Feedback-Runde 2026-07-19 abends — zweite Runde (43–48):**
+43. ✅ **Dawarich nutzen?** Entschieden: **nicht parallel betreiben**, sondern
+    die gute Idee übernehmen — Life-Dash bekommt einen eigenen
+    OwnTracks/Overland-kompatiblen Live-Endpoint; Dawarich (AGPL, Ruby)
+    bleibt reine Format-/API-Referenz → Paket **P2.8**.
+44. ✅ **Importe automatisieren:** vorerst nur mitdenken (idempotente Importe
+    als Grundlage existieren); umgesetzt wird, wenn die Connectoren stehen
+    → Paket **P2.9** (bewusst zuletzt, wie alle Import-Themen).
+45. ✅ **Karte auf großen Bildschirmen zu klein** (+ „allgemein verbessern" —
+    konkrete Ideen bewusst noch offen, werden gesammelt) → Paket **A24**.
+46. ✅ **Ortsnamen auflösen / Adressen kürzen / Fremdschrift eindeutschen
+    zusammenlegen:** serverseitig schon ein Job mit drei Scopes, die UI
+    folgt; spätestens mit F10 (de/en) muss „eindeutschen" sprachneutral
+    werden → Paket **A25**.
+47. ✅ **„Meine Daten" unter Verwaltung besser sortieren** → Paket **A26**.
+48. ✅ **Allgemeingültigkeit prüfen:** UI-Texte, Docs und Defaults dürfen
+    nichts Homelab-Spezifisches hart verdrahten (z. B. „Pocket ID" im
+    Login-Screen) — andere sollen das Projekt sauber deployen können
+    → Paket **A27**.
 
 **Noch offen / zu entscheiden:**
 6. **Neuberechnungs-Granularität & Kosten:** Bleibt offen — hängt vom endgültigen Modell ab (lokal = Laufzeit, API = Kontingent/Kosten). Der Quota-Schutz (Abbruch mit Erhalt des Altbestands) ist umgesetzt; einzelne Fragmente gezielt neu verarbeiten wäre der nächste Schritt, wenn die Datenmenge wächst.
