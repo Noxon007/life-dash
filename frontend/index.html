@@ -621,7 +621,7 @@
           <div class="stat-card" data-go="timeline:meal" data-req-mod="food"><div class="stat-num" id="stat-meals">–</div><div class="stat-label">Mahlzeiten</div><div class="stat-sub">Kategorie meal</div></div>
           <div class="stat-card" data-go="admin"><div class="stat-num" id="stat-unconfirmed">–</div><div class="stat-label">Unbestätigt</div><div class="stat-sub">zu moderieren</div></div>
         </div>
-        <div class="grid cols-2" style="margin-bottom:24px">
+        <div class="grid cols-4" style="margin-bottom:24px">
           <div class="stat-card" data-event-slot="hot">
             <div class="stat-num" id="stat-hot">–</div>
             <div class="stat-label">🔥 Heißester Tag</div>
@@ -631,6 +631,26 @@
             <div class="stat-num" id="stat-cold">–</div>
             <div class="stat-label">❄️ Kältester Tag</div>
             <div class="stat-sub" id="stat-cold-sub">Wetter-Enrichment ausführen</div>
+          </div>
+          <div class="stat-card" data-event-slot="sunny">
+            <div class="stat-num" id="stat-sunny">–</div>
+            <div class="stat-label">☀️ Sonnigster Tag</div>
+            <div class="stat-sub" id="stat-sunny-sub">–</div>
+          </div>
+          <div class="stat-card" data-event-slot="rainy">
+            <div class="stat-num" id="stat-rainy">–</div>
+            <div class="stat-label">🌧️ Nassester Tag</div>
+            <div class="stat-sub" id="stat-rainy-sub">–</div>
+          </div>
+          <div class="stat-card" data-event-slot="windy">
+            <div class="stat-num" id="stat-windy">–</div>
+            <div class="stat-label">💨 Windigster Tag</div>
+            <div class="stat-sub" id="stat-windy-sub">–</div>
+          </div>
+          <div class="stat-card" data-event-slot="snowy">
+            <div class="stat-num" id="stat-snowy">–</div>
+            <div class="stat-label">❄️ Schneereichster Tag</div>
+            <div class="stat-sub" id="stat-snowy-sub">–</div>
           </div>
         </div>
         <div class="grid cols-2">
@@ -1049,7 +1069,7 @@
   </div>
 
 <!-- A15 — Onboarding: Tracking-Auswahl beim ersten Start -->
-<div class="modal" id="track-modal">
+<div class="modal-overlay" id="track-modal">
   <div class="modal-box">
     <h3>🧩 Was möchtest du tracken?</h3>
     <div class="hint" style="margin-top:4px">Wähle die Bereiche, die dich interessieren —
@@ -1322,11 +1342,34 @@ function fmtDate(e) {
 }
 
 // ---------- Chips für ein Event ----------
+// F3: Alle Wetter-Metriken werden zu EINER kompakten Zeile gebündelt
+// („12–17 °C · Nieselregen · ☀️ 3,2 h · 🌧️ 5,1 mm") statt vieler Roh-Chips.
+function weatherSummary(e) {
+  const get = k => (e.metrics || []).find(m => m.key === k);
+  const min = get('temp_min_c'), max = get('temp_max_c'), mean = get('temperature_c');
+  const parts = [];
+  if (min && max) parts.push(`${min.value}–${max.value} °C`);
+  else if (mean) parts.push(`${mean.value} °C`);
+  const cond = get('weather');
+  if (cond && cond.value_text) parts.push(cond.value_text);
+  const sun = get('sunshine_h');
+  if (sun && sun.value > 0) parts.push(`☀️ ${sun.value} h`);
+  const rain = get('rain_mm');
+  if (rain && rain.value > 0) parts.push(`🌧️ ${rain.value} mm`);
+  const snow = get('snow_cm');
+  if (snow && snow.value > 0) parts.push(`❄️ ${snow.value} cm`);
+  const wind = get('wind_max_kmh');
+  if (wind && wind.value >= 30) parts.push(`💨 ${wind.value} km/h`);  // nur wenn nennenswert
+  return parts.length ? parts.join(' · ') : null;
+}
 function eventChips(e) {
   const chips = [];
   if (e.location && e.location.name) chips.push(`📍 ${e.location.name}`);
   (e.entities || []).forEach(en => chips.push(`🏷️ ${en.name}`));
+  const w = weatherSummary(e);
+  if (w) chips.push(`🌤️ ${w}`);
   (e.metrics || []).forEach(m => {
+    if (m.source === 'weather') return;  // oben gebündelt
     const val = m.value_text ?? (m.value != null ? `${m.value}${m.unit ? ' '+m.unit : ''}` : '');
     chips.push(`📈 ${m.key}${val ? ': '+val : ''}`);
   });
@@ -1707,19 +1750,36 @@ async function loadStats() {
     document.getElementById('stat-age-sub').textContent = 'Geburt als Meilenstein eintragen';
   }
 
-  // Heißester / kältester Tag — aus den Wetter-Metriken (Stufe 3)
+  // Wetter-Extreme — aus den Wetter-Metriken. F3: Hitze/Kälte nutzen die
+  // echten Tages-Max/Min (Bestandsdaten ohne Min/Max: Tagesmittel als Rückfall)
+  const metricOf = (e, ...keys) => {
+    for (const k of keys) {
+      const m = (e.metrics || []).find(mm => mm.key === k);
+      if (m && m.value != null) return m.value;
+    }
+    return null;
+  };
   let hot = null, cold = null;
   events.forEach(e => {
-    const t = (e.metrics || []).find(m => m.key === 'temperature_c');
-    if (!t || t.value == null) return;
-    if (!hot || t.value > hot.t) hot = { t: t.value, e };
-    if (!cold || t.value < cold.t) cold = { t: t.value, e };
+    const hi = metricOf(e, 'temp_max_c', 'temperature_c');
+    if (hi != null && (!hot || hi > hot.t)) hot = { t: hi, e };
+    const lo = metricOf(e, 'temp_min_c', 'temperature_c');
+    if (lo != null && (!cold || lo < cold.t)) cold = { t: lo, e };
   });
-  const tempCard = (id, x) => {
-    document.getElementById(id).textContent = x ? `${x.t} °C` : '–';
+  // Größter Wert einer Metrik über alle Events (nur > 0 zählt)
+  const metricMax = key => {
+    let best = null;
+    events.forEach(e => {
+      const v = metricOf(e, key);
+      if (v != null && v > 0 && (!best || v > best.t)) best = { t: v, e };
+    });
+    return best;
+  };
+  const tempCard = (id, x, unit = ' °C', empty = 'keine Wetterdaten — Verwaltung → „Wetter ergänzen"') => {
+    document.getElementById(id).textContent = x ? `${x.t}${unit}` : '–';
     document.getElementById(id + '-sub').textContent = x
       ? `${fmtDate(x.e)} · ${placeOf(x.e) || 'ohne Ort'} — ${x.e.title}`
-      : 'keine Wetterdaten — Admin → „Wetter ergänzen"';
+      : empty;
     // Klick auf die Kachel öffnet das Event (Schnellbearbeitung)
     const card = document.getElementById(id).closest('.stat-card');
     if (card) card.dataset.eventId = x ? x.e.id : '';
@@ -1727,6 +1787,11 @@ async function loadStats() {
   };
   tempCard('stat-hot', hot);
   tempCard('stat-cold', cold);
+  const newDataHint = 'kommt mit neuen Wetter-Anreicherungen (ab v0.14)';
+  tempCard('stat-sunny', metricMax('sunshine_h'), ' h', newDataHint);
+  tempCard('stat-rainy', metricMax('rain_mm'), ' mm', newDataHint);
+  tempCard('stat-windy', metricMax('wind_max_kmh'), ' km/h', newDataHint);
+  tempCard('stat-snowy', metricMax('snow_cm'), ' cm', newDataHint);
 
   const perYear = {};
   events.forEach(e => { const y = eventYear(e); if (y) perYear[y] = (perYear[y]||0) + 1; });
@@ -2269,13 +2334,7 @@ function mpClusterMin() { return SETTINGS.map_cluster_min || 50; }
 // Nur Events, die den aktiven Kategorie-Filter passieren
 function mpFiltered() { return mp.located.filter(e => passesFilter(e, mp.catFilter)); }
 
-function weatherOf(e) {
-  const temp = (e.metrics || []).find(m => m.key === 'temperature_c');
-  const cond = (e.metrics || []).find(m => m.key === 'weather');
-  if (!temp && !cond) return null;
-  return [temp ? `${temp.value}${temp.unit || '°C'}` : null, cond ? cond.value_text : null]
-    .filter(Boolean).join(' · ');
-}
+function weatherOf(e) { return weatherSummary(e); }
 function periodKey(e) {
   const d = new Date(e.date_start);
   const pad = n => String(n).padStart(2, '0');

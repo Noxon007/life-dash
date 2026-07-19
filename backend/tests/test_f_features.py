@@ -6,28 +6,19 @@ from app.models import Entity, Event, EventEntityLink, Fragment, Location, Metri
 from app.routers.tracks import import_timeline, resolve_place_names
 from app.services.enrichment import _add_weather
 from app.services.ingestion import ingest_fragment
-from app.services.weather import _dominant_daytime_code
 from tests.test_timeline_a12_users import _device_payload, fake_reverse  # noqa: F401
 
 
 # --------------------------------------------------------------------------- #
-# F3 — Wetter: dominantes Tagwetter + getrennte Metriken
+# F3 — Wetter: reine Tageswerte (Min/Max, Sonne, Regen, Schnee, Wind)
 # --------------------------------------------------------------------------- #
-def test_dominant_daytime_code_ignores_night():
-    hourly = {
-        "time": [f"2024-07-01T{h:02d}:00" for h in range(24)],
-        # 0-7 Uhr Regen (61), tagsüber klar (0), 21-23 Gewitter (95)
-        "weathercode": [61] * 8 + [0] * 13 + [95] * 3,
-    }
-    assert _dominant_daytime_code(hourly) == 0  # Nacht zählt nicht
-
-
-def test_add_weather_stores_min_max_precip(db, user, monkeypatch):
+def test_add_weather_stores_daily_values(db, user, monkeypatch):
     monkeypatch.setattr(
         "app.services.enrichment.fetch_weather",
         lambda lat, lng, when: {"temp_c": 21.5, "temp_min_c": 14.0,
-                                "temp_max_c": 29.0, "precip_mm": 0.4,
-                                "condition": "klar"})
+                                "temp_max_c": 29.0, "sun_h": 11.2,
+                                "rain_mm": 0.4, "snow_cm": 0.0,
+                                "wind_max_kmh": 18.4, "condition": "klar"})
     loc = Location(user_id=user.id, name="Detmold", lat=51.9, lng=8.9)
     db.add(loc)
     db.flush()
@@ -39,11 +30,14 @@ def test_add_weather_stores_min_max_precip(db, user, monkeypatch):
 
     assert _add_weather(db, ev) is True
     db.commit()
-    keys = {m.key: (m.value, m.value_text) for m in db.query(Metric).all()}
+    keys = {m.key: (m.value, m.value_text, m.unit) for m in db.query(Metric).all()}
     assert keys["temperature_c"][0] == 21.5
     assert keys["temp_min_c"][0] == 14.0
     assert keys["temp_max_c"][0] == 29.0
-    assert keys["precipitation_mm"][0] == 0.4
+    assert keys["sunshine_h"] == (11.2, None, "h")
+    assert keys["rain_mm"] == (0.4, None, "mm")
+    assert keys["snow_cm"][0] == 0.0
+    assert keys["wind_max_kmh"] == (18.4, None, "km/h")
     assert keys["weather"][1] == "klar"
 
 

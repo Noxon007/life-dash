@@ -28,13 +28,21 @@ jedem `MINOR` vorkommen.
   Ländern war ich?" endlich auch für importierte Bewegungsdaten.
 
 ### Geändert
-- **Ehrlicheres Wetter:** Die Wetterbedingung kommt jetzt aus den
-  Stundendaten — angezeigt wird das **vorherrschende Tagwetter (8–20 Uhr)**
-  statt des schwersten Codes des ganzen Tages (eine Stunde Morgenregen
-  überdeckte bisher einen sonnigen Tag). Neu gespeichert werden außerdem
-  Tages-Minimum und -Maximum getrennt sowie die Niederschlagsmenge.
-  Bereits geholtes Wetter bleibt unverändert (Fakten werden nie
-  überschrieben); neue Anreicherungen bekommen die vollen Werte.
+- **Volleres, ehrlicheres Wetter:** Gespeichert werden jetzt die reinen
+  **Tageswerte**: Höchst- und Tiefsttemperatur getrennt, **Sonnenstunden**,
+  **Regen (mm)**, **Schnee (cm)**, **maximaler Wind (km/h)** und die
+  Tages-Wetterlage. In Event-Karten und Karten-Popups erscheint alles als
+  eine kompakte Zeile („12–17,4 °C · Nieselregen · ☀️ 9,1 h · 🌧️ 5,1 mm";
+  Wind nur, wenn nennenswert). Bereits geholtes Wetter bleibt unverändert —
+  Fakten werden nie überschrieben.
+- **Statistik mit Wetter-Extremen:** Neben „Heißester/Kältester Tag" (die
+  jetzt echte Tages-Höchst-/Tiefstwerte nutzen) gibt es neue Kacheln
+  **Sonnigster**, **Nassester**, **Windigster** und **Schneereichster Tag**
+  — Klick öffnet wie gewohnt das jeweilige Ereignis.
+
+### Behoben
+- **„Was möchtest du tracken?"-Fenster ließ sich nicht schließen:** Der
+  Dialog verwendete eine falsche CSS-Klasse und blieb dauerhaft sichtbar.
 
 ## [0.13.0] – 2026-07-19
 

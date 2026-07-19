@@ -30,20 +30,28 @@ def _weather_candidates(db: Session) -> list[Event]:
     return [e for e in db.query(Event).all() if _needs_weather(e)]
 
 
+# F3: gespeicherte Tageswerte -> Metrik-Schlüssel + Einheit
+_WEATHER_METRICS = {
+    "temp_c": ("temperature_c", "°C"),   # Tagesmittel (Kompatibilität/Statistik)
+    "temp_min_c": ("temp_min_c", "°C"),
+    "temp_max_c": ("temp_max_c", "°C"),
+    "sun_h": ("sunshine_h", "h"),
+    "rain_mm": ("rain_mm", "mm"),
+    "snow_cm": ("snow_cm", "cm"),
+    "wind_max_kmh": ("wind_max_kmh", "km/h"),
+}
+
+
 def _add_weather(db: Session, event: Event) -> bool:
     """Holt Wetter für EIN Event und hängt es als Metriken an (ohne Commit).
-    F3: Mittel + Min/Max getrennt, Bedingung aus Stundendaten, Niederschlag."""
+    F3: reine Tageswerte — Min/Max, Sonnenstunden, Regen, Schnee, Wind."""
     w = fetch_weather(event.location.lat, event.location.lng, event.date_start)
     if not w:
         return False
-    for key in ("temp_c", "temp_min_c", "temp_max_c"):
-        if w.get(key) is not None:
-            db.add(Metric(event_id=event.id,
-                          key="temperature_c" if key == "temp_c" else key,
-                          value=w[key], unit="°C", source=Source.weather))
-    if w.get("precip_mm") is not None:
-        db.add(Metric(event_id=event.id, key="precipitation_mm",
-                      value=w["precip_mm"], unit="mm", source=Source.weather))
+    for src, (key, unit) in _WEATHER_METRICS.items():
+        if w.get(src) is not None:
+            db.add(Metric(event_id=event.id, key=key, value=w[src],
+                          unit=unit, source=Source.weather))
     if w.get("condition"):
         db.add(Metric(event_id=event.id, key="weather",
                       value_text=w["condition"], source=Source.weather))
