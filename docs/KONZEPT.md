@@ -651,10 +651,18 @@ Nutzerverwaltungs-UI.
 | **A16** | ✅ **Monats-Präzision zählt als unscharf** *(Anmerkung 25, Bugfix; fertig v0.9.0)* | S | „Juni Urlaub Dänemark" wird korrekt als `month` (01.06.–30.06.) gespeichert, tauchte aber **nicht** in der Unscharfe-Zeiten-Liste auf — die filterte nur `season`/`year`/`decade`/ohne Datum (P2.3-Lücke). Behoben: `month` zählt mit; Grundsatz aus Kap. 6.2 gilt unverändert (unscharfe KI-Zeiten sind `unconfirmed`, bis der Nutzer sie bestätigt oder konkretisiert). | Monatsgenaue Events landen in der Nachschärf-Liste, wie es das Konzept vorsieht. |
 | **A17** | ✅ **Log-Ansicht in der UI** *(Anmerkung 29; fertig v0.10.0)* | S–M | Die zentralen `lifedash.*`-Logs (A9) zusätzlich in einem **Ring-Puffer** halten (z. B. letzte 500 Zeilen, In-Memory-Logging-Handler) und als Admin-Reiter anzeigen: Level-Filter (DEBUG–ERROR), Logger-Filter (Import, Geocoding, Wetter, KI …), Auto-Refresh. Kein Persistieren, kein Log-File-Zugriff — `docker logs` bleibt die vollständige Quelle. Leitplanke: Logs enthalten keine Secrets (gilt bereits) und sind nur für Admins sichtbar (Logs sind nutzerübergreifend). | Was das System gerade tut (Importe, Batch-Läufe, Fehler) ist ohne SSH/Docker-Zugriff sichtbar. |
 | **A18** | ✅ **Karten-Clustering erst ab Schwelle (einstellbar)** *(Anmerkung 26; fertig v0.9.0)* | S | Clustering greift erst, wenn der Zeitraum mehr Punkte enthält als die Schwelle; darunter Einzelmarker bzw. nummerierte Route. **Vom Nutzer einstellbar** (Feld „Cluster ab N Punkten" auf der Karte, gespeichert als `map_cluster_min`), aber im Rahmen **10–300** — die Obergrenze schützt die Performance (zu viele Einzelmarker frieren den Browser ein). Gilt für die normale und die gebündelte Ansicht (A5). | Kleine Zeiträume zeigen sofort echte Marker statt Zahlenblasen. |
+| **A19** | **„Gesuchte Adresse" bereinigen** *(Anmerkung 32)* | S | Das Label „Gesuchte Adresse" stiftet keinen Mehrwert (anders als Zuhause/Arbeit): (a) beim Auflösen wird das Präfix künftig **komplett entfernt** — es bleibt die reine Adresse; Bestandsdaten zieht „Ortsnamen auflösen"/„Adressen kürzen" mit; (b) Besuche, deren Ort dauerhaft **ohne auflösbare Adresse** bleibt (nur nacktes Label), werden beim Import übersprungen bzw. per Aufräum-Aktion entfernt (zusätzlich hilft der `min_probability`-Filter, A12). | Keine kryptischen „Gesuchte Adresse"-Einträge mehr in Karte und Zeitstrahl. |
+| **A20** | **Mobile-Bugfixes: Suche + Karten-Reiter** *(Anmerkungen 33+34)* | S–M | (a) Die globale Suche springt auf dem Handy zwar zum Zeitstrahl, **filtert aber nichts**; (b) der Karten-Reiter zeigt auf dem Handy **keine Karte** (die Kompendium-Detailkarte funktioniert — Verdacht: Höhe/`invalidateSize` beim Einblenden des Karten-Views im mobilen Layout). Beides debuggen und fixen; mobile Smoke-Checks ergänzen. | Die zwei wichtigsten mobilen Funktionen (Suchen, Karte) funktionieren unterwegs. |
+| **A21** | **Export mit Auswahl** *(Anmerkung 35)* | S | Vor dem JSON-Export wählen, was hineinkommt: nach **Quelle** (z. B. ohne `google_timeline`-Besuche/Tracks), optional „nur Bestätigtes" und Zeitraum. Voreinstellung bleibt „alles" (Backup-Fall); der Export-Toast zeigt die aktive Auswahl. | Handliche Exporte (z. B. nur die handgepflegte Lebensdatenbank ohne 10k Import-Besuche). |
+| **A22** | **Jobs serverseitig (Background)** *(Anmerkung 36)* | M–L | Batch-Läufe laufen heute als Browser-Schleife — Seite zu = Lauf stoppt. Neu: Jobs laufen **im Backend** (Background-Task pro Job, Fortschritt in der Job-Tabelle) und damit auch bei geschlossener Seite; der Jobs-Reiter bekommt einen **Stopp-Knopf** je laufendem Job. Dazu optionaler **Zeitplan**: bestimmte Job-Typen (Wetter, Embeddings, Ortsnamen) nachts automatisch laufen lassen — pro Typ vom Nutzer ein-/ausschaltbar inkl. Uhrzeit. Baut auf A11 auf (Lock/Job-Tabelle bleiben). | Lange Läufe (10k Ortsnamen ≈ 3 h wegen Nominatim-Drossel) brauchen keinen offenen Browser mehr. |
+| **A23** | **Klartext statt Stufen-Jargon im UI** *(Anmerkung 40)* | S | „Stufe 1/2/3", „S1/S2" etc. verschwinden aus der Oberfläche — stattdessen sprechende Begriffe: **Roh-Eingang**, **Vorschläge**, **Lebensdatenbank**, **Ansichten**. Die Stufen-Terminologie bleibt Konzept-/Entwickler-Sprache (KONZEPT, Code-Kommentare). | Die App ist ohne Lektüre des Konzepts verständlich. |
 
 **Empfohlene Reihenfolge in A** (A1–A6, A8–A14, A16–A18 sind erledigt):
-Es verbleiben **A7** (Modul-Vollausbau) → **A15** (Tracking-Auswahl,
-braucht A7). Danach ist Gruppe A abgeschlossen → **P2.1 (Immich)**.
+**A20** (Mobile-Bugs) zuerst, dann die Kleinen **A19 → A21 → A23**,
+danach **A7** (Modul-Vollausbau) → **A15** (Tracking-Auswahl, braucht A7)
+→ **A22** (Background-Jobs, größter Brocken). Danach ist Gruppe A
+abgeschlossen → **P2.1 (Immich)**; aus B drängen F7 (Tages-Kinder) und
+F10 (Englisch-Umstellung) am meisten.
 
 #### Gruppe B — Neue Features (nach A bzw. als bewusste Ausnahme)
 
@@ -667,6 +675,10 @@ braucht A7). Danach ist Gruppe A abgeschlossen → **P2.1 (Immich)**.
 | **F4** | **Import füttert das Kompendium (Länder)** *(Frage 21)* | M | Der Timeline-Import erzeugt heute nur Events + Locations — **keine Entities/Links**, daher bleiben Länder-Kompendium und Länder-Statistik von Importen unberührt. Neu: Beim (Reverse-)Geocoding das Land aus den `addressdetails` mitnehmen (werden bereits angefragt, aber verworfen), an der `Location` speichern und je Besuchsland eine `country`-Entity anlegen/verknüpfen — als Teil der Ortsauflösung, rückwirkend über „Ortsnamen auflösen". Baut auf A10/A12 auf. Später erweiterbar auf Städte/Orte als eigene Kompendium-Typen (`place`-Modul). | „In wie vielen Ländern war ich?" stimmt endlich — gespeist aus echten Bewegungsdaten. |
 | **F5** | **Welt-Reiter: Länder-Karte & Kontinente-Checkliste** *(Anmerkung 27)* | M | Neuer Reiter (unter Statistik oder eigenständig): **Weltkarte mit eingefärbten besuchten Ländern** (Choropleth über Leaflet + Länder-GeoJSON, gespeist aus den `country`-Entities) und **Checklisten**: Kontinente (7/7?), Länder pro Kontinent, „zuletzt neu besucht". Braucht F4 (Import erzeugt Länder-Entities), sonst bleibt die Karte bei Import-Daten leer. | „Wo war ich schon?" auf einen Blick — motiviert, Lücken zu füllen. |
 | **F6** | **Achievements (Bronze/Silber/Gold/Platin)** *(Anmerkung 28)* | M | Neuer Reiter mit Erfolgen in vier Stufen, **deklarativ aus den Modul-YAMLs** (baut auf A7/P3.1 auf): je Achievement eine Metrik + Schwellwerte, z. B. „Tier-Sammler" (5/25/100/500 Arten gesehen), „Weltenbummler" (Länder), „Konzertgänger", „Feinschmecker". Berechnet aus Stufe 2 (Schicht-4-Ableitung, jederzeit neu berechenbar, kein eigener Datenbestand außer optional „erreicht am"). Anzeige mit Fortschrittsbalken zur nächsten Stufe. | Spielerischer Anreiz, Erlebnisse zu erfassen — macht die Lebensdatenbank „belohnend". |
+| **F7** | **Mehrtages-Events mit Tages-Unterereignissen** *(Anmerkung 37, entschieden: „beides")* | M–L | Ein mehrtägiges Event („Mallorca 05.–12.07.") bleibt EIN Reise-Event, bekommt aber **verknüpfte Tages-Events** (Eltern-Kind). **Datenmodell-Folge ist klein:** eine neue Spalte `Event.parent_event_id` (Self-FK, nullable) — kein neuer Tabellentyp. Die Arbeit steckt im Verhalten: Tages-Kinder werden auf Knopfdruck (oder beim Bestätigen) für die Spanne erzeugt („Mallorca — Tag 3", `day`-Präzision, erben Ort + Bestätigung); **Anreicherung (Wetter, später Fotos) hängt an den Kindern** = pro Tag; das Eltern-Event zeigt die Tagesleiste aggregiert; Timeline zeigt Kinder eingeklappt unterm Eltern-Event (Tages-Zoom zeigt sie einzeln); Löschen des Eltern-Events fragt, ob die Kinder mitgehen; Export/Import und Neuberechnungs-Schutz (`confirmed`) gelten unverändert — Kinder sind normale Lebensdatenbank-Events, nur mit Herkunftsverweis. Passt direkt zum Reisetagebuch (F1: Journal pro Tag). | Jeder Urlaubstag trägt eigenes Wetter, eigene Fotos, eigene Notizen — ohne den Zeitstrahl mit Duplikaten zu fluten. |
+| **F8** | **Druckansicht ausgewählter Tage** *(Anmerkung 38)* | M | Zeitraum wählen → druckfreundliche Seite (helles Layout, keine Navigation): Events chronologisch mit Ort, Wetter, Notizen, später Fotos; Browser-Druckdialog (PDF). Sinnvoll nach F1/F7 (Tagesebene). | Erinnerungen physisch: Urlaubstage ausdrucken oder als PDF teilen. |
+| **F9** | **Heller Modus** *(Anmerkung 41)* | S–M | Die App ist bisher dunkel; die Farben liegen bereits in CSS-Variablen. Neu: helles Theme + Umschalter (Auto nach Systemeinstellung, manuell übersteuerbar, pro Gerät gespeichert). Karte wechselt den Tile-Stil mit (hell/dunkel). | Lesbarkeit bei Tageslicht; Grundlage für die Druckansicht (F8). |
+| **F10** | **Zweisprachigkeit: App de/en, Doku englisch** *(Anmerkung 42, entschieden)* | M–L | **App-UI** bekommt einen Sprachumschalter Deutsch/Englisch (String-Katalog statt hartcodierter Texte — die eigentliche Arbeit, da alle Texte inline liegen; KI-Prompts bleiben davon unberührt). **Doku (README, CHANGELOG, KONZEPT) wird auf Englisch umgestellt**: einmalige Übersetzung, danach nur noch englisch gepflegt. Diskussion/Input dürfen weiterhin deutsch sein — übersetzt wird beim Schreiben; einzige Kosten: die einmalige KONZEPT-Übersetzung (~750 Zeilen) und konsistente Begriffe (Glossar: z. B. Lebensdatenbank → *life database*, Vorschlagsraum → *proposal space*). | Erreichbarkeit für die internationale Self-Hosted-Community (AGPL + englische Doku = GitHub-Standard). |
 | **P3.1** | **Deklarative Statistik-Widgets** | M | Widgets aus Modul-YAML (`count`, `count_distinct`, `timeseries`) generisch rendern statt hart codiert. Baut sinnvoll auf A7 auf. | Neue Module bringen ihre Statistik automatisch mit. |
 | **P4.1** | **Health-Connect-Import** | M | Upload des Health-Connect-Exports, Schritte/HF/Workouts → `Metric`, Workout-GPS → `Track`. | Fitness-Kontext an Events. |
 | **P4.2** | **PSN-Connector** | M | NPSSO-Token pro Nutzer, Sync via `psnawp`: Spiele→`game`-Entities, Trophäen/Spielzeit→Metrics. | Gaming-Historie im Kompendium. Braucht `game`-Modul (S, inklusive). |
@@ -781,6 +793,35 @@ echtem Open Source):**
     - *Umsetzung:* `LICENSE`-Datei (AGPL-3.0-Volltext) ins Repo, Lizenz-Hinweis
       in README + `pyproject`/Docker-Labels; gilt ab dem Commit der Aufnahme
       (rückwirkend bleiben alte Stände „all rights reserved").
+
+**Feedback-Runde 2026-07-19 — Anmerkungen aus der Nutzung (32–42):**
+32. ✅ **„Gesuchte Adresse" taucht weiter auf:** Label wird abgeschafft — nach
+    Auflösung bleibt nur die Adresse; nicht auflösbare Label-Besuche werden
+    gefiltert/aufgeräumt → Paket **A19**.
+33. ✅ **Handy: Suche filtert nicht** (springt nur zum Zeitstrahl) → Bugfix,
+    Paket **A20**.
+34. ✅ **Handy: Karten-Reiter zeigt keine Karte** (Kompendium-Karte geht —
+    Verdacht: Größen-Berechnung beim Einblenden) → Bugfix, Paket **A20**.
+35. ✅ **Export-Auswahl** (z. B. ohne Google-Import) → Paket **A21**.
+36. ✅ **Jobs sollen ohne offene Seite laufen:** serverseitige Background-Jobs
+    + Stopp-Knopf im Jobs-Reiter + optionaler Nachtplan pro Job-Typ
+    (vom Nutzer ein-/ausschaltbar) → Paket **A22** (baut auf A11 auf).
+37. ✅ **Mehrtägige Events pro Tag anreichern:** Entscheidung **„beides"** —
+    ein Reise-Event plus Tages-Unterereignisse (`parent_event_id`, eine
+    Spalte, kein Umbau); Anreicherung hängt an den Tages-Kindern
+    → Paket **F7**. Details/Datenmodell-Folgen dort.
+38. ✅ **Druckansicht ausgewählter Tage** → Paket **F8**.
+39. ✅ **CHANGELOG versteht keiner (A1/P2.5 …):** Prozessregel ab sofort —
+    Changelog-Einträge in verständlicher Produktsprache ohne Paketkürzel;
+    die Kürzel leben nur noch hier im KONZEPT (Zuordnung übers Datum).
+40. ✅ **UI spricht von „Stufe 1/2/3":** Klartext-Begriffe im UI
+    (Roh-Eingang / Vorschläge / Lebensdatenbank / Ansichten) → Paket **A23**.
+41. ✅ **Heller Modus** (+ Umschalter, Auto nach System) → Paket **F9**.
+42. ✅ **Sprachen:** App-UI umschaltbar de/en; README/CHANGELOG/KONZEPT werden
+    **einmalig auf Englisch umgestellt** und danach englisch gepflegt.
+    Deutscher Input bleibt ausdrücklich okay (wird beim Schreiben übersetzt) —
+    keine Komplikation, nur die einmalige KONZEPT-Übersetzung und ein
+    Begriffs-Glossar sind der Preis → Paket **F10**.
 
 **Noch offen / zu entscheiden:**
 6. **Neuberechnungs-Granularität & Kosten:** Bleibt offen — hängt vom endgültigen Modell ab (lokal = Laufzeit, API = Kontingent/Kosten). Der Quota-Schutz (Abbruch mit Erhalt des Altbestands) ist umgesetzt; einzelne Fragmente gezielt neu verarbeiten wäre der nächste Schritt, wenn die Datenmenge wächst.
