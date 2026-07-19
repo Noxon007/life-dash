@@ -14,15 +14,28 @@ from app.models import Event, Metric, Source
 from app.services.weather import fetch_weather
 
 
+# F3-Tageswerte — fehlen sie ALLE, stammt das Wetter noch aus der Zeit vor
+# 0.14.0 (nur temperature_c + Bedingung) und wird additiv nachgerüstet
+_DAILY_KEYS = {"temp_min_c", "temp_max_c", "sunshine_h", "rain_mm",
+               "snow_cm", "wind_max_kmh"}
+
+
 def _needs_weather(event: Event) -> bool:
-    """Verortet, datiert, nicht in der Zukunft und noch ohne Wetter-Metrik?"""
+    """Verortet, datiert, nicht in der Zukunft — und Wetter fehlt oder ist
+    noch Alt-Format (vor 0.14.0, ohne Tageswerte)?"""
     today = datetime.now(timezone.utc).date()
     loc = event.location
     if not loc or loc.lat is None or event.date_start is None:
         return False
     if event.date_start.date() > today:
         return False  # Zukunft hat noch kein Wetter
-    return not any(m.source == Source.weather for m in event.metrics)
+    have = {m.key for m in event.metrics if m.source == Source.weather}
+    if not have:
+        return True
+    # 0.15.1: Alt-Bestand additiv um die Tageswerte ergänzen (KONZEPT F3:
+    # „Bestandsdaten per Re-Enrichment additiv ergänzbar") — vorhandene
+    # Werte bleiben unangetastet, es kommen nur fehlende Schlüssel dazu.
+    return not (have & _DAILY_KEYS)
 
 
 def _weather_candidates(db: Session) -> list[Event]:
@@ -44,18 +57,25 @@ _WEATHER_METRICS = {
 
 def _add_weather(db: Session, event: Event) -> bool:
     """Holt Wetter für EIN Event und hängt es als Metriken an (ohne Commit).
-    F3: reine Tageswerte — Min/Max, Sonnenstunden, Regen, Schnee, Wind."""
+    F3: reine Tageswerte — Min/Max, Sonnenstunden, Regen, Schnee, Wind.
+    Nur FEHLENDE Schlüssel werden angelegt (0.15.1: Alt-Bestand wird additiv
+    vervollständigt; Fakten werden nie überschrieben)."""
     w = fetch_weather(event.location.lat, event.location.lng, event.date_start)
     if not w:
         return False
+    have = {m.key for m in event.metrics if m.source == Source.weather}
+    added = 0
     for src, (key, unit) in _WEATHER_METRICS.items():
-        if w.get(src) is not None:
-            db.add(Metric(event_id=event.id, key=key, value=w[src],
-                          unit=unit, source=Source.weather))
-    if w.get("condition"):
+        if key in have or w.get(src) is None:
+            continue
+        db.add(Metric(event_id=event.id, key=key, value=w[src],
+                      unit=unit, source=Source.weather))
+        added += 1
+    if "weather" not in have and w.get("condition"):
         db.add(Metric(event_id=event.id, key="weather",
                       value_text=w["condition"], source=Source.weather))
-    return True
+        added += 1
+    return added > 0
 
 
 def auto_enrich_events(db: Session, events: list[Event]) -> int:

@@ -110,13 +110,14 @@ def test_wetter_enrichment_ist_additiv_und_idempotent(db, user, fake_weather):
     enriched, remaining = enrich_weather(db)
     assert (enriched, remaining) == (1, 0)
     assert _snapshot(db.get(Event, event.id)) == before  # Event selbst unberührt
-    assert len(event.metrics) == 2  # Temperatur + Bedingung ergänzt
+    assert len(event.metrics) == 8  # 7 Tageswerte + Bedingung ergänzt
 
-    # Zweiter Lauf: Wetter ist schon da -> nichts wird ersetzt oder dupliziert
+    # Zweiter Lauf: Wetter ist vollständig -> kein neuer API-Call,
+    # nichts wird ersetzt oder dupliziert
     enriched, _ = enrich_weather(db)
     assert enriched == 0
     assert len(fake_weather) == 1
-    assert len(db.get(Event, event.id).metrics) == 2
+    assert len(db.get(Event, event.id).metrics) == 8
 
 
 def test_auto_enrichment_fehler_bricht_erfassung_nie_ab(db, user, monkeypatch):

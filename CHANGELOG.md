@@ -10,6 +10,22 @@ jedem `MINOR` vorkommen.
 
 ## [Unreleased]
 
+## [0.15.1] – 2026-07-19
+
+### Behoben
+- **Ältere Einträge bekommen jetzt auch die neuen Wetterwerte:** „Wetter
+  ergänzen" übersprang bisher jedes Ereignis, das schon irgendein Wetter
+  hatte — Einträge aus der Zeit vor 0.14.0 blieben deshalb dauerhaft ohne
+  Höchst-/Tiefsttemperatur, Sonnenstunden, Regen, Schnee und Wind. Der
+  Lauf rüstet die fehlenden Tageswerte jetzt **additiv** nach: Vorhandene
+  Werte (alte Temperatur, Wetterlage) bleiben unverändert stehen, es
+  kommen nur die fehlenden dazu. Einfach einmal „🌤️ Wetter ergänzen"
+  starten (oder den Nachtplan machen lassen).
+- **Wetter-Lauf stoppt sauber statt endlos zu probieren:** Kam der Lauf
+  nicht voran (z. B. Open-Meteo nicht erreichbar oder Datum ohne
+  Archivdaten), fragte er dieselben Ereignisse in Dauerschleife ab. Jetzt
+  endet er mit dem Hinweis, wie viele Ereignisse nicht anreicherbar waren.
+
 ## [0.15.0] – 2026-07-19
 
 ### Hinzugefügt

@@ -896,9 +896,11 @@
             <div class="action-row">
               <button class="btn secondary" id="btn-enrich">🌤️ Wetter ergänzen</button>
               <div class="action-desc"><b>Fehlendes Wetter nachtragen (Fakten-Anreicherung).</b><br>
-                Holt historisches Wetter (Temperatur, Bedingungen via Open-Meteo) für Events, die noch
-                <i>keins</i> haben — z. B. nach neuen Einträgen oder Importen. Einmal geholt = dauerhaft:
-                Wetter gehört zur Lebensdatenbank und wird nie verworfen oder neu berechnet.</div>
+                Holt historisches Wetter (via Open-Meteo) für Events, die noch <i>keins</i> haben —
+                z. B. nach neuen Einträgen oder Importen. Ältere Events mit Wetter im Alt-Format
+                (nur Temperatur + Bedingung) bekommen dabei die fehlenden <i>Tageswerte</i>
+                (Min/Max, Sonne, Regen, Schnee, Wind) <b>additiv</b> nachgerüstet. Einmal geholt =
+                dauerhaft: Vorhandene Werte werden nie überschrieben oder neu berechnet.</div>
             </div>
             <div class="action-row">
               <button class="btn secondary" id="btn-embed">🧠 Embeddings berechnen</button>

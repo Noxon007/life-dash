@@ -41,6 +41,52 @@ def test_add_weather_stores_daily_values(db, user, monkeypatch):
     assert keys["weather"][1] == "klar"
 
 
+# 0.15.1 — Alt-Wetter (vor 0.14.0: nur temperature_c + Bedingung) wird
+# additiv um die Tageswerte ergänzt; vorhandene Werte bleiben unangetastet
+def test_old_weather_gets_daily_values_backfilled(db, user, monkeypatch):
+    from datetime import datetime
+
+    from app.services.enrichment import _needs_weather, enrich_weather
+
+    monkeypatch.setattr(
+        "app.services.enrichment.fetch_weather",
+        lambda lat, lng, when: {"temp_c": 99.0, "temp_min_c": 14.0,
+                                "temp_max_c": 29.0, "sun_h": 11.2,
+                                "rain_mm": 0.4, "snow_cm": 0.0,
+                                "wind_max_kmh": 18.4, "condition": "NEU"})
+    loc = Location(user_id=user.id, name="Detmold", lat=51.9, lng=8.9)
+    db.add(loc)
+    db.flush()
+    ev = Event(user_id=user.id, title="Alt-Event", location_id=loc.id,
+               date_start=datetime(2024, 7, 1))
+    db.add(ev)
+    db.flush()
+    db.add(Metric(event_id=ev.id, key="temperature_c", value=21.5,
+                  unit="°C", source=Source.weather))
+    db.add(Metric(event_id=ev.id, key="weather", value_text="klar",
+                  source=Source.weather))
+    db.commit()
+
+    assert _needs_weather(ev) is True  # Alt-Format -> Kandidat
+    enriched, remaining = enrich_weather(db)
+    assert (enriched, remaining) == (1, 0)
+
+    rows = {m.key: m for m in db.query(Metric).all()}
+    # Vorhandenes bleibt exakt stehen — nichts überschrieben, keine Dublette
+    assert rows["temperature_c"].value == 21.5
+    assert rows["weather"].value_text == "klar"
+    assert db.query(Metric).filter(Metric.key == "temperature_c").count() == 1
+    # Neue Tageswerte sind additiv dazugekommen
+    assert rows["temp_min_c"].value == 14.0
+    assert rows["temp_max_c"].value == 29.0
+    assert rows["sunshine_h"].value == 11.2
+    assert rows["wind_max_kmh"].value == 18.4
+
+    # Vollständige Events sind KEINE Kandidaten mehr (kein Endlos-Nachrüsten)
+    db.refresh(ev)
+    assert _needs_weather(ev) is False
+
+
 # --------------------------------------------------------------------------- #
 # F4 — Länder-Kompendium aus der Ortsauflösung
 # --------------------------------------------------------------------------- #

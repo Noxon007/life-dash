@@ -247,6 +247,10 @@ def _run_weather(db: Session, job: Job) -> tuple[str, str]:
         cont = _tick(db, job.id, enriched, remaining)
         if remaining <= 0:
             return "done", f"{db.get(Job, job.id).done} Events mit Wetter angereichert"
+        # 0.15.1: Ohne Fortschritt sauber stoppen statt Open-Meteo endlos
+        # anzufragen (z. B. Dienst nicht erreichbar oder Datum ohne Archiv)
+        if enriched == 0:
+            return "stopped", f"{remaining} nicht anreicherbar (Open-Meteo/Datum prüfen)"
         if not cont:
             return "stopped", "gestoppt"
         if enriched == 0:
