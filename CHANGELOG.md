@@ -10,6 +10,33 @@ jedem `MINOR` vorkommen.
 
 ## [Unreleased]
 
+## [0.15.0] – 2026-07-19
+
+### Hinzugefügt
+- **📖 Reisetagebuch:** Im Zeitstrahl gibt es jetzt „Tagebuch schreiben" —
+  ein formatierter Eintrag pro Tag (Markdown: **fett**, Überschriften,
+  Listen, Zitate, Links), mit Vorschau im Schreibfenster. Der Eintrag
+  erscheint als Tageskopf über den Ereignissen des Tages; existiert für
+  den gewählten Tag schon einer, wird er zum Weiterschreiben geladen.
+  Die KI fasst Tagebuchtexte grundsätzlich nie an. Auch der Kommentar an
+  normalen Ereignissen kann jetzt länger sein und wird als Markdown
+  formatiert angezeigt (sicher gerendert, ohne fremde Bibliotheken).
+- **📅 Mehrtägige Ereignisse mit Tages-Einträgen:** Ein Urlaub bleibt EIN
+  Ereignis, bekommt aber im Bearbeiten-Dialog den Knopf „Tages-Einträge
+  anlegen": je Tag der Spanne entsteht ein eigenes Ereignis
+  („Mallorca — Tag 3"), das Ort und Bestätigung erbt und **eigenes Wetter
+  pro Tag** bekommt. Im Zeitstrahl bleiben die Tage eingeklappt unterm
+  Haupt-Ereignis (Chip „📅 N Tages-Einträge" klappt auf; der Tages-Zoom
+  zeigt sie einzeln). Der Knopf ist gefahrlos mehrfach nutzbar — er füllt
+  nur fehlende Tage auf. Beim Löschen des Haupt-Ereignisses fragt
+  Life-Dash, ob die Tages-Einträge mitgehen oder als eigenständige
+  Ereignisse bleiben.
+- **☀️ Heller Modus:** Neben dem dunklen gibt es jetzt ein helles
+  Erscheinungsbild. Der Knopf oben rechts wechselt zwischen **Auto**
+  (folgt der Systemeinstellung, auch live z. B. bei Sonnenuntergang),
+  **Hell** und **Dunkel**; die Wahl wird pro Gerät gespeichert. Die
+  Karten wechseln ihren Kartenstil mit.
+
 ## [0.14.0] – 2026-07-19
 
 ### Hinzugefügt

@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0f1420">
 <title>Life-Dash</title>
+<script>
+  // F9: Theme so früh wie möglich setzen (kein Dunkel-Blitz für Hell-Nutzer).
+  // Einstellung liegt pro Gerät in localStorage: 'auto' | 'light' | 'dark'.
+  (function () {
+    var s = localStorage.getItem('lifedash_theme') || 'auto';
+    document.documentElement.dataset.theme = s === 'auto'
+      ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : s;
+  })();
+</script>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
@@ -31,6 +40,18 @@
     --cat-country: #b07bff;
     --cat-sport: #ff8f5c;
     --cat-media: #f5a623;
+    --cat-journal: #d9a441;
+  }
+  /* F9 — helles Theme: dieselben Variablen mit hellen Werten. Das data-theme-
+     Attribut setzt JS (Auto nach Systemeinstellung, manuell übersteuerbar). */
+  :root[data-theme="light"] {
+    --bg: #eef1f6;
+    --bg-panel: #ffffff;
+    --bg-elev: #e7ebf3;
+    --border: #d3dae6;
+    --text: #1d2536;
+    --text-dim: #5b6880;
+    --accent: #3a6ce0;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
@@ -165,6 +186,21 @@
   .event-card.cat-concert { border-left-color: #ff5c9e; } .event-card.cat-concert::before { background: #ff5c9e; }
   .event-card.cat-meal { border-left-color: #ffd166; } .event-card.cat-meal::before { background: #ffd166; }
   .event-card.cat-milestone { border-left-color: #e85dff; } .event-card.cat-milestone::before { background: #e85dff; }
+  .event-card.cat-journal { border-left-color: var(--cat-journal); } .event-card.cat-journal::before { background: var(--cat-journal); }
+  /* F1 — Tagebuch/Markdown: Notiz-Block + gerenderte Markdown-Elemente */
+  .ev-note { margin-top: 8px; background: var(--bg-elev); border-left: 3px solid var(--accent-2);
+    border-radius: 8px; padding: 8px 12px; font-size: 13px; line-height: 1.55; }
+  .md p { margin: 0 0 8px; } .md p:last-child { margin-bottom: 0; }
+  .md h1, .md h2, .md h3 { margin: 10px 0 6px; }
+  .md h1 { font-size: 16px; } .md h2 { font-size: 15px; } .md h3 { font-size: 14px; }
+  .md h1:first-child, .md h2:first-child, .md h3:first-child { margin-top: 0; }
+  .md ul, .md ol { margin: 0 0 8px; padding-left: 20px; }
+  .md li { margin-bottom: 2px; }
+  .md blockquote { margin: 0 0 8px; padding: 2px 12px; border-left: 3px solid var(--border); color: var(--text-dim); }
+  .md a { color: var(--accent); }
+  /* F7 — aufgeklappte Tages-Einträge unterm Eltern-Event */
+  .tl-children { margin-left: 22px; }
+  .tl-children .event-card::before { display: none; }
   #comp-map { height: 320px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 18px; }
   .ev-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
   .ev-title { font-weight: 600; font-size: 15px; }
@@ -496,6 +532,7 @@
           <option value="concert">Konzert</option>
           <option value="meal">Mahlzeit</option>
           <option value="milestone">Meilenstein</option>
+          <option value="journal">Tagebuch</option>
         </select></div></div>
       <div class="field-row"><div class="field-key">Ort / Adresse</div>
         <div class="field-val"><input id="ed-location" placeholder="z. B. Reeperbahn 1, Hamburg — wird geocodiert" style="max-width:none"></div></div>
@@ -505,7 +542,14 @@
           <button class="btn small secondary" id="ed-ent-add" style="margin-top:6px">+ Objekt</button>
         </div></div>
       <div class="field-row"><div class="field-key">💬 Kommentar</div>
-        <div class="field-val"><textarea id="ed-note" rows="3" placeholder="persönliche Notiz — bleibt von der KI unberührt" style="width:100%; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:6px 10px; color:var(--text); font-size:13px; font-family:inherit; resize:vertical"></textarea></div></div>
+        <div class="field-val"><textarea id="ed-note" rows="6" placeholder="persönliche Notiz / Tagebuchtext — Markdown möglich (**fett**, # Überschrift, - Liste), bleibt von der KI unberührt" style="width:100%; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:6px 10px; color:var(--text); font-size:13px; font-family:inherit; resize:vertical"></textarea></div></div>
+      <!-- F7: Mehrtages-Event -> Tages-Unterereignisse anlegen -->
+      <div class="field-row" id="ed-days-row" style="display:none"><div class="field-key">📅 Tage</div>
+        <div class="field-val" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+          <span class="stat-label" id="ed-days-info"></span>
+          <button class="btn small secondary" id="ed-days-btn"
+            title="Legt für jeden Tag der Spanne ein Tages-Ereignis an („… — Tag 3") — mit eigenem Wetter pro Tag; im Zeitstrahl eingeklappt unterm Haupt-Event">Tages-Einträge anlegen</button>
+        </div></div>
       <div class="btn-row" style="margin-top:18px">
         <button class="btn" id="ed-save">💾 Speichern</button>
         <button class="btn secondary" id="ed-cancel">Abbrechen</button>
@@ -538,6 +582,8 @@
         <div class="sub" id="view-sub">Dein Leben als Ereignisstrom</div>
       </div>
       <input class="search" id="global-search" placeholder="🔍 Suche: „am Meer&quot;, „Frankreich&quot; …">
+      <button class="btn small secondary" id="theme-btn"
+        title="Erscheinungsbild: Auto folgt der Systemeinstellung; Klick wechselt Auto → Hell → Dunkel (pro Gerät gespeichert)">🌓 Auto</button>
     </div>
     <div class="content">
 
@@ -553,6 +599,7 @@
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:-8px 0 20px">
           <div class="filter-chips" id="tl-filters" style="margin:0"></div>
           <span class="filter-chip off" id="tl-visits-toggle" title="Importierte Timeline-Besuche (Google) im Zeitstrahl anzeigen — auf der Karte sind sie immer sichtbar">🛰️ Besuche</span>
+          <span class="filter-chip" id="tl-journal-btn" title="Tagebuch-Eintrag für einen Tag schreiben (Markdown) — erscheint als Tageskopf über den Ereignissen des Tages">📖 Tagebuch schreiben</span>
         </div>
         <div id="tl-search-note" class="hint" style="display:none"></div>
         <div class="timeline" id="timeline-list"></div>
@@ -762,6 +809,7 @@
                 <option value="concert">Konzert</option>
                 <option value="meal">Mahlzeit</option>
                 <option value="milestone">Meilenstein (Hochzeit, Geburt, Umzug …)</option>
+                <option value="journal">Tagebuch (ein Eintrag pro Tag)</option>
               </select></div></div>
             <div class="field-row"><div class="field-key">Ort</div>
               <div class="field-val" style="display:flex; gap:8px">
@@ -1082,6 +1130,27 @@
   </div>
 </div>
 
+<!-- F1 — Tagebuch: EIN formatierter Eintrag pro Tag (Markdown, KI-frei) -->
+<div class="modal-overlay" id="journal-modal">
+  <div class="modal-box">
+    <h3>📖 Tagebuch-Eintrag</h3>
+    <div class="stat-label" style="margin:6px 0 12px; line-height:1.5">Ein Eintrag pro Tag — erscheint im
+      Zeitstrahl als Tageskopf über den Ereignissen des Tages. Formatierung mit Markdown:
+      <code>**fett**</code>, <code>*kursiv*</code>, <code># Überschrift</code>, <code>- Liste</code>, <code>&gt; Zitat</code>.
+      Die KI fasst den Text nie an.</div>
+    <div class="field-row"><div class="field-key">Tag</div>
+      <div class="field-val"><input id="jr-date" type="date" class="mf-select"></div></div>
+    <textarea id="jr-text" class="input-area" rows="10" style="margin-top:12px; font-size:14px"
+      placeholder="Wie war der Tag? Schreib frei drauflos …"></textarea>
+    <div id="jr-preview-box" class="ev-note md" style="display:none; margin-top:12px"></div>
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn" id="jr-save">💾 Speichern</button>
+      <button class="btn secondary" id="jr-preview">👁 Vorschau</button>
+      <button class="btn ghost" id="jr-cancel">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
@@ -1195,15 +1264,52 @@ function uiDialog(text, opts = {}) {
 const uiConfirm = (text, opts = {}) => uiDialog(text, opts);
 const uiPrompt = (text, opts = {}) => uiDialog(text, { ...opts, input: true });
 
+// ---------- F9: Heller Modus ----------
+// Einstellung pro Gerät (localStorage): 'auto' folgt der Systemeinstellung,
+// 'light'/'dark' übersteuern manuell. Ein früher Head-Script setzt data-theme
+// schon vor dem ersten Rendern; hier hängen Umschalter + Karten-Tiles dran.
+const THEME_LABELS = { auto: '🌓 Auto', light: '☀️ Hell', dark: '🌙 Dunkel' };
+let mainTiles = null, compTiles = null;   // Leaflet-Tile-Layer folgen dem Theme
+function themeSetting() { return localStorage.getItem('lifedash_theme') || 'auto'; }
+function effectiveTheme() {
+  const s = themeSetting();
+  if (s !== 'auto') return s;
+  return matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+function tileUrl() {
+  const style = effectiveTheme() === 'light' ? 'light_all' : 'dark_all';
+  return `https://{s}.basemaps.cartocdn.com/${style}/{z}/{x}/{y}{r}.png`;
+}
+function applyTheme() {
+  const eff = effectiveTheme();
+  document.documentElement.dataset.theme = eff;
+  document.querySelector('meta[name="theme-color"]')
+    .setAttribute('content', eff === 'light' ? '#eef1f6' : '#0f1420');
+  document.getElementById('theme-btn').textContent = THEME_LABELS[themeSetting()];
+  if (mainTiles) mainTiles.setUrl(tileUrl());
+  if (compTiles) compTiles.setUrl(tileUrl());
+}
+document.getElementById('theme-btn').addEventListener('click', () => {
+  const order = ['auto', 'light', 'dark'];
+  localStorage.setItem('lifedash_theme',
+    order[(order.indexOf(themeSetting()) + 1) % order.length]);
+  applyTheme();
+});
+// Systemwechsel (z. B. Sonnenuntergang) greift live, solange 'auto' gilt
+matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+  if (themeSetting() === 'auto') applyTheme();
+});
+applyTheme();
+
 // ---------- Kategorien ----------
 // Basis-Werte für Kategorien OHNE Modul (event, sport, home, media) — alles
 // Modulare (A7) kommt zur Laufzeit aus /api/modules und überlagert diese Maps.
-const catLabels = { trip:"Reise", sighting:"Sichtung", sport:"Aktivität", concert:"Konzert", meal:"Mahlzeit", milestone:"Meilenstein", event:"Ereignis", home:"Wohnort", media:"Medien", country:"Land" };
-const catColors = { trip:'#5b8cff', sighting:'#35c4a7', sport:'#ff8f5c', concert:'#ff5c9e', meal:'#ffd166', milestone:'#e85dff', media:'#f5a623', home:'#b07bff', event:'#f5a623' };
-const KNOWN_CATS = ['trip','sighting','sport','concert','meal','milestone','home','media'];
+const catLabels = { trip:"Reise", sighting:"Sichtung", sport:"Aktivität", concert:"Konzert", meal:"Mahlzeit", milestone:"Meilenstein", journal:"Tagebuch", event:"Ereignis", home:"Wohnort", media:"Medien", country:"Land" };
+const catColors = { trip:'#5b8cff', sighting:'#35c4a7', sport:'#ff8f5c', concert:'#ff5c9e', meal:'#ffd166', milestone:'#e85dff', journal:'#d9a441', media:'#f5a623', home:'#b07bff', event:'#f5a623' };
+const KNOWN_CATS = ['trip','sighting','sport','concert','meal','milestone','journal','home','media'];
 // Kategorien für Filter-Chips (Timeline + Karte); wird nach dem Modul-Load
 // neu berechnet (A15: nur getrackte Module)
-const FILTER_CATS_BASE = ['trip','sighting','sport','concert','meal','milestone','event'];
+const FILTER_CATS_BASE = ['trip','sighting','sport','concert','meal','milestone','journal','event'];
 let FILTER_CATS = [...FILTER_CATS_BASE];
 
 // ---------- Module (A7/A15): dynamische Kategorien, Reiter, Tracking ----------
@@ -1453,6 +1559,17 @@ function renderTimelineList() {
   const el = document.getElementById('timeline-list');
   el.style.display = '';
   let filtered = tl.events.filter(e => passesFilter(e, tl.catFilter));
+  // F7: Tages-Unterereignisse sammeln und (außer im Tages-Zoom) unterm
+  // Eltern-Event einklappen — der Chip „📅 N Tages-Einträge" klappt sie auf.
+  TL_CHILDREN.clear();
+  tl.events.forEach(e => {
+    if (!e.parent_event_id) return;
+    if (!TL_CHILDREN.has(e.parent_event_id)) TL_CHILDREN.set(e.parent_event_id, []);
+    TL_CHILDREN.get(e.parent_event_id).push(e);
+  });
+  TL_CHILDREN.forEach(list =>
+    list.sort((a, b) => ((a.date_start || '') < (b.date_start || '') ? -1 : 1)));
+  if (tl.zoom !== 'day') filtered = filtered.filter(e => !e.parent_event_id);
   // Importierte Google-Besuche standardmäßig ausblenden (Kontext für die
   // Karte, nicht für den Zeitstrahl) — Toggle „🛰️ Besuche" blendet sie ein
   const visits = filtered.filter(e => e.source === 'google_timeline').length;
@@ -1474,8 +1591,16 @@ function renderTimelineList() {
   // innerhalb einer Zeitgruppe zu EINER Sammelkarte bündeln („59× Besuch: X")
   // — sonst füllen Alltagsorte (Zuhause/Arbeit) die 25er-Kappe komplett.
   VISIT_GROUPS.length = 0;
-  Object.values(groups).forEach(g => { g.items = compressVisits(g.items); });
-  const renderItem = x => x.visitGroup ? visitGroupCard(x) : eventCard(x);
+  // F1: Tagebuch-Einträge stehen als Tageskopf ÜBER den Ereignissen ihres
+  // Tages (stabile Sortierung: nur innerhalb desselben Tages umsortieren).
+  const dayOf = x => x.date_start ? x.date_start.slice(0, 10) : '';
+  const jr = x => x.category === 'journal' ? 1 : 0;
+  Object.values(groups).forEach(g => {
+    g.items = compressVisits(g.items);
+    g.items.sort((a, b) => dayOf(a) === dayOf(b) ? jr(b) - jr(a) : 0);
+  });
+  const renderItem = x => x.visitGroup ? visitGroupCard(x)
+    : (x.category === 'journal' ? journalCard(x) : eventCard(x));
   const ordered = Object.values(groups).sort((a,b) => b.sort - a.sort);
   el.innerHTML = ordered.map((g, gi) => `
     <div class="tl-year">
@@ -1531,9 +1656,13 @@ document.getElementById('timeline-list').addEventListener('click', ev => {
   card.outerHTML = items.map(eventCard).join('');
 });
 const EVENT_CACHE = {};   // id -> Event (für den Bearbeiten-Dialog)
+const TL_CHILDREN = new Map();  // F7: parent_event_id -> Tages-Kinder (sortiert)
 function eventCard(e) {
   EVENT_CACHE[e.id] = e;
   const conf = e.confirmed === 'confirmed';
+  // Aufklapp-Chip nur, wenn die Kinder eingeklappt sind (im Tages-Zoom
+  // stehen sie ohnehin einzeln im Zeitstrahl)
+  const kids = tl.zoom !== 'day' ? TL_CHILDREN.get(e.id) : null;
   return `
     <div class="event-card ${catClass(e.category)}" data-id="${esc(e.id)}" title="Klicken zum Bearbeiten">
       <div class="ev-head">
@@ -1541,13 +1670,31 @@ function eventCard(e) {
         <span class="ev-date">${fmtDate(e)}</span>
       </div>
       <div class="ev-desc">${esc(e.description || '')}</div>
-      ${e.note ? `<div class="ev-desc" style="margin-top:6px; color:var(--accent-2)">💬 ${esc(e.note)}</div>` : ''}
+      ${e.note ? `<div class="ev-note md">${mdRender(e.note)}</div>` : ''}
       <div class="ev-meta">
         <span class="chip">${catLabels[e.category] || e.category}</span>
+        ${e.parent_event_id ? '<span class="chip">📅 Tages-Eintrag</span>' : ''}
+        ${kids && kids.length ? `<span class="chip" data-expand-children="${esc(e.id)}" title="Tages-Einträge ein-/ausklappen">📅 ${kids.length} Tages-Einträge ▾</span>` : ''}
         ${eventChips(e).map(t => `<span class="chip">${esc(t)}</span>`).join('')}
         <span class="chip ${conf ? 'badge-confirmed' : 'badge-unconfirmed'}">
           ${conf ? '✓ bestätigt' : `⚠ unbestätigt · ${Math.round(e.confidence*100)}%`}
         </span>
+      </div>
+    </div>`;
+}
+// F1: Tagebuch-Karte — Tageskopf mit gerendertem Markdown (sanitisiert)
+function journalCard(e) {
+  EVENT_CACHE[e.id] = e;
+  return `
+    <div class="event-card cat-journal" data-id="${esc(e.id)}" title="Klicken zum Bearbeiten">
+      <div class="ev-head">
+        <span class="ev-title">📖 ${esc(e.title)}</span>
+        <span class="ev-date">${fmtDate(e)}</span>
+      </div>
+      <div class="md" style="font-size:13px; line-height:1.55">${mdRender(e.note || e.description || '')}</div>
+      <div class="ev-meta">
+        <span class="chip">${catLabels.journal}</span>
+        ${e.location && e.location.name ? `<span class="chip">📍 ${esc(e.location.name)}</span>` : ''}
       </div>
     </div>`;
 }
@@ -1565,6 +1712,75 @@ document.querySelectorAll('#tl-zoom [data-zoom]').forEach(btn => {
     tl.zoom = btn.dataset.zoom;
     renderTimeline();
   });
+});
+
+// ---------- F1: Tagebuch — EIN Markdown-Eintrag pro Tag ----------
+// Gespeichert als normales Event (Kategorie journal, Tages-Präzision); der
+// Text liegt im note-Feld und wird damit nie von der KI angefasst.
+let jrExisting = null;   // Journal-Event des gewählten Tages (falls vorhanden)
+async function jrLoad(dateStr) {
+  const events = await fetchEvents().catch(() => []);
+  jrExisting = events.find(e => e.category === 'journal' && e.date_start
+    && e.date_start.slice(0, 10) === dateStr) || null;
+  document.getElementById('jr-text').value = jrExisting ? (jrExisting.note || '') : '';
+  jrPreview(false);
+}
+function jrPreview(show) {
+  const box = document.getElementById('jr-preview-box');
+  const on = show ?? box.style.display === 'none';
+  box.style.display = on ? '' : 'none';
+  if (on) box.innerHTML = mdRender(document.getElementById('jr-text').value) || '<span class="stat-label">noch kein Text</span>';
+  document.getElementById('jr-preview').textContent = on ? '✏️ zurück zum Text' : '👁 Vorschau';
+}
+function openJournal(dateStr) {
+  const d = dateStr || new Date().toISOString().slice(0, 10);
+  document.getElementById('jr-date').value = d;
+  document.getElementById('journal-modal').classList.add('show');
+  jrLoad(d);
+}
+function closeJournal() { document.getElementById('journal-modal').classList.remove('show'); }
+document.getElementById('tl-journal-btn').addEventListener('click', () => openJournal());
+document.getElementById('jr-date').addEventListener('change', ev => jrLoad(ev.target.value));
+document.getElementById('jr-preview').addEventListener('click', () => jrPreview());
+document.getElementById('jr-cancel').addEventListener('click', closeJournal);
+document.getElementById('journal-modal').addEventListener('click', ev => {
+  if (ev.target === document.getElementById('journal-modal')) closeJournal();
+});
+document.getElementById('jr-save').addEventListener('click', async ev => {
+  const date = document.getElementById('jr-date').value;
+  const text = document.getElementById('jr-text').value.trim();
+  if (!date) { toast('Bitte einen Tag wählen.', 'warn'); return; }
+  if (!text) { toast('Bitte erst etwas schreiben.', 'warn'); return; }
+  const btn = ev.target;
+  btn.disabled = true; btn.textContent = '… speichere';
+  try {
+    if (jrExisting) {
+      await api(`/api/moderation/${jrExisting.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: text }),
+      });
+    } else {
+      await api('/api/events', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `Tagebuch — ${date.split('-').reverse().join('.')}`,
+          date_start: date + 'T00:00:00',
+          date_end: date + 'T00:00:00',
+          date_precision: 'day',
+          category: 'journal',
+          note: text,
+          entities: [],
+        }),
+      });
+    }
+    closeJournal();
+    toast('✓ Tagebuch gespeichert.');
+    await refreshAll();
+  } catch (err) {
+    toast('Speichern fehlgeschlagen: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 Speichern';
+  }
 });
 
 // ---------- KOMPENDIUM ----------
@@ -1652,7 +1868,7 @@ async function openEntityDetail(type, entityId, name) {
   if (compMapObj) { compMapObj.remove(); compMapObj = null; }
   if (located.length) {
     compMapObj = L.map('comp-map');
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    compTiles = L.tileLayer(tileUrl(),  // F9: Tile-Stil folgt dem Theme
       { attribution: '© OpenStreetMap © CARTO', maxZoom: 19 }).addTo(compMapObj);
     const latlngs = [];
     located.forEach(e => {
@@ -2165,8 +2381,41 @@ function openEventEdit(id) {
   const entBox = document.getElementById('ed-entities');
   entBox.innerHTML = '';
   (e.entities || []).forEach(en => entBox.appendChild(edEntityRow(en.type, en.name)));
+  // F7: Mehrtages-Event -> Tages-Einträge anbieten (idempotent: füllt Lücken)
+  const daysRow = document.getElementById('ed-days-row');
+  const span = (e.date_start && e.date_end)
+    ? Math.round((new Date(e.date_end.slice(0, 10)) - new Date(e.date_start.slice(0, 10))) / 86400000) + 1
+    : 1;
+  const kids = tl.events.filter(x => x.parent_event_id === e.id).length;
+  if (!e.parent_event_id && span >= 2 && span <= 366) {
+    daysRow.style.display = '';
+    document.getElementById('ed-days-info').textContent =
+      kids ? `${kids} von ${span} Tagen angelegt` : `${span} Tage Spanne`;
+    document.getElementById('ed-days-btn').textContent =
+      kids ? '📅 Fehlende Tage anlegen' : '📅 Tages-Einträge anlegen';
+  } else daysRow.style.display = 'none';
   document.getElementById('edit-modal').classList.add('show');
 }
+// F7: Tages-Kinder anlegen — je Tag der Spanne ein Event („… — Tag 3") mit
+// Ort + Bestätigung vom Eltern-Event und eigenem Wetter pro Tag
+document.getElementById('ed-days-btn').addEventListener('click', async ev => {
+  const e = editingEvent;
+  if (!e) return;
+  const btn = ev.target;
+  btn.disabled = true; btn.textContent = '… lege an';
+  try {
+    const created = await api(`/api/events/${e.id}/days`, { method: 'POST' });
+    toast(created.length
+      ? `✓ ${created.length} Tages-Einträge angelegt — im Zeitstrahl eingeklappt unterm Haupt-Event; Wetter pro Tag wird ergänzt, soweit verfügbar.`
+      : 'Alle Tage sind bereits angelegt.');
+    closeEventEdit();
+    await refreshAll();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+});
 document.getElementById('ed-ent-add').addEventListener('click', () =>
   document.getElementById('ed-entities').appendChild(edEntityRow('animal', '')));
 function closeEventEdit() {
@@ -2175,6 +2424,17 @@ function closeEventEdit() {
 }
 // Klick-Delegation: jede Event-Karte (Timeline, Suche, Kompendium-Detail) öffnet den Dialog
 document.querySelector('.content').addEventListener('click', ev => {
+  // F7: Chip „📅 N Tages-Einträge" klappt die Kinder unterm Eltern-Event auf/zu
+  const tog = ev.target.closest('[data-expand-children]');
+  if (tog) {
+    const card = tog.closest('.event-card');
+    const next = card.nextElementSibling;
+    if (next && next.classList.contains('tl-children')) { next.remove(); return; }
+    const kids = TL_CHILDREN.get(tog.dataset.expandChildren) || [];
+    card.insertAdjacentHTML('afterend', `<div class="tl-children">${
+      kids.map(k => k.category === 'journal' ? journalCard(k) : eventCard(k)).join('')}</div>`);
+    return;
+  }
   const card = ev.target.closest('.event-card');
   if (card && card.dataset.id) openEventEdit(card.dataset.id);
 });
@@ -2230,7 +2490,15 @@ document.getElementById('ed-delete').addEventListener('click', async () => {
   if (!e) return;
   if (!(await uiConfirm(`Der Roh-Text im Eingang bleibt erhalten.`,
     { title: `„${e.title}" löschen?`, okLabel: '🗑️ Löschen', danger: true }))) return;
-  await api(`/api/moderation/${e.id}`, { method: 'DELETE' });
+  // F7: Hat das Event Tages-Einträge, fragt der Dialog, ob sie mitgehen —
+  // „Abbrechen" behält sie als eigenständige Einzel-Events.
+  const kids = tl.events.filter(x => x.parent_event_id === e.id).length;
+  let withChildren = false;
+  if (kids) withChildren = await uiConfirm(
+    `Mitlöschen — oder als eigenständige Events behalten?\n„Abbrechen" behält die Tages-Einträge.`,
+    { title: `${kids} Tages-Einträge mitlöschen?`, okLabel: `🗑️ Alle ${kids} mitlöschen`, danger: true });
+  await api(`/api/moderation/${e.id}${withChildren ? '?with_children=true' : ''}`,
+    { method: 'DELETE' });
   closeEventEdit();
   await refreshAll();
 });
@@ -2394,7 +2662,7 @@ async function openMapView() {
   mp.located = (await fetchEvents()).filter(e => e.location && e.location.lat != null && e.date_start);
   if (!mapObj) {
     mapObj = L.map('map').setView([50, 6], 4);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    mainTiles = L.tileLayer(tileUrl(),  // F9: Tile-Stil folgt dem Theme
       { attribution: '© OpenStreetMap © CARTO', maxZoom: 19 }).addTo(mapObj);
     mapMarkers = L.layerGroup().addTo(mapObj);
     // A5: Cluster-Layer für große Mengen — alle Punkte statt 300er-Deckel.
@@ -2872,6 +3140,48 @@ document.querySelectorAll('.nav-item').forEach(item =>
 
 // ---------- Sonstiges ----------
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+// F1: Mini-Markdown — sanitisiert per Konstruktion (bewusst ohne externe Lib):
+// erst wird ALLES escaped, danach erzeugen nur die eigenen Regeln sichere Tags.
+// Unterstützt: #/##/### Überschriften, **fett**, *kursiv*, `Code`,
+// [Text](https://…), -/*-Listen, 1.-Listen, > Zitate, Absätze/Zeilenumbrüche.
+function mdInline(s) {
+  return s
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/\*([^*]+)\*/g, '<i>$1</i>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+}
+function mdRender(text) {
+  const lines = esc(text).replace(/\r\n/g, '\n').split('\n');
+  const out = [];
+  let list = null;   // 'ul' | 'ol' | null
+  let para = [];
+  const closeList = () => { if (list) { out.push(`</${list}>`); list = null; } };
+  const flushPara = () => {
+    if (para.length) { out.push(`<p>${para.map(mdInline).join('<br>')}</p>`); para = []; }
+  };
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    if (!line.trim()) { flushPara(); closeList(); continue; }
+    const h = line.match(/^(#{1,3})\s+(.*)/);
+    if (h) { flushPara(); closeList(); out.push(`<h${h[1].length}>${mdInline(h[2])}</h${h[1].length}>`); continue; }
+    const li = line.match(/^[-*]\s+(.*)/) || line.match(/^\d+[.)]\s+(.*)/);
+    if (li) {
+      flushPara();
+      const want = /^[-*]/.test(line) ? 'ul' : 'ol';
+      if (list !== want) { closeList(); out.push(`<${want}>`); list = want; }
+      out.push(`<li>${mdInline(li[1])}</li>`);
+      continue;
+    }
+    const bq = line.match(/^&gt;\s?(.*)/);   // '>' ist nach esc() '&gt;'
+    if (bq) { flushPara(); closeList(); out.push(`<blockquote>${mdInline(bq[1])}</blockquote>`); continue; }
+    closeList();
+    para.push(line);
+  }
+  flushPara(); closeList();
+  return out.join('');
+}
 function isAdmin() { return AUTH.user && AUTH.user.role === 'admin'; }
 async function refreshAll() {
   fetchEvents(true); // Cache invalidieren — alle Ansichten teilen sich den neuen Abruf

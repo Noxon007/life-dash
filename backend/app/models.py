@@ -181,6 +181,12 @@ class Event(Base):
     origin_fragment_id: Mapped[str | None] = mapped_column(
         ForeignKey("fragments.id"), nullable=True
     )
+    # F7: Mehrtages-Event -> Tages-Unterereignisse. Kinder sind normale
+    # Lebensdatenbank-Events, nur mit Herkunftsverweis auf das Eltern-Event
+    # (Self-FK, eine Spalte — kein eigener Tabellentyp).
+    parent_event_id: Mapped[str | None] = mapped_column(
+        ForeignKey("events.id"), nullable=True, index=True
+    )
     # Vektor für semantische Suche (JSON-Liste; pgvector erst mit Postgres).
     # none_as_null: Python-None als SQL NULL speichern (nicht als JSON 'null'),
     # damit "fehlt noch"-Filter (IS NULL) funktionieren.
@@ -193,6 +199,14 @@ class Event(Base):
 
     location: Mapped[Location | None] = relationship(back_populates="events")
     origin_fragment: Mapped[Fragment | None] = relationship(back_populates="events")
+    # F7: Eltern/Kinder — KEIN Lösch-Cascade: ob Kinder mitgehen, entscheidet
+    # der Nutzer im Lösch-Dialog (sonst werden sie abgehängt).
+    parent: Mapped["Event | None"] = relationship(
+        "Event", remote_side="Event.id", back_populates="children"
+    )
+    children: Mapped[list["Event"]] = relationship(
+        "Event", back_populates="parent"
+    )
     entity_links: Mapped[list["EventEntityLink"]] = relationship(
         back_populates="event", cascade="all, delete-orphan"
     )

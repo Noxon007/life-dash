@@ -29,6 +29,7 @@ def event_to_read(event: Event) -> EventRead:
         source=event.source,
         location=location,
         origin_fragment_id=event.origin_fragment_id,
+        parent_event_id=event.parent_event_id,
         entities=entities,
         metrics=metrics,
     )

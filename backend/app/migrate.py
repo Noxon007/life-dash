@@ -16,7 +16,8 @@ _MISSING_COLUMNS: dict[str, dict[str, str]] = {
     "locations": {"user_id": "VARCHAR(36)", "country": "VARCHAR(64)"},
     "events": {"user_id": "VARCHAR(36)", "embedding": "JSON", "note": "TEXT",
                "external_id": "VARCHAR(64)",
-               "confirmed_at": "TIMESTAMP", "confirmed_by": "VARCHAR(16)"},
+               "confirmed_at": "TIMESTAMP", "confirmed_by": "VARCHAR(16)",
+               "parent_event_id": "VARCHAR(36)"},
     "entities": {"user_id": "VARCHAR(36)"},
     "jobs": {"params": "JSON"},
 }

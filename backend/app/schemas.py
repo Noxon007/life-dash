@@ -82,6 +82,8 @@ class EventRead(BaseModel):
     source: Source
     location: LocationRead | None = None
     origin_fragment_id: str | None = None
+    # F7: Herkunftsverweis eines Tages-Unterereignisses auf sein Eltern-Event
+    parent_event_id: str | None = None
     entities: list[EntityRead] = []
     metrics: list[MetricRead] = []
 
@@ -119,6 +121,8 @@ class EventManualCreate(BaseModel):
     date_end: datetime | None = None
     date_precision: DatePrecision = DatePrecision.day
     category: str = "event"
+    # F1: persönliche Notiz/Tagebuchtext (Markdown) — nie von der KI angefasst
+    note: str | None = None
     location_name: str | None = None
     entities: list[ManualEntity] = []
 

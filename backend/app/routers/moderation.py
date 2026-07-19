@@ -213,10 +213,19 @@ def bulk_confirm(
 @router.delete("/{event_id}", status_code=204, response_model=None)
 def discard_event(
     event_id: str,
+    with_children: bool = False,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> None:
-    """Verwirft ein Event (löscht die Stufe-2-Ableitung; Fragment bleibt erhalten)."""
+    """Verwirft ein Event (löscht die Stufe-2-Ableitung; Fragment bleibt erhalten).
+
+    F7: Hat das Event Tages-Unterereignisse, entscheidet with_children, ob
+    die Kinder mitgelöscht oder abgehängt werden (dann normale Einzel-Events)."""
     event = _get_event(db, event_id, user)
+    for child in list(event.children):
+        if with_children:
+            db.delete(child)
+        else:
+            child.parent_event_id = None
     db.delete(event)
     db.commit()

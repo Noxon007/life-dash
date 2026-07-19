@@ -107,6 +107,8 @@ def reset_reprocess(db: Session) -> int:
         if any(e.confirmed == ConfirmState.confirmed for e in fragment.events):
             continue
         for event in list(fragment.events):
+            for child in list(event.children):  # F7: Tages-Kinder abhängen
+                child.parent_event_id = None
             db.delete(event)
         fragment.status = FragmentStatus.pending
         count += 1
@@ -174,6 +176,7 @@ def create_manual_event(db: Session, user_id: str, payload) -> Event:
         date_end=payload.date_end,
         date_precision=payload.date_precision,
         category=payload.category,
+        note=payload.note,  # F1: Tagebuchtext/Notiz (Markdown), KI-frei
         confidence=1.0,
         confirmed=ConfirmState.confirmed,
         confirmed_at=_utcnow(),
