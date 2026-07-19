@@ -10,6 +10,32 @@ jedem `MINOR` vorkommen.
 
 ## [Unreleased]
 
+## [0.14.0] – 2026-07-19
+
+### Hinzugefügt
+- **📍 Standort beim Erfassen:** Beim Quick-Capture und in der manuellen
+  Eingabe gibt es jetzt einen Standort-Knopf — nie automatisch, nur auf
+  Klick. Bei der KI-Analyse wird der Gerätestandort zum Ortsvorschlag,
+  wenn der Text selbst keinen Ort nennt (Text hat immer Vorrang); die
+  Roh-Koordinaten wandern mit in den Roh-Eingang, damit eine spätere
+  Neuberechnung sie kennt. Im manuellen Formular füllt der Knopf das
+  Ortsfeld mit der aktuellen Adresse (überschreibbar). Braucht die
+  Standort-Freigabe des Browsers (HTTPS).
+- **Länder-Kompendium füllt sich aus Importen:** Beim Auflösen von
+  Ortsnamen wird das Land jetzt mitgenommen, am Ort gespeichert und als
+  Länder-Eintrag mit allen Besuchen dort verknüpft — rückwirkend über
+  „Ortsnamen auflösen"/„Adressen kürzen". Damit stimmt „In wie vielen
+  Ländern war ich?" endlich auch für importierte Bewegungsdaten.
+
+### Geändert
+- **Ehrlicheres Wetter:** Die Wetterbedingung kommt jetzt aus den
+  Stundendaten — angezeigt wird das **vorherrschende Tagwetter (8–20 Uhr)**
+  statt des schwersten Codes des ganzen Tages (eine Stunde Morgenregen
+  überdeckte bisher einen sonnigen Tag). Neu gespeichert werden außerdem
+  Tages-Minimum und -Maximum getrennt sowie die Niederschlagsmenge.
+  Bereits geholtes Wetter bleibt unverändert (Fakten werden nie
+  überschrieben); neue Anreicherungen bekommen die vollen Werte.
+
 ## [0.13.0] – 2026-07-19
 
 ### Hinzugefügt

@@ -105,6 +105,10 @@ class Fragment(Base):
         ForeignKey("users.id"), nullable=True, index=True
     )
     raw_text: Mapped[str] = mapped_column(Text)
+    # F2: optional beim Erfassen mitgegebener Gerätestandort (Roh-Koordinaten,
+    # damit Re-Processing sie kennt); NIE automatisch — nur per Knopf
+    capture_lat: Mapped[float | None] = mapped_column(Float, nullable=True)
+    capture_lng: Mapped[float | None] = mapped_column(Float, nullable=True)
     audio_ref: Mapped[str | None] = mapped_column(String(512), nullable=True)
     source: Mapped[Source] = mapped_column(Enum(Source), default=Source.manual)
     status: Mapped[FragmentStatus] = mapped_column(
@@ -129,6 +133,8 @@ class Location(Base):
     type: Mapped[str | None] = mapped_column(String(64), nullable=True)  # city|country|poi|home
     lat: Mapped[float | None] = mapped_column(Float, nullable=True)
     lng: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # F4: Land aus dem (Reverse-)Geocoding — speist das Länder-Kompendium
+    country: Mapped[str | None] = mapped_column(String(64), nullable=True)
     external_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     events: Mapped[list["Event"]] = relationship(back_populates="location")

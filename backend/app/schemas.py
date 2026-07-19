@@ -30,6 +30,10 @@ class AuthConfig(BaseModel):
 class FragmentCreate(BaseModel):
     raw_text: str = Field(..., min_length=1, examples=["12.07.2026 war in Detmold und habe einen Adler gesehen"])
     source: Source = Source.manual
+    # F2: optionaler Gerätestandort (nur per Knopf, nie automatisch);
+    # der Text hat Vorrang, wenn er selbst einen Ort nennt
+    capture_lat: float | None = Field(None, ge=-90, le=90)
+    capture_lng: float | None = Field(None, ge=-180, le=180)
 
 
 class EntityRead(BaseModel):

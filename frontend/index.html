@@ -691,7 +691,9 @@
         <div class="btn-row">
           <button class="btn" id="analyze-btn">🤖 KI analysieren</button>
           <button class="btn secondary" id="voice-btn">🎙️ Sprachaufnahme</button>
+          <button class="btn secondary" id="geo-btn" title="Gerätestandort als Ortsvorschlag mitgeben — nur auf Knopfdruck, nie automatisch. Nennt der Text selbst einen Ort, hat der Text Vorrang.">📍 Standort verwenden</button>
         </div>
+        <div class="hint" id="geo-hint" style="display:none"></div>
 
         <div class="ai-preview" id="ai-preview">
           <div class="ai-head">
@@ -742,7 +744,10 @@
                 <option value="milestone">Meilenstein (Hochzeit, Geburt, Umzug …)</option>
               </select></div></div>
             <div class="field-row"><div class="field-key">Ort</div>
-              <div class="field-val"><input id="mf-location" placeholder="z. B. Bern, Schweiz — wird automatisch geocodiert" style="max-width:none"></div></div>
+              <div class="field-val" style="display:flex; gap:8px">
+                <input id="mf-location" placeholder="z. B. Bern, Schweiz — wird automatisch geocodiert" style="max-width:none; flex:1">
+                <button class="btn small secondary" id="mf-geo-btn" title="Gerätestandort als Adresse übernehmen (überschreibbar)">📍</button>
+              </div></div>
             <div class="field-row"><div class="field-key">Objekte</div>
               <div class="field-val">
                 <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center">
@@ -1914,6 +1919,51 @@ document.getElementById('bulk-confirm-btn').addEventListener('click', bulkConfir
 
 // ---------- DATENEINGABE / KI-VORSCHAU ----------
 let previewEvents = [];
+// F2: Gerätestandort — NIE automatisch, nur nach Klick auf 📍; gilt für die
+// nächste KI-Analyse und wird danach verworfen
+let capturePos = null;
+function getPosition() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) { reject(new Error('Standort wird von diesem Browser nicht unterstützt.')); return; }
+    navigator.geolocation.getCurrentPosition(
+      p => resolve({ lat: +p.coords.latitude.toFixed(5), lng: +p.coords.longitude.toFixed(5) }),
+      err => reject(new Error(err.code === 1 ? 'Standort-Freigabe abgelehnt.' : 'Standort nicht verfügbar.')),
+      { enableHighAccuracy: true, timeout: 10000 });
+  });
+}
+document.getElementById('geo-btn').addEventListener('click', async ev => {
+  const btn = ev.target, hint = document.getElementById('geo-hint');
+  if (capturePos) {  // zweiter Klick = wieder abwählen
+    capturePos = null;
+    btn.classList.remove('active');
+    hint.style.display = 'none';
+    return;
+  }
+  btn.disabled = true; btn.textContent = '📍 hole Standort…';
+  try {
+    capturePos = await getPosition();
+    btn.classList.add('active');
+    hint.style.display = '';
+    hint.textContent = `📍 Standort wird mitgegeben (${capturePos.lat}, ${capturePos.lng}) — nennt der Text einen Ort, hat der Text Vorrang. Nochmal klicken zum Entfernen.`;
+  } catch (err) {
+    toast(err.message, 'warn');
+  } finally {
+    btn.disabled = false; btn.textContent = '📍 Standort verwenden';
+  }
+});
+document.getElementById('mf-geo-btn').addEventListener('click', async ev => {
+  const btn = ev.target;
+  btn.disabled = true;
+  try {
+    const pos = await getPosition();
+    const r = await api(`/api/ingest/reverse-location?lat=${pos.lat}&lng=${pos.lng}`);
+    document.getElementById('mf-location').value = r.name;
+  } catch (err) {
+    toast(err.message, 'warn');
+  } finally {
+    btn.disabled = false;
+  }
+});
 async function analyze() {
   const text = document.getElementById('input-text').value.trim();
   if (!text) return;
@@ -1924,8 +1974,13 @@ async function analyze() {
     const result = await api("/api/ingest", {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ raw_text: text }),
+      body: JSON.stringify({ raw_text: text,
+        capture_lat: capturePos ? capturePos.lat : null,
+        capture_lng: capturePos ? capturePos.lng : null }),
     });
+    capturePos = null;
+    document.getElementById('geo-btn').classList.remove('active');
+    document.getElementById('geo-hint').style.display = 'none';
     previewEvents = result.events || [];
     renderPreview(previewEvents);
   } catch (err) {

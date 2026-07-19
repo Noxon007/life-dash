@@ -32,7 +32,9 @@ from app.database import get_db
 from app.models import (
     ConfirmState,
     DatePrecision,
+    Entity,
     Event,
+    EventEntityLink,
     Fragment,
     FragmentStatus,
     Location,
@@ -320,7 +322,42 @@ def _apply_resolved_name(db: Session, loc: Location, user_id: str,
         if (ev.field_overrides or {}).get("title"):
             continue
         ev.title = f"Besuch: {short}"[:255]
+    # F4: Land aus den addressdetails mitnehmen -> Länder-Kompendium/-Statistik
+    country = (hit.get("address") or {}).get("country")
+    if country:
+        loc.country = country[:64]
+        events_here = (db.query(Event)
+                       .filter(Event.user_id == user_id, Event.location_id == loc.id)
+                       .all())
+        _link_country(db, user_id, loc.country, events_here)
     return True
+
+
+def _link_country(db: Session, user_id: str, country: str,
+                  events: list[Event]) -> int:
+    """F4: Legt die country-Entity an (falls neu) und verknüpft die Events —
+    idempotent (bestehende Verknüpfungen bleiben einmalig). Import-Daten sind
+    Fakten -> Entity ist bestätigt."""
+    if not country or not events:
+        return 0
+    entity = (db.query(Entity)
+              .filter(Entity.user_id == user_id, Entity.type == "country",
+                      Entity.name.ilike(country))
+              .first())
+    if not entity:
+        entity = Entity(user_id=user_id, type="country", name=country,
+                        confirmed=ConfirmState.confirmed)
+        db.add(entity)
+        db.flush()
+    have = {l.event_id for l in db.query(EventEntityLink)
+            .filter(EventEntityLink.entity_id == entity.id).all()}
+    added = 0
+    for ev in events:
+        if ev.id not in have:
+            db.add(EventEntityLink(event_id=ev.id, entity_id=entity.id,
+                                   role="mentioned"))
+            added += 1
+    return added
 
 
 def _unresolved_name_filter():

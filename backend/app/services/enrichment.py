@@ -31,13 +31,19 @@ def _weather_candidates(db: Session) -> list[Event]:
 
 
 def _add_weather(db: Session, event: Event) -> bool:
-    """Holt Wetter für EIN Event und hängt es als Metriken an (ohne Commit)."""
+    """Holt Wetter für EIN Event und hängt es als Metriken an (ohne Commit).
+    F3: Mittel + Min/Max getrennt, Bedingung aus Stundendaten, Niederschlag."""
     w = fetch_weather(event.location.lat, event.location.lng, event.date_start)
     if not w:
         return False
-    if w.get("temp_c") is not None:
-        db.add(Metric(event_id=event.id, key="temperature_c",
-                      value=w["temp_c"], unit="°C", source=Source.weather))
+    for key in ("temp_c", "temp_min_c", "temp_max_c"):
+        if w.get(key) is not None:
+            db.add(Metric(event_id=event.id,
+                          key="temperature_c" if key == "temp_c" else key,
+                          value=w[key], unit="°C", source=Source.weather))
+    if w.get("precip_mm") is not None:
+        db.add(Metric(event_id=event.id, key="precipitation_mm",
+                      value=w["precip_mm"], unit="mm", source=Source.weather))
     if w.get("condition"):
         db.add(Metric(event_id=event.id, key="weather",
                       value_text=w["condition"], source=Source.weather))

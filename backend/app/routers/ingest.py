@@ -21,8 +21,9 @@ def ingest(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> IngestResult:
-    """Speichert den Roh-Text (Stufe 1) und erzeugt KI-Vorschläge (Stufe 2, unbestätigt)."""
-    fragment = Fragment(user_id=user.id, raw_text=payload.raw_text, source=payload.source)
+    """Speichert den Roh-Text (Roh-Eingang) und erzeugt KI-Vorschläge (unbestätigt)."""
+    fragment = Fragment(user_id=user.id, raw_text=payload.raw_text, source=payload.source,
+                        capture_lat=payload.capture_lat, capture_lng=payload.capture_lng)
     db.add(fragment)
     db.flush()
 
@@ -36,3 +37,21 @@ def ingest(
         fragment=FragmentRead.model_validate(fragment),
         events=[event_to_read(e) for e in events],
     )
+
+
+@router.get("/reverse-location")
+def reverse_location(
+    lat: float,
+    lng: float,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """F2: Gerätestandort -> Adressvorschlag fürs Eingabeformular
+    (Reverse-Geocoding im gewählten Anzeige-Format)."""
+    from fastapi import HTTPException
+
+    from app.services import geocode as geocode_svc
+
+    hit = geocode_svc.reverse_geocode(lat, lng)
+    if not hit:
+        raise HTTPException(404, "Keine Adresse zu diesem Standort gefunden")
+    return {"name": geocode_svc.short_name(hit, geocode_svc.parts_for(user))}

@@ -11,8 +11,9 @@ from sqlalchemy.engine import Engine
 
 # Tabelle -> {Spalte: SQL-Typ}
 _MISSING_COLUMNS: dict[str, dict[str, str]] = {
-    "fragments": {"user_id": "VARCHAR(36)"},
-    "locations": {"user_id": "VARCHAR(36)"},
+    "fragments": {"user_id": "VARCHAR(36)",
+                  "capture_lat": "FLOAT", "capture_lng": "FLOAT"},
+    "locations": {"user_id": "VARCHAR(36)", "country": "VARCHAR(64)"},
     "events": {"user_id": "VARCHAR(36)", "embedding": "JSON", "note": "TEXT",
                "external_id": "VARCHAR(64)",
                "confirmed_at": "TIMESTAMP", "confirmed_by": "VARCHAR(16)"},
