@@ -10,6 +10,16 @@ jedem `MINOR` vorkommen.
 
 ## [Unreleased]
 
+## [0.17.0] – 2026-07-19
+
+### Hinzugefügt
+- **🖨️ Zeitstrahl drucken:** Neuer Knopf „Drucken" im Zeitstrahl — druckt
+  die aktuelle Ansicht (mit gewähltem Zoom, Filtern und Suche) in hellem,
+  druckfreundlichem Layout ohne Navigation; über den Browser-Druckdialog
+  auch als PDF sicherbar. Erste Ausbaustufe der Druckansicht: Zeitraum
+  wählst du über die normalen Filter, eingeklappte Gruppen vorher über
+  „weitere anzeigen" aufklappen.
+
 ## [0.16.0] – 2026-07-19
 
 ### Geändert

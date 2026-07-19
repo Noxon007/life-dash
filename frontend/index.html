@@ -417,6 +417,23 @@
   .toast.warn  { border-left-color: #f5a623; }
   @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
 
+  /* ============ DRUCK (F8, erste Ausbaustufe) ============
+     Druckt die AKTUELLE Ansicht (Zeitstrahl mit Zoom/Filtern/Suche) hell und
+     ohne Navigation — Zeitraum vorher über die normalen Filter wählen. */
+  @media print {
+    :root { --bg:#fff; --bg-panel:#fff; --bg-elev:#f3f3f3; --border:#bbb;
+            --text:#111; --text-dim:#555; --accent:#333; --accent-2:#333; }
+    .sidebar, .topbar, .zoom-bar, .toast-wrap, .filter-chips, #tl-visits-toggle,
+    #tl-journal-btn, #tl-print-btn, #tl-search-note, .map-filters,
+    .modal-overlay, .loading-overlay, [data-tl-more] { display: none !important; }
+    body { display: block; height: auto; overflow: visible; background: #fff; }
+    .main, .content { overflow: visible; height: auto; padding: 0; }
+    .timeline { padding-left: 0; }
+    .timeline::before, .event-card::before { display: none; }
+    .event-card { break-inside: avoid; cursor: default; }
+    .event-card:hover { transform: none; }
+  }
+
   /* ============ MOBILE (Bottom-Navigation, PWA) ============ */
   @media (max-width: 860px) {
     body { flex-direction: column; }
@@ -603,6 +620,7 @@
           <div class="filter-chips" id="tl-filters" style="margin:0"></div>
           <span class="filter-chip off" id="tl-visits-toggle" title="Importierte Timeline-Besuche (Google) im Zeitstrahl anzeigen — auf der Karte sind sie immer sichtbar">🛰️ Besuche</span>
           <span class="filter-chip" id="tl-journal-btn" title="Tagebuch-Eintrag für einen Tag schreiben (Markdown) — erscheint als Tageskopf über den Ereignissen des Tages">📖 Tagebuch schreiben</span>
+          <span class="filter-chip" id="tl-print-btn" title="Aktuelle Ansicht drucken oder als PDF sichern — erst Zoom/Filter/Suche setzen, ggf. „weitere anzeigen" aufklappen; gedruckt wird hell und ohne Navigation">🖨️ Drucken</span>
         </div>
         <div id="tl-search-note" class="hint" style="display:none"></div>
         <div class="timeline" id="timeline-list"></div>
@@ -1757,6 +1775,8 @@ function openJournal(dateStr) {
 }
 function closeJournal() { document.getElementById('journal-modal').classList.remove('show'); }
 document.getElementById('tl-journal-btn').addEventListener('click', () => openJournal());
+// F8 (erste Ausbaustufe): druckt die aktuell gefilterte Zeitstrahl-Ansicht
+document.getElementById('tl-print-btn').addEventListener('click', () => window.print());
 document.getElementById('jr-date').addEventListener('change', ev => jrLoad(ev.target.value));
 document.getElementById('jr-preview').addEventListener('click', () => jrPreview());
 document.getElementById('jr-cancel').addEventListener('click', closeJournal);
