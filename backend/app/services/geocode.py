@@ -17,15 +17,56 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
+from app.config import settings
+
 log = logging.getLogger("lifedash.geocode")
 
-NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
-NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse"
 USER_AGENT = "life-dash/0.1 (self-hosted life database)"
 ACCEPT_LANGUAGE = "de,en"  # Fallback-Kette: Deutsch -> englische Umschrift
+
+
+def _base() -> str:
+    """Basis-URL des Geocoders (OSM-Nominatim oder z. B. LocationIQ)."""
+    return settings.geocoder_base_url.rstrip("/")
+
+
+def _with_key(params: dict) -> dict:
+    """API-Key anhängen, falls ein Key-Dienst (LocationIQ) konfiguriert ist."""
+    if settings.geocoder_api_key:
+        params["key"] = settings.geocoder_api_key
+    return params
+
+
+def _fetch_json(url: str, what: str):
+    """GET + JSON mit 429-Behandlung (0.15.2): Drosselt der Dienst, wird
+    Retry-After respektiert (Deckel 30 s) und EINMAL erneut versucht —
+    statt im Sekundentakt gegen die Sperre weiterzufeuern."""
+    for attempt in (1, 2):
+        req = urllib.request.Request(
+            url, headers={"User-Agent": USER_AGENT, "Accept-Language": ACCEPT_LANGUAGE})
+        try:
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            if exc.code == 429 and attempt == 1:
+                try:
+                    wait = min(float(exc.headers.get("Retry-After") or 5), 30)
+                except ValueError:
+                    wait = 5.0
+                log.warning("%s: Geocoder drosselt (429) — warte %.0f s", what, wait)
+                time.sleep(wait)
+                continue
+            log.warning("%s fehlgeschlagen: %s", what, exc)
+            return None
+        except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+            log.warning("%s fehlgeschlagen: %s", what, exc)
+            return None
+    return None
 
 # Nicht-lateinische Schriften (Griechisch, Kyrillisch, Hebräisch, Arabisch,
 # Devanagari, Thai, Kana, CJK, Hangul) — zum Erkennen von Fremdschrift-Namen
@@ -122,19 +163,12 @@ def geocode(query: str) -> dict | None:
     """Gibt {name, lat, lng, type} für den besten Treffer zurück oder None."""
     if not query or not query.strip():
         return None
-    params = urllib.parse.urlencode(
+    params = urllib.parse.urlencode(_with_key(
         {"q": query.strip(), "format": "json", "limit": 1,
          "addressdetails": 1, "namedetails": 1}
-    )
-    req = urllib.request.Request(
-        f"{NOMINATIM_URL}?{params}",
-        headers={"User-Agent": USER_AGENT, "Accept-Language": ACCEPT_LANGUAGE},
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-        log.warning("Nominatim-Suche fehlgeschlagen (%r): %s", query, exc)
+    ))
+    data = _fetch_json(f"{_base()}/search?{params}", f"Nominatim-Suche ({query!r})")
+    if data is None:
         return None
     if not data:
         log.debug("Nominatim-Suche ohne Treffer: %r", query)
@@ -160,19 +194,16 @@ def reverse_geocode(lat: float, lng: float) -> dict | None:
 
     Achtung Nominatim-Policy: max. 1 Anfrage/Sekunde — Aufrufer drosselt.
     """
-    params = urllib.parse.urlencode(
-        {"lat": lat, "lon": lng, "format": "jsonv2", "zoom": 17,
+    # LocationIQ kennt kein "jsonv2" — mit Key schlicht "json" (die genutzten
+    # Felder display_name/address/namedetails sind in beiden identisch)
+    fmt = "json" if settings.geocoder_api_key else "jsonv2"
+    params = urllib.parse.urlencode(_with_key(
+        {"lat": lat, "lon": lng, "format": fmt, "zoom": 17,
          "addressdetails": 1, "namedetails": 1}
-    )
-    req = urllib.request.Request(
-        f"{NOMINATIM_REVERSE_URL}?{params}",
-        headers={"User-Agent": USER_AGENT, "Accept-Language": ACCEPT_LANGUAGE},
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-        log.warning("Reverse-Geocoding fehlgeschlagen (%s, %s): %s", lat, lng, exc)
+    ))
+    data = _fetch_json(f"{_base()}/reverse?{params}",
+                       f"Reverse-Geocoding ({lat}, {lng})")
+    if not data or not isinstance(data, dict):
         return None
     name = data.get("display_name")
     if not name:

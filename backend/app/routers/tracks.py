@@ -47,8 +47,14 @@ from app.services import geocode as geocode_svc
 
 log = logging.getLogger("lifedash.timeline")
 
-# Nominatim-Policy: max. 1 Anfrage/Sekunde (Modul-Konstante -> in Tests patchbar)
-NOMINATIM_DELAY_S = 1.0
+# Nominatim-Policy: max. 1 Anfrage/Sekunde — 1,2 s lässt Luft, damit der
+# öffentliche Endpoint nicht mit 429 drosselt (Modul-Konstante -> in Tests
+# patchbar). Mit konfiguriertem Key-Dienst (LocationIQ, 2/s) geht es schneller.
+NOMINATIM_DELAY_S = 1.2
+
+
+def _geo_delay() -> float:
+    return min(NOMINATIM_DELAY_S, 0.6) if settings.geocoder_api_key else NOMINATIM_DELAY_S
 # Beim Import nur kleine Mengen NEUER Orte direkt auflösen — große Erstimporte
 # laufen über den Admin-Button „Ortsnamen auflösen" (sonst dauert der Upload Minuten)
 AUTO_RESOLVE_MAX = 30
@@ -521,7 +527,7 @@ def import_timeline(
         parts = geocode_svc.parts_for(user)
         for i, loc in enumerate(unnamed_new):
             if i:
-                time.sleep(NOMINATIM_DELAY_S)
+                time.sleep(_geo_delay())
             if _apply_resolved_name(db, loc, user.id, parts):
                 names_resolved += 1
 
@@ -587,7 +593,7 @@ def resolve_place_names(
     resolved = failed = 0
     for i, loc in enumerate(locs):
         if i:
-            time.sleep(NOMINATIM_DELAY_S)
+            time.sleep(_geo_delay())
         ok = _apply_resolved_name(db, loc, user.id, parts)
         if ok:
             db.commit()

@@ -10,6 +10,22 @@ jedem `MINOR` vorkommen.
 
 ## [Unreleased]
 
+## [0.15.2] – 2026-07-19
+
+### Behoben
+- **Ortsnamen-Auflösung geht besser mit der Nominatim-Drossel um:** Meldet
+  der Geocoding-Dienst „429 Too many requests", wartet Life-Dash jetzt die
+  angeforderte Zeit ab und versucht es einmal erneut, statt im Sekundentakt
+  gegen die Sperre weiterzufeuern; der Abstand zwischen Anfragen ist leicht
+  erhöht (1,2 s), damit die Sperre gar nicht erst greift.
+
+### Hinzugefügt
+- **Optionaler schnellerer Geocoding-Dienst:** In der `.env` lässt sich ein
+  Nominatim-kompatibler Dienst mit API-Key eintragen (z. B. LocationIQ,
+  kostenlos 5.000 Anfragen/Tag statt ~1/Sekunde) — `GEOCODER_BASE_URL` +
+  `GEOCODER_API_KEY`, sonst ändert sich nichts. Ohne Eintrag bleibt alles
+  beim öffentlichen OpenStreetMap-Nominatim.
+
 ## [0.15.1] – 2026-07-19
 
 ### Behoben

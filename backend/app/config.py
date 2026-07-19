@@ -44,6 +44,13 @@ class Settings(BaseSettings):
 
     # Geocoding (Nominatim) für präzise Adressen bis Straße/Hausnummer
     geocoding_enabled: bool = True
+    # Optionaler Nominatim-kompatibler Dienst statt des öffentlichen OSM-
+    # Endpoints (drosselt auf 1 Anfrage/s und liefert bei Volumen 429).
+    # Z. B. LocationIQ (kostenlos 5000 Anfragen/Tag, 2/s):
+    #   GEOCODER_BASE_URL=https://eu1.locationiq.com/v1
+    #   GEOCODER_API_KEY=pk....
+    geocoder_base_url: str = "https://nominatim.openstreetmap.org"
+    geocoder_api_key: str = ""
 
     # Verzeichnis mit den YAML-Modul-Definitionen
     modules_dir: Path = BASE_DIR / "modules"
