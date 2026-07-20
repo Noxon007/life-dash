@@ -41,7 +41,9 @@ Entscheidungen/Anmerkungen in Kap. 15. Erst dort gezielt nachlesen statt Code ra
   etc. aus Config); `.env.example` ist die Setup-Referenz
 
 ## Stand
-Umgesetzt bis **v0.18.0** (2026-07-20). Offen laut KONZEPT 14.2: F8-Rest
-(Druck-Auswahldialog, Fotos), F10 de/en, P3.1, A24-Rest (Karten-Ideen),
-A27-Rest (Docs-Audit); Import-Quellen (P2.1 Immich, P2.8 OwnTracks,
-P2.9 Automatisierung, P4.x) bewusst ZULETZT. Details/Begründungen: KONZEPT Kap. 14.2+15.
+Umgesetzt bis **v0.19.0** (2026-07-20). Gruppe A ist komplett; von Gruppe B
+offen: **F10** (de/en + englische Doku — als Nächstes, eigenes Release 0.20.0)
+und **P3.1** (deklarative Statistik-Widgets). F8 ist bis auf „Druck mit Fotos"
+fertig, das auf P2.1 wartet. Danach nur noch die großen Pakete: Import-Quellen
+(P2.1 Immich, P2.8 OwnTracks, P2.9 Automatisierung, P4.1 Health, P4.2 PSN) und
+P5.1/P5.2 (Offline-Capture, Whisper). Details/Begründungen: KONZEPT Kap. 14.2+15.

@@ -75,7 +75,7 @@ class UserRole(str, enum.Enum):
 
 
 # --------------------------------------------------------------------------- #
-# Identität — Multi-User via OIDC (Pocket ID)
+# Identität — Multi-User via OIDC
 # --------------------------------------------------------------------------- #
 class User(Base):
     """Ein angemeldeter Nutzer. Alle Stufe-1/2/3-Daten sind nutzergebunden."""

@@ -463,21 +463,40 @@
   .toast.warn  { border-left-color: #f5a623; }
   @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
 
-  /* ============ DRUCK (F8, erste Ausbaustufe) ============
-     Druckt die AKTUELLE Ansicht (Zeitstrahl mit Zoom/Filtern/Suche) hell und
-     ohne Navigation — Zeitraum vorher über die normalen Filter wählen. */
+  /* ============ DRUCK (F8) ============
+     Gedruckt wird NICHT die Bildschirmansicht, sondern ein eigens aufgebauter
+     Bereich (#print-area) mit dem im Dialog gewählten Zeitraum. Das ist der
+     Grund, warum eingeklappte Gruppen und „weitere anzeigen" hier egal sind. */
+  #print-area { display: none; }
   @media print {
     :root { --bg:#fff; --bg-panel:#fff; --bg-elev:#f3f3f3; --border:#bbb;
             --text:#111; --text-dim:#555; --accent:#333; --accent-2:#333; }
-    .sidebar, .topbar, .zoom-bar, .toast-wrap, .filter-chips, #tl-visits-toggle,
-    #tl-journal-btn, #tl-print-btn, #tl-search-note, .map-filters,
-    .modal-overlay, .loading-overlay, [data-tl-more] { display: none !important; }
-    body { display: block; height: auto; overflow: visible; background: #fff; }
-    .main, .content { overflow: visible; height: auto; padding: 0; }
-    .timeline { padding-left: 0; }
-    .timeline::before, .event-card::before { display: none; }
-    .event-card { break-inside: avoid; cursor: default; }
-    .event-card:hover { transform: none; }
+    /* Alles außer dem Druckbereich verschwindet */
+    body > *:not(#print-area) { display: none !important; }
+    body { display: block; height: auto; overflow: visible; background: #fff;
+           color: #111; }
+    #print-area { display: block; padding: 0; }
+    @page { margin: 16mm 14mm; }
+
+    .pr-head { border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 18px; }
+    .pr-head h1 { margin: 0 0 4px; font-size: 20pt; }
+    .pr-head .pr-sub { color: #555; font-size: 10pt; }
+    .pr-day { break-inside: avoid; margin-bottom: 14px; }
+    .pr-day-head {
+      font-size: 12pt; font-weight: 700; border-bottom: 1px solid #bbb;
+      padding-bottom: 3px; margin-bottom: 8px;
+    }
+    .pr-ev { break-inside: avoid; margin: 0 0 10px 0; padding-left: 10px;
+             border-left: 2px solid #ccc; }
+    .pr-ev-title { font-size: 11pt; font-weight: 600; }
+    .pr-ev-desc { font-size: 10pt; color: #333; margin-top: 2px; }
+    .pr-ev-note { font-size: 10pt; color: #222; margin-top: 4px;
+                  background: #f5f5f5; padding: 5px 8px; border-radius: 3px; }
+    .pr-ev-meta { font-size: 8.5pt; color: #555; margin-top: 3px; }
+    .pr-ev-meta span::after { content: " · "; }
+    .pr-ev-meta span:last-child::after { content: ""; }
+    .pr-journal { background: #f5f5f5; padding: 8px 10px; border-left: 3px solid #666; }
+    .pr-empty { font-size: 11pt; color: #555; }
   }
 
   /* ============ MOBILE (Bottom-Navigation, PWA) ============ */
@@ -668,7 +687,7 @@
           <div class="filter-chips" id="tl-filters" style="margin:0"></div>
           <span class="filter-chip off" id="tl-visits-toggle" title="Importierte Timeline-Besuche (Google) im Zeitstrahl anzeigen — auf der Karte sind sie immer sichtbar">🛰️ Besuche</span>
           <span class="filter-chip" id="tl-journal-btn" title="Tagebuch-Eintrag für einen Tag schreiben (Markdown) — erscheint als Tageskopf über den Ereignissen des Tages">📖 Tagebuch schreiben</span>
-          <span class="filter-chip" id="tl-print-btn" title="Aktuelle Ansicht drucken oder als PDF sichern — erst Zoom/Filter/Suche setzen, ggf. „weitere anzeigen" aufklappen; gedruckt wird hell und ohne Navigation">🖨️ Drucken</span>
+          <span class="filter-chip" id="tl-print-btn" title="Zeitraum wählen und drucken oder als PDF sichern — gedruckt wird hell, ohne Navigation und mit allen Ereignissen des Zeitraums">🖨️ Drucken</span>
         </div>
         <div id="tl-search-note" class="hint" style="display:none"></div>
         <div class="timeline" id="timeline-list"></div>
@@ -1193,7 +1212,7 @@
         <div class="admin-tabpane admin-only" data-tabpane="nutzer" style="display:none">
           <div class="section-title">Nutzer</div>
           <div class="hint" style="margin-bottom:14px">
-            👥 Konten entstehen automatisch beim ersten OIDC-Login (Pocket ID).
+            👥 Konten entstehen automatisch beim ersten Login<span id="users-provider"></span>.
             Hier lassen sich Rollen ändern und Nutzer <b>mitsamt all ihren Daten</b> löschen.
             Das eigene Konto ist geschützt — so bleibt immer ein Admin übrig.
           </div>
@@ -1269,6 +1288,46 @@
     </div>
   </div>
 </div>
+
+<!-- F8: Druck-Auswahldialog — Zeitraum und Umfang wählen -->
+<div class="modal-overlay" id="print-modal">
+  <div class="modal-box">
+    <h3>🖨️ Drucken</h3>
+    <div class="stat-label" style="margin:6px 0 12px; line-height:1.5">
+      Wähle den Zeitraum — gedruckt wird eine eigene, helle Seite mit allen
+      Ereignissen darin, chronologisch nach Tagen. Eingeklappte Gruppen und
+      „weitere anzeigen" spielen dabei keine Rolle. Über den Druckdialog des
+      Browsers lässt sich das Ergebnis auch als PDF sichern.
+    </div>
+    <div class="filter-chips" style="margin-bottom:12px">
+      <span class="filter-chip" data-print-preset="all">Alles</span>
+      <span class="filter-chip" data-print-preset="year">Dieses Jahr</span>
+      <span class="filter-chip" data-print-preset="12m">Letzte 12 Monate</span>
+    </div>
+    <div class="field-row"><div class="field-key">Von</div>
+      <div class="field-val"><input id="pr-from" type="date" class="mf-select"></div></div>
+    <div class="field-row"><div class="field-key">Bis</div>
+      <div class="field-val"><input id="pr-to" type="date" class="mf-select"></div></div>
+    <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px">
+      <label class="stat-label" style="display:flex; align-items:center; gap:8px">
+        <input type="checkbox" id="pr-desc" checked> Beschreibungen mitdrucken</label>
+      <label class="stat-label" style="display:flex; align-items:center; gap:8px">
+        <input type="checkbox" id="pr-notes" checked> Notizen und Tagebuch mitdrucken</label>
+      <label class="stat-label" style="display:flex; align-items:center; gap:8px">
+        <input type="checkbox" id="pr-visits"> Importierte Standort-Besuche einschließen</label>
+      <label class="stat-label" style="display:flex; align-items:center; gap:8px">
+        <input type="checkbox" id="pr-unconfirmed"> Unbestätigte Vorschläge einschließen</label>
+    </div>
+    <div id="pr-count" class="action-desc" style="margin-top:12px">—</div>
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn" id="pr-go">🖨️ Drucken</button>
+      <button class="btn ghost" id="pr-cancel">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- F8: Inhalt der Druckseite (nur beim Drucken sichtbar) -->
+<div id="print-area" aria-hidden="true"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
@@ -1863,7 +1922,157 @@ function openJournal(dateStr) {
 function closeJournal() { document.getElementById('journal-modal').classList.remove('show'); }
 document.getElementById('tl-journal-btn').addEventListener('click', () => openJournal());
 // F8 (erste Ausbaustufe): druckt die aktuell gefilterte Zeitstrahl-Ansicht
-document.getElementById('tl-print-btn').addEventListener('click', () => window.print());
+// ---------- F8: Drucken mit Zeitraum-Auswahl ----------
+// Statt die Bildschirmansicht zu drucken, wird #print-area frisch aufgebaut:
+// so landet der ganze gewählte Zeitraum auf dem Papier, unabhängig davon, was
+// im Zeitstrahl gerade eingeklappt oder noch nicht nachgeladen ist.
+function prDateInput(id) {
+  const v = document.getElementById(id).value;
+  return v ? new Date(v + 'T00:00:00') : null;
+}
+
+function prSelected(events) {
+  const from = prDateInput('pr-from');
+  const to = prDateInput('pr-to');
+  if (to) to.setHours(23, 59, 59, 999);
+  const withVisits = document.getElementById('pr-visits').checked;
+  const withUnconfirmed = document.getElementById('pr-unconfirmed').checked;
+
+  return events.filter(e => {
+    if (!e.date_start) return false;
+    const d = new Date(e.date_start);
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    if (!withVisits && e.source === 'google_timeline') return false;
+    if (!withUnconfirmed && e.confirmed !== 'confirmed') return false;
+    return true;
+  }).sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
+}
+
+async function prRefreshCount() {
+  const box = document.getElementById('pr-count');
+  try {
+    const n = prSelected(await fetchEvents()).length;
+    box.textContent = n
+      ? `${n} Ereignis${n === 1 ? '' : 'se'} im gewählten Zeitraum.`
+      : 'Keine Ereignisse im gewählten Zeitraum — Zeitraum oder Optionen anpassen.';
+  } catch (_) {
+    box.textContent = 'Anzahl konnte nicht ermittelt werden.';
+  }
+}
+
+function prBuildPage(events) {
+  const from = document.getElementById('pr-from').value;
+  const to = document.getElementById('pr-to').value;
+  const withDesc = document.getElementById('pr-desc').checked;
+  const withNotes = document.getElementById('pr-notes').checked;
+  const fmtDay = d => new Date(d + 'T00:00:00').toLocaleDateString('de-DE',
+    { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+
+  const range = from && to ? `${fmtDay(from)} – ${fmtDay(to)}`
+    : from ? `ab ${fmtDay(from)}`
+    : to ? `bis ${fmtDay(to)}` : 'gesamter Zeitraum';
+
+  let html = `<div class="pr-head">
+      <h1>Life-Dash</h1>
+      <div class="pr-sub">${esc(range)} · ${events.length} Ereignis${events.length === 1 ? '' : 'se'}
+        · gedruckt am ${new Date().toLocaleDateString('de-DE')}</div>
+    </div>`;
+
+  if (!events.length) {
+    html += '<div class="pr-empty">Keine Ereignisse im gewählten Zeitraum.</div>';
+    document.getElementById('print-area').innerHTML = html;
+    return;
+  }
+
+  // Nach Tagen gruppieren — das Tagebuch (F1) steht als Kopf über dem Tag
+  const days = new Map();
+  events.forEach(e => {
+    const key = e.date_start.slice(0, 10);
+    if (!days.has(key)) days.set(key, []);
+    days.get(key).push(e);
+  });
+
+  for (const [day, list] of days) {
+    html += `<div class="pr-day"><div class="pr-day-head">${esc(fmtDay(day))}</div>`;
+    const journal = list.filter(e => e.category === 'journal');
+    const rest = list.filter(e => e.category !== 'journal');
+
+    if (withNotes) {
+      journal.forEach(e => {
+        html += `<div class="pr-ev pr-journal">
+          <div class="pr-ev-title">📖 ${esc(e.title)}</div>
+          <div class="pr-ev-desc">${mdRender(e.note || e.description || '')}</div>
+        </div>`;
+      });
+    }
+
+    rest.forEach(e => {
+      const meta = [catLabels[e.category] || e.category];
+      if (e.location && e.location.name) meta.push('📍 ' + e.location.name);
+      eventChips(e).forEach(c => meta.push(c));
+      if (e.confirmed !== 'confirmed') meta.push('unbestätigter Vorschlag');
+      html += `<div class="pr-ev">
+        <div class="pr-ev-title">${esc(e.title)}</div>
+        ${withDesc && e.description ? `<div class="pr-ev-desc">${esc(e.description)}</div>` : ''}
+        ${withNotes && e.note ? `<div class="pr-ev-note">${mdRender(e.note)}</div>` : ''}
+        <div class="pr-ev-meta">${meta.map(m => `<span>${esc(m)}</span>`).join('')}</div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+  document.getElementById('print-area').innerHTML = html;
+}
+
+document.getElementById('tl-print-btn').addEventListener('click', async () => {
+  const events = await fetchEvents().catch(() => []);
+  const dated = events.filter(e => e.date_start).map(e => e.date_start.slice(0, 10)).sort();
+  // Vorbelegung: die volle Spanne der vorhandenen Daten
+  if (!document.getElementById('pr-from').value && dated.length) {
+    document.getElementById('pr-from').value = dated[0];
+    document.getElementById('pr-to').value = dated[dated.length - 1];
+  }
+  document.getElementById('print-modal').classList.add('show');
+  prRefreshCount();
+});
+
+document.querySelectorAll('#print-modal [data-print-preset]').forEach(chip => {
+  chip.addEventListener('click', async () => {
+    const today = new Date();
+    const iso = d => d.toISOString().slice(0, 10);
+    if (chip.dataset.printPreset === 'year') {
+      document.getElementById('pr-from').value = `${today.getFullYear()}-01-01`;
+      document.getElementById('pr-to').value = `${today.getFullYear()}-12-31`;
+    } else if (chip.dataset.printPreset === '12m') {
+      const back = new Date(today);
+      back.setFullYear(back.getFullYear() - 1);
+      document.getElementById('pr-from').value = iso(back);
+      document.getElementById('pr-to').value = iso(today);
+    } else {
+      const events = await fetchEvents().catch(() => []);
+      const dated = events.filter(e => e.date_start)
+        .map(e => e.date_start.slice(0, 10)).sort();
+      document.getElementById('pr-from').value = dated[0] || '';
+      document.getElementById('pr-to').value = dated[dated.length - 1] || '';
+    }
+    prRefreshCount();
+  });
+});
+
+['pr-from', 'pr-to', 'pr-desc', 'pr-notes', 'pr-visits', 'pr-unconfirmed']
+  .forEach(id => document.getElementById(id)
+    .addEventListener('change', prRefreshCount));
+
+document.getElementById('pr-cancel').addEventListener('click',
+  () => document.getElementById('print-modal').classList.remove('show'));
+
+document.getElementById('pr-go').addEventListener('click', async () => {
+  const events = prSelected(await fetchEvents().catch(() => []));
+  prBuildPage(events);
+  document.getElementById('print-modal').classList.remove('show');
+  // Kurz warten, damit das Layout des frisch gebauten Bereichs steht
+  setTimeout(() => window.print(), 60);
+});
 document.getElementById('jr-date').addEventListener('change', ev => jrLoad(ev.target.value));
 document.getElementById('jr-preview').addEventListener('click', () => jrPreview());
 document.getElementById('jr-cancel').addEventListener('click', closeJournal);
@@ -3974,8 +4183,12 @@ document.getElementById('logout-link').addEventListener('click', async ev => {
   try {
     const cfg = await api("/api/auth/config");
     AUTH.mode = cfg.mode;
-    if (cfg.provider_name)  // A27: Provider-Name rein kosmetisch aus der Config
+    // A27: Provider-Name rein kosmetisch aus der Config — ohne ihn bleibt
+    // überall ein neutraler SSO-Text stehen, nichts Fremdes hart verdrahtet.
+    if (cfg.provider_name) {
       document.getElementById('login-provider').textContent = ` über ${cfg.provider_name}`;
+      document.getElementById('users-provider').textContent = ` über ${cfg.provider_name}`;
+    }
   } catch (_) { /* Backend nicht erreichbar -> Banner unten */ }
 
   try {

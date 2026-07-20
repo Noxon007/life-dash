@@ -5,7 +5,8 @@ Konzerte & mehr als responsive PWA mit KI-gestützter Erfassung und Suche.
 
 - **Konzept & Roadmap:** [docs/KONZEPT.md](docs/KONZEPT.md)
 - **Backend/Architektur:** [backend/README.md](backend/README.md)
-- **Deployment (Homelab):** [docs/DEPLOY.md](docs/DEPLOY.md)
+- **Deployment:** [docs/DEPLOY.md](docs/DEPLOY.md)
+- **Alle Einstellungen:** [.env.example](.env.example)
 - **Änderungen pro Version:** [CHANGELOG.md](CHANGELOG.md)
 
 ## Schnellstart
@@ -17,14 +18,20 @@ docker compose up -d      # App + PostgreSQL; Image: ghcr.io/noxon007/life-dash
 
 Frontend/PWA: `http://<host>:8000/` · API-Docs: `/docs` · Health: `/health`
 
-Lokale Entwicklung ohne Docker: siehe [backend/README.md](backend/README.md)
-(`AUTH_MODE=dev`, uvicorn mit Reload).
+Ohne KI-Schlüssel läuft die App im Modus `mock` (regelbasierte Erfassung) —
+zum Ausprobieren genügt das. Lokale Entwicklung ohne Docker: siehe
+[backend/README.md](backend/README.md) (`AUTH_MODE=dev`, uvicorn mit Reload).
 
 ## Stack
 
 FastAPI + SQLAlchemy (SQLite oder PostgreSQL) · Vanilla-JS-PWA (vom Backend
-ausgeliefert) · OIDC-Login via Pocket ID · KI über die Gemini API
-(OpenAI-kompatibler Endpoint) · Releases als Docker-Image via GitHub Actions.
+ausgeliefert) · Releases als Docker-Image via GitHub Actions.
+
+Life-Dash bindet sich an keinen Anbieter: der Login läuft über **jeden
+standardkonformen OIDC-Provider** (Authentik, Keycloak, Pocket ID, Zitadel …),
+die KI über **jede OpenAI-kompatible API** (OpenAI, Gemini, lokal via Ollama
+oder LM Studio …) und die Ortsauflösung über **Nominatim oder einen
+kompatiblen Dienst**. Was du einsetzt, entscheidet allein deine `.env`.
 
 ## Versionierung & Releases
 

@@ -1,4 +1,4 @@
-"""Auth-Endpoints: OIDC-Login (Pocket ID), Session, aktueller Nutzer."""
+"""Auth-Endpoints: OIDC-Login, Session, aktueller Nutzer."""
 from __future__ import annotations
 
 import json

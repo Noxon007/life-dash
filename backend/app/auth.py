@@ -1,9 +1,10 @@
-"""Auth: Multi-User via OIDC (Pocket ID) + Dev-Modus.
+"""Auth: Multi-User via OIDC + Dev-Modus.
 
 Zwei Betriebsarten (AUTH_MODE):
   dev  -> kein Login; ein fester Dev-User (Admin). Für lokale Entwicklung.
-  oidc -> Authorization Code Flow mit PKCE gegen den OIDC-Provider
-          (Pocket ID). Das Backend führt den Flow aus, validiert das
+  oidc -> Authorization Code Flow mit PKCE gegen einen beliebigen
+          standardkonformen OIDC-Provider (Authentik, Keycloak, Pocket ID,
+          Zitadel, Auth0, ...). Das Backend führt den Flow aus, validiert das
           ID-Token gegen den JWKS-Endpoint und setzt ein signiertes
           HttpOnly-Session-Cookie. Nutzer werden beim ersten Login
           automatisch angelegt (JIT-Provisioning über den sub-Claim).
@@ -29,16 +30,19 @@ from app.config import settings
 from app.database import engine, get_db
 from app.migrate import adopt_orphan_rows
 from app.models import User, UserRole
+from app.version import APP_VERSION
 
 SESSION_COOKIE = "lifedash_session"
 STATE_COOKIE = "lifedash_oidc_state"
 
-# Manche Reverse Proxies / Bot-Filter (z. B. Traefik/Pangolin, CrowdSec)
+# Manche Reverse Proxies / Bot-Filter (Traefik, CrowdSec u. ä.)
 # blocken den Default-User-Agent von urllib ("Python-urllib/…") mit HTTP 403.
 # Darum bei allen Server-zu-Server-Aufrufen an den OIDC-Provider einen eigenen
 # User-Agent senden.
+# Der User-Agent nennt die Software (nicht die Instanz) — die Projekt-URL ist
+# hier die Identität von Life-Dash selbst und bleibt darum fest verdrahtet.
 HTTP_HEADERS = {
-    "User-Agent": "Life-Dash/1.0 (+https://github.com/Noxon007/life-dash)",
+    "User-Agent": f"Life-Dash/{APP_VERSION} (+https://github.com/Noxon007/life-dash)",
     "Accept": "application/json",
 }
 

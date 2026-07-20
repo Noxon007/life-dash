@@ -10,6 +10,45 @@ jedem `MINOR` vorkommen.
 
 ## [Unreleased]
 
+## [0.19.0] – 2026-07-20
+
+### Hinzugefügt
+- **🖨️ Drucken mit Zeitraum-Auswahl:** Der Drucken-Knopf im Zeitstrahl öffnet
+  jetzt einen Dialog: Zeitraum von/bis wählen (oder direkt **Alles**,
+  **Dieses Jahr**, **Letzte 12 Monate**), dazu Schalter für Beschreibungen,
+  Notizen und Tagebuch, importierte Standort-Besuche und unbestätigte
+  Vorschläge. Der Dialog zeigt vorab, wie viele Ereignisse er erfasst.
+  Gedruckt wird eine eigens aufgebaute Seite mit **allen** Ereignissen des
+  Zeitraums, nach Tagen gruppiert — eingeklappte Gruppen und „weitere
+  anzeigen" spielen keine Rolle mehr, was vorher die größte Einschränkung war.
+
+### Geändert
+- **Life-Dash lässt sich überall betreiben:** Die App war an mehreren Stellen
+  auf das Setup des Autors zugeschnitten — Anmeldedienst, KI-Anbieter und
+  Reverse Proxy waren in Beispielen, Vorgaben und Anleitungen fest verdrahtet.
+  Jetzt gilt durchgängig: Life-Dash spricht Standards (Anmeldung über OIDC,
+  KI über eine OpenAI-kompatible Schnittstelle, Ortsauflösung über Nominatim),
+  und welchen Anbieter du einsetzt, entscheidest allein du.
+  - `.env.example` ist die vollständige Setup-Referenz — **jede** Einstellung
+    steht dort, mit Beispielwerten für mehrere Anbieter statt einer Vorgabe.
+  - Ohne KI-Schlüssel startet die App im Modus „mock" (regelbasiert), statt
+    die Einrichtung mit einer Fehlermeldung abzubrechen.
+  - Die Nutzerverwaltung nennt den Namen deines Anmeldedienstes nur noch,
+    wenn du ihn konfiguriert hast — sonst steht dort ein neutraler Text.
+  - Anleitungen (README, Backend-README, Deployment) beschreiben das Vorgehen
+    allgemein und führen konkrete Produkte nur noch als Beispiele auf.
+- **Karte:** Die 2026 offengebliebene Ideensammlung „Karte allgemein
+  verbessern" ist abgeschlossen — Höhe und Vollbild sind seit 0.16.0 erledigt,
+  weitere Wünsche werden künftig einzeln aufgenommen.
+
+### Behoben
+- **Veraltete Beispiel-Konfiguration:** `backend/.env.example` beschrieb noch
+  Einstellungen, die es gar nicht mehr gibt (Ollama-Variablen aus einer frühen
+  Version), und ließ neuere weg. Die Datei ist jetzt auf die tatsächliche
+  Konfiguration abgeglichen; die zugehörigen toten Schalter sind entfernt.
+- Die Vorgabe-Version im Deployment zeigte noch auf 0.14.0 statt auf die
+  aktuelle Ausgabe.
+
 ## [0.18.0] – 2026-07-20
 
 ### Hinzugefügt

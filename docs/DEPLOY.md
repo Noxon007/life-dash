@@ -1,37 +1,46 @@
-# Life-Dash — Deployment ins Homelab (D1)
+# Life-Dash — Deployment
 
-Runbook für das erste echte Deployment: GitHub-Repo → GHCR-Image → Server mit
-Docker Compose, HTTPS via **Pangolin (Traefik)**, Login via **Pocket ID**.
+Runbook für ein eigenes Deployment: GHCR-Image → Server mit Docker Compose →
+HTTPS über einen Reverse Proxy → Login über deinen OIDC-Provider.
+
+Die genannten Produkte sind **Beispiele, keine Voraussetzung**. Life-Dash
+spricht nur Standards: OIDC fürs Login, eine OpenAI-kompatible API für die KI,
+Nominatim fürs Geocoding. Womit du die belegst, entscheidest du in der `.env` —
+die vollständige Referenz dazu ist [.env.example](../.env.example).
+
+Wer das Image nicht selbst bauen will, überspringt Schritt 1: die offiziellen
+Images liegen öffentlich unter `ghcr.io/noxon007/life-dash`.
 
 ---
 
-## 1. GitHub-Repo & Release pushen (Windows-Dev-Rechner)
+## 1. Eigenes Image bauen (optional)
 
-Auf github.com ein **öffentliches** Repo `life-dash` unter `Noxon007` anlegen
-(ohne README/License, das Repo ist schon initialisiert). Dann Code und den
-SemVer-Release-Tag pushen:
+Nur nötig, wenn du einen Fork betreibst oder eigene Änderungen ausrollst.
+Repo auf GitHub anlegen, Code und einen SemVer-Tag pushen:
 
-```powershell
-cd d:\Python\life-dash
-git remote add origin https://github.com/Noxon007/life-dash.git
+```bash
+git remote add origin https://github.com/<dein-account>/life-dash.git
 git push -u origin main
-git push origin v0.5.0
+git push origin v0.19.0
 ```
 
 Der Tag-Push startet die Action **Docker Release**: sie baut das Multi-Arch-Image
-und pusht es als `ghcr.io/noxon007/life-dash:0.5.0`, `:0.5` und `:latest`. Status
-unter *Repo → Actions*. Nach dem ersten Lauf einmal prüfen, dass das Package
-öffentlich ist (*Profil → Packages → life-dash → Package settings →
-Visibility*) — dann zieht der Server es ohne Login.
+(`linux/amd64` + `linux/arm64`) und pusht es als
+`ghcr.io/<dein-account>/life-dash:0.19.0`, `:0.19` und `:latest`. Status unter
+*Repo → Actions*. Nach dem ersten Lauf prüfen, dass das Package öffentlich ist
+(*Profil → Packages → life-dash → Package settings → Visibility*) — dann zieht
+der Server es ohne Registry-Login. In der `docker-compose.yml` den `image:`-Pfad
+auf deinen Account umstellen.
 
 **Neue Version veröffentlichen** (Versionsschema: [CHANGELOG.md](../CHANGELOG.md)):
-committen, CHANGELOG ergänzen, `git tag v0.5.1` (Bugfix) bzw. `v0.6.0`
+committen, CHANGELOG ergänzen, `git tag v0.19.1` (Bugfix) bzw. `v0.20.0`
 (Feature), Tag pushen. Auf dem Server dann `LIFEDASH_VERSION` in `.env`
 hochsetzen und `docker compose pull && docker compose up -d`.
 
-## 2. Pocket ID: OIDC-Client anlegen
+## 2. OIDC-Client anlegen
 
-In Pocket ID (läuft bereits) einen neuen OIDC-Client anlegen:
+Life-Dash funktioniert mit jedem standardkonformen OIDC-Provider — Authentik,
+Keycloak, Pocket ID, Zitadel, Auth0 und andere. Dort einen Client anlegen:
 
 | Feld | Wert |
 |---|---|
@@ -39,18 +48,23 @@ In Pocket ID (läuft bereits) einen neuen OIDC-Client anlegen:
 | Callback-URL | `https://life.example.com/api/auth/callback` (= `PUBLIC_BASE_URL` + `/api/auth/callback`) |
 | Public Client (PKCE) | ja → `OIDC_CLIENT_SECRET` bleibt leer |
 
-`OIDC_ISSUER` ist die Basis-URL von Pocket ID, `OIDC_CLIENT_ID` die generierte Client-ID.
+`OIDC_ISSUER` ist die Basis-URL des Providers (dort muss
+`/.well-known/openid-configuration` erreichbar sein), `OIDC_CLIENT_ID` die
+generierte Client-ID. Mit `OIDC_PROVIDER_NAME` kannst du den Namen deines
+Anmeldedienstes auf dem Login-Screen anzeigen lassen; ohne die Variable steht
+dort ein neutraler SSO-Hinweis.
 
-## 2a. Hinweis: Raspberry Pi / ARM64
+Kein OIDC-Provider zur Hand? `AUTH_MODE=dev` startet ohne Login mit einem festen
+Admin-Nutzer — nur für lokale Tests, **niemals öffentlich erreichbar betreiben**.
+
+## 2a. Hinweis: ARM64 / Einplatinenrechner
 
 Das Image wird als Multi-Arch-Manifest gebaut (`linux/amd64` + `linux/arm64`) —
-`docker compose pull` zieht auf einem Pi 5 automatisch die passende Variante,
-kein Extra-Schritt nötig.
+`docker compose pull` zieht automatisch die passende Variante, kein Extra-Schritt.
 
-Die KI läuft ohnehin über die **Gemini API** (kein LLM-Dienst im Stack), der Pi
-ist also nur der leichte App-Server — für FastAPI + SQLite/Postgres reicht er
-locker. Der `db`-Service (offizielles `postgres:18-alpine`) läuft nativ auf
-ARM64, keine Einschränkung.
+Für FastAPI + SQLite/Postgres reicht ein Einplatinenrechner (z. B. Raspberry Pi 5)
+locker, solange die KI über eine externe API läuft und kein LLM lokal rechnet.
+Der `db`-Service (offizielles `postgres:18-alpine`) läuft nativ auf ARM64.
 
 ## 3. Server vorbereiten
 
@@ -67,20 +81,31 @@ cp .env.example .env
 `.env` ausfüllen — Minimum:
 
 ```ini
-LIFEDASH_VERSION=0.6.0
+LIFEDASH_VERSION=0.19.0
 PUBLIC_BASE_URL=https://life.example.com
 OIDC_ISSUER=https://id.example.com
-OIDC_CLIENT_ID=<aus Pocket ID>
+OIDC_CLIENT_ID=<Client-ID aus deinem OIDC-Provider>
 SESSION_SECRET=<python -c "import secrets; print(secrets.token_urlsafe(48))">
 POSTGRES_PASSWORD=<eigenes DB-Passwort — PostgreSQL ist der Standard>
-# KI über Gemini (Standardweg) — Key von https://aistudio.google.com/apikey:
-AI_PROVIDER=openai
-OPENAI_API_KEY=<Gemini-Key>
-# AI_PROVIDER=mock lässt die KI weg (kein Key nötig) — für einen ersten Smoke-Test.
 ```
 
-Die übrigen Gemini-Defaults (Base-URL, Modell, Embeddings) sind in
-`.env.example` bereits gesetzt und müssen nur bei Abweichung angepasst werden.
+Damit läuft die App bereits — die KI bleibt im Modus `mock` (regelbasiert,
+kein Schlüssel nötig). Für echte KI-Analyse zusätzlich einen
+OpenAI-kompatiblen Endpoint eintragen, zum Beispiel:
+
+```ini
+AI_PROVIDER=openai
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_API_KEY=<dein Schlüssel>
+OPENAI_MODEL=gpt-4o-mini
+# Optional: semantische Suche
+OPENAI_EMBED_MODEL=text-embedding-3-small
+```
+
+Andere Anbieter (Gemini, lokales Ollama, LM Studio …) unterscheiden sich nur in
+Basis-URL und Modellnamen — Beispiele stehen in [.env.example](../.env.example).
+Wer Embeddings nutzt, sollte `SEMANTIC_MIN_SIMILARITY` zum Modell passend
+nachziehen; der Standard 0.4 ist für bge-m3 kalibriert.
 
 Start:
 
@@ -90,20 +115,26 @@ docker compose up -d
 curl -s http://127.0.0.1:8000/health   # -> {"status": ...}
 ```
 
-## 4. Pangolin: Resource anlegen
+## 4. Reverse Proxy einrichten
 
-In Pangolin eine neue **Resource** für die gewünschte Domain
-(z. B. `life.example.com`) anlegen:
+Life-Dash lauscht auf `LIFEDASH_PORT` (Standard 8000) und erwartet davor einen
+Reverse Proxy, der TLS terminiert — Traefik, Caddy, nginx, Pangolin oder was du
+sonst betreibst. Nötig ist nur:
 
-- **Ziel:** `http://<server-ip-oder-newt-site>:8000` (der `LIFEDASH_PORT` aus `.env`).
-- **HTTPS:** übernimmt Pangolin/Traefik automatisch.
-- **Pangolin-eigene Authentifizierung für diese Resource deaktivieren** —
-  Life-Dash hat den eigenen Pocket-ID-Login; sonst gibt es einen Doppel-Login
-  und die PWA-/API-Aufrufe vom Handy scheitern am Pangolin-Auth-Redirect.
+- **Ziel:** `http://<server-ip>:8000` (der `LIFEDASH_PORT` aus `.env`).
+- **HTTPS** für die öffentliche Domain.
+- **Weiterreichen der Proxy-Header** (`X-Forwarded-Proto`, `X-Forwarded-For`):
+  Uvicorn läuft mit `--proxy-headers`, damit Scheme und Client-IP stimmen.
 
-Die Domain muss exakt `PUBLIC_BASE_URL` entsprechen, sonst schlägt der
-OIDC-Callback fehl. Uvicorn läuft mit `--proxy-headers`, damit hinter Traefik
-Scheme/Client-IP stimmen.
+Zwei Stolperfallen:
+
+- Die Domain muss **exakt** `PUBLIC_BASE_URL` entsprechen, sonst schlägt der
+  OIDC-Callback fehl.
+- Falls dein Proxy eine **eigene Authentifizierung** davorschalten kann
+  (Traefik ForwardAuth, Authelia, Pangolin-Auth …), schalte sie für diese
+  Anwendung **ab**. Life-Dash bringt seinen eigenen OIDC-Login mit; sonst gibt
+  es einen Doppel-Login, und die PWA-/API-Aufrufe vom Handy scheitern am
+  Auth-Redirect des Proxys.
 
 ## 5. Erster Login & Datenübernahme
 

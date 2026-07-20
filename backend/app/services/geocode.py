@@ -9,8 +9,9 @@ statt der Lokalschrift (z. B. Griechisch). Zusätzlich wird über
 `namedetails` der beste lateinische Name (`name:de` -> `name:en`) bevorzugt,
 falls der Hauptname trotzdem in Fremdschrift kommt.
 
-MVP: öffentlicher Nominatim-Endpoint. Fürs Homelab später self-hosted
-Nominatim (gleiche API) -> nur base_url tauschen. Nur Standardbibliothek.
+Standard: öffentlicher Nominatim-Endpoint. Ein selbst gehosteter oder
+kommerzieller Nominatim-kompatibler Dienst (gleiche API) läuft genauso —
+nur GEOCODER_BASE_URL tauschen. Nur Standardbibliothek.
 """
 from __future__ import annotations
 

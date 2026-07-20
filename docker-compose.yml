@@ -1,4 +1,4 @@
-# Life-Dash — Homelab-Deployment
+# Life-Dash — Deployment mit Docker Compose
 #
 #   Server (Image aus GHCR, öffentlich — kein Login nötig):
 #     docker compose pull && docker compose up -d
@@ -15,12 +15,13 @@
 #   ./db    -> PostgreSQL-Datenverzeichnis
 # Backup = diese Ordner sichern (bzw. der JSON-Export aus der App).
 #
-# KI läuft über die Gemini API (OpenAI-kompatibler Endpoint) — kein lokaler
-# LLM-Dienst im Stack. Konfiguration über .env (siehe .env.example).
-# Details: docs/DEPLOY.md
+# Die KI spricht eine OpenAI-kompatible API — welcher Anbieter dahintersteht,
+# entscheidet die .env; kein LLM-Dienst im Stack. Ohne Konfiguration läuft die
+# App im Modus "mock" (regelbasiert, kein Key nötig).
+# Alle Einstellungen: .env.example · Anleitung: docs/DEPLOY.md
 services:
   app:
-    image: ghcr.io/noxon007/life-dash:${LIFEDASH_VERSION:-0.14.0}
+    image: ghcr.io/noxon007/life-dash:${LIFEDASH_VERSION:-0.19.0}
     build: .  # greift nur bei `docker compose build` im Quell-Checkout
     restart: unless-stopped
     ports:
@@ -38,23 +39,32 @@ services:
       TZ: ${TZ:-Europe/Berlin}
       # Ausführlichkeit der App-Logs: DEBUG | INFO | WARNING | ERROR (A9)
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      # --- Auth (Pocket ID) ---
+      # --- Auth: OIDC (beliebiger standardkonformer Provider) ---
       AUTH_MODE: ${AUTH_MODE:-oidc}
-      OIDC_ISSUER: ${OIDC_ISSUER:?OIDC_ISSUER in .env setzen (Pocket ID URL)}
+      OIDC_ISSUER: ${OIDC_ISSUER:?OIDC_ISSUER in .env setzen (Basis-URL deines OIDC-Providers)}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?OIDC_CLIENT_ID in .env setzen}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_PROVIDER_NAME: ${OIDC_PROVIDER_NAME:-}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://127.0.0.1:8000}
       SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET in .env setzen (langer Zufallswert)}
-      # --- KI: Gemini API (OpenAI-kompatibel), Chat + Embeddings ---
-      AI_PROVIDER: ${AI_PROVIDER:-openai}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY in .env setzen (Gemini-Key von aistudio.google.com/apikey) — oder AI_PROVIDER=mock}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gemini-3.5-flash}
-      OPENAI_EMBED_MODEL: ${OPENAI_EMBED_MODEL:-gemini-embedding-2}
+      SESSION_MAX_AGE_DAYS: ${SESSION_MAX_AGE_DAYS:-30}
+      # --- KI: OpenAI-kompatible API, Anbieter frei (siehe .env.example) ---
+      # Kein Key erzwungen: ohne Konfiguration bleibt es beim Modus "mock".
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      CONFIDENCE_REVIEW_THRESHOLD: ${CONFIDENCE_REVIEW_THRESHOLD:-0.75}
+      OPENAI_EMBED_MODEL: ${OPENAI_EMBED_MODEL:-}
       OPENAI_EMBED_BASE_URL: ${OPENAI_EMBED_BASE_URL:-}
       OPENAI_EMBED_API_KEY: ${OPENAI_EMBED_API_KEY:-}
-      SEMANTIC_MIN_SIMILARITY: ${SEMANTIC_MIN_SIMILARITY:-0.6}
+      OPENAI_EMBED_QUERY_PREFIX: ${OPENAI_EMBED_QUERY_PREFIX:-}
+      OPENAI_EMBED_DOC_PREFIX: ${OPENAI_EMBED_DOC_PREFIX:-}
+      SEMANTIC_MIN_SIMILARITY: ${SEMANTIC_MIN_SIMILARITY:-0.4}
+      # --- Geocoding: Nominatim oder ein kompatibler Dienst ---
       GEOCODING_ENABLED: ${GEOCODING_ENABLED:-true}
+      GEOCODER_BASE_URL: ${GEOCODER_BASE_URL:-https://nominatim.openstreetmap.org}
+      GEOCODER_API_KEY: ${GEOCODER_API_KEY:-}
       # --- DB: PostgreSQL (Default) — SQLite via DATABASE_URL-Override ---
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://lifedash:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD in .env setzen}@db:5432/lifedash}
       SEED_DEMO: ${SEED_DEMO:-false}
@@ -63,7 +73,7 @@ services:
         condition: service_healthy
 
   db:
-    # PG 18: Support bis Nov. 2030, Async-I/O (schnellere Reads auf dem Pi);
+    # PG 18: Support bis Nov. 2030, Async-I/O (spürbar auf schwacher Hardware);
     # pgvector/PostGIS (geplant) unterstützen 18 inkl. ARM64.
     # Achtung: Major-Wechsel auf bestehendem Volume braucht Dump/Restore
     # (JSON-Export -> Volume leeren -> Import, docs/DEPLOY.md Kap. 6).
