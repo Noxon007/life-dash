@@ -14,6 +14,7 @@ from app.database import Base, SessionLocal, engine
 from app.migrate import ensure_schema
 from app.modules.registry import load_modules
 from app.routers import (
+    achievements,
     admin,
     auth,
     data,
@@ -24,6 +25,7 @@ from app.routers import (
     modules,
     search,
     tracks,
+    world,
 )
 from app.seed import seed_demo
 from app.version import APP_VERSION
@@ -107,6 +109,8 @@ app.include_router(modules.router)
 app.include_router(data.router)
 app.include_router(tracks.router)
 app.include_router(jobs.router)
+app.include_router(world.router)
+app.include_router(achievements.router)
 app.include_router(admin.router)
 
 

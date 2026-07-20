@@ -32,3 +32,12 @@ category_labels:
 prompt_rules: |
   - Kategorie meal = Essen/Mahlzeit (Restaurantbesuch, besonderes Gericht, gekocht).
   - Entity food: konkretes Gericht oder Essen ("Ramen", "Pizza Margherita", ...).
+
+# --- F6: Erfolge ---
+achievements:
+  - id: gourmet
+    label: "Feinschmecker"
+    emoji: "🍽️"
+    description: "Verschiedene Gerichte gegessen"
+    metric: entity_count
+    tiers: { bronze: 10, silber: 50, gold: 150, platin: 500 }

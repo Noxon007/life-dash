@@ -8,3 +8,12 @@ compendium: true
 event_categories: []
 prompt_rules: |
   - Entity game: konkrete Spieletitel ("Zelda: Tears of the Kingdom", "Elden Ring", ...).
+
+# --- F6: Erfolge ---
+achievements:
+  - id: gamer
+    label: "Spieler"
+    emoji: "🎮"
+    description: "Verschiedene Spiele gespielt"
+    metric: entity_count
+    tiers: { bronze: 5, silber: 25, gold: 75, platin: 200 }

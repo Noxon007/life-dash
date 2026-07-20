@@ -29,3 +29,12 @@ category_labels:
   trip: Reise
 prompt_rules: |
   - Kategorie trip = Reise, Urlaub, Ausflug, Städtetrip.
+
+# --- F6: Erfolge ---
+achievements:
+  - id: traveller
+    label: "Vielreisender"
+    emoji: "🧳"
+    description: "Reisen und Ausflüge unternommen"
+    metric: event_count
+    tiers: { bronze: 5, silber: 25, gold: 75, platin: 200 }

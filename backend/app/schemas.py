@@ -222,3 +222,65 @@ class ModuleRead(BaseModel):
     compendium: bool = False
     category_labels: dict = {}
     event_categories: list[str] = []
+
+
+# --------------------------------------------------------------------------- #
+# F5 — Welt-Reiter (Länderkarte & Kontinente-Checkliste)
+# --------------------------------------------------------------------------- #
+class VisitedCountry(BaseModel):
+    """Ein besuchtes Land — Schlüssel ist der ISO-Code (passt zum GeoJSON)."""
+    iso: str
+    name: str
+    continent: str
+    event_count: int
+    first_visit: datetime | None = None
+    last_visit: datetime | None = None
+
+
+class ContinentProgress(BaseModel):
+    """Fortschritt je Kontinent für die Checkliste."""
+    code: str
+    label: str
+    total: int          # Länder auf diesem Kontinent (Stammdaten)
+    visited: int
+    countries: list[VisitedCountry] = []
+    missing: list[str] = []   # noch nicht besuchte Länder — macht es zur Checkliste
+
+
+class WorldRead(BaseModel):
+    """Alles, was der Welt-Reiter braucht — eine reine Ableitung (Schicht 4)."""
+    countries_total: int
+    countries_visited: int
+    continents_total: int
+    continents_visited: int
+    continents: list[ContinentProgress]
+    recent: list[VisitedCountry] = []   # zuletzt neu besucht
+    # Länder-Entities, die zu keinem Eintrag der Stammdaten passen (Tippfehler,
+    # historische Namen) — sichtbar machen statt stillschweigend verschlucken.
+    unmatched: list[str] = []
+
+
+# --------------------------------------------------------------------------- #
+# F6 — Achievements (Bronze/Silber/Gold/Platin)
+# --------------------------------------------------------------------------- #
+class AchievementRead(BaseModel):
+    """Ein Erfolg samt aktuellem Stand — jederzeit neu berechenbar."""
+    id: str
+    module: str
+    label: str
+    description: str | None = None
+    emoji: str | None = None
+    value: int                      # aktueller Metrik-Wert
+    tier: str | None = None         # erreichte Stufe: bronze|silber|gold|platin
+    tier_index: int = 0             # 0 = noch keine Stufe, 4 = platin
+    next_tier: str | None = None    # nächste Stufe (None = alles erreicht)
+    next_threshold: int | None = None
+    progress: float = 0.0           # 0..1 bis zur nächsten Stufe
+    thresholds: dict[str, int] = {}
+
+
+class AchievementsRead(BaseModel):
+    earned: int                     # Erfolge mit mindestens Bronze
+    total: int
+    points: int                     # Bronze 1, Silber 2, Gold 3, Platin 4
+    achievements: list[AchievementRead]

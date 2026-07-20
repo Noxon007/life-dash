@@ -21,8 +21,10 @@ Entscheidungen/Anmerkungen in Kap. 15. Erst dort gezielt nachlesen statt Code ra
 - `backend/app/`: `models.py` (Event mit parent_event_id/F7, note=Markdown/F1),
   `migrate.py` (ALTER-TABLE-Migrationen: `_MISSING_COLUMNS`), `routers/` (events,
   moderation, tracks=Timeline-Import+Ortsnamen, jobs=Background-Worker mit Lock pro Typ,
-  admin, data=Export/Import, auth=OIDC), `services/` (ingestion, enrichment=Wetter,
-  geocode=Nominatim/LocationIQ mit 429-Backoff, weather=Open-Meteo)
+  admin, data=Export/Import, auth=OIDC, world=F5, achievements=F6), `services/`
+  (ingestion, enrichment=Wetter, geocode=Nominatim/LocationIQ mit 429-Backoff,
+  weather=Open-Meteo, achievements=F6-Metriken), `data/countries.py` (Länder-Stammdaten:
+  Name→ISO→Kontinent; passt zu `frontend/world-countries.geojson`)
 - `frontend/index.html`: EIN File (CSS+HTML+JS, ~3600 Zeilen) — **gezielt per Grep und
   Read mit offset/limit lesen, nie komplett**
 - Module deklarativ: `backend/modules/*.yaml` (Kategorien, Labels, Farben, Kompendium)
@@ -39,7 +41,7 @@ Entscheidungen/Anmerkungen in Kap. 15. Erst dort gezielt nachlesen statt Code ra
   etc. aus Config); `.env.example` ist die Setup-Referenz
 
 ## Stand
-Umgesetzt bis **v0.17.0** (2026-07-19). Offen laut KONZEPT 14.2: F5 Welt-Reiter,
-F6 Achievements, F8-Rest (Druck-Auswahldialog, Fotos), F10 de/en, P3.1, A24-Rest
-(Karten-Ideen), A27-Rest (Docs-Audit); Import-Quellen (P2.1 Immich, P2.8 OwnTracks,
+Umgesetzt bis **v0.18.0** (2026-07-20). Offen laut KONZEPT 14.2: F8-Rest
+(Druck-Auswahldialog, Fotos), F10 de/en, P3.1, A24-Rest (Karten-Ideen),
+A27-Rest (Docs-Audit); Import-Quellen (P2.1 Immich, P2.8 OwnTracks,
 P2.9 Automatisierung, P4.x) bewusst ZULETZT. Details/Begründungen: KONZEPT Kap. 14.2+15.

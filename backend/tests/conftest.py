@@ -27,6 +27,16 @@ def safe_settings(monkeypatch):
     monkeypatch.setattr("app.routers.jobs.WORKERS_ENABLED", False)
 
 
+@pytest.fixture(autouse=True)
+def modules_loaded():
+    """Die Modul-Registry wird sonst nur beim App-Start gefüllt — Tests, die
+    deklarative Module brauchen (Achievements F6, Prompt-Regeln A7), stünden
+    ohne sie vor einer leeren Registry."""
+    from app.modules.registry import load_modules, registry
+    if not registry.modules:
+        load_modules()
+
+
 @pytest.fixture()
 def db():
     engine = create_engine(

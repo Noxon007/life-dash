@@ -30,6 +30,8 @@ class Module:
     entity_schema: dict = field(default_factory=dict)
     statistics: list[dict] = field(default_factory=list)
     compendium_view: dict = field(default_factory=dict)
+    # F6: Erfolge deklarativ — je Eintrag eine Metrik + Schwellwerte
+    achievements: list[dict] = field(default_factory=list)
 
     @property
     def known_entity_names(self) -> list[str]:

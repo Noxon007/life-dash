@@ -30,3 +30,18 @@ compendium: true
 prompt_rules: |
   - Entity country: JEDES erwähnte Land. Auch ableiten, wenn nur eine Stadt genannt ist
     und das Land eindeutig ist (Bern -> Schweiz) — dann confidence des Events leicht senken.
+
+# --- F6: Erfolge ---
+achievements:
+  - id: globetrotter
+    label: "Weltenbummler"
+    emoji: "🌍"
+    description: "Länder besucht"
+    metric: country_count
+    tiers: { bronze: 3, silber: 10, gold: 25, platin: 50 }
+  - id: continent_hopper
+    label: "Kontinent-Springer"
+    emoji: "🧭"
+    description: "Kontinente betreten (7 sind möglich)"
+    metric: continent_count
+    tiers: { bronze: 2, silber: 3, gold: 5, platin: 7 }

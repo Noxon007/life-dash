@@ -77,3 +77,18 @@ prompt_rules: |
   - Kategorie sighting = ein Tier gesehen/beobachtet.
   - Entity animal: JEDES erwähnte Tier, egal welche Art — Hai, Adler, Kuh, Qualle ...
     attributes: {"species": "<Tierart>", "wild": true/false}. Name = die Tierart, nicht "ein Tier".
+
+# --- F6: Erfolge (Metrik + Schwellwerte, vier Stufen) ---
+achievements:
+  - id: animal_collector
+    label: "Tier-Sammler"
+    emoji: "🦁"
+    description: "Verschiedene Tierarten gesehen"
+    metric: entity_count
+    tiers: { bronze: 5, silber: 25, gold: 100, platin: 500 }
+  - id: animal_watcher
+    label: "Beobachter"
+    emoji: "🔭"
+    description: "Tiersichtungen festgehalten"
+    metric: event_count
+    tiers: { bronze: 10, silber: 50, gold: 200, platin: 1000 }

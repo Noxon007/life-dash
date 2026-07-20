@@ -10,6 +10,33 @@ jedem `MINOR` vorkommen.
 
 ## [Unreleased]
 
+## [0.18.0] – 2026-07-20
+
+### Hinzugefügt
+- **🌍 Welt:** Ein neuer Reiter zeigt, wo du schon warst — eine **Weltkarte,
+  auf der besuchte Länder eingefärbt sind** (je kräftiger, desto mehr
+  Ereignisse; Klick aufs Land zeigt Anzahl, ersten und letzten Besuch) und
+  eine **Checkliste je Kontinent** („2 von 46 in Europa") mit den besuchten
+  Ländern. Ein Klick auf einen Kontinent klappt auf, was dir noch fehlt.
+  Oben stehen die Eckdaten: besuchte Länder, Kontinente, Anteil der Welt und
+  das zuletzt neu entdeckte Land. Gespeist wird das aus deinen Ländern im
+  Kompendium — die entstehen sowohl aus eigenen Einträgen als auch aus dem
+  Standort-Import. Verschiedene Schreibweisen desselben Landes („USA" und
+  „Vereinigte Staaten") zählen als eines; Namen, die zu keinem Land passen,
+  werden unter der Karte benannt, damit du sie korrigieren kannst.
+  Die Landesgrenzen liegen als Datei bei der App — es wird nichts nachgeladen.
+- **🏆 Erfolge:** Ein neuer Reiter mit Abzeichen in vier Stufen —
+  Bronze, Silber, Gold, Platin. Zum Start dabei: Weltenbummler,
+  Kontinent-Springer, Tier-Sammler, Beobachter, Konzertgänger,
+  Bühnen-Sammler, Feinschmecker, Vielreisender, Cineast, Leseratte,
+  Spieler und Lebenskapitel. Jedes Abzeichen zeigt den aktuellen Stand,
+  einen Fortschrittsbalken und wie viel noch bis zur nächsten Stufe fehlt;
+  oben stehen erreichte Erfolge, Punkte und was kurz bevorsteht.
+  Gezählt wird nur, was in deiner Lebensdatenbank bestätigt ist —
+  Vorschläge lösen keine Erfolge aus. Erfolge werden bei jedem Aufruf neu
+  berechnet und speichern selbst nichts; wer ein Thema nicht trackt,
+  bekommt dessen Abzeichen auch nicht angezeigt.
+
 ## [0.17.0] – 2026-07-19
 
 ### Hinzugefügt

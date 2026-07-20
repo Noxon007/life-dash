@@ -8,3 +8,12 @@ compendium: true
 event_categories: []
 prompt_rules: |
   - Entity movie: konkrete Filmtitel ("Oppenheimer", "Der Herr der Ringe", ...).
+
+# --- F6: Erfolge ---
+achievements:
+  - id: cinephile
+    label: "Cineast"
+    emoji: "🎬"
+    description: "Verschiedene Filme gesehen"
+    metric: entity_count
+    tiers: { bronze: 10, silber: 50, gold: 200, platin: 750 }

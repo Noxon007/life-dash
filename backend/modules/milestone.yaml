@@ -37,3 +37,12 @@ category_labels:
 prompt_rules: |
   - Kategorie milestone = besonderes Lebensereignis: Hochzeit, Verlobung, Geburt, Umzug,
     Schul-/Studienabschluss, neuer Job, Taufe, Einschulung.
+
+# --- F6: Erfolge ---
+achievements:
+  - id: life_chapters
+    label: "Lebenskapitel"
+    emoji: "⭐"
+    description: "Meilensteine festgehalten"
+    metric: event_count
+    tiers: { bronze: 3, silber: 10, gold: 25, platin: 50 }

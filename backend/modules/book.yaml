@@ -8,3 +8,12 @@ compendium: true
 event_categories: []
 prompt_rules: |
   - Entity book: konkrete Buchtitel ("Der Steppenwolf", "Harry Potter", ...).
+
+# --- F6: Erfolge ---
+achievements:
+  - id: bookworm
+    label: "Leseratte"
+    emoji: "📖"
+    description: "Verschiedene Bücher gelesen"
+    metric: entity_count
+    tiers: { bronze: 5, silber: 25, gold: 100, platin: 300 }

@@ -32,3 +32,18 @@ category_labels:
 prompt_rules: |
   - Kategorie concert = Konzert, Festival, Live-Auftritt.
   - Entity artist: Band oder Künstler bei Konzerten/Festivals ("Die Ärzte", "Rammstein", ...).
+
+# --- F6: Erfolge ---
+achievements:
+  - id: concert_goer
+    label: "Konzertgänger"
+    emoji: "🎸"
+    description: "Konzerte und Festivals besucht"
+    metric: event_count
+    tiers: { bronze: 3, silber: 15, gold: 50, platin: 150 }
+  - id: artist_collector
+    label: "Bühnen-Sammler"
+    emoji: "🎤"
+    description: "Verschiedene Künstler live gesehen"
+    metric: entity_count
+    tiers: { bronze: 3, silber: 15, gold: 50, platin: 150 }
