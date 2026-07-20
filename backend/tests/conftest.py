@@ -67,11 +67,15 @@ def fake_weather(monkeypatch):
 
     def _fake(lat, lng, when):
         calls.append((lat, lng, when))
-        # Volles Tageswerte-Format (F3) — sonst gälte das Wetter als
-        # Alt-Bestand und würde beim nächsten Lauf nachgerüstet (0.15.1)
+        # Vollständiges Format (F3-Tageswerte + F12-Zusatzwerte) — sonst
+        # gälte das Wetter als Alt-Bestand und würde beim nächsten Lauf
+        # nachgerüstet (0.15.1 / 0.23.0)
         return {"temp_c": 21.5, "temp_min_c": 14.0, "temp_max_c": 29.0,
                 "sun_h": 11.2, "rain_mm": 0.4, "snow_cm": 0.0,
-                "wind_max_kmh": 18.4, "condition": "Klar"}
+                "wind_max_kmh": 18.4, "condition": "Klar",
+                "apparent_max_c": 31.2, "apparent_min_c": 12.5, "rain_h": 1.0,
+                "daylight_h": 15.8, "gust_max_kmh": 42.0, "uv_max": 6.4,
+                "sunrise": "05:14", "sunset": "21:02"}
 
     monkeypatch.setattr("app.services.enrichment.fetch_weather", _fake)
     return calls

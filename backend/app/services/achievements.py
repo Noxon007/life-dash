@@ -22,7 +22,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.data import countries as ref
-from app.models import ConfirmState, Entity, Event, EventEntityLink
+from app.models import ConfirmState, Entity, Event, EventEntityLink, Metric, Source
 from app.modules.registry import Module, registry
 from app.schemas import AchievementRead, AchievementsRead
 from app.services.ingestion import tracked_modules
@@ -85,11 +85,58 @@ def _continent_count(db: Session, user_id: str, module: Module, spec: dict) -> i
     return len({c.continent for c in _visited_countries(db, user_id)})
 
 
+def _weather_query(db: Session, user_id: str, spec: dict):
+    """Basis für die F11-Wettermetriken: bestätigte Events des Nutzers, die
+    eine bestimmte Wetter-Metrik tragen, gefiltert über `min`/`max`.
+
+    Deklaration im YAML:
+
+        metric: weather_event_count
+        weather: { key: sunshine_h, min: 10 }
+    """
+    cfg = spec.get("weather") or {}
+    key = cfg.get("key")
+    if not key:
+        return None
+    q = (db.query(Metric.value)
+         .join(Event, Event.id == Metric.event_id)
+         .filter(Event.user_id == user_id,
+                 Event.confirmed == ConfirmState.confirmed,
+                 Metric.source == Source.weather,
+                 Metric.key == key,
+                 Metric.value.isnot(None)))
+    if cfg.get("min") is not None:
+        q = q.filter(Metric.value >= float(cfg["min"]))
+    if cfg.get("max") is not None:
+        q = q.filter(Metric.value <= float(cfg["max"]))
+    return q
+
+
+def _weather_event_count(db: Session, user_id: str, module: Module, spec: dict) -> int:
+    """Wie viele bestätigte Tage erfüllen die Wetterbedingung?
+    („Sonnenanbeter": Tage mit ≥ 10 Sonnenstunden.)"""
+    q = _weather_query(db, user_id, spec)
+    return q.count() if q is not None else 0
+
+
+def _weather_sum(db: Session, user_id: str, module: Module, spec: dict) -> int:
+    """Summe einer Wetter-Metrik über alle bestätigten Events — z. B.
+    gesammelte Sonnenstunden. Gerundet, weil Erfolge in ganzen Zahlen zählen."""
+    q = _weather_query(db, user_id, spec)
+    if q is None:
+        return 0
+    return int(round(sum(v for (v,) in q.all())))
+
+
 _METRICS = {
     "entity_count": _entity_count,
     "event_count": _event_count,
     "country_count": _country_count,
     "continent_count": _continent_count,
+    # F11 — Erfolge aus bereits gespeicherten Wetterdaten, ohne einen
+    # einzigen zusätzlichen API-Aufruf
+    "weather_event_count": _weather_event_count,
+    "weather_sum": _weather_sum,
 }
 
 

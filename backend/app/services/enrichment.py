@@ -14,8 +14,16 @@ from app.models import Event, Metric, Source
 from app.services.weather import fetch_weather
 
 
+# Welche Wetter-Generation trägt ein Event? Hochzählen, wenn neue Felder
+# dazukommen — dann rüstet der nächste Lauf Bestandsdaten additiv nach.
+#   1 = 0.14.0, F3-Tageswerte (Min/Max, Sonne, Regen, Schnee, Wind)
+#   2 = 0.23.0, F12-Zusatzwerte (gefühlt, Regenstunden, Sonnenlauf, Böen, UV)
+WEATHER_REVISION = 2
+_REVISION_KEY = "weather_rev"
+
 # F3-Tageswerte — fehlen sie ALLE, stammt das Wetter noch aus der Zeit vor
-# 0.14.0 (nur temperature_c + Bedingung) und wird additiv nachgerüstet
+# 0.14.0 (nur temperature_c + Bedingung). Bleibt als Erkennung für Bestände,
+# die noch gar keinen Revisionsmarker tragen.
 _DAILY_KEYS = {"temp_min_c", "temp_max_c", "sunshine_h", "rain_mm",
                "snow_cm", "wind_max_kmh"}
 
@@ -29,13 +37,25 @@ def _needs_weather(event: Event) -> bool:
         return False
     if event.date_start.date() > today:
         return False  # Zukunft hat noch kein Wetter
-    have = {m.key for m in event.metrics if m.source == Source.weather}
-    if not have:
+    weather = [m for m in event.metrics if m.source == Source.weather]
+    if not weather:
         return True
-    # 0.15.1: Alt-Bestand additiv um die Tageswerte ergänzen (KONZEPT F3:
-    # „Bestandsdaten per Re-Enrichment additiv ergänzbar") — vorhandene
-    # Werte bleiben unangetastet, es kommen nur fehlende Schlüssel dazu.
-    return not (have & _DAILY_KEYS)
+    # Alt-Bestand additiv nachrüsten (KONZEPT F3: „Bestandsdaten per
+    # Re-Enrichment additiv ergänzbar") — vorhandene Werte bleiben
+    # unangetastet, es kommen nur fehlende Schlüssel dazu.
+    #
+    # Entscheidend ist der Revisionsmarker, NICHT das Vorhandensein einzelner
+    # Felder: Open-Meteo liefert nicht für jeden Ort und jedes Datum jedes
+    # Feld (UV und Böen fehlen in alten Archivjahren regelmäßig). Würde man
+    # auf die Felder selbst prüfen, geriete so ein Event in eine Endlosschleife
+    # und würde bei JEDEM Lauf erneut abgefragt. Der Marker sagt „für diese
+    # Generation wurde gefragt" — unabhängig davon, was zurückkam.
+    rev = next((m.value for m in weather if m.key == _REVISION_KEY), None)
+    if rev is None:
+        # Kein Marker: entweder Vor-0.14.0-Bestand (nur temperature_c) oder
+        # F3-Bestand aus 0.14.0–0.22.0. Beides bekommt einen Nachrüst-Lauf.
+        return True
+    return rev < WEATHER_REVISION
 
 
 def _weather_candidates(db: Session) -> list[Event]:
@@ -52,6 +72,19 @@ _WEATHER_METRICS = {
     "rain_mm": ("rain_mm", "mm"),
     "snow_cm": ("snow_cm", "cm"),
     "wind_max_kmh": ("wind_max_kmh", "km/h"),
+    # --- F12 (0.23.0) ---
+    "apparent_max_c": ("apparent_temp_max_c", "°C"),
+    "apparent_min_c": ("apparent_temp_min_c", "°C"),
+    "rain_h": ("rain_h", "h"),
+    "daylight_h": ("daylight_h", "h"),
+    "gust_max_kmh": ("gust_max_kmh", "km/h"),
+    "uv_max": ("uv_max", None),
+}
+
+# F12: Werte, die als Text gespeichert werden (Uhrzeiten statt Zahlen)
+_WEATHER_TEXT_METRICS = {
+    "sunrise": "sunrise",
+    "sunset": "sunset",
 }
 
 
@@ -74,6 +107,24 @@ def _add_weather(db: Session, event: Event) -> bool:
     if "weather" not in have and w.get("condition"):
         db.add(Metric(event_id=event.id, key="weather",
                       value_text=w["condition"], source=Source.weather))
+        added += 1
+    for src, key in _WEATHER_TEXT_METRICS.items():   # F12: Sonnenauf-/-untergang
+        if key in have or not w.get(src):
+            continue
+        db.add(Metric(event_id=event.id, key=key,
+                      value_text=w[src], source=Source.weather))
+        added += 1
+    # Revisionsmarker setzen bzw. hochziehen — auch wenn die Quelle diesmal
+    # kein einziges neues Feld geliefert hat. Genau das verhindert, dass
+    # dasselbe Event bei jedem Lauf erneut abgefragt wird.
+    marker = next((m for m in event.metrics
+                   if m.source == Source.weather and m.key == _REVISION_KEY), None)
+    if marker is None:
+        db.add(Metric(event_id=event.id, key=_REVISION_KEY,
+                      value=WEATHER_REVISION, source=Source.weather))
+        added += 1
+    elif (marker.value or 0) < WEATHER_REVISION:
+        marker.value = WEATHER_REVISION
         added += 1
     return added > 0
 

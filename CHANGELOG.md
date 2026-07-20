@@ -15,6 +15,41 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.23.0] – 2026-07-20
+
+### Added
+- **🌦️ Your weather record:** a new block in the statistics adds up what the
+  weather already attached to your entries actually says — days carrying
+  weather, total hours of sunshine, how many of your days were rainy, and your
+  warmest trip. Plus a “rainy days per year” chart. **None of this needs a
+  single new lookup:** the data has been sitting there since v0.14, and until
+  now exactly one panel read it.
+- **Six weather achievements:** sun worshipper, sunshine collector, bad-weather
+  defier, frostbite, heat seeker and storm-hardened — in the familiar four
+  tiers, computed from the weather already stored. They live in their own
+  “Weather” module, so you can switch them off like any other module if that
+  is not your thing.
+- **Average temperature per country** in the world tab — visible in the map
+  popup and on the country chips in the checklist.
+- **More weather per day:** entries enriched from now on also record the
+  **feels-like temperature**, **how long it rained** (not just how much),
+  **sunrise, sunset and length of day**, plus **wind gusts** and the **UV
+  index**. Five degrees with wind is a different memory from five degrees
+  without, and on a trip to the far north the length of the day is half the
+  story. The event line shows the feels-like value only when it differs
+  noticeably from the thermometer — otherwise it would just repeat the number.
+- Existing entries are **topped up additively** on the next weather run:
+  nothing already stored is overwritten or recomputed.
+
+### Fixed
+- **Weather enrichment could have re-fetched the same day forever.** Life-Dash
+  decided whether an entry still needed weather by checking which values were
+  present — but a weather service does not return every value for every place
+  and date (the UV index is missing from older archive years, for instance).
+  Such an entry would have been queried again on every single run. Entries now
+  record which generation of weather data they carry, so each one is fetched
+  once and only once, whatever comes back.
+
 ## [0.22.0] – 2026-07-20
 
 ### Added

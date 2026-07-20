@@ -1,0 +1,70 @@
+# Modul: Wetter
+#
+# Ein Sonderfall unter den Modulen: Wetter ist keine Kategorie, die man erfasst,
+# sondern eine Anreicherung, die an Events hängt (Kap. 3.1 — Fakten-Anreicherung
+# der Lebensdatenbank). Es gibt deshalb keine event_categories, keine Entities
+# und kein Kompendium — nur Erfolge.
+#
+# Warum trotzdem ein eigenes Modul (F11, 0.23.0)? Weil Erfolge laut Konzept
+# deklarativ im YAML stehen und die Tracking-Auswahl (A15) pro Modul greift:
+# wer keine Wetter-Erfolge mag, blendet dieses Modul aus. In trip.yaml
+# einsortiert wären sie an Reisen gekoppelt — Wetter hängt aber an jedem
+# verorteten Event, nicht nur an Urlauben.
+key: weather
+label: Wetter
+icon: cloud
+color: "#5bc0de"
+emoji: "🌦️"
+event_categories: []
+compendium: false
+
+# --- F11: Erfolge aus bereits gespeicherten Wetterdaten ---
+# Alle Metriken lesen NUR vorhandene Werte — kein einziger API-Aufruf.
+achievements:
+  - id: sun_worshipper
+    label: "Sonnenanbeter"
+    emoji: "☀️"
+    description: "Tage mit mindestens 10 Sonnenstunden erlebt"
+    metric: weather_event_count
+    weather: { key: sunshine_h, min: 10 }
+    tiers: { bronze: 5, silber: 25, gold: 100, platin: 365 }
+
+  - id: sun_collector
+    label: "Sonnenstunden-Sammler"
+    emoji: "🌞"
+    description: "Sonnenstunden über alle Tage zusammengezählt"
+    metric: weather_sum
+    weather: { key: sunshine_h }
+    tiers: { bronze: 100, silber: 500, gold: 2000, platin: 10000 }
+
+  - id: rain_defier
+    label: "Schlechtwetter-Trotzer"
+    emoji: "🌧️"
+    description: "Tage mit mindestens 10 mm Regen — trotzdem unterwegs"
+    metric: weather_event_count
+    weather: { key: rain_mm, min: 10 }
+    tiers: { bronze: 3, silber: 15, gold: 50, platin: 150 }
+
+  - id: frostbite
+    label: "Frostbeule"
+    emoji: "🥶"
+    description: "Tage, an denen es nicht über den Gefrierpunkt kam"
+    metric: weather_event_count
+    weather: { key: temp_max_c, max: 0 }
+    tiers: { bronze: 1, silber: 10, gold: 30, platin: 100 }
+
+  - id: heat_seeker
+    label: "Hitzesucher"
+    emoji: "🔥"
+    description: "Tage mit 30 °C oder mehr"
+    metric: weather_event_count
+    weather: { key: temp_max_c, min: 30 }
+    tiers: { bronze: 1, silber: 10, gold: 40, platin: 120 }
+
+  - id: storm_chaser
+    label: "Sturmerprobt"
+    emoji: "💨"
+    description: "Tage mit Böen ab 70 km/h (kommt mit neueren Wetterdaten)"
+    metric: weather_event_count
+    weather: { key: gust_max_kmh, min: 70 }
+    tiers: { bronze: 1, silber: 5, gold: 20, platin: 60 }

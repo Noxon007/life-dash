@@ -798,6 +798,22 @@
             <div class="stat-sub" id="stat-snowy-sub">–</div>
           </div>
         </div>
+
+        <!-- F11: Auswertungen aus bereits gespeicherten Wetterdaten -->
+        <div class="panel" id="weather-summary" style="margin-bottom:20px; display:none">
+          <h3 data-i18n="wx.title">🌦️ Deine Wetterbilanz</h3>
+          <div class="grid cols-4" id="weather-tiles"></div>
+          <div class="action-desc" style="margin-top:12px">
+            <span data-i18n="wx.hint">Gerechnet aus dem Wetter, das bereits an deinen Ereignissen hängt —
+            ohne neue Abfragen. Je mehr Ereignisse Wetter tragen, desto aussagekräftiger.</span>
+          </div>
+        </div>
+        <div class="grid cols-2">
+          <div class="panel" id="panel-rain-years" style="display:none">
+            <h3 data-i18n="chart.raindays">Regentage pro Jahr</h3>
+            <div id="chart-raindays"></div>
+          </div>
+        </div>
         <div class="grid cols-2">
           <div class="panel">
             <h3 data-i18n="chart.peryear">Ereignisse pro Jahr</h3>
@@ -1669,6 +1685,19 @@ const I18N_EN = {
   'adm.fuzzy': "⏳ Vague dates",
   'btn.preview': "🔍 Preview",
   'btn.confirmall': "✓ Confirm all",
+  'wx.title': "🌦️ Your weather record",
+  'wx.hint': "Computed from the weather already attached to your entries — no new lookups. The more entries carry weather, the more it says.",
+  'wx.days': "📆 Days with weather",
+  'wx.days.sub': "entries carrying weather data",
+  'wx.sun': "☀️ Hours of sunshine",
+  'wx.sun.sub': "across all days together",
+  'wx.rain': "🌧️ Rainy days",
+  'wx.rain.sub': "of your recorded days",
+  'wx.trip': "🏖️ Warmest trip",
+  'wx.trip.sub': "no trip with weather yet",
+  'wx.feels': "feels like",
+  'chart.raindays': "Rainy days per year",
+  'world.avgtemp': "Avg. temperature",
   'bm.auto': "🌓 Matching the theme",
   'bm.osm': "🗺️ OpenStreetMap",
   'bm.topo': "⛰️ OpenTopoMap",
@@ -2242,6 +2271,19 @@ function weatherSummary(e) {
   if (snow && snow.value > 0) parts.push(`❄️ ${snow.value} cm`);
   const wind = get('wind_max_kmh');
   if (wind && wind.value >= 30) parts.push(`💨 ${wind.value} km/h`);  // nur wenn nennenswert
+  // F12: gefühlte Temperatur nur zeigen, wenn sie spürbar abweicht — sonst
+  // wiederholt die Zeile bloß dieselbe Zahl. Ab 3 °C Unterschied wird's eine
+  // eigene Erinnerung („gefühlt −8 °C").
+  const appMin = get('apparent_temp_min_c'), appMax = get('apparent_temp_max_c');
+  if (appMin && min && Math.abs(appMin.value - min.value) >= 3)
+    parts.push(`${t('wx.feels', 'gefühlt')} ${Math.round(appMin.value)}–${Math.round((appMax || appMin).value)} °C`);
+  const rainH = get('rain_h');
+  if (rainH && rainH.value > 0) parts.push(`⏱️ ${rainH.value} h`);
+  const gust = get('gust_max_kmh');
+  if (gust && gust.value >= 60) parts.push(`🌪️ ${gust.value} km/h`);
+  const rise = get('sunrise'), set_ = get('sunset');
+  if (rise && set_ && rise.value_text && set_.value_text)
+    parts.push(`🌅 ${rise.value_text}–${set_.value_text}`);
   return parts.length ? parts.join(' · ') : null;
 }
 function eventChips(e) {
@@ -2893,6 +2935,70 @@ document.querySelectorAll('#view-stats .stat-card[data-event-slot]').forEach(car
   card.addEventListener('click', () => { if (card.dataset.eventId) openEventEdit(card.dataset.eventId); }));
 
 // ---------- STATISTIK ----------
+// --------------------------------------------------------------------------- //
+// F11 — Wetterbilanz
+// --------------------------------------------------------------------------- //
+// Reine Ableitung aus dem, was ohnehin an den Events hängt: kein API-Aufruf,
+// nichts Gespeichertes. Der Block bleibt versteckt, solange nichts Wetter
+// trägt — eine Bilanz aus null Tagen wäre nur eine Reihe Striche.
+function renderWeatherSummary(events, metricOf, placeOf) {
+  const box = document.getElementById('weather-summary');
+  const panel = document.getElementById('panel-rain-years');
+  if (!box) return;
+  const withWeather = events.filter(e => metricOf(e, 'temperature_c', 'temp_max_c') != null);
+  if (!withWeather.length) { box.style.display = 'none'; panel.style.display = 'none'; return; }
+
+  const sum = key => withWeather.reduce((a, e) => a + (metricOf(e, key) || 0), 0);
+  const rainDays = withWeather.filter(e => (metricOf(e, 'rain_mm') || 0) >= 1).length;
+  const sunHours = Math.round(sum('sunshine_h'));
+  // Wärmste Reise: Tagesmittel über die Events einer Reise, nicht der eine
+  // heißeste Tag — sonst gewinnt jede Reise, die zufällig einen Hitzetag hatte.
+  const trips = {};
+  withWeather.filter(e => e.category === 'trip').forEach(e => {
+    const t = metricOf(e, 'temperature_c');
+    if (t == null) return;
+    const k = e.parent_event_id || e.id;
+    (trips[k] = trips[k] || { sum: 0, n: 0, e }).sum += t;
+    trips[k].n++;
+  });
+  const warmest = Object.values(trips)
+    .map(x => ({ avg: x.sum / x.n, e: x.e }))
+    .sort((a, b) => b.avg - a.avg)[0];
+
+  const tile = (num, label, sub) => `
+    <div class="stat-card">
+      <div class="stat-num">${num}</div>
+      <div class="stat-label">${label}</div>
+      <div class="stat-sub">${sub}</div>
+    </div>`;
+  const share = Math.round(rainDays / withWeather.length * 100);
+  document.getElementById('weather-tiles').innerHTML = [
+    tile(withWeather.length, t('wx.days', '📆 Tage mit Wetter'),
+         t('wx.days.sub', 'Ereignisse mit Wetterdaten')),
+    tile(sunHours ? `${sunHours} h` : '–', t('wx.sun', '☀️ Sonnenstunden'),
+         t('wx.sun.sub', 'über alle Tage zusammen')),
+    tile(rainDays, t('wx.rain', '🌧️ Regentage'),
+         `${share}% ${t('wx.rain.sub', 'deiner erfassten Tage')}`),
+    tile(warmest ? `${warmest.avg.toFixed(1)} °C` : '–', t('wx.trip', '🏖️ Wärmste Reise'),
+         warmest ? esc(warmest.e.title) : t('wx.trip.sub', 'noch keine Reise mit Wetter')),
+  ].join('');
+  box.style.display = '';
+
+  // Regentage pro Jahr — nur zeigen, wenn es überhaupt Regentage gab
+  const perYear = {};
+  withWeather.forEach(e => {
+    const y = eventYear(e);
+    if (!y) return;
+    perYear[y] = perYear[y] || 0;
+    if ((metricOf(e, 'rain_mm') || 0) >= 1) perYear[y]++;
+  });
+  const data = Object.entries(perYear).sort((a, b) => a[0] - b[0]);
+  if (rainDays && data.length) {
+    renderBars('chart-raindays', data);
+    panel.style.display = '';
+  } else panel.style.display = 'none';
+}
+
 async function loadStats() {
   const [events, animals, countries, artists] = await Promise.all([
     fetchEvents(),
@@ -2979,6 +3085,7 @@ async function loadStats() {
   tempCard('stat-rainy', metricMax('rain_mm'), ' mm', newDataHint);
   tempCard('stat-windy', metricMax('wind_max_kmh'), ' km/h', newDataHint);
   tempCard('stat-snowy', metricMax('snow_cm'), ' cm', newDataHint);
+  renderWeatherSummary(events, metricOf, placeOf);
 
   const perYear = {};
   events.forEach(e => { const y = eventYear(e); if (y) perYear[y] = (perYear[y]||0) + 1; });
@@ -3960,9 +4067,11 @@ function renderWorldChecklist(data) {
   const box = document.getElementById('world-checklist');
   box.innerHTML = data.continents.map(c => {
     const pct = c.total ? Math.round(c.visited / c.total * 100) : 0;
-    const chips = c.countries.map(x =>
-      `<span class="world-chip hit" title="${esc(x.name)}: ${x.event_count} Ereignisse">${esc(x.name)}<span class="n">${x.event_count}</span></span>`
-    ).join('');
+    const chips = c.countries.map(x => {
+      // F11: Durchschnittstemperatur, wenn das Land Wetterdaten trägt
+      const temp = x.avg_temp_c != null ? ` · ⌀ ${x.avg_temp_c} °C` : '';
+      return `<span class="world-chip hit" title="${esc(x.name)}: ${x.event_count} Ereignisse${temp}">${esc(x.name)}<span class="n">${x.event_count}</span></span>`;
+    }).join('');
     const missing = c.missing.map(n => `<span class="world-chip">${esc(n)}</span>`).join('');
     return `<div class="world-cont" data-cont="${esc(c.code)}">
       <div class="world-cont-head">
@@ -4026,7 +4135,10 @@ async function renderWorldMap(data) {
       if (hit) {
         const first = hit.first_visit ? new Date(hit.first_visit).toLocaleDateString('de-DE') : '–';
         const last = hit.last_visit ? new Date(hit.last_visit).toLocaleDateString('de-DE') : '–';
-        layer.bindPopup(`<b>${esc(hit.name)}</b><br>${hit.event_count} Ereignisse<br>
+        // F11: Durchschnittstemperatur aus den bereits gespeicherten Wetterdaten
+        const temp = hit.avg_temp_c != null
+          ? `<br>${t('world.avgtemp', 'Ø Temperatur')} ${hit.avg_temp_c} °C` : '';
+        layer.bindPopup(`<b>${esc(hit.name)}</b><br>${hit.event_count} Ereignisse${temp}<br>
           <span style="opacity:.7">erstmals ${first}<br>zuletzt ${last}</span>`);
       } else {
         layer.bindPopup(`<b>${esc(feat.properties.name)}</b><br><span style="opacity:.7">noch nicht besucht</span>`);

@@ -246,6 +246,9 @@ class VisitedCountry(BaseModel):
     event_count: int
     first_visit: datetime | None = None
     last_visit: datetime | None = None
+    # F11: Durchschnittstemperatur der bestätigten Events dieses Landes —
+    # None, solange keines davon Wetter trägt
+    avg_temp_c: float | None = None
 
 
 class ContinentProgress(BaseModel):

@@ -36,7 +36,13 @@ def fetch_weather(lat: float, lng: float, day: datetime | date) -> dict | None:
     """Liefert Tageswetter für Ort+Tag oder None (F3, Entscheidung 2026-07-19:
     reine TAGESWERTE statt abgeleiteter Logik):
     {temp_min_c, temp_max_c, sun_h, rain_mm, snow_cm, wind_max_kmh,
-     condition, code} — dazu temp_c (Tagesmittel) für Bestands-Kompatibilität."""
+     condition, code} — dazu temp_c (Tagesmittel) für Bestands-Kompatibilität.
+
+    F12 ergänzt: gefühlte Temperatur (apparent_*), Regenstunden, Sonnenauf-
+    und -untergang samt Tageslichtdauer, Windböen und UV-Index. Alles aus
+    DEMSELBEN Aufruf — die Felder waren immer verfügbar und wurden bisher
+    nur nicht abgefragt. Stundenwerte bleiben bewusst außen vor
+    (Entscheidung F3, siehe KONZEPT Anmerkung 49)."""
     if isinstance(day, datetime):
         day = day.date()
     iso = day.isoformat()
@@ -46,7 +52,11 @@ def fetch_weather(lat: float, lng: float, day: datetime | date) -> dict | None:
         "start_date": iso,
         "end_date": iso,
         "daily": ("temperature_2m_max,temperature_2m_min,weathercode,"
-                  "rain_sum,snowfall_sum,sunshine_duration,windspeed_10m_max"),
+                  "rain_sum,snowfall_sum,sunshine_duration,windspeed_10m_max,"
+                  # F12
+                  "apparent_temperature_max,apparent_temperature_min,"
+                  "precipitation_hours,sunrise,sunset,daylight_duration,"
+                  "windgusts_10m_max,uv_index_max"),
         "timezone": "auto",
     })
     req = urllib.request.Request(f"{ARCHIVE_URL}?{params}")
@@ -69,6 +79,11 @@ def fetch_weather(lat: float, lng: float, day: datetime | date) -> dict | None:
         temp = round((tmax + tmin) / 2, 1)
     elif tmax is not None:
         temp = tmax
+    daylight_s = first("daylight_duration")
+    # Sonnenauf-/-untergang kommen als ISO-Zeitstempel in Ortszeit
+    # ("2024-07-12T05:14"); gespeichert wird nur die Uhrzeit — das Datum
+    # steht ohnehin am Event.
+    clock = lambda v: v.split("T")[1][:5] if isinstance(v, str) and "T" in v else None  # noqa: E731
     return {
         "temp_c": temp,
         "temp_min_c": tmin,
@@ -79,4 +94,13 @@ def fetch_weather(lat: float, lng: float, day: datetime | date) -> dict | None:
         "wind_max_kmh": first("windspeed_10m_max"),
         "condition": WMO.get(code, "unbekannt") if code is not None else None,
         "code": code,
+        # --- F12 ---
+        "apparent_max_c": first("apparent_temperature_max"),
+        "apparent_min_c": first("apparent_temperature_min"),
+        "rain_h": first("precipitation_hours"),
+        "daylight_h": round(daylight_s / 3600, 1) if daylight_s is not None else None,
+        "gust_max_kmh": first("windgusts_10m_max"),
+        "uv_max": first("uv_index_max"),
+        "sunrise": clock(first("sunrise")),
+        "sunset": clock(first("sunset")),
     }
