@@ -235,6 +235,82 @@ def test_candidates_skip_vague_events(db, immich_user):
     assert len(candidates(db, immich_user.id)) == 1
 
 
+def test_photos_go_to_day_children_not_the_trip(db, immich_user, fake_search):
+    """F7: Hat eine Reise Tages-Kinder, bekommt sie selbst keine Fotos — die
+    Anreicherung hängt an den Tagen, genau wie das Wetter. Vorher lagen die
+    ersten zwölf Bilder am Reise-Eintrag und nichts an den einzelnen Tagen."""
+    trip = _event(db, immich_user, when=datetime(2024, 7, 1),
+                  end=datetime(2024, 7, 3), precision=DatePrecision.day)
+    for day in (1, 2, 3):
+        child = _event(db, immich_user, when=datetime(2024, 7, day),
+                       precision=DatePrecision.day)
+        child.parent_event_id = trip.id
+    db.commit()
+
+    cand_ids = {e.id for e in candidates(db, immich_user.id)}
+    assert trip.id not in cand_ids           # Eltern-Reise ausgeschlossen
+    assert len(cand_ids) == 3                 # nur die drei Tage
+
+    fake_search["assets"] = [_asset("foto", "2024-07-02T10:00:00")]
+    link_batch(db, immich_user)
+    linked = db.query(MediaRef).all()
+    assert len(linked) == 1
+    assert linked[0].event_id != trip.id      # hängt an einem Tag, nicht an der Reise
+
+
+def test_multi_day_trip_without_children_still_gets_photos(db, immich_user, fake_search):
+    """Ohne Tages-Kinder bekommt die Reise als Ganzes ihre Fotos."""
+    trip = _event(db, immich_user, when=datetime(2024, 7, 1),
+                  end=datetime(2024, 7, 3), precision=DatePrecision.day)
+    fake_search["assets"] = [_asset("foto", "2024-07-02T10:00:00")]
+
+    link_batch(db, immich_user)
+
+    assert db.query(MediaRef).one().event_id == trip.id
+
+
+def test_transient_errors_are_retried(monkeypatch):
+    """Ein 502/503/504 vom Reverse-Proxy ist vorübergehend — einmal warten und
+    erneut versuchen, statt den ganzen Foto-Lauf abzubrechen."""
+    import urllib.error
+
+    from app.services import immich as api
+
+    monkeypatch.setattr(api.time, "sleep", lambda *_: None, raising=False)
+    calls = {"n": 0}
+
+    class _Resp:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self): return b'{"version":"1.0"}'
+
+    def _open(req, timeout=0):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise urllib.error.HTTPError(req.full_url, 502, "Bad Gateway", {}, None)
+        return _Resp()
+
+    monkeypatch.setattr("urllib.request.urlopen", _open)
+    result = api.check("https://immich.example.org", "key")
+    assert result["version"] == "1.0"
+    assert calls["n"] == 2      # erst 502, dann Erfolg
+
+
+def test_persistent_errors_still_fail(monkeypatch):
+    import urllib.error
+
+    from app.services import immich as api
+
+    monkeypatch.setattr(api.time, "sleep", lambda *_: None, raising=False)
+
+    def _open(req, timeout=0):
+        raise urllib.error.HTTPError(req.full_url, 503, "Unavailable", {}, None)
+
+    monkeypatch.setattr("urllib.request.urlopen", _open)
+    with pytest.raises(api.ImmichError):
+        api.check("https://immich.example.org", "key")
+
+
 # --------------------------------------------------------------------------- #
 # Verweise sind Ableitung — Uploads nicht (Anmerkung 57)
 # --------------------------------------------------------------------------- #

@@ -27,12 +27,19 @@ def candidates(db: Session, user_id: str) -> list[Event]:
     Vage datierte Ereignisse fallen schon in `window_for` heraus; sie hier
     mitzuzählen würde den Fortschrittsbalken dauerhaft bei „noch offen"
     stehen lassen.
+
+    F7: Hat ein Ereignis **Tages-Kinder**, bekommt es selbst KEINE Fotos —
+    die Anreicherung hängt an den Kindern, pro Tag (genau wie das Wetter). Der
+    Reise-Eintrag zeigt die Fotos seiner Tage aggregiert. Sonst lägen an einer
+    Woche Urlaub die ersten zwölf Bilder am Reise-Eintrag und nichts an den
+    einzelnen Tagen — die Beschwerde, die zu dieser Regel führte.
     """
     rows = (db.query(Event)
             .filter(Event.user_id == user_id, Event.date_start.isnot(None))
             .all())
     return [e for e in rows
             if api.window_for(e) is not None
+            and not e.children
             and not any(m.provider == PROVIDER for m in e.media)]
 
 

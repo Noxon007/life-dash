@@ -15,6 +15,30 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.28.1] – 2026-07-20
+
+### Fixed
+- **The two “Today” tiles did nothing.** “Capture something” and “Go to the
+  timeline” had no effect — the click handler was wired only to the statistics
+  view, so the tiles added in 0.28.0 were never connected. Both work now, and
+  so does “Waiting for review”.
+- **Immich photos now hang on the individual days of a trip, not on the trip
+  itself.** For a multi-day trip that has day sub-entries, the pictures belong
+  to each day (exactly as the weather already does) — previously the first
+  twelve landed on the trip and none on the days. If a trip has no day
+  sub-entries, it still gets the photos as a whole. (You may want to discard the
+  Immich links and run “link photos” again to move existing ones onto the days.)
+- **A brief 502/503/504 from Immich no longer aborts the whole run.** A reverse
+  proxy in front of Immich returns those under load or during a restart; Life-
+  Dash now waits a moment and retries instead of stopping. The limit of twelve
+  pictures per entry is unchanged — with photos now landing per day, that is
+  twelve per day rather than twelve for a whole trip.
+
+### Changed
+- The release workflow uses the current GitHub Actions versions (checkout v6,
+  the Docker actions v4/v6/v7), which run on Node.js 24 — clearing the
+  deprecation warning about Node.js 20.
+
 ## [0.28.0] – 2026-07-20
 
 ### Added

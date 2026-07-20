@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -41,32 +42,54 @@ def config_for(user) -> tuple[str, str] | None:
     return (url, key) if url and key else None
 
 
+# Ein Reverse-Proxy vor Immich (Nginx, Traefik …) liefert bei Last oder einem
+# kurzen Neustart gern ein 502/503/504. Das ist vorübergehend — einmal kurz
+# warten und erneut versuchen, statt den ganzen Foto-Lauf abzubrechen.
+_TRANSIENT = (502, 503, 504)
+_RETRIES = 2
+_RETRY_WAIT = 1.5
+
+
 def _request(url: str, key: str, path: str, *, payload: dict | None = None,
              raw: bool = False):
     """Ein Aufruf gegen Immich. `payload` -> POST (JSON), sonst GET."""
+
     target = f"{url}/api{path}"
     data = json.dumps(payload).encode() if payload is not None else None
-    req = urllib.request.Request(target, data=data, method="POST" if data else "GET")
-    req.add_header("x-api-key", key)
-    req.add_header("Accept", "application/octet-stream" if raw else "application/json")
-    if data:
-        req.add_header("Content-Type", "application/json")
-    try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
-            body = resp.read()
-            return body if raw else json.loads(body.decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        if exc.code in (401, 403):
-            raise ImmichError("Immich lehnt den API-Schlüssel ab (401/403)") from exc
-        if exc.code == 404:
-            raise ImmichError(f"Immich kennt {path} nicht (404) — "
-                              "passt die URL und die Immich-Version?") from exc
-        raise ImmichError(f"Immich antwortet mit {exc.code}") from exc
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        raise ImmichError(f"Immich nicht erreichbar: {exc}") from exc
-    except json.JSONDecodeError as exc:
-        raise ImmichError("Immich liefert keine gültige JSON-Antwort — "
-                          "zeigt die URL wirklich auf Immich?") from exc
+    last: ImmichError | None = None
+    for attempt in range(_RETRIES + 1):
+        req = urllib.request.Request(target, data=data, method="POST" if data else "GET")
+        req.add_header("x-api-key", key)
+        req.add_header("Accept", "application/octet-stream" if raw else "application/json")
+        if data:
+            req.add_header("Content-Type", "application/json")
+        try:
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+                body = resp.read()
+                return body if raw else json.loads(body.decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            if exc.code in (401, 403):
+                raise ImmichError("Immich lehnt den API-Schlüssel ab (401/403)") from exc
+            if exc.code == 404:
+                raise ImmichError(f"Immich kennt {path} nicht (404) — "
+                                  "passt die URL und die Immich-Version?") from exc
+            if exc.code in _TRANSIENT and attempt < _RETRIES:
+                last = ImmichError(f"Immich vorübergehend nicht bereit ({exc.code})")
+                log.info("Immich %d bei %s — erneuter Versuch %d/%d",
+                         exc.code, path, attempt + 1, _RETRIES)
+                time.sleep(_RETRY_WAIT)
+                continue
+            raise ImmichError(f"Immich antwortet mit {exc.code}") from exc
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            if attempt < _RETRIES:
+                last = ImmichError(f"Immich nicht erreichbar: {exc}")
+                time.sleep(_RETRY_WAIT)
+                continue
+            raise ImmichError(f"Immich nicht erreichbar: {exc}") from exc
+        except json.JSONDecodeError as exc:
+            raise ImmichError("Immich liefert keine gültige JSON-Antwort — "
+                              "zeigt die URL wirklich auf Immich?") from exc
+    raise last or ImmichError("Immich nicht erreichbar")
 
 
 def check(url: str, key: str) -> dict:

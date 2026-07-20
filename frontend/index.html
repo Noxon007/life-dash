@@ -3232,13 +3232,15 @@ function jumpToEntity(type, id, name) {
   document.getElementById('view-sub').textContent = titles['compendium'][1];
   openEntityDetail(type, id, name);
 }
-document.querySelectorAll('#view-stats .stat-card[data-go]').forEach(card =>
+// data-go-Kacheln in Statistik UND Heute (F16). Vorher nur #view-stats —
+// die Heute-Kacheln „Etwas festhalten"/„Zum Zeitstrahl" hatten deshalb gar
+// keinen Handler und taten nichts.
+document.querySelectorAll('.stat-card[data-go]').forEach(card =>
   card.addEventListener('click', () => {
     const go = card.dataset.go;
-    if (go === 'admin') gotoView('admin');
-    else if (go === 'map') gotoView('map');
-    else if (go.startsWith('comp:')) openCompendiumType(go.slice(5));
+    if (go.startsWith('comp:')) openCompendiumType(go.slice(5));
     else if (go.startsWith('timeline:')) tlFilterOnly(go.slice(9));
+    else gotoView(go);   // input, timeline, admin, map …
   }));
 document.querySelectorAll('#view-stats .stat-card[data-event-slot]').forEach(card =>
   card.addEventListener('click', () => { if (card.dataset.eventId) openEventEdit(card.dataset.eventId); }));

@@ -61,6 +61,11 @@ und P5.1/P5.2 (Offline-Capture, Whisper).
 0.34 Freeze · **1.0 = Veröffentlichung**. Import-Konnektoren erst danach.
 Kein Termindruck (Anmerkung 58). Dort nachsehen statt Reihenfolge raten.
 
+**F17 (Altersanzeige, offen, Anmerkung 72):** Geburtsdatum ist ein
+Meilenstein-Ereignis „Geburt" (kein Profilfeld — eine Wahrheit); Alter je
+Ereignis = Ableitung, dezent auf der Karte. Startformular dazu hängt an A35
+(0.29, Anmerkung 73). F17 selbst noch nicht terminiert.
+
 **Offener Messwert (Anmerkung 61):** `/api/events` liefert ALLES auf einmal —
 2,0 kB je Ereignis, bei 20.000 Ereignissen 38 MB, davon 74 % Metriken/Medien/
 Objekte. F12 hat das etwa verdoppelt. 0.27 bringt nur die Ladeanzeige (A30);
