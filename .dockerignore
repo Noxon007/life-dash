@@ -1,10 +1,9 @@
-# Build-Kontext klein halten — das Dockerfile kopiert nur
-# backend/requirements.txt, backend/app, backend/modules und frontend.
+# Keep the build context small — the Dockerfile only copies
+# backend/requirements.txt, backend/app, backend/modules and frontend.
 .git
 .github
 .claude
 docs
-mockup
 .env
 backend/.env
 backend/*.db
@@ -14,5 +13,4 @@ backend/_server.err
 backend/_test.err
 **/__pycache__
 **/.venv
-START.ps1
 docker-compose.yml
