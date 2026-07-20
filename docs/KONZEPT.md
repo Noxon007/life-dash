@@ -712,6 +712,50 @@ so the table below keeps one line per package rather than repeating it.
 
 ---
 
+### 14.3 Release plan to 1.0 (decided 2026-07-20)
+
+**What 1.0 means here.** Not “feature complete” — it is a *promise*: the data
+model is stable, the upgrade path from any 0.2x database is tested, semantic
+versioning applies from then on, and a stranger can go from zero to a populated,
+working instance in ten minutes. 1.0 is therefore the **publication version**
+(note 54: no promotion before it). Everything that does not serve that promise
+is deliberately pushed to 1.x.
+
+**Ordering principle:** features first, while the data model is still cheap to
+change — then the demo dataset, which freezes what the features look like — then
+hardening, packaging and the project surface. The demo data comes *after* the
+features on purpose: seeded from an unfinished feature set, it would have to be
+rebuilt with every release.
+
+| Version | Theme | Contains | Effort |
+|---|---|---|---|
+| **0.21.0** | **Everyday polish** | **A28** (one place-name run instead of a scope selection) · **F14** (“on this day”). Two small packages with immediate daily payoff; F14 is pulled ahead of the weather packages because it costs the least and changes the feel of the app the most. | S + S |
+| **0.22.0** | **Maps** | **F13**: layer switcher on all maps (OSM, light/dark, OpenTopoMap, satellite) plus a configurable tile URL template, attribution per layer, choice stored per device. | S–M |
+| **0.23.0** | **Weather** | **F11** (aggregations, weather achievements, average temperature per country in the world tab — no API call) and **F12** (feels-like temperature, precipitation hours, sunrise/sunset via re-enrichment). Shipped together so users run **one** re-enrichment pass, not two. | S–M + S–M |
+| **0.24.0** | **Statistics** | **P3.1**: statistics widgets rendered generically from the module YAML. Placed last among the features because it pays off twice — new modules bring their own statistics, and the demo dataset in 0.25.0 then shows a full statistics tab without hand-written widgets. | M |
+| **0.25.0** | **Demo mode** (R1a) | A seeded, entirely fictional dataset behind one flag: a plausible life with trips, places across several continents, sightings, concerts, journal entries, weather and achievements. **This is the release that unblocks everything else** — screenshots, the comparison table, evaluating the tool without using your own life. | M–L |
+| **0.26.0** | **Hardening & operations** (R1c/d/f) | `AUTH_MODE=dev` unstartable in a production-shaped environment · no secrets in logs · pinned base images · Dependabot · `SECURITY.md` · versioned ghcr images and a genuine `docker compose up` · **the upgrade path from an older database tested end to end** · backup and restore documented. | M–L |
+| **0.27.0** | **Project surface** (R1b/e) | README with screenshots and a short GIF · the “why not X” comparison table from ch. 1.1 · `CONTRIBUTING.md` (single-author project, issues yes, pull requests not yet — note 55) · issue templates · questions routed to Discussions · a short “what this project deliberately does not do”. | S–M |
+| **0.28.0** | **Freeze & fresh-install pass** | No new features. Walk the stranger's path from an empty machine, fix what that turns up, tidy the docs, verify every `.env.example` key is real and every documented command works. Bug fixes only from here. | S–M |
+| **1.0.0** | **Publication** | The promise above, kept. Then promotion in the order set out in note 54: selfh.st → r/selfhosted → awesome-selfhosted → Show HN → Fediverse/Lemmy/r/quantifiedself. | — |
+
+**Deliberately after 1.0 (the 1.x line).** All import sources, per the decision
+of 2026-07-19 that they come last: **P2.1** (Immich — and with it the remainder
+of **F8**, printing with photos), **P2.10** (Trakt), **P2.11**
+(Dawarich/Reitti/GPX), **P2.8** (OwnTracks), **P2.9** (import automation),
+**P4.1** (Health Connect), **P4.2** (PSN and Steam), plus **P5.1** (offline
+capture) and **P5.2** (Whisper). This is what defines 1.0 by exclusion: it is a
+complete tool for **capturing and exploring a life by hand**, with the Google
+Timeline import as the one bulk source that already works. Every connector after
+that widens the intake, not the concept.
+
+**Risk to watch.** Four feature releases sit ahead of the demo mode, which is
+the gate for everything public. If time runs short, 0.23.0 and 0.24.0 are the
+ones to defer past 1.0 — weather refinements and generic widgets impress an
+existing user, but neither changes whether a stranger stays.
+
+---
+
 ## 15. Open questions & decisions to sharpen
 
 **Already decided (from the concept phase):**

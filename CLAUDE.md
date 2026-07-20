@@ -53,6 +53,11 @@ Import-Quellen (P2.1 Immich, P2.8 OwnTracks, P2.9 Automatisierung,
 P2.10 Trakt/Medienkonsum, P2.11 Dawarich/Reitti/GPX, P4.1 Health, P4.2 PSN)
 und P5.1/P5.2 (Offline-Capture, Whisper).
 
+**Releaseplan bis 1.0 steht in KONZEPT Kap. 14.3** — Reihenfolge: 0.21 A28+F14 ·
+0.22 F13 · 0.23 F11+F12 · 0.24 P3.1 · 0.25 Demo-Modus · 0.26 Härtung/Betrieb ·
+0.27 Projektoberfläche · 0.28 Freeze · **1.0 = Veröffentlichung**. Alle
+Import-Quellen bewusst erst nach 1.0. Dort nachsehen statt Reihenfolge raten.
+
 Marktposition und Abgrenzung stehen seit 2026-07-20 in **KONZEPT Kap. 1.1**;
 Anmerkungen 51–56 halten die Entscheidungen dazu fest (Karten, KI-Urheberschaft,
 Marktanalyse, Werbung, Wachstum, Medienimporte). **Beitragsmodell: vorerst
