@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import secrets
 import urllib.error
 import urllib.parse
 import urllib.request
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app import auth
@@ -16,8 +17,11 @@ from app.auth import get_current_user
 from app.config import settings
 from app.database import get_db
 from app.models import User
-from app.schemas import AuthConfig, UserRead
+from app.schemas import (AdminCreateUser, AuthConfig, LocalLogin, LocalRegister,
+                         PasswordChange, UserRead)
 from app.services import geocode as geocode_svc
+
+log = logging.getLogger("lifedash.auth")
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
@@ -27,10 +31,89 @@ def _redirect_uri() -> str:
 
 
 @router.get("/config", response_model=AuthConfig)
-def auth_config() -> AuthConfig:
-    """Sagt dem Frontend, ob ein Login nötig ist."""
+def auth_config(db: Session = Depends(get_db)) -> AuthConfig:
+    """Sagt dem Frontend, ob und wie ein Login nötig ist."""
+    needs_setup = (settings.auth_mode == "local"
+                   and db.query(User).count() == 0)
     return AuthConfig(mode=settings.auth_mode,
-                      provider_name=settings.oidc_provider_name)
+                      provider_name=settings.oidc_provider_name,
+                      needs_setup=needs_setup)
+
+
+# --------------------------------------------------------------------------- #
+# A35 — lokale Konten (nur bei AUTH_MODE=local)
+# --------------------------------------------------------------------------- #
+def _require_local_mode() -> None:
+    if settings.auth_mode != "local":
+        raise HTTPException(404, "Lokale Konten sind nicht aktiv (AUTH_MODE=local)")
+
+
+def _session_response(user: User) -> JSONResponse:
+    resp = JSONResponse({"id": user.id, "email": user.email,
+                         "display_name": user.display_name, "role": user.role.value})
+    resp.set_cookie(
+        auth.SESSION_COOKIE,
+        auth.sign_cookie({"uid": user.id}, auth.session_max_age()),
+        max_age=auth.session_max_age(),
+        httponly=True,
+        samesite="lax",
+        secure=auth.cookie_secure(),
+    )
+    return resp
+
+
+@router.post("/local/register")
+def local_register(payload: LocalRegister, db: Session = Depends(get_db)) -> JSONResponse:
+    """Legt das ERSTE Konto an (wird Admin). Danach ist die öffentliche
+    Registrierung zu — weitere Konten legt ein Admin an. So wird aus einer
+    frisch aufgesetzten Instanz nicht versehentlich eine offene Anmeldung."""
+    _require_local_mode()
+    if db.query(User).count() > 0:
+        raise HTTPException(
+            403, "Es gibt bereits Konten — neue Konten legt ein Administrator an.")
+    if "@" not in payload.email:
+        raise HTTPException(400, "Bitte eine gültige E-Mail-Adresse angeben")
+    user = auth.create_local_user(db, email=payload.email, password=payload.password,
+                                  name=payload.display_name)
+    log.info("Lokales Erst-Konto angelegt (Admin): %s", user.email)
+    return _session_response(user)
+
+
+@router.post("/local/login")
+def local_login(payload: LocalLogin, db: Session = Depends(get_db)) -> JSONResponse:
+    """Anmeldung mit E-Mail und Passwort."""
+    _require_local_mode()
+    locked = auth.login_locked_for(payload.email)
+    if locked:
+        raise HTTPException(
+            429, f"Zu viele Fehlversuche — bitte in {locked // 60 + 1} Minuten erneut.")
+    user = auth.authenticate_local(db, payload.email, payload.password)
+    if user is None:
+        auth.note_login_failure(payload.email)
+        # Bewusst dieselbe Meldung für „E-Mail unbekannt" und „Passwort falsch".
+        raise HTTPException(401, "E-Mail oder Passwort ist falsch")
+    auth.clear_login_failures(payload.email)
+    log.info("Lokale Anmeldung: %s", user.email)
+    return _session_response(user)
+
+
+@router.post("/local/change-password")
+def local_change_password(
+    payload: PasswordChange,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Ändert das eigene Passwort (nur für lokale Konten)."""
+    _require_local_mode()
+    from app.services import password as pw
+
+    if not user.password_hash or not pw.verify_password(payload.current_password,
+                                                        user.password_hash):
+        raise HTTPException(400, "Das aktuelle Passwort stimmt nicht")
+    user.password_hash = pw.hash_password(payload.new_password)
+    db.commit()
+    log.info("Passwort geändert: %s", user.email)
+    return {"changed": True}
 
 
 @router.get("/me", response_model=UserRead)

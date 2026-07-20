@@ -70,10 +70,12 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------ #
     # Auth: Multi-User via OIDC — funktioniert mit jedem standardkonformen
     # Provider (Authentik, Keycloak, Pocket ID, Zitadel, Auth0, ...).
-    #   AUTH_MODE=dev  -> kein Login, fester Dev-User (lokale Entwicklung)
-    #   AUTH_MODE=oidc -> Login über den OIDC-Provider
+    #   AUTH_MODE=dev   -> kein Login, fester Dev-User (lokale Entwicklung)
+    #   AUTH_MODE=oidc  -> Login über den OIDC-Provider
+    #   AUTH_MODE=local -> E-Mail + Passwort, ohne Identitätsanbieter (A35);
+    #                      erster registrierter Nutzer wird Admin
     # ------------------------------------------------------------------ #
-    auth_mode: str = "dev"  # "dev" | "oidc"
+    auth_mode: str = "dev"  # "dev" | "oidc" | "local"
     # A27: Anzeigename des Providers für den Login-Screen (rein kosmetisch);
     # leer = neutraler SSO-Text, damit nichts Fremdes hart verdrahtet ist
     oidc_provider_name: str = ""

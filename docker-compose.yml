@@ -45,10 +45,11 @@ services:
       # F15: Ablage der hochgeladenen Fotos (auf das eigene Volume oben)
       MEDIA_DIR: ${MEDIA_DIR:-/data/media}
       MEDIA_MAX_MB: ${MEDIA_MAX_MB:-25}
-      # --- Auth: OIDC (beliebiger standardkonformer Provider) ---
-      AUTH_MODE: ${AUTH_MODE:-oidc}
-      OIDC_ISSUER: ${OIDC_ISSUER:?OIDC_ISSUER in .env setzen (Basis-URL deines OIDC-Providers)}
-      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?OIDC_CLIENT_ID in .env setzen}
+      # --- Auth: local (E-Mail+Passwort, A35) oder oidc (SSO) ---
+      AUTH_MODE: ${AUTH_MODE:-local}
+      # OIDC_* nur bei AUTH_MODE=oidc nötig — im local-Modus bleiben sie leer.
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
       OIDC_PROVIDER_NAME: ${OIDC_PROVIDER_NAME:-}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://127.0.0.1:8000}

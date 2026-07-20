@@ -21,10 +21,42 @@ class UserRead(BaseModel):
 
 
 class AuthConfig(BaseModel):
-    """Frontend-Info: 'dev' = kein Login nötig, 'oidc' = Login-Redirect."""
+    """Frontend-Info: 'dev' = kein Login nötig, 'oidc' = Login-Redirect,
+    'local' = E-Mail/Passwort-Formular."""
     mode: str
     # A27: optionaler Anzeigename des SSO-Providers (kosmetisch)
     provider_name: str = ""
+    # A35: gibt es schon Konten? Nein -> das Formular bietet Registrierung
+    # (der erste Nutzer wird Admin) statt nur Login an.
+    needs_setup: bool = False
+
+
+class LocalLogin(BaseModel):
+    """A35: Anmeldung mit lokalem Konto."""
+    email: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=1, max_length=1024)
+
+
+class LocalRegister(BaseModel):
+    """A35: Konto anlegen. Öffentlich nur für den allerersten Nutzer (Admin);
+    danach legt ein Admin weitere Konten an."""
+    email: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=8, max_length=1024)
+    display_name: str | None = Field(None, max_length=255)
+
+
+class PasswordChange(BaseModel):
+    """A35: eigenes Passwort ändern."""
+    current_password: str = Field(..., min_length=1, max_length=1024)
+    new_password: str = Field(..., min_length=8, max_length=1024)
+
+
+class AdminCreateUser(BaseModel):
+    """A35: ein Admin legt ein weiteres lokales Konto an."""
+    email: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=8, max_length=1024)
+    display_name: str | None = Field(None, max_length=255)
+    role: UserRole = UserRole.user
 
 
 # --------------------------------------------------------------------------- #

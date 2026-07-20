@@ -31,6 +31,7 @@ from app.models import (
     UserRole,
 )
 from app.services.enrichment import auto_enrich_events, enrich_weather
+from app.schemas import AdminCreateUser
 from app.services.ingestion import reprocess_pending, reset_reprocess
 from app.services import media as media_svc
 
@@ -394,19 +395,55 @@ def read_logs(
 @router.get("/users")
 def list_users(db: Session = Depends(get_db)) -> list[dict]:
     """Alle Nutzer mit Rolle und Datenumfang (fürs Admin-Panel).
-    Neue Nutzer entstehen weiterhin nur durch OIDC-Login (JIT-Provisioning)."""
+    Konten entstehen per OIDC-Login (JIT) oder — bei AUTH_MODE=local — durch
+    Registrierung/Admin-Anlage (A35)."""
     return [
         {
             "id": u.id,
             "email": u.email,
             "display_name": u.display_name,
             "role": u.role.value,
+            # A35: woher stammt das Konto? Für das Admin-Panel sichtbar.
+            "auth": ("local" if u.oidc_subject.startswith("local:")
+                     else "dev" if u.oidc_subject == "dev-user" else "oidc"),
             "created_at": u.created_at.isoformat() if u.created_at else None,
             "events": db.query(Event).filter(Event.user_id == u.id).count(),
             "fragments": db.query(Fragment).filter(Fragment.user_id == u.id).count(),
         }
         for u in db.query(User).order_by(User.created_at).all()
     ]
+
+
+@router.post("/users")
+def create_user(
+    payload: AdminCreateUser,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict:
+    """A35: ein Admin legt ein weiteres lokales Konto an.
+
+    Nur bei AUTH_MODE=local — bei OIDC entstehen Konten beim ersten Login des
+    jeweiligen Nutzers, ein Passwort gäbe es dort nicht.
+    """
+    from app import auth as auth_mod
+    from app.config import settings as settings_mod
+
+    if settings_mod.auth_mode != "local":
+        raise HTTPException(
+            400, "Konten von Hand anlegen geht nur bei AUTH_MODE=local; "
+                 "bei OIDC entstehen sie automatisch beim ersten Login.")
+    if "@" not in payload.email:
+        raise HTTPException(400, "Bitte eine gültige E-Mail-Adresse angeben")
+    if auth_mod.find_local_user(db, payload.email) is not None:
+        raise HTTPException(409, "Ein Konto mit dieser E-Mail existiert bereits")
+    from app.services.password import MIN_LENGTH
+    if len(payload.password) < MIN_LENGTH:
+        raise HTTPException(400, f"Das Passwort braucht mindestens {MIN_LENGTH} Zeichen")
+    new = auth_mod.create_local_user(db, email=payload.email, password=payload.password,
+                                     name=payload.display_name, role=payload.role)
+    log.info("Nutzerverwaltung: Konto %s angelegt (%s) von %s",
+             new.email, new.role.value, admin.email or admin.id)
+    return {"id": new.id, "email": new.email, "role": new.role.value}
 
 
 @router.patch("/users/{user_id}")

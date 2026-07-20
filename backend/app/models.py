@@ -83,9 +83,14 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    # Stabile Identität. OIDC: der sub-Claim. Lokale Konten (A35): "local:<email>".
+    # dev-Modus: "dev-user". Immer eindeutig, darum der Login-Schlüssel.
     oidc_subject: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # A35: Passwort-Hash für lokale Konten (scrypt). NULL bei OIDC/dev — die
+    # authentifizieren sich anders. Das erste Passwort, das Life-Dash speichert.
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.user)
     # Pro-Nutzer-Einstellungen (später: Immich-API-Key, PSN-Token, ...)
     settings: Mapped[dict] = mapped_column(JSON, default=dict)

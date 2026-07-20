@@ -15,6 +15,38 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.29.0] – 2026-07-20
+
+### Added
+- **🔑 Sign in without an identity provider.** Set `AUTH_MODE=local` and
+  Life-Dash offers plain email-and-password accounts — no Authentik, Keycloak
+  or the like required. On first visit you create an account and it becomes the
+  administrator; further accounts are made under Settings → Users, and everyone
+  can change their own password. This is now the simplest way to get started,
+  and it is the groundwork the public demo and 1.0 stand on.
+  - Passwords are hashed with **scrypt** and a random salt per password; the
+    plain text is stored nowhere.
+  - A wrong password and an unknown email give the **same** answer, so the
+    login form cannot be used to find out which addresses have accounts.
+  - Repeated failed attempts **lock that account for a while**, to blunt
+    password guessing.
+- **A gentle first-run form.** On an empty account the “Today” view offers to
+  enter a birth date and home town, which become your first real entries. The
+  birth date is recorded as a “Birth” milestone — an ordinary event, the same
+  one the statistics already read your age from, and the one a future
+  “age at each event” feature will use. Entirely optional and skippable.
+
+### Notes for self-hosters
+- New setting **`AUTH_MODE=local`** (the new default in the example config).
+  OIDC continues to work unchanged with `AUTH_MODE=oidc`. Either way,
+  **`SESSION_SECRET` must be set** — it signs the session cookies, and the app
+  now warns at startup if it is still the placeholder.
+- The Compose file no longer forces `OIDC_ISSUER`/`OIDC_CLIENT_ID` to be
+  present, so a local-account setup starts with just `SESSION_SECRET` and
+  `PUBLIC_BASE_URL`.
+- One database column was added (`users.password_hash`, empty for OIDC/dev
+  accounts) — applied automatically on start.
+
 ## [0.28.1] – 2026-07-20
 
 ### Fixed

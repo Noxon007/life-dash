@@ -610,9 +610,31 @@
   <div class="login-overlay" id="login-overlay">
     <div class="login-box">
       <div class="logo"><span class="dot"></span> Life-Dash</div>
-      <!-- A27: kein hart verdrahteter Provider-Name — kommt aus der Config -->
-      <p><span data-i18n="login.claim">Deine durchsuchbare Lebensdatenbank.<br>Bitte melde dich an</span><span id="login-provider"></span>.</p>
-      <a class="btn" href="/api/auth/login" style="text-decoration:none; display:inline-block" data-i18n="login.btn">🔐 Anmelden (SSO)</a>
+      <!-- OIDC/SSO -->
+      <div id="login-sso">
+        <!-- A27: kein hart verdrahteter Provider-Name — kommt aus der Config -->
+        <p><span data-i18n="login.claim">Deine durchsuchbare Lebensdatenbank.<br>Bitte melde dich an</span><span id="login-provider"></span>.</p>
+        <a class="btn" href="/api/auth/login" style="text-decoration:none; display:inline-block" data-i18n="login.btn">🔐 Anmelden (SSO)</a>
+      </div>
+      <!-- A35: lokale Konten (E-Mail + Passwort) -->
+      <div id="login-local" style="display:none">
+        <p id="login-local-claim" data-i18n="login.local.claim">Deine durchsuchbare Lebensdatenbank.</p>
+        <form id="login-form" style="display:flex; flex-direction:column; gap:10px; text-align:left">
+          <input type="email" id="login-email" autocomplete="username" required
+                 data-i18n-ph="login.email" placeholder="E-Mail"
+                 style="padding:9px 11px; border-radius:8px; border:1px solid var(--border); background:var(--bg-elev); color:var(--text)">
+          <input type="password" id="login-password" autocomplete="current-password" required
+                 data-i18n-ph="login.password" placeholder="Passwort"
+                 style="padding:9px 11px; border-radius:8px; border:1px solid var(--border); background:var(--bg-elev); color:var(--text)">
+          <input type="password" id="login-password2" autocomplete="new-password"
+                 data-i18n-ph="login.password2" placeholder="Passwort wiederholen"
+                 style="display:none; padding:9px 11px; border-radius:8px; border:1px solid var(--border); background:var(--bg-elev); color:var(--text)">
+          <div id="login-error" class="hint" style="display:none; background:rgba(255,90,90,.1); border-color:rgba(255,90,90,.4); margin:0"></div>
+          <button class="btn" type="submit" id="login-submit" data-i18n="login.submit">Anmelden</button>
+        </form>
+        <p id="login-setup-hint" class="hint" style="display:none; margin-top:12px" data-i18n="login.setup.hint">
+          Noch kein Konto vorhanden — das erste, das du anlegst, wird der Administrator dieser Instanz.</p>
+      </div>
     </div>
   </div>
 
@@ -779,6 +801,25 @@
             <div class="stat-num">📅</div>
             <div class="stat-label" data-i18n="today.timeline">Zum Zeitstrahl</div>
             <div class="stat-sub" data-i18n="today.timeline.sub">Alles chronologisch</div>
+          </div>
+        </div>
+        <!-- A35/Anmerkung 73: Startformular für die ersten Einträge, nur bei leerer
+             Lebensdatenbank. Legt bestätigte Ereignisse an (u. a. „Geburt", das F17
+             später fürs Alter liest) — überspringbar, kein Zwang. -->
+        <div class="panel" id="seed-form" style="display:none; margin-bottom:20px">
+          <h3 data-i18n="seed.title">👋 Die ersten Einträge</h3>
+          <div class="action-desc" style="margin-bottom:12px"><span data-i18n="seed.desc">Ein paar Angaben genügen,
+            und die Lebensdatenbank ist nicht mehr leer. Alles freiwillig und jederzeit änderbar.</span></div>
+          <div style="display:flex; flex-direction:column; gap:10px; max-width:420px">
+            <label class="stat-label"><span data-i18n="seed.birth">Geburtsdatum</span>
+              <input type="date" id="seed-birth" class="mf-select" style="display:block; margin-top:4px; width:100%"></label>
+            <label class="stat-label"><span data-i18n="seed.home">Wohnort</span>
+              <input type="text" id="seed-home" class="mf-select" style="display:block; margin-top:4px; width:100%"
+                     data-i18n-ph="seed.home.ph" placeholder="z. B. Hamburg"></label>
+            <div style="display:flex; gap:10px; margin-top:6px">
+              <button class="btn" id="seed-save" data-i18n="seed.save">Anlegen</button>
+              <button class="btn ghost" id="seed-skip" data-i18n="seed.skip">Überspringen</button>
+            </div>
           </div>
         </div>
         <div id="otd-block"></div>
@@ -1330,6 +1371,22 @@
           </div>
         </div>
 
+        <!-- A35: Passwort ändern (nur lokale Konten) -->
+        <div class="section-title local-only" style="display:none" data-i18n="adm.password">Passwort</div>
+        <div class="panel local-only" style="padding:0; display:none">
+          <div class="action-row">
+            <div style="flex-shrink:0; min-width:215px; display:flex; flex-direction:column; gap:8px">
+              <input type="password" id="pw-current" autocomplete="current-password"
+                     data-i18n-ph="pw.current" placeholder="Aktuelles Passwort" class="mf-select">
+              <input type="password" id="pw-new" autocomplete="new-password"
+                     data-i18n-ph="pw.new" placeholder="Neues Passwort (min. 8)" class="mf-select">
+              <button class="btn secondary" id="btn-pw-change" style="text-align:left" data-i18n="pw.change">🔑 Passwort ändern</button>
+            </div>
+            <div class="action-desc"><span data-i18n="pw.desc">Ändert das Passwort deines lokalen Kontos.
+              Es wird sicher gehasht gespeichert (scrypt) — im Klartext liegt es nirgends.</span></div>
+          </div>
+        </div>
+
         <!-- A33: eigene Daten löschen — das Gegenstück zum Export -->
         <div class="section-title" data-i18n="adm.wipemine">Meine Daten löschen</div>
         <div class="panel" style="padding:0">
@@ -1423,6 +1480,23 @@
           </div>
           <div style="overflow-x:auto">
             <table class="db-table" id="users-table"></table>
+          </div>
+          <!-- A35: bei lokalen Konten legt der Admin hier weitere an -->
+          <div class="local-only" id="user-create" style="display:none; margin-top:16px">
+            <div class="section-title" data-i18n="adm.newuser">Konto anlegen</div>
+            <div class="action-row">
+              <div style="flex-shrink:0; min-width:215px; display:flex; flex-direction:column; gap:8px">
+                <input type="email" id="nu-email" data-i18n-ph="login.email" placeholder="E-Mail" class="mf-select" autocomplete="off">
+                <input type="password" id="nu-password" data-i18n-ph="pw.new" placeholder="Passwort (min. 8)" class="mf-select" autocomplete="new-password">
+                <select id="nu-role" class="mf-select">
+                  <option value="user" data-i18n="role.user">Nutzer</option>
+                  <option value="admin" data-i18n="role.admin">Administrator</option>
+                </select>
+                <button class="btn secondary" id="btn-nu-create" style="text-align:left" data-i18n="adm.newuser.btn">➕ Konto anlegen</button>
+              </div>
+              <div class="action-desc"><span data-i18n="adm.newuser.desc">Legt ein weiteres lokales Konto an.
+                Die Person kann ihr Passwort danach selbst ändern.</span></div>
+            </div>
           </div>
         </div>
 
@@ -1612,7 +1686,54 @@ async function _apiCall(path, opts) {
   return res.json();
 }
 function showLogin() {
-  if (AUTH.mode === "oidc") document.getElementById("login-overlay").classList.add("show");
+  if (AUTH.mode === "oidc" || AUTH.mode === "local")
+    document.getElementById("login-overlay").classList.add("show");
+}
+
+// A35: lokaler Login/Registrierung. Bei needs_setup zeigt dasselbe Formular
+// die Registrierung des ersten (Admin-)Kontos — mit Passwort-Wiederholung.
+function setupLocalLogin(needsSetup) {
+  document.getElementById('login-sso').style.display = 'none';
+  document.getElementById('login-local').style.display = '';
+  const pw2 = document.getElementById('login-password2');
+  const hint = document.getElementById('login-setup-hint');
+  const submit = document.getElementById('login-submit');
+  const claim = document.getElementById('login-local-claim');
+  pw2.style.display = needsSetup ? '' : 'none';
+  hint.style.display = needsSetup ? '' : 'none';
+  submit.textContent = needsSetup ? t('login.create', 'Konto anlegen') : t('login.submit', 'Anmelden');
+  if (needsSetup) {
+    document.getElementById('login-password').autocomplete = 'new-password';
+    claim.textContent = t('login.setup.claim', 'Willkommen — richte das Administrator-Konto ein.');
+  }
+  const form = document.getElementById('login-form');
+  form.onsubmit = async ev => {
+    ev.preventDefault();
+    const err = document.getElementById('login-error');
+    err.style.display = 'none';
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    if (needsSetup) {
+      if (password.length < 8) { showLoginError(t('login.err.short', 'Das Passwort braucht mindestens 8 Zeichen.')); return; }
+      if (password !== pw2.value) { showLoginError(t('login.err.match', 'Die Passwörter stimmen nicht überein.')); return; }
+    }
+    submit.disabled = true;
+    try {
+      const path = needsSetup ? '/api/auth/local/register' : '/api/auth/local/login';
+      await api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password,
+                          display_name: needsSetup ? (email.split('@')[0]) : undefined }) });
+      location.reload();   // Session-Cookie ist gesetzt — sauber neu laden
+    } catch (e) {
+      showLoginError(e.message);
+      submit.disabled = false;
+    }
+  };
+}
+function showLoginError(msg) {
+  const err = document.getElementById('login-error');
+  err.textContent = msg;
+  err.style.display = '';
 }
 function showBanner(msg) {
   let b = document.getElementById('conn-banner');
@@ -1971,6 +2092,40 @@ const I18N_EN = {
   'wipemine.ask': "All your entries, items, places, routes, photos and raw records will be permanently deleted. Type LOESCHEN to confirm.",
   'wipemine.done': "✓ {rows} rows and {files} image files deleted.",
   'btn.delete': "Delete",
+  'seed.title': "👋 Your first entries",
+  'seed.desc': "A few details and the life database is no longer empty. All optional and changeable at any time.",
+  'seed.birth': "Date of birth",
+  'seed.home': "Home town",
+  'seed.home.ph': "e.g. Hamburg",
+  'seed.save': "Create",
+  'seed.skip': "Skip",
+  'seed.birth.title': "Birth",
+  'seed.home.title': "Home: {t}",
+  'seed.done': "✓ {n} entry/entries created.",
+  'login.local.claim': "Your searchable life database.",
+  'login.email': "Email",
+  'login.password': "Password",
+  'login.password2': "Repeat password",
+  'login.submit': "Sign in",
+  'login.create': "Create account",
+  'login.setup.claim': "Welcome — set up the administrator account.",
+  'login.setup.hint': "No account exists yet — the first one you create becomes the administrator of this instance.",
+  'login.err.short': "The password needs at least 8 characters.",
+  'login.err.match': "The passwords do not match.",
+  'adm.password': "Password",
+  'pw.current': "Current password",
+  'pw.new': "New password (min. 8)",
+  'pw.change': "🔑 Change password",
+  'pw.desc': "Changes the password of your local account. It is stored securely hashed (scrypt) — the plain text is kept nowhere.",
+  'pw.done': "✓ Password changed.",
+  'pw.err.short': "The new password needs at least 8 characters.",
+  'adm.newuser': "Create account",
+  'adm.newuser.btn': "➕ Create account",
+  'adm.newuser.desc': "Creates another local account. That person can change their password afterwards.",
+  'adm.newuser.done': "✓ Account created.",
+  'adm.newuser.err': "Enter an email and a password of at least 8 characters.",
+  'role.user': "User",
+  'role.admin': "Administrator",
   'nav.today': "Today",
   'view.today.title': "Today",
   'view.today.sub': "What is waiting — and what happened on this day in earlier years",
@@ -2691,8 +2846,47 @@ async function loadToday() {
       events.filter(e => e.confirmed !== 'confirmed').length.toLocaleString('de-DE');
     document.getElementById('today-span').textContent = years.length
       ? `${years[0]} – ${years[years.length - 1]}` : '–';
+    // A35/Anmerkung 73: Startformular nur bei komplett leerer Lebensdatenbank
+    // und solange es nicht übersprungen wurde.
+    const empty = events.length === 0 && localStorage.getItem('seed-done') !== '1';
+    document.getElementById('seed-form').style.display = empty ? '' : 'none';
   } catch (_) { /* Kacheln bleiben auf „–" */ }
 }
+
+// A35/Anmerkung 73: aus den Startangaben werden bestätigte Ereignisse. Das
+// Geburtsdatum wird ein Meilenstein „Geburt" — genau das liest F17 fürs Alter
+// (Anmerkung 72), eine Wahrheit, kein Profilfeld.
+function dismissSeed() {
+  localStorage.setItem('seed-done', '1');
+  document.getElementById('seed-form').style.display = 'none';
+}
+document.getElementById('seed-skip').addEventListener('click', dismissSeed);
+document.getElementById('seed-save').addEventListener('click', async () => {
+  const birth = document.getElementById('seed-birth').value;
+  const home = document.getElementById('seed-home').value.trim();
+  if (!birth && !home) { dismissSeed(); return; }
+  const btn = document.getElementById('seed-save');
+  btn.disabled = true;
+  let made = 0;
+  try {
+    if (birth) {
+      await api('/api/events', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: t('seed.birth.title', 'Geburt'), date_start: birth + 'T00:00:00',
+          date_precision: 'day', category: 'milestone' }) });
+      made++;
+    }
+    if (home) {
+      await api('/api/events', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: t('seed.home.title', 'Wohnort: {t}').replace('{t}', home),
+          date_precision: 'year', category: 'milestone', location_name: home }) });
+      made++;
+    }
+    dismissSeed();
+    fetchEvents(true);   // Cache leeren, damit die neuen Einträge überall auftauchen
+    toast(t('seed.done', '✓ {n} Eintrag/Einträge angelegt.').replace('{n}', made));
+    await loadToday();
+  } catch (err) { toast(err.message, 'error'); btn.disabled = false; }
+});
 // DOM-Schutz: pro Zeitgruppe zunächst nur TL_GROUP_CAP Karten rendern —
 // nach einem Timeline-Import (10k+ Events) friert der Browser sonst ein.
 const TL_GROUP_CAP = 25;
@@ -4741,11 +4935,14 @@ async function loadUsers() {
   let users;
   try { users = await api('/api/admin/users'); }
   catch { tbl.innerHTML = ''; return; }
+  // A35: Anlege-Panel nur bei lokalen Konten
+  document.getElementById('user-create').style.display = AUTH.mode === 'local' ? '' : 'none';
   tbl.innerHTML = '<thead><tr><th>Nutzer</th><th>Rolle</th><th>Daten</th><th>Dabei seit</th><th></th></tr></thead><tbody>'
     + users.map(u => {
       const self = AUTH.user && u.id === AUTH.user.id;
+      const authChip = u.auth === 'local' ? '' : ` <span class="chip">${esc(u.auth)}</span>`;
       return `<tr data-uid="${esc(u.id)}">
-        <td><b>${esc(u.display_name || '—')}</b>${self ? ' <span class="chip">das bist du</span>' : ''}<br>
+        <td><b>${esc(u.display_name || '—')}</b>${self ? ' <span class="chip">das bist du</span>' : ''}${authChip}<br>
           <span class="stat-label">${esc(u.email || u.id)}</span></td>
         <td><select class="mf-select" data-role ${self ? 'disabled title="Die eigene Rolle kann nicht geändert werden"' : ''}>
           <option value="user" ${u.role === 'user' ? 'selected' : ''}>Nutzer</option>
@@ -5419,6 +5616,39 @@ async function saveImmich() {
 }
 // A33: eigene Daten löschen. Getippte Bestätigung statt bloßem OK — bei einer
 // unwiderruflichen Aktion soll ein Fehlklick nicht reichen.
+// A35: eigenes Passwort ändern (lokale Konten)
+document.getElementById('btn-pw-change').addEventListener('click', async () => {
+  const cur = document.getElementById('pw-current');
+  const neu = document.getElementById('pw-new');
+  if (neu.value.length < 8) { toast(t('pw.err.short', 'Das neue Passwort braucht mindestens 8 Zeichen.'), 'error'); return; }
+  try {
+    await api('/api/auth/local/change-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ current_password: cur.value, new_password: neu.value }) });
+    cur.value = ''; neu.value = '';
+    toast(t('pw.done', '✓ Passwort geändert.'));
+  } catch (err) { toast(err.message, 'error'); }
+});
+
+// A35: Admin legt ein weiteres lokales Konto an
+document.getElementById('btn-nu-create').addEventListener('click', async () => {
+  const email = document.getElementById('nu-email').value.trim();
+  const password = document.getElementById('nu-password').value;
+  const role = document.getElementById('nu-role').value;
+  if (!email || password.length < 8) {
+    toast(t('adm.newuser.err', 'E-Mail und ein Passwort mit mindestens 8 Zeichen angeben.'), 'error'); return;
+  }
+  try {
+    await api('/api/admin/users', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, role }) });
+    document.getElementById('nu-email').value = '';
+    document.getElementById('nu-password').value = '';
+    toast(t('adm.newuser.done', '✓ Konto angelegt.'));
+    loadUsers();
+  } catch (err) { toast(err.message, 'error'); }
+});
+
 document.getElementById('btn-wipe-mine').addEventListener('click', async () => {
   const typed = await uiPrompt(
     t('wipemine.ask', 'Alle deine Ereignisse, Objekte, Orte, Routen, Fotos und Roh-Einträge werden endgültig gelöscht. '
@@ -5563,8 +5793,9 @@ document.getElementById('logout-link').addEventListener('click', async ev => {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
+  let cfg = null;
   try {
-    const cfg = await api("/api/auth/config");
+    cfg = await api("/api/auth/config");
     AUTH.mode = cfg.mode;
     // A27: Provider-Name rein kosmetisch aus der Config — ohne ihn bleibt
     // überall ein neutraler SSO-Text stehen, nichts Fremdes hart verdrahtet.
@@ -5574,10 +5805,17 @@ document.getElementById('logout-link').addEventListener('click', async ev => {
     }
   } catch (_) { /* Backend nicht erreichbar -> Banner unten */ }
 
+  // A35: Braucht die frische Instanz erst ein Admin-Konto? Dann direkt das
+  // Einrichtungsformular, ohne den (scheiternden) /me-Aufruf abzuwarten.
+  if (cfg && cfg.mode === 'local') {
+    setupLocalLogin(cfg.needs_setup);
+    if (cfg.needs_setup) { showLogin(); return; }
+  }
+
   try {
     AUTH.user = await api("/api/auth/me");
   } catch (err) {
-    if (AUTH.mode === 'oidc') { showLogin(); return; }
+    if (AUTH.mode === 'oidc' || AUTH.mode === 'local') { showLogin(); return; }
     showBanner(`${t('banner.offline', '⚠ Backend nicht erreichbar. Starte es mit <code>uvicorn app.main:app</code> im Ordner <code>backend/</code> und lade neu.')}`);
     return;
   }
@@ -5602,7 +5840,11 @@ document.getElementById('logout-link').addEventListener('click', async ev => {
   const who = AUTH.user.display_name || AUTH.user.email || 'angemeldet';
   document.getElementById('foot-user').textContent =
     `${who}${AUTH.user.role === 'admin' ? ' · Admin' : ''}`;
-  if (AUTH.mode === 'oidc') document.getElementById('logout-link').style.display = '';
+  if (AUTH.mode === 'oidc' || AUTH.mode === 'local')
+    document.getElementById('logout-link').style.display = '';
+  // A35: Passwort ändern nur für lokale Konten anbieten
+  if (AUTH.mode === 'local')
+    document.querySelectorAll('.local-only').forEach(el => el.style.display = '');
   if (!isAdmin()) document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
 
   try {

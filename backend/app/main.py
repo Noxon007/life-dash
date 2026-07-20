@@ -52,6 +52,15 @@ async def lifespan(app: FastAPI):
     log.info("Life-Dash %s startet — auth=%s, ai=%s, db=%s, log_level=%s",
              APP_VERSION, settings.auth_mode, settings.ai_provider,
              settings.database_url.split("://")[0], settings.log_level.upper())
+    # A35: Bei echter Anmeldung (local/oidc) signiert das Standard-Secret die
+    # Session-Cookies — wer es kennt, fälscht eine fremde Sitzung. Laut,
+    # damit es niemand produktiv übersieht. (Die Härtung von dev-Modus in
+    # Produktion folgt mit R1.)
+    if (settings.auth_mode in ("local", "oidc")
+            and settings.session_secret == "dev-secret-change-me"):
+        log.warning("SESSION_SECRET ist noch der Standardwert — bei %s-Login "
+                    "UNBEDINGT setzen (python -c \"import secrets; "
+                    "print(secrets.token_urlsafe(48))\").", settings.auth_mode)
     # Module aus YAML laden
     load_modules()
     # Bestehende Tabellen um neue Spalten ergänzen (user_id, embedding)

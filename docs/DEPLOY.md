@@ -37,7 +37,28 @@ commit, update the CHANGELOG, `git tag v0.20.1` (fix) or `v0.21.0` (feature),
 push the tag. On the server, raise `LIFEDASH_VERSION` in `.env` and run
 `docker compose pull && docker compose up -d`.
 
-## 2. Create an OIDC client
+## 2. Sign-in: local accounts or OIDC
+
+Life-Dash has two ways to sign people in. Pick one with `AUTH_MODE`.
+
+### The simple path: `AUTH_MODE=local`
+
+Email and password, no identity provider required. On first visit the app asks
+you to create an account — **the first one becomes the administrator**. Further
+accounts are created by an admin under Settings → Users; each person can then
+change their own password. Passwords are stored hashed with scrypt (a random
+salt per password); the plain text is never kept.
+
+This is the least-effort setup — you only need `SESSION_SECRET` and
+`PUBLIC_BASE_URL`. Skip the OIDC section entirely.
+
+> Two things to know: the failed-login lockout is per process, so behind
+> multiple workers it is a baseline rather than a hard guarantee; and there is
+> no “forgot password” flow — an admin sets a new account up if someone is
+> locked out of their only admin login, so keep a second admin or your
+> `SESSION_SECRET` safe.
+
+### The SSO path: `AUTH_MODE=oidc` — create an OIDC client
 
 Life-Dash works with any standards-compliant OIDC provider — Authentik,
 Keycloak, Pocket ID, Zitadel, Auth0 and others. Create a client there:

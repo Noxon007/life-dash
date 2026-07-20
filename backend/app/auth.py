@@ -161,6 +161,87 @@ def get_dev_user(db: Session) -> User:
 
 
 # --------------------------------------------------------------------------- #
+# A35 — lokale Konten (AUTH_MODE=local): E-Mail + Passwort
+# --------------------------------------------------------------------------- #
+from app.services import password as pw  # noqa: E402
+
+LOCAL_PREFIX = "local:"
+
+
+def _local_sub(email: str) -> str:
+    """Stabiler, eindeutiger Identitätsschlüssel eines lokalen Kontos.
+
+    Über `oidc_subject` (unique) — so erzwingt schon die Datenbank, dass jede
+    E-Mail nur einmal existiert, ohne eine zweite Unique-Spalte."""
+    return LOCAL_PREFIX + email.strip().lower()
+
+
+def find_local_user(db: Session, email: str) -> User | None:
+    return db.query(User).filter(User.oidc_subject == _local_sub(email)).first()
+
+
+def create_local_user(db: Session, *, email: str, password: str,
+                      name: str | None = None, role: UserRole | None = None) -> User:
+    """Legt ein lokales Konto an. Der ERSTE Nutzer überhaupt wird Admin und
+    adoptiert Altdaten ohne user_id (wie beim OIDC-Erstlogin)."""
+    is_first = db.query(User).count() == 0
+    user = User(
+        oidc_subject=_local_sub(email),
+        email=email.strip(),
+        display_name=(name or "").strip() or email.split("@")[0],
+        password_hash=pw.hash_password(password),
+        role=role or (UserRole.admin if is_first else UserRole.user),
+    )
+    db.add(user)
+    db.commit()
+    if is_first:
+        adopt_orphan_rows(engine, user.id)
+    return user
+
+
+# In-Prozess-Sperre gegen Passwort-Raten. Bewusst einfach: ein Zähler je
+# E-Mail, kein Redis. Bei mehreren Workern gilt sie pro Prozess — als Basis
+# gegen Brute Force reicht das; das dokumentiert DEPLOY.md so.
+_FAIL_MAX = 5
+_LOCK_SECONDS = 900          # 15 Minuten
+_fail_state: dict[str, tuple[int, float]] = {}   # email -> (Versuche, gesperrt_bis)
+
+
+def login_locked_for(email: str) -> int:
+    """Verbleibende Sperrsekunden für diese E-Mail (0 = frei)."""
+    _, until = _fail_state.get(email.lower(), (0, 0.0))
+    return max(0, int(until - time.time()))
+
+
+def note_login_failure(email: str) -> None:
+    key = email.lower()
+    count, _ = _fail_state.get(key, (0, 0.0))
+    count += 1
+    until = time.time() + _LOCK_SECONDS if count >= _FAIL_MAX else 0.0
+    _fail_state[key] = (count, until)
+
+
+def clear_login_failures(email: str) -> None:
+    _fail_state.pop(email.lower(), None)
+
+
+def authenticate_local(db: Session, email: str, password: str) -> User | None:
+    """Prüft E-Mail + Passwort. Gibt den Nutzer zurück oder None.
+
+    Kein Aufschluss darüber, WELCHE Angabe falsch war: existiert die E-Mail
+    nicht, wird trotzdem gegen einen Dummy-Hash geprüft, damit ein Angreifer
+    gültige von ungültigen Adressen nicht an der Antwortzeit unterscheidet.
+    """
+    user = find_local_user(db, email)
+    if user is None:
+        pw.verify_password(password, pw.DUMMY_HASH)   # Timing angleichen
+        return None
+    if not pw.verify_password(password, user.password_hash):
+        return None
+    return user
+
+
+# --------------------------------------------------------------------------- #
 # FastAPI-Dependencies
 # --------------------------------------------------------------------------- #
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:

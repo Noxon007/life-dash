@@ -20,6 +20,8 @@ _MISSING_COLUMNS: dict[str, dict[str, str]] = {
                "parent_event_id": "VARCHAR(36)"},
     "entities": {"user_id": "VARCHAR(36)"},
     "jobs": {"params": "JSON"},
+    # A35: Passwort-Hash für lokale Konten (NULL bei OIDC/dev)
+    "users": {"password_hash": "VARCHAR(255)"},
     # F15: hochgeladene Bilder. `user_id` schließt die Lücke aus Anmerkung 57.
     "media_refs": {"user_id": "VARCHAR(36)", "mime": "VARCHAR(64)",
                    "bytes": "INTEGER", "width": "INTEGER", "height": "INTEGER",
