@@ -4,6 +4,10 @@ sqlalchemy==2.0.36
 pydantic==2.10.4
 pydantic-settings==2.7.1
 pyyaml==6.0.2
+# F15: hochgeladene Bilder — Formaterkennung, Vorschaubilder, EXIF
+Pillow==11.3.0
+# F15: Datei-Uploads (multipart/form-data) für FastAPI
+python-multipart==0.0.20
 python-dateutil==2.9.0.post0
 # Auth (OIDC / Pocket ID): JWT-Validierung inkl. RS256 (JWKS)
 PyJWT[crypto]==2.10.1

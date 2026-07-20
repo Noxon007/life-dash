@@ -29,6 +29,9 @@ services:
     volumes:
       # App-Daten (z. B. SQLite-DB beim Minimal-Setup)
       - ./data:/data
+      # F15: hochgeladene Fotos. EIGENES Volume, weil hier die einzigen Daten
+      # liegen, die der JSON-Export nicht enthalten kann — separat sichern!
+      - ./media:/data/media
     # Log-Rotation: `docker logs` bleibt nutzbar, ohne die SD-Karte zu füllen
     logging: &default-logging
       driver: json-file
@@ -39,6 +42,9 @@ services:
       TZ: ${TZ:-Europe/Berlin}
       # Ausführlichkeit der App-Logs: DEBUG | INFO | WARNING | ERROR (A9)
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # F15: Ablage der hochgeladenen Fotos (auf das eigene Volume oben)
+      MEDIA_DIR: ${MEDIA_DIR:-/data/media}
+      MEDIA_MAX_MB: ${MEDIA_MAX_MB:-25}
       # --- Auth: OIDC (beliebiger standardkonformer Provider) ---
       AUTH_MODE: ${AUTH_MODE:-oidc}
       OIDC_ISSUER: ${OIDC_ISSUER:?OIDC_ISSUER in .env setzen (Basis-URL deines OIDC-Providers)}

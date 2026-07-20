@@ -26,3 +26,5 @@ backend/_test.err
 # OS / Editor
 .DS_Store
 Thumbs.db
+backend/media/
+media/

@@ -32,6 +32,7 @@ from app.models import (
 )
 from app.services.enrichment import auto_enrich_events, enrich_weather
 from app.services.ingestion import reprocess_pending, reset_reprocess
+from app.services import media as media_svc
 
 log = logging.getLogger("lifedash.admin")
 
@@ -213,6 +214,9 @@ def delete_row(name: str, row_id: str, db: Session = Depends(get_db)) -> dict:
 
     side_effects: list[str] = []
     if name == "events":
+        n_files = media_svc.purge_for_events(db, [row_id])   # F15: erst die Dateien
+        if n_files:
+            side_effects.append(f"{n_files} Bilddateien gelöscht")
         for model, label in ((Metric, "Metriken"), (MediaRef, "Medien-Verweise"),
                              (EventEntityLink, "Objekt-Verknüpfungen")):
             n = (db.query(model).filter(model.event_id == row_id)
@@ -294,6 +298,13 @@ def wipe_data() -> dict:
     Die Bestätigungs-Nachfrage passiert im Frontend; dieser Endpoint ist
     nur für Admins erreichbar (Router-Dependency)."""
     deleted: dict[str, int] = {}
+    # F15: erst die Dateien, dann die Zeilen — danach ist nicht mehr bekannt,
+    # welche Bilder gemeint waren, und das Medienverzeichnis bliebe voll.
+    db = SessionLocal()
+    try:
+        files = media_svc.purge_all(db)
+    finally:
+        db.close()
     # Reihenfolge beachtet die Fremdschlüssel (Kinder zuerst)
     order = ["metrics", "media_refs", "event_entity_links", "tracks", "events",
              "entities", "locations", "fragments"]
@@ -301,10 +312,10 @@ def wipe_data() -> dict:
         for table in order:
             result = conn.execute(text(f'DELETE FROM "{table}"'))
             deleted[table] = result.rowcount or 0
-    log.warning("ALLE Lebensdaten gelöscht: %d Zeilen (%s)",
-                sum(deleted.values()),
+    log.warning("ALLE Lebensdaten gelöscht: %d Zeilen, %d Bilddateien (%s)",
+                sum(deleted.values()), files,
                 ", ".join(f"{k}={v}" for k, v in deleted.items() if v))
-    return {"deleted": deleted, "total": sum(deleted.values())}
+    return {"deleted": deleted, "total": sum(deleted.values()), "media_files": files}
 
 
 @router.post("/reset-embeddings")
@@ -428,6 +439,9 @@ def delete_user(
 
     event_ids = select(Event.id).where(Event.user_id == user_id).scalar_subquery()
     deleted: dict[str, int] = {}
+    # F15: Bilddateien vor den Datensätzen — sonst bleiben sie auf der Platte
+    deleted["media_files"] = media_svc.purge_for_events(
+        db, [i for (i,) in db.query(Event.id).filter(Event.user_id == user_id).all()])
     # Kinder zuerst (Fremdschlüssel): Metriken/Medien/Links hängen an Events
     deleted["metrics"] = (db.query(Metric)
                           .filter(Metric.event_id.in_(event_ids))

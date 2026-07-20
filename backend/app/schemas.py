@@ -89,6 +89,7 @@ class EventRead(BaseModel):
     parent_event_id: str | None = None
     entities: list[EntityRead] = []
     metrics: list[MetricRead] = []
+    media: list["MediaRead"] = []   # F15: angehängte Bilder
 
 
 class FragmentRead(BaseModel):
@@ -165,6 +166,32 @@ class PlaceNameResolveResult(BaseModel):
     resolved: int
     failed: int
     remaining: int
+
+
+class MediaRead(BaseModel):
+    """F15: ein Bild an einem Event. `url`/`thumb_url` zeigen auf die
+    geschützten Endpunkte — Dateien werden nie direkt statisch ausgeliefert."""
+    id: str
+    event_id: str
+    provider: str
+    mime: str | None = None
+    bytes: int | None = None
+    width: int | None = None
+    height: int | None = None
+    caption: str | None = None
+    sort_order: int = 0
+    captured_at: datetime | None = None
+    url: str
+    thumb_url: str
+
+
+class MediaUploadResult(BaseModel):
+    """Ergebnis eines Uploads. Die EXIF-Werte sind **Vorschläge** — angewendet
+    werden sie erst, wenn der Nutzer zustimmt (Kap. 3.1)."""
+    media: MediaRead
+    suggested_captured_at: datetime | None = None
+    suggested_lat: float | None = None
+    suggested_lng: float | None = None
 
 
 class OnThisDayGroup(BaseModel):

@@ -258,17 +258,47 @@ class EventEntityLink(Base):
 # Stufe 3 — Anreicherungen (Enrichment)
 # --------------------------------------------------------------------------- #
 class MediaRef(Base):
-    """Verweis auf externe Medien (z. B. Immich). Keine Kopie."""
+    """Bild an einem Event.
+
+    ZWEI Naturen, an `provider` zu unterscheiden — der Unterschied ist keine
+    Kosmetik, sondern die Schichtzuordnung aus KONZEPT Kap. 3.1 (Anmerkung 57):
+
+    * `provider="local"` (F15): eine HOCHGELADENE Datei. Sie existiert
+      nirgendwo sonst und gehört damit zur **Lebensdatenbank** — Maschinen
+      fassen sie nie an, keine Neuberechnung darf sie verwerfen.
+    * `provider="immich"` (P2.1): ein VERWEIS auf ein fremdes System. Das ist
+      eine **Ableitung** und jederzeit verwerf- und neu berechenbar.
+
+    Für lokale Dateien trägt `external_id` den Dateinamen im Medienverzeichnis.
+    """
 
     __tablename__ = "media_refs"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    # Anmerkung 57: fehlte bisher, obwohl Kap. 6.1 es zusagt. Solange Medien
+    # nur über ihr Event erreichbar waren, war das folgenlos — mit eigenen
+    # Uploads wäre es der Weg zu fremden Bildern.
+    user_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     event_id: Mapped[str] = mapped_column(ForeignKey("events.id"))
     provider: Mapped[str] = mapped_column(String(32), default="immich")
     external_id: Mapped[str] = mapped_column(String(255))
     captured_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    # --- F15: Angaben zur hochgeladenen Datei ---
+    mime: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    width: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    height: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    caption: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
     event: Mapped[Event] = relationship(back_populates="media")
+
+    @property
+    def is_upload(self) -> bool:
+        """Hochgeladen = Lebensdatenbank, nicht Ableitung (Anmerkung 57)."""
+        return self.provider == "local"
 
 
 class Track(Base):

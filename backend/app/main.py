@@ -21,6 +21,7 @@ from app.routers import (
     events,
     ingest,
     jobs,
+    media,
     moderation,
     modules,
     search,
@@ -103,6 +104,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(ingest.router)
 app.include_router(events.router)
+app.include_router(media.router)      # F15: Bilder an Events
 app.include_router(search.router)
 app.include_router(moderation.router)
 app.include_router(modules.router)

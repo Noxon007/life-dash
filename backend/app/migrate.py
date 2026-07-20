@@ -20,6 +20,11 @@ _MISSING_COLUMNS: dict[str, dict[str, str]] = {
                "parent_event_id": "VARCHAR(36)"},
     "entities": {"user_id": "VARCHAR(36)"},
     "jobs": {"params": "JSON"},
+    # F15: hochgeladene Bilder. `user_id` schließt die Lücke aus Anmerkung 57.
+    "media_refs": {"user_id": "VARCHAR(36)", "mime": "VARCHAR(64)",
+                   "bytes": "INTEGER", "width": "INTEGER", "height": "INTEGER",
+                   "caption": "TEXT", "sort_order": "INTEGER",
+                   "created_at": "TIMESTAMP"},
 }
 
 # Einmalige Nacharbeiten, wenn eine Spalte NEU angelegt wurde (Bestandsdaten).
@@ -33,6 +38,11 @@ _BACKFILLS: dict[str, str] = {
         "confirmed_by = CASE WHEN source = 'google_timeline' "
         "THEN 'import' ELSE 'manual' END "
         "WHERE confirmed = 'confirmed'"
+    ),
+    # F15: Bestands-Medienverweise gehören dem Besitzer ihres Events.
+    "media_refs.user_id": (
+        "UPDATE media_refs SET user_id = ("
+        "SELECT e.user_id FROM events e WHERE e.id = media_refs.event_id)"
     ),
 }
 

@@ -97,10 +97,23 @@ def export_data(
     log.info("Export: %d Fragmente, %d Orte, %d Entities, %d Events, %d Tracks "
              "(user=%s)", len(fragments), len(locations), len(entities),
              len(events), len(tracks), user.email or user.id)
+    # F15/Anmerkung 57: Ab hier ist der JSON-Export KEIN vollständiges Backup
+    # mehr. Bilddateien passen nicht hinein; ihre Metadaten schon. Wer das
+    # nicht weiß, verliert seine Fotos im Vertrauen auf eine Datei, die
+    # vollständig aussieht — deshalb steht es im Export selbst, nicht nur in
+    # der Doku. Das schließt A29 (ZIP-Export mit Dateien) später sauber ab.
+    uploads = sum(1 for m in media if m.provider == "local")
     return {
         "format": "lifedash-export",
         "version": EXPORT_VERSION,
         "exported_at": datetime.now(timezone.utc).isoformat(),
+        "media_files_included": False,
+        "media_files_count": uploads,
+        "media_note": (
+            f"Dieser Export enthält die Angaben zu {uploads} hochgeladenen Bildern, "
+            "aber NICHT die Bilddateien selbst. Das Medienverzeichnis "
+            "(MEDIA_DIR) muss separat gesichert werden — siehe docs/DEPLOY.md."
+        ) if uploads else None,
         "fragments": [_row_to_dict(x) for x in fragments],
         "locations": [_row_to_dict(x) for x in locations],
         "entities": [_row_to_dict(x) for x in entities],

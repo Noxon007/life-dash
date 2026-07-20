@@ -99,6 +99,12 @@ def reset_reprocess(db: Session) -> int:
     (moderierte Wahrheit wird geschützt); ihre unbestätigten Geschwister-Events
     ebenso. Bei den übrigen werden die alten (unbestätigten) Events verworfen.
     Gibt die Anzahl der zu verarbeitenden Fragmente zurück.
+
+    F15/Anmerkung 57: Ein Event mit **hochgeladenem Bild** ist ebenso
+    unantastbar wie ein bestätigtes. Die Datei existiert nirgendwo sonst —
+    würde die Neuberechnung das Event verwerfen, wäre das Foto weg. Ein
+    Mensch, der ein Bild anhängt, hat den Eintrag genauso angefasst wie
+    einer, der ihn bestätigt.
     """
     count = 0
     for fragment in db.query(Fragment).filter(
@@ -106,6 +112,8 @@ def reset_reprocess(db: Session) -> int:
         Fragment.status != FragmentStatus.discarded,
     ).all():
         if any(e.confirmed == ConfirmState.confirmed for e in fragment.events):
+            continue
+        if any(m.provider == "local" for e in fragment.events for m in e.media):
             continue
         for event in list(fragment.events):
             for child in list(event.children):  # F7: Tages-Kinder abhängen

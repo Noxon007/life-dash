@@ -194,8 +194,23 @@ docker compose ps                 # health status (the container has a HEALTHCHE
 docker compose pull && docker compose up -d   # update to a new tag
 ```
 
-Backup minimum: save the folders `./db` (PostgreSQL, with `sudo` — owned by
-uid 70) or `./data` (SQLite) next to the Compose file — or regularly take the
-JSON export, which is complete and version-independent. Cleaner than the raw
-folder is a dump:
-`docker compose exec db pg_dump -U lifedash lifedash > backup.sql`.
+### Backup
+
+**Two things have to be saved, not one.**
+
+1. **The database** — the folders `./db` (PostgreSQL, with `sudo`, owned by
+   uid 70) or `./data` (SQLite) next to the Compose file. Cleaner than the raw
+   folder is a dump:
+   `docker compose exec db pg_dump -U lifedash lifedash > backup.sql`.
+2. **The media folder** (`MEDIA_DIR`, `./media` by default) — every photo you
+   uploaded lives there and **nowhere else**.
+
+> ⚠️ **The JSON export is not a full backup.** It carries everything the
+> database holds, including the details of every uploaded picture — but it
+> cannot carry the image files themselves. Restoring only from JSON gives you
+> entries whose photos are gone. The export says so in its own `media_note`
+> field, and the app warns you when you download one. A single archive
+> containing both is planned (package A29).
+
+Uploaded photos are **primary data**: unlike weather or place names, nothing
+can recompute them. Treat `MEDIA_DIR` with the same care as the database.

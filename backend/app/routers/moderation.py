@@ -10,6 +10,7 @@ from app.auth import get_current_user
 from app.database import get_db
 from app.models import ConfirmState, Event, EventEntityLink, User
 from app.routers._serialize import event_to_read
+from app.services import media as media_svc
 from app.schemas import (
     BulkConfirmFilter,
     BulkConfirmPreview,
@@ -222,10 +223,15 @@ def discard_event(
     F7: Hat das Event Tages-Unterereignisse, entscheidet with_children, ob
     die Kinder mitgelöscht oder abgehängt werden (dann normale Einzel-Events)."""
     event = _get_event(db, event_id, user)
+    doomed = [event.id]
     for child in list(event.children):
         if with_children:
+            doomed.append(child.id)
             db.delete(child)
         else:
             child.parent_event_id = None
+    # F15: Bilddateien vor den Datensätzen entfernen — sonst bleiben sie
+    # verwaist im Medienverzeichnis liegen.
+    media_svc.purge_for_events(db, doomed)
     db.delete(event)
     db.commit()

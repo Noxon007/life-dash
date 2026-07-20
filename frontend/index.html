@@ -294,6 +294,32 @@
   .field-val { font-size: 14px; flex: 1; min-width: 0; }
   .field-val input { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--text); font-size: 13px; width: 100%; max-width: 320px; }
   .mf-select { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--text); font-size: 13px; }
+  /* F15: Fotogalerie im Bearbeiten-Dialog, Karte und Druck */
+  .media-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .media-grid:empty { display: none; }
+  .media-item { position: relative; width: 110px; }
+  .media-item img { width: 110px; height: 110px; object-fit: cover; border-radius: 8px;
+    border: 1px solid var(--border); cursor: zoom-in; display: block; background: var(--bg-elev); }
+  .media-item .media-del { position: absolute; top: 4px; right: 4px; border: none; cursor: pointer;
+    background: rgba(0,0,0,.65); color: #fff; border-radius: 6px; width: 24px; height: 24px;
+    line-height: 1; font-size: 13px; }
+  .media-item input.media-cap { width: 110px; margin-top: 4px; font-size: 11px; padding: 3px 5px;
+    background: var(--bg-elev); color: var(--text); border: 1px solid var(--border); border-radius: 5px; }
+  .media-drop { margin-top: 10px; padding: 14px; text-align: center; cursor: pointer; font-size: 12px;
+    border: 1px dashed var(--border); border-radius: 8px; color: var(--text-dim); }
+  .media-drop.over { border-color: var(--accent); color: var(--accent); }
+  /* Bildbetrachter */
+  .lightbox { position: fixed; inset: 0; z-index: 3000; background: rgba(0,0,0,.92);
+    display: none; align-items: center; justify-content: center; flex-direction: column; gap: 12px; }
+  .lightbox.show { display: flex; }
+  .lightbox img { max-width: 94vw; max-height: 82vh; object-fit: contain; border-radius: 6px; }
+  .lightbox .lb-cap { color: #ddd; font-size: 13px; max-width: 80vw; text-align: center; }
+  .lightbox .lb-nav { position: absolute; top: 50%; transform: translateY(-50%); font-size: 34px;
+    color: #fff; background: none; border: none; cursor: pointer; padding: 12px; opacity: .75; }
+  .lightbox .lb-prev { left: 8px; } .lightbox .lb-next { right: 8px; }
+  /* Fotos in der Timeline-Karte */
+  .ev-photos { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .ev-photos img { width: 72px; height: 72px; object-fit: cover; border-radius: 6px; cursor: zoom-in; }
   /* F13: Ebenenwahl auf der Karte. Eigener Rahmen statt leaflet-bar-Optik,
      damit das Feld in beiden Themes lesbar bleibt (Leaflet-Controls sind hell). */
   .basemap-ctl { border: none !important; background: none !important; }
@@ -501,6 +527,11 @@
     .pr-ev-meta span::after { content: " · "; }
     .pr-ev-meta span:last-child::after { content: ""; }
     .pr-journal { background: #f5f5f5; padding: 8px 10px; border-left: 3px solid #666; }
+    /* F8-Rest: Fotos im Ausdruck */
+    .pr-photos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .pr-photos figure { margin: 0; break-inside: avoid; max-width: 46mm; }
+    .pr-photos img { width: 46mm; height: auto; border-radius: 2px; display: block; }
+    .pr-photos figcaption { font-size: 7.5pt; color: #555; margin-top: 2px; }
     .pr-empty { font-size: 11pt; color: #555; }
   }
 
@@ -590,6 +621,14 @@
   </div>
 
   <!-- EVENT BEARBEITEN (Modal) -->
+  <!-- F15: Bildbetrachter -->
+  <div class="lightbox" id="lightbox">
+    <button class="lb-nav lb-prev" id="lb-prev" aria-label="zurück">‹</button>
+    <img id="lb-img" alt="">
+    <div class="lb-cap" id="lb-cap"></div>
+    <button class="lb-nav lb-next" id="lb-next" aria-label="weiter">›</button>
+  </div>
+
   <div class="modal-overlay" id="edit-modal">
     <div class="modal-box">
       <h3 data-i18n="edit.title">✏️ Eintrag bearbeiten</h3>
@@ -633,6 +672,18 @@
         </div></div>
       <div class="field-row"><div class="field-key" data-i18n="field.comment">💬 Kommentar</div>
         <div class="field-val"><textarea id="ed-note" rows="6" data-i18n-ph="edit.note.ph" placeholder="persönliche Notiz / Tagebuchtext — Markdown möglich (**fett**, # Überschrift, - Liste), bleibt von der KI unberührt" style="width:100%; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:6px 10px; color:var(--text); font-size:13px; font-family:inherit; resize:vertical"></textarea></div></div>
+      <!-- F15: Fotos von Hand anhängen -->
+      <div class="field-row"><div class="field-key" data-i18n="field.photos">📷 Fotos</div>
+        <div class="field-val" style="max-width:none">
+          <div id="ed-media" class="media-grid"></div>
+          <div id="ed-drop" class="media-drop">
+            <span data-i18n="media.drop">Bilder hierher ziehen oder auswählen</span>
+            <input type="file" id="ed-media-file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden>
+          </div>
+          <div class="hint" style="margin-top:6px" data-i18n="media.hint">Die Dateien liegen auf deinem Server und
+          gehören zur Lebensdatenbank — keine Neuberechnung fasst sie an. <b>Wichtig:</b> Der JSON-Export enthält
+          sie nicht; das Medienverzeichnis muss separat gesichert werden.</div>
+        </div></div>
       <!-- F7: Mehrtages-Event -> Tages-Unterereignisse anlegen -->
       <div class="field-row" id="ed-days-row" style="display:none"><div class="field-key" data-i18n="field.days">📅 Tage</div>
         <div class="field-val" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
@@ -1357,6 +1408,9 @@
         <input type="checkbox" id="pr-notes" checked> <span data-i18n="pr.opt.notes">Notizen und Tagebuch mitdrucken</span></label>
       <label class="stat-label" style="display:flex; align-items:center; gap:8px">
         <input type="checkbox" id="pr-visits"> <span data-i18n="pr.opt.visits">Importierte Standort-Besuche einschließen</span></label>
+      <!-- F8-Rest: Drucken mit Fotos — wurde durch F15 möglich -->
+      <label class="stat-label" style="display:flex; align-items:center; gap:6px">
+        <input type="checkbox" id="pr-photos" checked> <span data-i18n="pr.opt.photos">Fotos mitdrucken</span></label>
       <label class="stat-label" style="display:flex; align-items:center; gap:8px">
         <input type="checkbox" id="pr-unconfirmed"> <span data-i18n="pr.opt.unconf">Unbestätigte Vorschläge einschließen</span></label>
     </div>
@@ -1685,6 +1739,21 @@ const I18N_EN = {
   'adm.fuzzy': "⏳ Vague dates",
   'btn.preview': "🔍 Preview",
   'btn.confirmall': "✓ Confirm all",
+  'field.photos': "📷 Photos",
+  'media.drop': "Drag images here or pick them",
+  'media.hint': "The files live on your own server and belong to the life database — no recomputation touches them. <b>Important:</b> the JSON export does not contain them; the media folder has to be backed up separately.",
+  'media.caption': "Caption",
+  'media.delete': "Delete picture",
+  'media.delete.ask': "The file will be permanently removed from the server — it exists nowhere else.",
+  'media.deleted': "✓ Picture deleted.",
+  'media.delfail': "Deleting failed: ",
+  'media.capfail': "Caption not saved: ",
+  'media.uploading': "Uploading …",
+  'media.uploaded': "✓ {n} picture(s) added.",
+  'media.exif.title': "Take the capture date?",
+  'media.exif.set': "The photo was taken on {d} — use that as the date?",
+  'media.exif.replace': "The photo was taken on {d} — change the entry's date to that?",
+  'pr.opt.photos': "Print photos",
   'wx.title': "🌦️ Your weather record",
   'wx.hint': "Computed from the weather already attached to your entries — no new lookups. The more entries carry weather, the more it says.",
   'wx.days': "📆 Days with weather",
@@ -2517,6 +2586,20 @@ document.getElementById('timeline-list').addEventListener('click', ev => {
   const items = VISIT_GROUPS[+card.dataset.visitGroup] || [];
   card.outerHTML = items.map(eventCard).join('');
 });
+// F15: Fotostreifen auf der Ereignis-Karte. Höchstens vier Vorschauen, damit
+// ein Urlaubstag mit dreißig Bildern den Zeitstrahl nicht sprengt — der Rest
+// steht als „+N" daneben und ist im Betrachter erreichbar.
+const CARD_PHOTOS = 4;
+function eventPhotos(e) {
+  const media = e.media || [];
+  if (!media.length) return '';
+  const shown = media.slice(0, CARD_PHOTOS);
+  const more = media.length - shown.length;
+  return `<div class="ev-photos" data-photos="${esc(e.id)}">${
+    shown.map((m, i) => `<img src="${esc(m.thumb_url)}" alt="${esc(m.caption || '')}" `
+      + `data-photo="${i}" loading="lazy">`).join('')
+    }${more ? `<span class="chip" data-photo="0">+${more}</span>` : ''}</div>`;
+}
 const EVENT_CACHE = {};   // id -> Event (für den Bearbeiten-Dialog)
 const TL_CHILDREN = new Map();  // F7: parent_event_id -> Tages-Kinder (sortiert)
 function eventCard(e) {
@@ -2533,6 +2616,7 @@ function eventCard(e) {
       </div>
       <div class="ev-desc">${esc(e.description || '')}</div>
       ${e.note ? `<div class="ev-note md">${mdRender(e.note)}</div>` : ''}
+      ${eventPhotos(e)}
       <div class="ev-meta">
         <span class="chip">${catLabel(e.category)}</span>
         ${e.parent_event_id ? '<span class="chip">📅 Tages-Eintrag</span>' : ''}
@@ -2642,11 +2726,25 @@ async function prRefreshCount() {
   }
 }
 
+// F8-Rest: Fotos im Ausdruck. Gedruckt wird die VORSCHAU, nicht das Original —
+// ein Blatt mit fünf 8-Megapixel-Bildern lässt jeden Druckdialog hängen, und
+// bei Druckgröße ist der Unterschied nicht zu sehen. Bildunterschriften stehen
+// darunter, weil sie auf Papier die einzige Erklärung sind.
+function prPhotos(e) {
+  const media = e.media || [];
+  if (!media.length) return '';
+  return `<div class="pr-photos">${media.map(m => `
+    <figure><img src="${esc(m.thumb_url)}" alt="">
+      ${m.caption ? `<figcaption>${esc(m.caption)}</figcaption>` : ''}
+    </figure>`).join('')}</div>`;
+}
+
 function prBuildPage(events) {
   const from = document.getElementById('pr-from').value;
   const to = document.getElementById('pr-to').value;
   const withDesc = document.getElementById('pr-desc').checked;
   const withNotes = document.getElementById('pr-notes').checked;
+  const withPhotos = document.getElementById('pr-photos').checked;
   const fmtDay = d => new Date(d + 'T00:00:00').toLocaleDateString('de-DE',
     { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
 
@@ -2697,6 +2795,7 @@ function prBuildPage(events) {
         <div class="pr-ev-title">${esc(e.title)}</div>
         ${withDesc && e.description ? `<div class="pr-ev-desc">${esc(e.description)}</div>` : ''}
         ${withNotes && e.note ? `<div class="pr-ev-note">${mdRender(e.note)}</div>` : ''}
+        ${withPhotos ? prPhotos(e) : ''}
         <div class="pr-ev-meta">${meta.map(m => `<span>${esc(m)}</span>`).join('')}</div>
       </div>`;
     });
@@ -3430,10 +3529,151 @@ function edEntities() {
                  name: r.querySelector('.ed-ent-name').value.trim(), attributes: {} }))
     .filter(en => en.name);
 }
+// --------------------------------------------------------------------------- //
+// F15 — Fotos an Events
+// --------------------------------------------------------------------------- //
+// Die Dateien liegen auf dem eigenen Server und gehören zur Lebensdatenbank
+// (KONZEPT Anmerkung 57). Gelöscht wird nur auf ausdrückliche Ansage.
+let LB_SET = [], LB_AT = 0;
+function openLightbox(items, index) {
+  LB_SET = items; LB_AT = index;
+  showLightbox();
+  document.getElementById('lightbox').classList.add('show');
+}
+function showLightbox() {
+  const it = LB_SET[LB_AT];
+  if (!it) return;
+  document.getElementById('lb-img').src = it.url;
+  document.getElementById('lb-cap').textContent = it.caption || '';
+  const many = LB_SET.length > 1;
+  document.getElementById('lb-prev').style.display = many ? '' : 'none';
+  document.getElementById('lb-next').style.display = many ? '' : 'none';
+}
+function stepLightbox(d) {
+  LB_AT = (LB_AT + d + LB_SET.length) % LB_SET.length;
+  showLightbox();
+}
+document.getElementById('lb-prev').addEventListener('click', ev => { ev.stopPropagation(); stepLightbox(-1); });
+document.getElementById('lb-next').addEventListener('click', ev => { ev.stopPropagation(); stepLightbox(1); });
+document.getElementById('lightbox').addEventListener('click', ev => {
+  if (ev.target.id === 'lb-img') return;
+  document.getElementById('lightbox').classList.remove('show');
+});
+document.addEventListener('keydown', ev => {
+  const lb = document.getElementById('lightbox');
+  if (!lb.classList.contains('show')) return;
+  if (ev.key === 'Escape') lb.classList.remove('show');
+  if (ev.key === 'ArrowLeft') stepLightbox(-1);
+  if (ev.key === 'ArrowRight') stepLightbox(1);
+});
+
+// Galerie im Bearbeiten-Dialog
+async function renderEventMedia(eventId) {
+  const box = document.getElementById('ed-media');
+  box.innerHTML = '';
+  let items = [];
+  try {
+    items = await api(`/api/events/${eventId}/media`);
+  } catch (_) { return; }
+  box.dataset.items = JSON.stringify(items);
+  box.innerHTML = items.map((m, i) => `
+    <div class="media-item" data-id="${esc(m.id)}">
+      <img src="${esc(m.thumb_url)}" alt="" data-index="${i}" loading="lazy">
+      <button class="media-del" data-del="${esc(m.id)}"
+              title="${t('media.delete', 'Bild löschen')}">✕</button>
+      <input class="media-cap" data-cap="${esc(m.id)}" value="${esc(m.caption || '')}"
+             placeholder="${t('media.caption', 'Bildunterschrift')}">
+    </div>`).join('');
+  if (editingEvent) editingEvent.media = items;
+}
+document.getElementById('ed-media').addEventListener('click', async ev => {
+  const del = ev.target.closest('[data-del]');
+  if (del) {
+    if (!await uiConfirm(t('media.delete.ask',
+        'Die Datei wird endgültig vom Server entfernt — sie liegt nirgendwo sonst.'),
+        { title: t('media.delete', 'Bild löschen'), okLabel: '🗑️', danger: true })) return;
+    try {
+      await api(`/api/media/${del.dataset.del}`, { method: 'DELETE' });
+      await renderEventMedia(editingEvent.id);
+      toast(t('media.deleted', '✓ Bild gelöscht.'));
+    } catch (err) { toast(t('media.delfail', 'Löschen fehlgeschlagen: ') + err.message, 'error'); }
+    return;
+  }
+  const img = ev.target.closest('img[data-index]');
+  if (img) {
+    const items = JSON.parse(document.getElementById('ed-media').dataset.items || '[]');
+    openLightbox(items, +img.dataset.index);
+  }
+});
+document.getElementById('ed-media').addEventListener('change', async ev => {
+  const cap = ev.target.closest('[data-cap]');
+  if (!cap) return;
+  try {
+    await api(`/api/media/${cap.dataset.cap}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ caption: cap.value }) });
+  } catch (err) { toast(t('media.capfail', 'Bildunterschrift nicht gespeichert: ') + err.message, 'error'); }
+});
+
+// Upload: Auswahl, Ziehen und Fallenlassen
+async function uploadEventMedia(files) {
+  if (!editingEvent || !files.length) return;
+  const drop = document.getElementById('ed-drop');
+  let done = 0, failed = 0, suggestion = null;
+  for (const file of files) {
+    drop.textContent = t('media.uploading', 'Lade hoch …') + ` ${done + failed + 1}/${files.length}`;
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      // Kein Content-Type setzen — den Multipart-Rand baut der Browser selbst
+      const res = await api(`/api/events/${editingEvent.id}/media`, { method: 'POST', body: fd });
+      done++;
+      if (!suggestion && (res.suggested_captured_at || res.suggested_lat != null)) suggestion = res;
+    } catch (err) { failed++; toast(err.message, 'error', 6000); }
+  }
+  drop.innerHTML = `<span data-i18n="media.drop">${t('media.drop', 'Bilder hierher ziehen oder auswählen')}</span>`;
+  await renderEventMedia(editingEvent.id);
+  if (done) toast(t('media.uploaded', '✓ {n} Bild(er) hinzugefügt.').replace('{n}', done));
+  // EXIF ist ein VORSCHLAG, kein Automatismus: über das Datum eines
+  // bestätigten Eintrags entscheidet der Mensch (Kap. 3.1).
+  if (suggestion) offerExifSuggestion(suggestion);
+}
+async function offerExifSuggestion(res) {
+  const dateField = document.getElementById('ed-date-start');
+  const when = res.suggested_captured_at ? res.suggested_captured_at.slice(0, 10) : null;
+  if (!when || dateField.value === when) return;
+  const msg = dateField.value
+    ? t('media.exif.replace', 'Das Foto wurde am {d} aufgenommen — Datum des Eintrags darauf ändern?')
+    : t('media.exif.set', 'Das Foto wurde am {d} aufgenommen — als Datum übernehmen?');
+  if (await uiConfirm(msg.replace('{d}', when),
+      { title: t('media.exif.title', 'Aufnahmedatum übernehmen?') })) {
+    dateField.value = when;
+    const time = res.suggested_captured_at.slice(11, 16);
+    if (time && time !== '00:00') document.getElementById('ed-time-start').value = time;
+  }
+}
+document.getElementById('ed-drop').addEventListener('click', () =>
+  document.getElementById('ed-media-file').click());
+document.getElementById('ed-media-file').addEventListener('change', ev => {
+  uploadEventMedia([...ev.target.files]);
+  ev.target.value = '';
+});
+['dragenter', 'dragover'].forEach(n =>
+  document.getElementById('ed-drop').addEventListener(n, ev => {
+    ev.preventDefault(); document.getElementById('ed-drop').classList.add('over');
+  }));
+['dragleave', 'drop'].forEach(n =>
+  document.getElementById('ed-drop').addEventListener(n, ev => {
+    ev.preventDefault(); document.getElementById('ed-drop').classList.remove('over');
+  }));
+document.getElementById('ed-drop').addEventListener('drop', ev =>
+  uploadEventMedia([...(ev.dataTransfer.files || [])].filter(f => f.type.startsWith('image/'))));
+
 function openEventEdit(id) {
   const e = EVENT_CACHE[id];
   if (!e) return;
   editingEvent = e;
+  renderEventMedia(id);
   document.getElementById('ed-title').value = e.title || '';
   document.getElementById('ed-desc').value = e.description || '';
   document.getElementById('ed-date-start').value = e.date_start ? e.date_start.slice(0, 10) : '';
@@ -3511,6 +3751,15 @@ document.querySelector('.content').addEventListener('click', ev => {
     const kids = TL_CHILDREN.get(tog.dataset.expandChildren) || [];
     card.insertAdjacentHTML('afterend', `<div class="tl-children">${
       kids.map(k => k.category === 'journal' ? journalCard(k) : eventCard(k)).join('')}</div>`);
+    return;
+  }
+  // F15: Klick auf ein Foto öffnet den Betrachter, NICHT den Bearbeiten-Dialog
+  const photo = ev.target.closest('[data-photo]');
+  if (photo) {
+    ev.stopPropagation();
+    const strip = photo.closest('[data-photos]');
+    const e = EVENT_CACHE[strip.dataset.photos];
+    if (e && (e.media || []).length) openLightbox(e.media, +photo.dataset.photo || 0);
     return;
   }
   const card = ev.target.closest('.event-card');

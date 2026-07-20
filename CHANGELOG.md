@@ -15,6 +15,52 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.24.0] – 2026-07-20
+
+### Added
+- **📷 Photos, at last:** attach pictures to any entry — drag them onto the
+  edit dialog, pick them from a file browser, or take one with the camera on a
+  phone. Several per entry, each with its own caption. They appear on the
+  timeline card, open in a full-screen viewer (arrow keys and swipe work), and
+  need **no external service**: the files live on your own server.
+- **The photo's own date and place are offered to you:** if a picture carries
+  capture time or GPS coordinates, Life-Dash reads them and *asks* whether to
+  use them. It never rewrites an entry on its own — that decision stays yours.
+- **Printing with photos** — the missing half of the print view. Pick a range,
+  tick “print photos”, and the pictures appear under their entries with their
+  captions. Printing uses the small preview version, so the dialog does not
+  choke on a page of full-resolution images.
+
+### Changed
+- **Uploaded pictures are protected like confirmed data.** Everything Life-Dash
+  computes — weather, place names, embeddings — can be thrown away and rebuilt.
+  A photo you uploaded cannot: it exists nowhere else. Recomputing your entries
+  therefore never discards an entry that carries one, and no cleanup job
+  touches the files. They disappear only when you delete the picture, the
+  entry, or the account — and then the files really are removed, rather than
+  being left behind on disk.
+- **The export now tells you what it cannot carry.** A JSON export holds the
+  details of every picture but not the image files. It says so in its own
+  `media_note` field, the app repeats it where you upload, and
+  [DEPLOY.md](docs/DEPLOY.md) now describes backup as two things to save, not
+  one. A single archive containing both is coming (see the concept, A29).
+
+### Fixed
+- Picture records had no owner of their own — they were only reachable through
+  their entry. That was harmless while nothing could be uploaded and is now
+  closed properly, so no request can reach another account's pictures.
+
+### Notes for self-hosters
+- New setting **`MEDIA_DIR`** (default `/data/media` in Docker) with its own
+  volume in `docker-compose.yml`. **Back it up separately from the database.**
+  Also new: `MEDIA_MAX_MB` (default 25) and `MEDIA_THUMB_PX` (default 640).
+- Two new Python dependencies: **Pillow** (image handling, previews, EXIF) and
+  **python-multipart** (file uploads). `pip install -r requirements.txt` after
+  updating, or just pull the new image.
+- Accepted formats are JPEG, PNG, WebP and GIF. SVG is deliberately refused —
+  it can contain scripts. Files are identified by opening them, not by
+  trusting their name or what the browser claims.
+
 ## [0.23.0] – 2026-07-20
 
 ### Added

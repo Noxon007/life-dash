@@ -57,6 +57,16 @@ class Settings(BaseSettings):
     # Verzeichnis des Frontends (wird vom Backend statisch ausgeliefert)
     frontend_dir: Path = BASE_DIR.parent / "frontend"
 
+    # F15: Verzeichnis für hochgeladene Bilder. ACHTUNG — hier liegen die
+    # einzigen Daten, die der JSON-Export NICHT enthalten kann: eigenes
+    # Docker-Volume, eigene Sicherung (siehe DEPLOY.md).
+    media_dir: Path = BASE_DIR / "media"
+    # Obergrenze je Datei. Handyfotos liegen bei 3–8 MB; 25 MB lassen auch
+    # Kamera-JPEGs zu, ohne dass ein Fehlgriff die Platte füllt.
+    media_max_mb: int = 25
+    # Kantenlänge der serverseitig erzeugten Vorschau (Timeline, Druck)
+    media_thumb_px: int = 640
+
     # ------------------------------------------------------------------ #
     # Auth: Multi-User via OIDC — funktioniert mit jedem standardkonformen
     # Provider (Authentik, Keycloak, Pocket ID, Zitadel, Auth0, ...).
