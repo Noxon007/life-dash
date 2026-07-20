@@ -25,6 +25,17 @@ enough to try it out. Local development without Docker: see
 The interface speaks **English and German**; a switch in the top bar changes
 the language at any time (it follows your browser on first visit).
 
+## How this was built
+
+The entire implementation was written by Anthropic's Claude models — **Fable and
+Opus** — from [docs/KONZEPT.md](docs/KONZEPT.md), with the author directing the
+work, deciding the architecture, reviewing the result and running it daily. This
+is stated up front rather than buried: if you are going to host a database of
+your own life, you should know how the software was made.
+
+This is currently a single-author project. Issues and questions are welcome;
+pull requests are not being accepted yet.
+
 ## Stack
 
 FastAPI + SQLAlchemy (SQLite or PostgreSQL) · vanilla-JS PWA (served by the

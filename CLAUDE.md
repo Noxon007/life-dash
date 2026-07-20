@@ -45,10 +45,18 @@ Umgesetzt bis **v0.20.0** (2026-07-20). **F10 komplett** (App zweisprachig +
 Doku auf Englisch). Offen und klein: **A28** (ein Ortsnamen-Lauf statt
 Scope-Auswahl), **F11** (mehr aus vorhandenen Wetterdaten — reine Ableitung,
 kein API-Aufruf), **F12** (zusätzliche Wetterfelder via Re-Enrichment),
-**P3.1** (deklarative Statistik-Widgets), F8-Rest („Druck mit Fotos", wartet
-auf P2.1). Danach nur noch die großen Pakete: Import-Quellen (P2.1 Immich,
-P2.8 OwnTracks, P2.9 Automatisierung, P4.1 Health, P4.2 PSN) und
-P5.1/P5.2 (Offline-Capture, Whisper).
+**F13** (wählbare Hintergrundkarten + eigene Tile-URL), **F14** („An diesem
+Tag"), **P3.1** (deklarative Statistik-Widgets), F8-Rest („Druck mit Fotos",
+wartet auf P2.1). Groß: **R1** (Veröffentlichungsreife — Demo-Modus,
+Screenshots, Härtung, getesteter Upgrade-Pfad; Gate vor jeder Werbung),
+Import-Quellen (P2.1 Immich, P2.8 OwnTracks, P2.9 Automatisierung,
+P2.10 Trakt/Medienkonsum, P2.11 Dawarich/Reitti/GPX, P4.1 Health, P4.2 PSN)
+und P5.1/P5.2 (Offline-Capture, Whisper).
+
+Marktposition und Abgrenzung stehen seit 2026-07-20 in **KONZEPT Kap. 1.1**;
+Anmerkungen 51–56 halten die Entscheidungen dazu fest (Karten, KI-Urheberschaft,
+Marktanalyse, Werbung, Wachstum, Medienimporte). **Beitragsmodell: vorerst
+keine Fremd-PRs** — bewusst kein CLA/DCO, damit die Lizenzfrage offen bleibt.
 
 **Doku ist ab 0.20.0 englisch** (README, backend/README, DEPLOY, KONZEPT,
 CHANGELOG). Diskussion/Input dürfen deutsch bleiben — übersetzt wird beim
