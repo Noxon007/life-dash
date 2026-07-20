@@ -15,6 +15,45 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.26.0] – 2026-07-20
+
+### Added
+- **📦 One file that really is your backup.** The export can now produce a
+  **ZIP containing your data *and* your photos** — tick “with photos” under
+  Settings → My data. Importing that archive brings everything back: entries,
+  places, weather, and the image files themselves, previews included. This
+  closes the gap that arrived with photo uploads in 0.24.0.
+- **Restoring is repeatable.** Import the same archive twice and nothing
+  changes — existing entries and existing files are recognised and skipped.
+- The plain JSON export stays exactly as it was, and stays the right choice
+  if you back up your media folder some other way: it is small, readable and
+  easy to diff.
+
+### Fixed
+- **“Delete all data” has been broken since v0.9.0** and returned a server
+  error instead of doing anything. It was never covered by a test; the full
+  backup-and-restore run built for this release finally exercised it. It works
+  again, now removes the image files along with the entries, and is covered by
+  tests from here on.
+- **Restoring on a different instance would have orphaned your photos.** Image
+  records kept the *original* account's identity instead of being handed to the
+  account doing the import, so after a restore the pictures belonged to nobody
+  and could not be shown.
+
+### Notes
+- The archive is **streamed** in both directions — neither the export nor the
+  import ever holds the whole thing in memory, so a library of many gigabytes
+  works on a small machine.
+- Previews are not stored in the archive (they can be rebuilt from the
+  originals) and are regenerated during the import — the export stays smaller
+  without losing anything.
+- **Immich pictures are not in the archive.** They live in Immich and are
+  backed up there; only the link is exported, and it can be rebuilt at any
+  time.
+- Archives are treated as foreign data: entries that try to escape the media
+  folder are refused, and every file is verified to be an actual image before
+  it is written.
+
 ## [0.25.0] – 2026-07-20
 
 ### Added

@@ -12,7 +12,7 @@ from sqlalchemy import DateTime as SADateTime
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy import Float as SAFloat
 from sqlalchemy import Integer as SAInteger
-from sqlalchemy import Table, func, select
+from sqlalchemy import Table, func, select, text
 from sqlalchemy.orm import Session
 
 from app.auth import require_admin
@@ -298,11 +298,13 @@ def wipe_data() -> dict:
     Die Bestätigungs-Nachfrage passiert im Frontend; dieser Endpoint ist
     nur für Admins erreichbar (Router-Dependency)."""
     deleted: dict[str, int] = {}
-    # F15: erst die Dateien, dann die Zeilen — danach ist nicht mehr bekannt,
-    # welche Bilder gemeint waren, und das Medienverzeichnis bliebe voll.
+    # F15: Erst merken, WELCHE Dateien es gibt — nach dem Löschen der Zeilen
+    # ist das nicht mehr feststellbar. Gelöscht werden sie aber erst danach:
+    # scheitert das Aufräumen der Datenbank, wären sonst die Bilder weg und
+    # die Daten noch da. Verwaiste Dateien sind die harmlose Richtung.
     db = SessionLocal()
     try:
-        files = media_svc.purge_all(db)
+        doomed = media_svc.list_uploads(db)
     finally:
         db.close()
     # Reihenfolge beachtet die Fremdschlüssel (Kinder zuerst)
@@ -312,6 +314,7 @@ def wipe_data() -> dict:
         for table in order:
             result = conn.execute(text(f'DELETE FROM "{table}"'))
             deleted[table] = result.rowcount or 0
+    files = media_svc.purge_files(doomed)
     log.warning("ALLE Lebensdaten gelöscht: %d Zeilen, %d Bilddateien (%s)",
                 sum(deleted.values()), files,
                 ", ".join(f"{k}={v}" for k, v in deleted.items() if v))

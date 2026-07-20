@@ -179,6 +179,49 @@ def store(user_id: str, data: bytes) -> dict:
             "captured_at": captured, "gps": gps}
 
 
+def is_image(data: bytes) -> bool:
+    """Sind das Bytes eines Bildes in einem erlaubten Format?
+
+    Für Daten, die nicht aus einem Upload kommen (A29: Dateien aus einem
+    Archiv). Ein Archiv ist genauso fremd wie ein Upload — geprüft wird auch
+    hier durch Öffnen, nicht anhand des Namens.
+    """
+    try:
+        with Image.open(io.BytesIO(data)) as img:
+            if (img.format or "").upper() not in ALLOWED:
+                return False
+            img.verify()
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def ensure_thumbnail(user_id: str, filename: str) -> bool:
+    """Erzeugt das Vorschaubild neu, falls es fehlt.
+
+    A29: Vorschauen liegen nicht im Archiv — sie sind aus dem Original
+    jederzeit ableitbar und würden das Backup ohne Gewinn aufblähen. Nach
+    einer Wiederherstellung müssen sie aber existieren, sonst zeigt der
+    Zeitstrahl lauter kaputte Bilder.
+    """
+    try:
+        original = path_for(user_id, filename)
+        thumb = path_for(user_id, filename + THUMB_SUFFIX)
+    except MediaError:
+        return False
+    if thumb.exists() or not original.is_file():
+        return False
+    try:
+        with Image.open(original) as img:
+            out = ImageOps.exif_transpose(img).convert("RGB")
+            out.thumbnail((settings.media_thumb_px, settings.media_thumb_px))
+            out.save(thumb, "JPEG", quality=82)
+        return True
+    except (OSError, ValueError) as exc:
+        log.warning("Vorschau für %s nicht erzeugbar: %s", filename, exc)
+        return False
+
+
 def purge_for_events(db, event_ids) -> int:
     """Löscht die Dateien aller hochgeladenen Bilder dieser Events.
 
@@ -199,18 +242,31 @@ def purge_for_events(db, event_ids) -> int:
     return len(refs)
 
 
-def purge_all(db) -> int:
-    """Löscht die Dateien ALLER hochgeladenen Bilder (für „alle Daten
-    löschen"). Räumt anschließend leere Nutzerverzeichnisse ab."""
+def list_uploads(db) -> list[tuple[str, str]]:
+    """(Nutzer-ID, Dateiname) aller hochgeladenen Bilder — VOR dem Löschen der
+    Zeilen einzusammeln, denn danach ist nicht mehr bekannt, welche Dateien
+    gemeint waren."""
     from app.models import MediaRef
 
-    refs = db.query(MediaRef).filter(MediaRef.provider == "local").all()
-    for ref in refs:
-        delete(ref.user_id or "", ref.external_id)
-    for child in media_root().iterdir():
+    return [(r.user_id or "", r.external_id)
+            for r in db.query(MediaRef).filter(MediaRef.provider == "local").all()]
+
+
+def purge_files(files: list[tuple[str, str]]) -> int:
+    """Löscht die eingesammelten Dateien und räumt leere Nutzerverzeichnisse ab.
+
+    Wird bewusst NACH dem Löschen der Datenbankzeilen aufgerufen. Andersherum
+    hätte ein Fehler mittendrin den schlimmstmöglichen Zustand hinterlassen:
+    Bilder weg, Daten noch da. So bleibt im Fehlerfall höchstens eine
+    verwaiste Datei übrig — das ist die harmlose Richtung.
+    """
+    for user_id, filename in files:
+        delete(user_id, filename)
+    root = media_root()
+    for child in root.iterdir():
         if child.is_dir() and not any(child.iterdir()):
             child.rmdir()
-    return len(refs)
+    return len(files)
 
 
 def delete(user_id: str, filename: str) -> None:

@@ -205,12 +205,19 @@ docker compose pull && docker compose up -d   # update to a new tag
 2. **The media folder** (`MEDIA_DIR`, `./media` by default) — every photo you
    uploaded lives there and **nowhere else**.
 
-> ⚠️ **The JSON export is not a full backup.** It carries everything the
-> database holds, including the details of every uploaded picture — but it
-> cannot carry the image files themselves. Restoring only from JSON gives you
+**Or take one archive instead of both.** Since v0.26.0 the app can export a
+**ZIP containing the data *and* the image files** (Settings → My data →
+Export, with “with photos” ticked). Importing that archive restores both,
+including previews, and can be repeated without creating duplicates. That is
+the simplest complete backup, and the one to use if you only want to remember
+one thing.
+
+> ⚠️ **The plain JSON export is still not a full backup.** It carries
+> everything the database holds, including the details of every uploaded
+> picture — but not the image files. Restoring only from JSON gives you
 > entries whose photos are gone. The export says so in its own `media_note`
-> field, and the app warns you when you download one. A single archive
-> containing both is planned (package A29).
+> field. It remains the right choice if you back up `MEDIA_DIR` by other
+> means: it is small, readable and diffable.
 
 Uploaded photos are **primary data**: unlike weather or place names, nothing
 can recompute them. Treat `MEDIA_DIR` with the same care as the database.

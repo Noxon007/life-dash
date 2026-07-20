@@ -1197,12 +1197,20 @@
               <label class="stat-label" style="display:inline-flex; align-items:center; gap:6px; margin-top:8px">
                 <input type="checkbox" id="exp-no-timeline">
                 ohne Google-Timeline-Daten (importierte Besuche, Routen &amp; deren Roh-Belege)
-              </label></div>
+              </label><br>
+              <!-- A29: das vollständige Backup -->
+              <label class="stat-label" style="display:inline-flex; align-items:center; gap:6px; margin-top:6px">
+                <input type="checkbox" id="exp-with-media" checked>
+                <b>mit Fotos (ZIP)</b> — vollständiges Backup
+              </label>
+              <span class="hint" style="display:block; margin-top:6px" data-i18n="exp.media.hint">Ohne dieses Häkchen
+              bekommst du reines JSON: klein, lesbar, diffbar — aber <b>ohne deine Bilddateien</b>. Die stecken nur
+              im ZIP. Immich-Bilder sind in keinem von beiden: die liegen in Immich und werden dort gesichert.</span></div>
           </div>
           <div class="action-row">
             <div style="flex-shrink:0; min-width:215px">
               <button class="btn secondary" id="btn-import" style="width:100%; text-align:left" data-i18n="act.import">📥 Daten importieren</button>
-              <input type="file" id="import-file" accept=".json,application/json" style="display:none">
+              <input type="file" id="import-file" accept=".json,.zip,application/json,application/zip" style="display:none">
             </div>
             <div class="action-desc" data-i18n="act.import.desc"><b>Export-Datei zurückspielen.</b><br>
               Importiert eine Life-Dash-Export-Datei. Bereits vorhandene Einträge (gleiche ID) werden
@@ -1768,6 +1776,12 @@ const I18N_EN = {
   'adm.fuzzy': "⏳ Vague dates",
   'btn.preview': "🔍 Preview",
   'btn.confirmall': "✓ Confirm all",
+  'exp.media.hint': "Without this tick you get plain JSON: small, readable, diffable — but <b>without your image files</b>. Those are only in the ZIP. Immich pictures are in neither: they live in Immich and are backed up there.",
+  'exp.zip.started': "📦 Building the full backup — the download starts shortly. With many photos this can take a moment.",
+  'imp.rows': "new rows",
+  'imp.known': "already present",
+  'imp.photos': "photos restored",
+  'imp.thumbs': "previews rebuilt",
   'adm.immich': "Immich (photos)",
   'im.test': "🔌 Test connection",
   'im.run': "🖼️ Link photos",
@@ -4962,10 +4976,28 @@ document.getElementById('btn-embed').addEventListener('click', e =>
 // A8: Export mit Rückmeldung — vorher lud der Button still herunter.
 document.getElementById('btn-export').addEventListener('click', async ev => {
   const btn = ev.target;
+  // Auswahl-Export (Anm. 35): Google-Import optional weglassen
+  const noTl = document.getElementById('exp-no-timeline').checked;
+  const q = noTl ? '?exclude_source=google_timeline' : '';
+
+  // A29: vollständiges Backup. Bewusst als normaler Download-Link statt über
+  // fetch+Blob — so streamt der Browser das Archiv direkt auf die Platte.
+  // Ein Leben an Fotos als Blob im Speicher wäre genau der Fehler, den der
+  // gestreamte Server-Export vermeidet.
+  if (document.getElementById('exp-with-media').checked) {
+    const a = document.createElement('a');
+    a.href = API + '/api/data/export.zip' + q;
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    toast(t('exp.zip.started', '📦 Vollständiges Backup wird erstellt — der Download startet gleich. '
+      + 'Bei vielen Fotos kann das einen Moment dauern.'), 'ok', 9000);
+    return;
+  }
+
   btn.disabled = true; btn.textContent = '… exportiere';
   try {
-    // Auswahl-Export (Anm. 35): Google-Import optional weglassen
-    const noTl = document.getElementById('exp-no-timeline').checked;
     const data = await api('/api/data/export' + (noTl ? '?exclude_source=google_timeline' : ''));
     const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -4993,6 +5025,21 @@ document.getElementById('import-file').addEventListener('change', async ev => {
   const btn = document.getElementById('btn-import');
   btn.disabled = true; btn.textContent = '… importiere';
   try {
+    // A29: Archiv mit Fotos — eine Anfrage, der Server entpackt.
+    // Kein Etappen-Import wie bei JSON: das Archiv lässt sich nicht sinnvoll
+    // in Tabellen zerlegen, ohne es im Browser komplett auszupacken.
+    if (/\.zip$/i.test(file.name) || file.type === 'application/zip') {
+      const fd = new FormData();
+      fd.append('file', file);
+      const r = await api('/api/data/import.zip', { method: 'POST', body: fd });
+      const bits = [`${r.total} ${t('imp.rows', 'Zeilen neu')}`,
+                    `${r.skipped_existing} ${t('imp.known', 'vorhanden')}`];
+      if (r.media_restored) bits.push(`${r.media_restored} ${t('imp.photos', 'Fotos wiederhergestellt')}`);
+      if (r.thumbnails_created) bits.push(`${r.thumbnails_created} ${t('imp.thumbs', 'Vorschauen erzeugt')}`);
+      toast('✓ ' + bits.join(', '), 'ok', 9000);
+      await refreshAll();
+      return;
+    }
     const payload = JSON.parse(await file.text());
     if (payload.format !== 'lifedash-export') { toast(t('toast.badexport', 'Kein Life-Dash-Export (format-Feld fehlt/falsch).'), 'error'); return; }
     // Etappen-Import (A2): Tabellen in FK-Reihenfolge, je max. IMPORT_CHUNK
