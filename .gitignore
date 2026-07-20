@@ -28,3 +28,5 @@ backend/_test.err
 Thumbs.db
 backend/media/
 media/
+tools/node_modules/
+tools/package-lock.json

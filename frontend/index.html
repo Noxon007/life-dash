@@ -476,6 +476,25 @@
     background: var(--bg-elev); overflow: hidden; display: none;
   }
   .loading-bar-fill { height: 100%; width: 0%; background: var(--accent); border-radius: 6px; transition: width .2s; }
+  /* A30: schmaler Balken am oberen Rand, solange Anfragen laufen. Bewusst
+     unbestimmt (kein Prozentwert) — die Antwortgröße ist vorher unbekannt. */
+  #net-bar { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 4000;
+    background: transparent; display: none; overflow: hidden; }
+  #net-bar.on { display: block; }
+  #net-bar::after { content: ""; position: absolute; inset: 0; width: 40%;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    animation: net-slide 1.1s ease-in-out infinite; }
+  @keyframes net-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
+  /* A30: Platzhalterkarten, damit der Zeitstrahl beim ersten Laden nicht leer wirkt */
+  .skeleton { border-radius: 10px; background: var(--bg-panel); border: 1px solid var(--border);
+    padding: 14px 16px; margin-bottom: 10px; }
+  .skeleton .sk-line { height: 11px; border-radius: 6px; margin: 6px 0;
+    background: linear-gradient(90deg, var(--bg-elev) 25%, var(--border) 37%, var(--bg-elev) 63%);
+    background-size: 400% 100%; animation: sk-shimmer 1.4s ease infinite; }
+  @keyframes sk-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+  @media (prefers-reduced-motion: reduce) {
+    #net-bar::after, .skeleton .sk-line { animation: none; }
+  }
 
   /* ---------- Toasts (A1) — Ersatz für alert() ---------- */
   .toast-wrap {
@@ -596,6 +615,9 @@
       <a class="btn" href="/api/auth/login" style="text-decoration:none; display:inline-block" data-i18n="login.btn">🔐 Anmelden (SSO)</a>
     </div>
   </div>
+
+  <!-- A30: Netz-Anzeige — signalisiert laufende Anfragen -->
+  <div id="net-bar" aria-hidden="true"></div>
 
   <!-- LADE-OVERLAY (KI-Analyse etc.) -->
   <div class="loading-overlay" id="loading-overlay">
@@ -1191,17 +1213,20 @@
         <div class="panel" style="padding:0">
           <div class="action-row">
             <button class="btn secondary" id="btn-export" data-i18n="act.export">📦 Daten exportieren</button>
-            <div class="action-desc" data-i18n="act.export.desc"><b>Backup als JSON-Datei.</b><br>
+            <div class="action-desc"><span data-i18n="act.export.desc"><b>Backup als JSON-Datei.</b><br>
               Lädt alle deine Daten (Roh-Eingang, Ereignisse, Objekte, Orte, Wetter) als eine
-              JSON-Datei herunter. Embeddings sind enthalten. Regelmäßig machen — das ist dein Backup.<br>
-              <label class="stat-label" style="display:inline-flex; align-items:center; gap:6px; margin-top:8px">
-                <input type="checkbox" id="exp-no-timeline">
-                ohne Google-Timeline-Daten (importierte Besuche, Routen &amp; deren Roh-Belege)
-              </label><br>
-              <!-- A29: das vollständige Backup -->
-              <label class="stat-label" style="display:inline-flex; align-items:center; gap:6px; margin-top:6px">
+              JSON-Datei herunter. Embeddings sind enthalten. Regelmäßig machen — das ist dein Backup.</span><br>
+              <!-- A32: BEIDE Häkchen bedeuten dasselbe — „ist enthalten".
+                   Vorher schloss das eine aus und das andere ein; zwei Zeilen
+                   auseinander, gegenläufig. Beide sind vorangehakt, damit der
+                   Standardweg das vollständige Backup ist. -->
+              <label class="stat-label" style="display:flex; align-items:center; gap:6px; margin-top:8px">
                 <input type="checkbox" id="exp-with-media" checked>
-                <b>mit Fotos (ZIP)</b> — vollständiges Backup
+                <span data-i18n="exp.opt.media"><b>Fotos einschließen</b> (ergibt eine ZIP-Datei — das vollständige Backup)</span>
+              </label>
+              <label class="stat-label" style="display:flex; align-items:center; gap:6px; margin-top:4px">
+                <input type="checkbox" id="exp-with-timeline" checked>
+                <span data-i18n="exp.opt.timeline">Importierte Google-Timeline-Daten einschließen (Besuche, Routen und deren Roh-Belege)</span>
               </label>
               <span class="hint" style="display:block; margin-top:6px" data-i18n="exp.media.hint">Ohne dieses Häkchen
               bekommst du reines JSON: klein, lesbar, diffbar — aber <b>ohne deine Bilddateien</b>. Die stecken nur
@@ -1225,11 +1250,11 @@
               <button class="btn secondary" id="btn-timeline-import" style="width:100%; text-align:left" data-i18n="act.tlimport">🛰️ Google Timeline importieren</button>
               <input type="file" id="timeline-file" accept=".json,application/json" style="display:none">
             </div>
-            <div class="action-desc" data-i18n="act.tlimport.desc"><b>Orts-Historie &amp; Routen aus Google Maps.</b><br>
+            <div class="action-desc"><span data-i18n="act.tlimport.desc"><b>Orts-Historie &amp; Routen aus Google Maps.</b><br>
               Importiert den Timeline-Export vom Smartphone (Android: Einstellungen → Standort →
               Standortdienste → Zeitachse → „Zeitachsendaten exportieren"; auch alte Takeout-Exporte
               funktionieren). Besuche werden zu Events, Bewegungen zu Routen auf der Karte.
-              Mehrfach-Import erzeugt keine Duplikate (Segment-Hash).<br>
+              Mehrfach-Import erzeugt keine Duplikate (Segment-Hash).</span><br>
               <label class="stat-label" style="display:inline-flex; align-items:center; gap:6px; margin-top:8px">
                 Besuche mit Ortssicherheit unter
                 <input id="tl-minprob" type="number" min="0" max="100" step="5" value="0"
@@ -1260,17 +1285,17 @@
           </div>
           <div class="action-row">
             <div style="flex-shrink:0; min-width:215px"><b style="font-size:13px" data-i18n="adm.format">📐 Anzeige-Format</b></div>
-            <div class="action-desc" data-i18n="adm.format.desc"><b>Bausteine für aufgelöste Adressen</b> — statt der langen
-              Adresskette mit Verwaltungsregionen und Postleitzahl:<br>
+            <div class="action-desc"><span data-i18n="adm.format.desc"><b>Bausteine für aufgelöste Adressen</b> — statt der langen
+              Adresskette mit Verwaltungsregionen und Postleitzahl:</span><br>
               <span id="fmt-parts" style="display:inline-flex; gap:14px; flex-wrap:wrap; margin:8px 0">
                 <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="road" checked> <span data-i18n="pn.street">Straße</span></label>
                 <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="suburb" checked> <span data-i18n="pn.district">Ortsteil</span></label>
                 <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="city" checked> <span data-i18n="pn.city">Stadt</span></label>
                 <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="country" checked> <span data-i18n="pn.country">Land</span></label>
               </span><br>
-              Benannte Orte (Restaurant, Museum …) behalten ihren Eigennamen immer vorn. Die Auswahl
-              gilt sofort für alle neuen Auflösungen; Bestandsdaten bringt der Lauf
-              oben aufs gewählte Muster.</div>
+              <span data-i18n="adm.format.desc2">Benannte Orte (Restaurant, Museum …) behalten ihren Eigennamen immer vorn.
+              Die Auswahl gilt sofort für alle neuen Auflösungen; Bestandsdaten bringt der Lauf
+              oben aufs gewählte Muster.</span></div>
           </div>
         </div>
 
@@ -1293,6 +1318,10 @@
               <input type="password" id="im-key" class="mf-select" style="width:100%; max-width:520px"
                      data-i18n-ph="im.key.ph" placeholder="API-Schlüssel (Immich → Konto → API-Schlüssel)"><br>
               <span class="hint" id="im-state" style="display:block; margin-top:8px" data-i18n="im.state.none">Noch kein Schlüssel hinterlegt.</span>
+              <span class="hint" style="display:block; margin-top:8px" data-i18n="im.perms"><b>Welche Rechte braucht der Schlüssel?</b>
+              Genau drei: <code>asset.read</code> (Fotos nach Zeit finden), <code>asset.view</code> (Vorschauen holen)
+              und <code>server.about</code> (Verbindungstest). Ein so beschränkter Schlüssel kann in Immich
+              <b>nichts löschen und nichts hochladen</b>. Anzulegen unter Immich → Konto-Einstellungen → API-Schlüssel.</span>
               <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap">
                 <button class="btn small secondary" id="im-save" data-i18n="im.save">Speichern</button>
               </div>
@@ -1328,10 +1357,10 @@
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div style="flex-shrink:0; min-width:215px"><b style="font-size:13px">🧩 Was trackst du?</b></div>
-            <div class="action-desc" data-i18n="adm.track.desc"><b>Module für Kompendium, Statistik &amp; KI wählen.</b><br>
+            <div class="action-desc"><span data-i18n="adm.track.desc"><b>Module für Kompendium, Statistik &amp; KI wählen.</b><br>
               Abgewählte Module verschwinden aus Reitern, Filtern, Formularen und dem
               KI-Prompt — vorhandene Daten bleiben erhalten und tauchen nach dem
-              Wieder-Anwählen sofort wieder auf.
+              Wieder-Anwählen sofort wieder auf.</span>
               <div id="track-settings" style="margin-top:8px; columns:2; max-width:420px"></div>
             </div>
           </div>
@@ -1341,10 +1370,10 @@
 
         <div class="admin-tabpane admin-only" data-tabpane="nutzer" style="display:none">
           <div class="section-title" data-i18n="adm.users.title">Nutzer</div>
-          <div class="hint" style="margin-bottom:14px" data-i18n="adm.users.hint">
+          <div class="hint" style="margin-bottom:14px">
             <span data-i18n="adm.users.hint1">👥 Konten entstehen automatisch beim ersten Login</span><span id="users-provider"></span>.
-            Hier lassen sich Rollen ändern und Nutzer <b>mitsamt all ihren Daten</b> löschen.
-            Das eigene Konto ist geschützt — so bleibt immer ein Admin übrig.
+            <span data-i18n="adm.users.hint2">Hier lassen sich Rollen ändern und Nutzer <b>mitsamt all ihren Daten</b> löschen.
+            Das eigene Konto ist geschützt — so bleibt immer ein Admin übrig.</span>
           </div>
           <div style="overflow-x:auto">
             <table class="db-table" id="users-table"></table>
@@ -1472,7 +1501,53 @@ const API = "";           // gleiche Origin: Backend liefert dieses Frontend aus
 let AUTH = { mode: "dev", user: null };
 
 // ---------- API-Helfer + Verbindungs-/Auth-Handling ----------
+// --------------------------------------------------------------------------- //
+// A30 — sichtbar machen, dass etwas läuft
+// --------------------------------------------------------------------------- //
+// Hängt an api() selbst, damit JEDE Anfrage erfasst ist statt an dutzenden
+// Aufrufstellen. Erst nach einer kurzen Verzögerung sichtbar: sonst blitzt der
+// Balken bei jedem schnellen Aufruf und beim 4-Sekunden-Takt der Job-Liste.
+//
+// WICHTIG: Das macht nichts schneller (KONZEPT Anmerkung 61). Bei zehntausenden
+// Ereignissen bleibt die Wartezeit — sie sieht nur nicht mehr nach Absturz aus.
+// Die Ursache behebt A36 (schlanke Ereignisliste).
+let NET_ACTIVE = 0, NET_TIMER = null;
+const NET_DELAY = 250;
+function netStart() {
+  NET_ACTIVE++;
+  if (NET_TIMER === null) {
+    NET_TIMER = setTimeout(() => {
+      if (NET_ACTIVE > 0) document.getElementById('net-bar').classList.add('on');
+    }, NET_DELAY);
+  }
+}
+function netEnd() {
+  NET_ACTIVE = Math.max(0, NET_ACTIVE - 1);
+  if (NET_ACTIVE) return;
+  clearTimeout(NET_TIMER);
+  NET_TIMER = null;
+  const bar = document.getElementById('net-bar');
+  if (bar) bar.classList.remove('on');
+}
+// Platzhalterkarten für den ersten Zeitstrahl-Aufbau
+function skeletonRows(n = 4) {
+  return Array.from({ length: n }, () => `
+    <div class="skeleton">
+      <div class="sk-line" style="width:45%"></div>
+      <div class="sk-line" style="width:78%"></div>
+      <div class="sk-line" style="width:30%"></div>
+    </div>`).join('');
+}
+
 async function api(path, opts) {
+  netStart();
+  try {
+    return await _apiCall(path, opts);
+  } finally {
+    netEnd();
+  }
+}
+async function _apiCall(path, opts) {
   const res = await fetch(API + path, Object.assign({ credentials: "same-origin" }, opts));
   if (res.status === 401) { showLogin(); throw new Error("401 nicht angemeldet"); }
   if (!res.ok) {
@@ -1776,6 +1851,11 @@ const I18N_EN = {
   'adm.fuzzy': "⏳ Vague dates",
   'btn.preview': "🔍 Preview",
   'btn.confirmall': "✓ Confirm all",
+  'adm.format.desc2': "Named places (restaurant, museum …) always keep their own name in front. The selection applies immediately to all new lookups; existing data is brought onto the chosen pattern by the run above.",
+  'adm.users.hint2': "Here you can change roles and delete users <b>together with all their data</b>. Your own account is protected — so there is always at least one admin left.",
+  'exp.opt.media': "<b>Include photos</b> (produces a ZIP file — the complete backup)",
+  'exp.opt.timeline': "Include imported Google timeline data (visits, routes and their raw records)",
+  'im.perms': "<b>Which permissions does the key need?</b> Exactly three: <code>asset.read</code> (finding photos by time), <code>asset.view</code> (fetching previews) and <code>server.about</code> (the connection test). A key limited to those <b>cannot delete or upload anything</b> in Immich. Create it under Immich → Account settings → API Keys.",
   'exp.media.hint': "Without this tick you get plain JSON: small, readable, diffable — but <b>without your image files</b>. Those are only in the ZIP. Immich pictures are in neither: they live in Immich and are backed up there.",
   'exp.zip.started': "📦 Building the full backup — the download starts shortly. With many photos this can take a moment.",
   'imp.rows': "new rows",
@@ -1814,7 +1894,7 @@ const I18N_EN = {
   'wx.title': "🌦️ Your weather record",
   'wx.hint': "Computed from the weather already attached to your entries — no new lookups. The more entries carry weather, the more it says.",
   'wx.days': "📆 Days with weather",
-  'wx.days.sub': "entries carrying weather data",
+  'wx.days.sub': "calendar days with weather data",
   'wx.sun': "☀️ Hours of sunshine",
   'wx.sun.sub': "across all days together",
   'wx.rain': "🌧️ Rainy days",
@@ -1972,7 +2052,6 @@ const I18N_EN = {
 
   // --- Letzte Erklaertexte ---
   'stats.hint': "💡 Statistics are <b>computed views</b> — rebuildable at any time. Every module (trips, animals …) brings its own widgets.",
-  'adm.users.hint': "👥 Accounts are created automatically on first sign-in. Here you can change roles and delete users <b>together with all their data</b>. Your own account is protected — so there is always at least one admin left.",
   'adm.db.title': "Database — raw view",
   'adm.db.hint': "🗄️ A direct look at the tables (admin). Raw inbox = <code>fragments</code>, life database = <code>events</code>/<code>entities</code>/<code>locations</code>, enrichments = <code>media_refs</code>/<code>metrics</code>.",
   'adm.logs.hint': "The most recent app log lines since the process started (max. 500, in memory only — no file access). Full logs remain available via <code>docker logs</code>; the level is controlled by <code>LOG_LEVEL</code> in the .env.",
@@ -3104,13 +3183,30 @@ function renderWeatherSummary(events, metricOf, placeOf) {
   const withWeather = events.filter(e => metricOf(e, 'temperature_c', 'temp_max_c') != null);
   if (!withWeather.length) { box.style.display = 'none'; panel.style.display = 'none'; return; }
 
-  const sum = key => withWeather.reduce((a, e) => a + (metricOf(e, key) || 0), 0);
-  const rainDays = withWeather.filter(e => (metricOf(e, 'rain_mm') || 0) >= 1).length;
+  // A31: Wetter gehört einem TAG, nicht einem Eintrag. Nach einem
+  // Timeline-Import hat ein Tag dutzende Besuche, die alle denselben
+  // Wetterdatensatz tragen — über Einträge gerechnet kämen mehr als 365
+  // Regentage im Jahr heraus und die Sonnenstunden wären vervielfacht.
+  // Regel: EIN Datensatz je Kalendertag, genommen vom frühesten Eintrag des
+  // Tages, der Wetter trägt. Eine Regel, in einem Satz erklärbar — und für
+  // den Normalfall (ein Ort pro Tag) exakt richtig.
+  const byDay = new Map();
+  [...withWeather]
+    .sort((a, b) => (a.date_start || '').localeCompare(b.date_start || ''))
+    .forEach(e => {
+      const day = (e.date_start || '').slice(0, 10);
+      if (!day || byDay.has(day)) return;
+      byDay.set(day, e);
+    });
+  const days = [...byDay.values()];
+
+  const sum = key => days.reduce((a, e) => a + (metricOf(e, key) || 0), 0);
+  const rainDays = days.filter(e => (metricOf(e, 'rain_mm') || 0) >= 1).length;
   const sunHours = Math.round(sum('sunshine_h'));
-  // Wärmste Reise: Tagesmittel über die Events einer Reise, nicht der eine
-  // heißeste Tag — sonst gewinnt jede Reise, die zufällig einen Hitzetag hatte.
+  // Wärmste Reise: Mittel über die TAGE einer Reise (nicht über ihre
+  // Einträge) — sonst zählt ein Reisetag mit zwanzig Besuchen zwanzigfach.
   const trips = {};
-  withWeather.filter(e => e.category === 'trip').forEach(e => {
+  days.filter(e => e.category === 'trip').forEach(e => {
     const temp = metricOf(e, 'temperature_c');
     if (temp == null) return;
     const k = e.parent_event_id || e.id;
@@ -3127,10 +3223,10 @@ function renderWeatherSummary(events, metricOf, placeOf) {
       <div class="stat-label">${label}</div>
       <div class="stat-sub">${sub}</div>
     </div>`;
-  const share = Math.round(rainDays / withWeather.length * 100);
+  const share = Math.round(rainDays / days.length * 100);
   document.getElementById('weather-tiles').innerHTML = [
-    tile(withWeather.length, t('wx.days', '📆 Tage mit Wetter'),
-         t('wx.days.sub', 'Ereignisse mit Wetterdaten')),
+    tile(days.length, t('wx.days', '📆 Tage mit Wetter'),
+         t('wx.days.sub', 'Kalendertage mit Wetterdaten')),
     tile(sunHours ? `${sunHours} h` : '–', t('wx.sun', '☀️ Sonnenstunden'),
          t('wx.sun.sub', 'über alle Tage zusammen')),
     tile(rainDays, t('wx.rain', '🌧️ Regentage'),
@@ -3140,9 +3236,10 @@ function renderWeatherSummary(events, metricOf, placeOf) {
   ].join('');
   box.style.display = '';
 
-  // Regentage pro Jahr — nur zeigen, wenn es überhaupt Regentage gab
+  // Regentage pro Jahr — über TAGE, nicht über Einträge (A31): sonst zeigte
+  // ein Jahr mit vielen importierten Besuchen über 600 „Regentage".
   const perYear = {};
-  withWeather.forEach(e => {
+  days.forEach(e => {
     const y = eventYear(e);
     if (!y) return;
     perYear[y] = perYear[y] || 0;
@@ -4976,9 +5073,10 @@ document.getElementById('btn-embed').addEventListener('click', e =>
 // A8: Export mit Rückmeldung — vorher lud der Button still herunter.
 document.getElementById('btn-export').addEventListener('click', async ev => {
   const btn = ev.target;
-  // Auswahl-Export (Anm. 35): Google-Import optional weglassen
-  const noTl = document.getElementById('exp-no-timeline').checked;
-  const q = noTl ? '?exclude_source=google_timeline' : '';
+  // Auswahl-Export (Anm. 35). A32: Das Häkchen bedeutet „einschließen" —
+  // ausgeschlossen wird also, wenn es NICHT gesetzt ist.
+  const withTl = document.getElementById('exp-with-timeline').checked;
+  const q = withTl ? '' : '?exclude_source=google_timeline';
 
   // A29: vollständiges Backup. Bewusst als normaler Download-Link statt über
   // fetch+Blob — so streamt der Browser das Archiv direkt auf die Platte.
@@ -4998,7 +5096,7 @@ document.getElementById('btn-export').addEventListener('click', async ev => {
 
   btn.disabled = true; btn.textContent = '… exportiere';
   try {
-    const data = await api('/api/data/export' + (noTl ? '?exclude_source=google_timeline' : ''));
+    const data = await api('/api/data/export' + q);
     const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -5414,6 +5512,11 @@ document.getElementById('logout-link').addEventListener('click', async ev => {
     if (h.version) document.getElementById('foot-version').textContent = `v${h.version}`;
     const chip = document.getElementById('ki-provider');
     if (chip) chip.textContent = ` ${h.ai_provider}`;
+    // A30: Platzhalter zeigen, solange die erste (potenziell große) Antwort
+    // unterwegs ist — ein leerer Zeitstrahl ist von einem kaputten nicht zu
+    // unterscheiden.
+    const list = document.getElementById('timeline-list');
+    if (list && !list.children.length) list.innerHTML = skeletonRows();
     await loadTimeline();
     await loadModQueue();
   } catch (err) {

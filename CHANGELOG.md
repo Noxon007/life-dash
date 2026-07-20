@@ -15,6 +15,39 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.27.0] – 2026-07-20
+
+### Fixed
+- **In English, several settings simply were not there.** The export options,
+  the import threshold for uncertain visits, the building blocks for address
+  formatting and the tracking selection all vanished as soon as the app was
+  switched to English — the translation replaced the whole block they lived in,
+  controls included. Broken since the app became bilingual in 0.20.0, which
+  means the English version has never been fully usable. All of them are back,
+  and a check now makes this impossible to repeat.
+- **The weather record counted entries instead of days.** After a timeline
+  import a single day holds dozens of visits that all share one weather
+  reading, so a year could show more than 600 “rainy days”, the total hours of
+  sunshine were multiplied by the number of entries per day, and the warmest
+  trip was skewed towards whichever trip had the most entries. Everything in
+  that panel now counts **calendar days**: one reading per day, taken from the
+  earliest entry of that day that carries weather.
+
+### Changed
+- **The backup options now point the same way.** Both ticks mean “include”:
+  *include photos* and *include imported Google timeline data*, both on by
+  default, so the complete backup is what you get without thinking about it.
+  Previously one tick added and the other removed — two lines apart.
+- **Something visibly happens while data is loading.** A slim bar at the top of
+  the window appears whenever a request is in flight, and the timeline shows
+  placeholder cards while the first (potentially large) response is on its way.
+  Quick requests do not flash it. This does not make anything faster — a very
+  large database still takes its time — but waiting no longer looks like a
+  crash.
+- The Immich settings now say **which permissions the API key needs**:
+  `asset.read`, `asset.view` and `server.about`. A key limited to those cannot
+  delete or upload anything in Immich.
+
 ## [0.26.1] – 2026-07-20
 
 ### Fixed
