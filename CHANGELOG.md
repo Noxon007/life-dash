@@ -15,6 +15,35 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.25.0] – 2026-07-20
+
+### Added
+- **🖼️ Immich photos next to your entries:** enter your Immich address and an
+  API key under Settings → My data, press “link photos”, and Life-Dash finds
+  the pictures that belong to each entry — by capture time, and by place when
+  both sides know where they were. They appear alongside the photos you
+  uploaded yourself and open in the same viewer.
+- **Nothing is copied.** The pictures stay in Immich; Life-Dash only remembers
+  which one belongs to which entry and passes previews through. Your API key
+  stays on the server and is never sent back to the browser — the settings
+  page only shows *whether* a key is stored.
+- **A connection test**, so a typo in the address or key tells you immediately
+  instead of turning into a run that mysteriously finds nothing.
+- **“Discard links”** throws the associations away so the next run can rebuild
+  them. Your pictures in Immich and the photos you uploaded yourself are never
+  affected — only the machine-made connections are.
+- The linking run works like the other background jobs: it survives a closed
+  browser, can be stopped, and can be scheduled nightly.
+
+### Notes
+- Entries with a **vague date** (month, season, year, decade) are deliberately
+  skipped. “Summer 2002” would collect photos at random, and a wrong picture on
+  an entry is worse than no picture at all.
+- At most 12 pictures are linked per entry — a holiday can hold three hundred,
+  and those belong in Immich, not as a wall of tiles in your timeline.
+- Photo clusters and albums becoming **entry suggestions** is the second half
+  of this feature and is not in this release yet.
+
 ## [0.24.0] – 2026-07-20
 
 ### Added

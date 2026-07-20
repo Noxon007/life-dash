@@ -17,7 +17,9 @@ from app.auth import get_current_user
 from app.database import get_db
 from app.models import Event, MediaRef, User
 from app.schemas import MediaRead, MediaUploadResult
+from app.services import immich as immich_api
 from app.services import media as media_svc
+from app.services.immich_link import PROVIDER as IMMICH
 
 log = logging.getLogger("lifedash.media")
 router = APIRouter(prefix="/api", tags=["Medien"])
@@ -117,6 +119,20 @@ def upload_media(
 
 
 def _send(ref: MediaRef, user: User, thumb: bool) -> Response:
+    # P2.1: Immich-Verweise kommen aus dem fremden Dienst — durchgereicht,
+    # nie zwischengespeichert (Kap. 9: Verweise, keine Kopien). Der
+    # API-Schlüssel bleibt dabei serverseitig und erreicht den Browser nie.
+    if ref.provider == IMMICH:
+        cfg = immich_api.config_for(user)
+        if cfg is None:
+            raise HTTPException(status_code=404, detail="Immich nicht eingerichtet")
+        try:
+            data = immich_api.thumbnail(*cfg, ref.external_id)
+        except immich_api.ImmichError as exc:
+            # 502: der Fehler liegt beim fremden Dienst, nicht bei uns
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        return Response(content=data, media_type="image/jpeg", headers=_SAFE_HEADERS)
+
     name = ref.external_id + (media_svc.THUMB_SUFFIX if thumb else "")
     try:
         path = media_svc.path_for(ref.user_id or user.id, name)
@@ -162,6 +178,21 @@ def update_media(
     db.commit()
     db.refresh(ref)
     return _to_read(ref)
+
+
+@router.post("/media/immich/reset")
+def reset_immich(db: Session = Depends(get_db),
+                 user: User = Depends(get_current_user)) -> dict:
+    """Verwirft alle Immich-Verknüpfungen — der nächste Lauf baut sie neu auf.
+
+    Erlaubt, weil Verweise eine **Ableitung** sind (Anmerkung 57): die Bilder
+    liegen in Immich und bleiben dort. Selbst hochgeladene Dateien
+    (`provider=local`) sind davon ausdrücklich NICHT betroffen — die gehören
+    zur Lebensdatenbank und wären unwiederbringlich.
+    """
+    from app.services.immich_link import reset
+
+    return {"removed": reset(db, user.id)}
 
 
 @router.delete("/media/{media_id}")

@@ -1266,6 +1266,35 @@
           </div>
         </div>
 
+        <!-- P2.1: Immich-Zugang je Nutzer -->
+        <div class="section-title" data-i18n="adm.immich">Immich (Fotos)</div>
+        <div class="panel" style="padding:0">
+          <div class="action-row">
+            <div style="flex-shrink:0; min-width:215px; display:flex; flex-direction:column; gap:8px">
+              <button class="btn secondary" id="im-test" style="text-align:left" data-i18n="im.test">🔌 Verbindung testen</button>
+              <button class="btn secondary" id="im-run" style="text-align:left" data-i18n="im.run">🖼️ Fotos verknüpfen</button>
+              <button class="btn ghost" id="im-reset" style="text-align:left" data-i18n="im.reset">↺ Verknüpfungen verwerfen</button>
+            </div>
+            <div class="action-desc">
+              <span data-i18n="im.desc"><b>Fotos bleiben in Immich</b> — Life-Dash merkt sich nur, welches Bild zu
+              welchem Ereignis gehört, und reicht die Vorschau durch. Kopiert wird nichts. Verknüpft wird nach
+              Aufnahmezeit und, wenn beide Seiten Koordinaten haben, nach Ort. Ereignisse mit vagem Datum
+              (Monat, Jahr) bleiben außen vor — dort wären die Treffer geraten.</span><br>
+              <input type="text" id="im-url" class="mf-select" style="width:100%; max-width:520px; margin:8px 0 6px"
+                     placeholder="https://immich.example.org"><br>
+              <input type="password" id="im-key" class="mf-select" style="width:100%; max-width:520px"
+                     data-i18n-ph="im.key.ph" placeholder="API-Schlüssel (Immich → Konto → API-Schlüssel)"><br>
+              <span class="hint" id="im-state" data-i18n="im.state.none">Noch kein Schlüssel hinterlegt.</span>
+              <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap">
+                <button class="btn small secondary" id="im-save" data-i18n="im.save">Speichern</button>
+              </div>
+              <span class="hint" style="display:block; margin-top:8px" data-i18n="im.reset.hint">„Verknüpfungen verwerfen"
+              löscht nur die Zuordnungen — die Bilder in Immich und deine selbst hochgeladenen Fotos bleiben
+              unangetastet. Der nächste Lauf baut die Zuordnungen neu auf.</span>
+            </div>
+          </div>
+        </div>
+
         <!-- F13: eigene Hintergrundkarte -->
         <div class="section-title" data-i18n="adm.basemap">Hintergrundkarte</div>
         <div class="panel" style="padding:0">
@@ -1739,6 +1768,20 @@ const I18N_EN = {
   'adm.fuzzy': "⏳ Vague dates",
   'btn.preview': "🔍 Preview",
   'btn.confirmall': "✓ Confirm all",
+  'adm.immich': "Immich (photos)",
+  'im.test': "🔌 Test connection",
+  'im.run': "🖼️ Link photos",
+  'im.reset': "↺ Discard links",
+  'im.desc': "<b>Photos stay in Immich</b> — Life-Dash only remembers which picture belongs to which entry and passes the preview through. Nothing is copied. Matching uses capture time and, when both sides have coordinates, place. Entries with a vague date (month, year) are left out — matches there would be guesswork.",
+  'im.key.ph': "API key (Immich → Account → API Keys)",
+  'im.state.none': "No key stored yet.",
+  'im.state.set': "Key stored. Leave the field empty to keep it.",
+  'im.save': "Save",
+  'im.saved': "✓ Immich access saved.",
+  'im.ok': "✓ Immich reachable (version {v}).",
+  'im.reset.ask': "Only the links are deleted. Your pictures in Immich and your own uploaded photos are left untouched.",
+  'im.reset.done': "✓ {n} link(s) discarded.",
+  'im.reset.hint': "“Discard links” removes only the associations — the pictures in Immich and your own uploaded photos stay untouched. The next run rebuilds them.",
   'field.photos': "📷 Photos",
   'media.drop': "Drag images here or pick them",
   'media.hint': "The files live on your own server and belong to the life database — no recomputation touches them. <b>Important:</b> the JSON export does not contain them; the media folder has to be backed up separately.",
@@ -4725,6 +4768,7 @@ document.querySelectorAll('.example-chip').forEach(c =>
 // ---------- JOBS (A11) ----------
 const JOB_LABELS = { recompute: '🔄 KI-Vorschläge neu berechnen', weather: '🌤️ Wetter ergänzen',
                      embeddings: '🧠 Embeddings', resolve_names: '📍 Ortsnamen auflösen/formatieren',
+                     immich: '🖼️ Fotos aus Immich verknüpfen',
                      timeline_import: '🛰️ Timeline-Import', data_import: '📥 Daten-Import' };
 const JOB_STATUS_DE = { running: '⏳ läuft', done: '✅ fertig', stopped: '⏹ gestoppt', error: '⚠️ Fehler' };
 // F10: Status in der aktiven Sprache
@@ -4766,7 +4810,7 @@ async function loadJobs() {
 }
 document.getElementById('jobs-refresh').addEventListener('click', loadJobs);
 // A22: Nachtplan-Einstellungen (pro Nutzer)
-const SCHED_TYPES = ['weather', 'embeddings', 'resolve_names', 'recompute'];
+const SCHED_TYPES = ['weather', 'embeddings', 'resolve_names', 'recompute', 'immich'];
 function renderSchedule() {
   const panel = document.getElementById('sched-panel');
   if (!panel) return;
@@ -5118,9 +5162,64 @@ async function loadPlaceFormat() {
       try { await saveTracked(keys); toast(t('toast.tracksaved', '✓ Tracking-Auswahl gespeichert.')); }
       catch (err) { toast(t('toast.savefail', 'Speichern fehlgeschlagen: ') + err.message, 'error'); loadPlaceFormat(); }
     }));
+    renderImmichState(s);          // P2.1
   } catch (_) { /* Standard-Häkchen bleiben */ }
   loadTileSettings();
 }
+
+// --------------------------------------------------------------------------- //
+// P2.1 — Immich
+// --------------------------------------------------------------------------- //
+// Der API-Schlüssel wird vom Server NIE zurückgegeben (nur „hinterlegt: ja/nein").
+// Das Feld bleibt deshalb leer; leer lassen heißt „unverändert".
+function renderImmichState(s) {
+  const url = document.getElementById('im-url');
+  const state = document.getElementById('im-state');
+  if (!url || !s || !s.immich) return;
+  url.value = s.immich.url || '';
+  state.textContent = s.immich.has_key
+    ? t('im.state.set', 'Schlüssel hinterlegt. Feld leer lassen, um ihn zu behalten.')
+    : t('im.state.none', 'Noch kein Schlüssel hinterlegt.');
+}
+async function saveImmich() {
+  const url = document.getElementById('im-url').value.trim();
+  const key = document.getElementById('im-key').value.trim();
+  try {
+    const s = await api('/api/auth/me/settings', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ immich: { url, api_key: key } }),
+    });
+    document.getElementById('im-key').value = '';
+    renderImmichState(s);
+    toast(t('im.saved', '✓ Immich-Zugang gespeichert.'));
+  } catch (err) { toast(t('toast.savefail', 'Speichern fehlgeschlagen: ') + err.message, 'error'); }
+}
+document.getElementById('im-save').addEventListener('click', saveImmich);
+document.getElementById('im-test').addEventListener('click', async ev => {
+  const btn = ev.target;
+  btn.disabled = true;
+  try {
+    // Gegen die Felder testen, wenn etwas drinsteht — sonst gegen das Gespeicherte.
+    const res = await api('/api/auth/me/settings/immich/test', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: document.getElementById('im-url').value.trim(),
+                             api_key: document.getElementById('im-key').value.trim() }),
+    });
+    toast(t('im.ok', '✓ Immich erreichbar (Version {v}).').replace('{v}', res.version), 'ok', 6000);
+  } catch (err) { toast(err.message, 'error', 8000); }
+  finally { btn.disabled = false; }
+});
+document.getElementById('im-run').addEventListener('click', e =>
+  startServerJob(e.target, 'immich'));
+document.getElementById('im-reset').addEventListener('click', async () => {
+  if (!(await uiConfirm(t('im.reset.ask',
+      'Nur die Zuordnungen werden gelöscht. Deine Bilder in Immich und deine selbst hochgeladenen Fotos bleiben unangetastet.'),
+      { title: t('im.reset', 'Verknüpfungen verwerfen'), okLabel: '↺' }))) return;
+  try {
+    const res = await api('/api/media/immich/reset', { method: 'POST' });
+    toast(t('im.reset.done', '✓ {n} Verknüpfung(en) verworfen.').replace('{n}', res.removed));
+  } catch (err) { toast(err.message, 'error'); }
+});
 
 // F13: eigene Kachelquelle — bewusst nur lokal (kein Server-Setting), weil die
 // Kartenwahl ohnehin pro Gerät gilt: am Telefon will man oft eine andere Karte

@@ -40,12 +40,13 @@ JOB_TYPES = {
     "weather": "Wetter ergänzen",
     "embeddings": "Embeddings berechnen",
     "resolve_names": "Ortsnamen auflösen/formatieren",
+    "immich": "Fotos aus Immich verknüpfen",
     "timeline_import": "Google-Timeline-Import",
     "data_import": "Daten-Import (JSON)",
 }
 # A22: Diese Typen laufen SERVERSEITIG als Background-Thread weiter, auch wenn
 # der Browser zu ist. Importe bleiben client-getrieben (die Datei liegt dort).
-SERVER_JOB_TYPES = ("weather", "embeddings", "resolve_names", "recompute")
+SERVER_JOB_TYPES = ("weather", "embeddings", "resolve_names", "recompute", "immich")
 # In Tests abgeschaltet (in-memory-DB verträgt keine fremden Threads)
 WORKERS_ENABLED = True
 
@@ -321,8 +322,34 @@ def _run_resolve_names(db: Session, job: Job) -> tuple[str, str]:
             return "stopped", f"{r.remaining} nicht auflösbar{what}"
 
 
+def _run_immich(db: Session, job: Job) -> tuple[str, str]:
+    """P2.1: Fotos aus Immich verknüpfen, stapelweise."""
+    from app.services import immich as immich_api
+    from app.services.immich_link import link_batch
+
+    user = db.get(User, job.user_id)
+    while True:
+        try:
+            processed, linked, remaining = link_batch(db, user, limit=25)
+        except immich_api.ImmichError as exc:
+            # Fremder Dienst weg: sauber stoppen mit der echten Ursache,
+            # statt es hundertfach zu wiederholen.
+            return "stopped", str(exc)
+        cont = _tick(db, job.id, linked, remaining)
+        if remaining <= 0:
+            return "done", f"{db.get(Job, job.id).done} Fotos verknüpft"
+        if not cont:
+            return "stopped", "gestoppt"
+        # processed == 0 bei remaining > 0 kann nicht vorkommen (der Stapel
+        # nimmt immer vom Anfang) — die Prüfung schützt trotzdem vor einer
+        # Endlosschleife, falls sich die Kandidatenlogik einmal ändert.
+        if processed == 0:
+            return "stopped", f"{remaining} Ereignisse übrig, kein Fortschritt"
+
+
 _RUNNERS = {
     "weather": _run_weather,
+    "immich": _run_immich,
     "embeddings": _run_embeddings,
     "recompute": _run_recompute,
     "resolve_names": _run_resolve_names,

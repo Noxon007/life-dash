@@ -73,6 +73,14 @@ def _settings_view(user: User) -> dict:
         "all_modules": registry.keys(),
         # A22: Nachtplan pro Job-Typ, z. B. {"weather": {"enabled": true, "hour": 3}}
         "job_schedule": prefs.get("job_schedule") or {},
+        # P2.1: Immich-Zugang. Der API-SCHLÜSSEL WIRD NIE ZURÜCKGEGEBEN —
+        # nur, ob einer hinterlegt ist. Ein Schlüssel, der bei jedem Laden
+        # der Einstellungsseite durchs Netz geht und im Browser steht, ist
+        # ein Schlüssel, den man auch weglassen könnte.
+        "immich": {
+            "url": (prefs.get("immich") or {}).get("url") or "",
+            "has_key": bool((prefs.get("immich") or {}).get("api_key")),
+        },
     }
 
 
@@ -136,10 +144,55 @@ def update_my_settings(
                 hour = 3
             sched[jtype] = {"enabled": bool(cfg.get("enabled")), "hour": hour}
         prefs["job_schedule"] = sched
+    if "immich" in payload:
+        raw = payload["immich"]
+        if not isinstance(raw, dict):
+            raise HTTPException(400, "immich: Objekt mit url/api_key erwartet")
+        current = dict(prefs.get("immich") or {})
+        if "url" in raw:
+            url = (raw["url"] or "").strip().rstrip("/")
+            if url and not url.startswith(("http://", "https://")):
+                raise HTTPException(400, "immich.url: muss mit http:// oder https:// beginnen")
+            current["url"] = url
+        # Leerer Schlüssel = unverändert lassen. Sonst würde jedes Speichern
+        # der Seite den Schlüssel löschen, weil das Feld ihn nie anzeigt.
+        if raw.get("api_key"):
+            current["api_key"] = str(raw["api_key"]).strip()
+        if raw.get("clear"):
+            current = {}
+        prefs["immich"] = current
+
     if prefs != (user.settings or {}):
         user.settings = prefs
         db.commit()
     return _settings_view(user)
+
+
+@router.post("/me/settings/immich/test")
+def test_immich(
+    payload: dict = Body(default_factory=dict),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """P2.1: Verbindungstest gegen Immich.
+
+    Ohne ihn merkt der Nutzer einen Tippfehler erst daran, dass ein Foto-Lauf
+    nichts findet — und sucht die Ursache an der falschen Stelle. Getestet
+    wird gegen die übergebenen Werte, sonst gegen die gespeicherten.
+    """
+    from app.services import immich as immich_api
+
+    url = (payload.get("url") or "").strip().rstrip("/")
+    key = (payload.get("api_key") or "").strip()
+    if not (url and key):
+        stored = immich_api.config_for(user)
+        if stored is None:
+            raise HTTPException(400, "Immich ist noch nicht eingerichtet")
+        url, key = url or stored[0], key or stored[1]
+    try:
+        return immich_api.check(url, key)
+    except immich_api.ImmichError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @router.get("/login")
