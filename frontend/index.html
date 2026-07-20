@@ -294,6 +294,11 @@
   .field-val { font-size: 14px; flex: 1; min-width: 0; }
   .field-val input { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--text); font-size: 13px; width: 100%; max-width: 320px; }
   .mf-select { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--text); font-size: 13px; }
+  /* F13: Ebenenwahl auf der Karte. Eigener Rahmen statt leaflet-bar-Optik,
+     damit das Feld in beiden Themes lesbar bleibt (Leaflet-Controls sind hell). */
+  .basemap-ctl { border: none !important; background: none !important; }
+  .basemap-ctl select { background: var(--bg-elev); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 8px; font-size: 12px; box-shadow: 0 1px 5px rgba(0,0,0,.4); cursor: pointer; }
   .ent-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 10px; border-radius: 20px; background: var(--bg-elev); border: 1px solid var(--border); }
   .ent-chip button { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 13px; padding: 0; }
   .conf-tag { font-size: 11px; padding: 2px 8px; border-radius: 20px; }
@@ -1190,7 +1195,28 @@
               </span><br>
               Benannte Orte (Restaurant, Museum …) behalten ihren Eigennamen immer vorn. Die Auswahl
               gilt sofort für alle neuen Auflösungen; Bestandsdaten bringt der Lauf
-              „Lange Adressen kürzen" (oben) aufs gewählte Muster.</div>
+              oben aufs gewählte Muster.</div>
+          </div>
+        </div>
+
+        <!-- F13: eigene Hintergrundkarte -->
+        <div class="section-title" data-i18n="adm.basemap">Hintergrundkarte</div>
+        <div class="panel" style="padding:0">
+          <div class="action-row">
+            <div style="flex-shrink:0; min-width:215px"><b style="font-size:13px" data-i18n="adm.basemap.own">🔧 Eigene Karte</b></div>
+            <div class="action-desc">
+              <span data-i18n="adm.basemap.desc">Die Karten oben rechts bieten OpenStreetMap, Topografie und Satellit.
+              Wer einen eigenen Kachel-Server betreibt oder einen Anbieter mit Schlüssel nutzt, trägt ihn hier ein —
+              die Auswahl „🔧 Eigene Karte" erscheint dann auf jeder Karte. Platzhalter: <code>{z}/{x}/{y}</code>,
+              optional <code>{s}</code> für Subdomains und <code>{r}</code> für hochauflösende Kacheln.</span><br>
+              <input type="text" id="tile-url" class="mf-select" style="width:100%; max-width:520px; margin:8px 0 6px"
+                     placeholder="https://tiles.example.org/{z}/{x}/{y}.png"><br>
+              <input type="text" id="tile-attr" class="mf-select" style="width:100%; max-width:520px"
+                     data-i18n-ph="adm.basemap.attr.ph" placeholder="Attribution, z. B. © Mein Kartenanbieter"><br>
+              <span class="hint" data-i18n="adm.basemap.note">Die Attribution ist kein Schmuck: nahezu jede Kachelquelle
+              verlangt sie in ihren Nutzungsbedingungen. Beide Angaben bleiben auf diesem Gerät.</span>
+              <div style="margin-top:8px"><button class="btn small secondary" id="tile-save" data-i18n="adm.basemap.save">Speichern</button></div>
+            </div>
           </div>
         </div>
 
@@ -1643,6 +1669,21 @@ const I18N_EN = {
   'adm.fuzzy': "⏳ Vague dates",
   'btn.preview': "🔍 Preview",
   'btn.confirmall': "✓ Confirm all",
+  'bm.auto': "🌓 Matching the theme",
+  'bm.osm': "🗺️ OpenStreetMap",
+  'bm.topo': "⛰️ OpenTopoMap",
+  'bm.sat': "🛰️ Satellite",
+  'bm.custom': "🔧 Custom map",
+  'bm.tip': "Choose the background map",
+  'adm.basemap': "Background map",
+  'adm.basemap.own': "🔧 Custom map",
+  'adm.basemap.desc': "The maps offer OpenStreetMap, topography and satellite in the top right. If you run your own tile server or use a provider with a key, enter it here — the option “🔧 Custom map” then appears on every map. Placeholders: <code>{z}/{x}/{y}</code>, optionally <code>{s}</code> for subdomains and <code>{r}</code> for high-resolution tiles.",
+  'adm.basemap.attr.ph': "Attribution, e.g. © My map provider",
+  'adm.basemap.note': "The attribution is not decoration: nearly every tile source requires it in its terms of use. Both entries stay on this device.",
+  'adm.basemap.save': "Save",
+  'toast.tilebad': "The tile URL needs the placeholders {z}, {x} and {y}.",
+  'toast.tilesaved': "✓ Custom map saved — selectable in the top right of any map.",
+  'toast.tilecleared': "✓ Custom map removed.",
   'otd.title': "🕰️ On this day",
   'otd.year': "one year ago",
   'otd.years': "{n} years ago",
@@ -1815,18 +1856,113 @@ function t(key, de) {
 // 'light'/'dark' übersteuern manuell. Ein früher Head-Script setzt data-theme
 // schon vor dem ersten Rendern; hier hängen Umschalter + Karten-Tiles dran.
 const THEME_LABELS = { auto: '🌓 Auto', light: '☀️ Hell', dark: '🌙 Dunkel' };
-// Leaflet-Tile-Layer folgen dem Theme — hier oben deklariert, weil applyTheme()
-// noch beim Laden läuft und sie sonst in der temporalen Todeszone stünden.
-let mainTiles = null, compTiles = null, worldTiles = null;
+// ACHTUNG Reihenfolge: der F13-Block (BASEMAPS, MAP_TILES) steht direkt unter
+// diesem Kommentar und MUSS vor applyTheme() stehen — applyTheme() läuft schon
+// beim Laden und greift auf MAP_TILES zu, das als const sonst in der temporalen
+// Todeszone läge. Ein reiner Syntaxcheck übersieht genau diesen Fehler.
 function themeSetting() { return localStorage.getItem('lifedash_theme') || 'auto'; }
 function effectiveTheme() {
   const s = themeSetting();
   if (s !== 'auto') return s;
   return matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 }
-function tileUrl() {
-  const style = effectiveTheme() === 'light' ? 'light_all' : 'dark_all';
-  return `https://{s}.basemaps.cartocdn.com/${style}/{z}/{x}/{y}{r}.png`;
+// --------------------------------------------------------------------------- //
+// F13 — Hintergrundkarten
+// --------------------------------------------------------------------------- //
+// Ein kleines mitgeliefertes Set plus eine frei konfigurierbare Kachel-URL:
+// kein Anbieter ist hart verdrahtet (A27), wer einen eigenen Tile-Server oder
+// einen Schlüssel hat, ist nicht ausgesperrt. Attribution gehört zur Ebene und
+// ist nicht optional — sie ist bei jeder dieser Quellen Lizenzbedingung.
+// `maxZoom` je Ebene ist echt: OpenTopoMap endet bei 17, darüber gäbe es nur
+// graue Kacheln.
+const BASEMAPS = {
+  auto: {
+    de: '🌓 Passend zum Thema', key: 'bm.auto', followsTheme: true,
+    url: () => 'https://{s}.basemaps.cartocdn.com/'
+      + (effectiveTheme() === 'light' ? 'light_all' : 'dark_all') + '/{z}/{x}/{y}{r}.png',
+    attribution: () => '© OpenStreetMap, © CARTO', maxZoom: 19,
+  },
+  osm: {
+    de: '🗺️ OpenStreetMap', key: 'bm.osm',
+    url: () => 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: () => '© OpenStreetMap', maxZoom: 19,
+  },
+  topo: {
+    de: '⛰️ OpenTopoMap', key: 'bm.topo',
+    url: () => 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    attribution: () => '© OpenTopoMap (CC-BY-SA), © OpenStreetMap', maxZoom: 17,
+  },
+  satellite: {
+    de: '🛰️ Satellit', key: 'bm.sat',
+    url: () => 'https://server.arcgisonline.com/ArcGIS/rest/services/'
+      + 'World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: () => 'Esri, Maxar, Earthstar Geographics', maxZoom: 19,
+  },
+  custom: {
+    de: '🔧 Eigene Karte', key: 'bm.custom',
+    url: () => localStorage.getItem('lifedash_tileurl') || '',
+    attribution: () => localStorage.getItem('lifedash_tileattr') || '',
+    maxZoom: 19,
+  },
+};
+function basemapSetting() {
+  const b = localStorage.getItem('lifedash_basemap') || 'auto';
+  // „Eigene Karte" ohne hinterlegte URL würde eine leere Karte zeigen — dann
+  // lieber still auf den Standard zurück, statt den Nutzer ins Graue laufen zu lassen.
+  if (b === 'custom' && !BASEMAPS.custom.url()) return 'auto';
+  return BASEMAPS[b] ? b : 'auto';
+}
+function currentBasemap() { return BASEMAPS[basemapSetting()]; }
+function tileUrl() { return currentBasemap().url(); }
+
+// Registrierte Karten: {map, cap} — `cap` deckelt den Zoom dort, wo die Karte
+// selbst enger ist als die Ebene (die Weltkarte zeigt nie mehr als Zoom 8).
+const MAP_TILES = [];
+function addTiles(map, cap) {
+  const bm = currentBasemap();
+  const layer = L.tileLayer(tileUrl(), {
+    attribution: bm.attribution(), maxZoom: Math.min(bm.maxZoom, cap),
+  }).addTo(map);
+  const entry = { map, cap, layer };
+  MAP_TILES.push(entry);
+  addBasemapControl(map);
+  return entry;
+}
+// Ebenenwechsel heißt Layer neu bauen, nicht nur setUrl(): Attribution und
+// maxZoom unterscheiden sich je Quelle und lassen sich nicht nachträglich setzen.
+function applyBasemap() {
+  const bm = currentBasemap();
+  MAP_TILES.forEach(e => {
+    e.map.removeLayer(e.layer);
+    e.layer = L.tileLayer(tileUrl(), {
+      attribution: bm.attribution(), maxZoom: Math.min(bm.maxZoom, e.cap),
+    }).addTo(e.map);
+    e.layer.bringToBack();
+  });
+  document.querySelectorAll('.basemap-pick').forEach(s => s.value = basemapSetting());
+}
+function addBasemapControl(map) {
+  const ctl = L.control({ position: 'topright' });
+  ctl.onAdd = () => {
+    const div = L.DomUtil.create('div', 'leaflet-bar basemap-ctl');
+    const sel = L.DomUtil.create('select', 'basemap-pick', div);
+    sel.title = t('bm.tip', 'Hintergrundkarte wählen');
+    Object.entries(BASEMAPS).forEach(([k, b]) => {
+      // „Eigene Karte" nur anbieten, wenn eine URL hinterlegt ist
+      if (k === 'custom' && !b.url()) return;
+      const o = L.DomUtil.create('option', '', sel);
+      o.value = k;
+      o.textContent = t(b.key, b.de);
+    });
+    sel.value = basemapSetting();
+    L.DomEvent.disableClickPropagation(div);
+    sel.addEventListener('change', () => {
+      localStorage.setItem('lifedash_basemap', sel.value);
+      applyBasemap();
+    });
+    return div;
+  };
+  ctl.addTo(map);
 }
 function applyTheme() {
   const eff = effectiveTheme();
@@ -1836,9 +1972,9 @@ function applyTheme() {
   const mode = themeSetting();
   document.getElementById('theme-btn').textContent =
     t(`theme.${mode}`, THEME_LABELS[mode]);
-  if (mainTiles) mainTiles.setUrl(tileUrl());
-  if (compTiles) compTiles.setUrl(tileUrl());
-  if (worldTiles) worldTiles.setUrl(tileUrl());
+  // F13: nur die themenabhängige Ebene muss beim Theme-Wechsel nachziehen —
+  // eine bewusst gewählte Karte (Satellit, Topo …) bleibt, wie sie ist.
+  if (currentBasemap().followsTheme) applyBasemap();
 }
 document.getElementById('theme-btn').addEventListener('click', () => {
   const order = ['auto', 'light', 'dark'];
@@ -2704,8 +2840,7 @@ async function openEntityDetail(type, entityId, name) {
   if (compMapObj) { compMapObj.remove(); compMapObj = null; }
   if (located.length) {
     compMapObj = L.map('comp-map');
-    compTiles = L.tileLayer(tileUrl(),  // F9: Tile-Stil folgt dem Theme
-      { attribution: '© OpenStreetMap © CARTO', maxZoom: 19 }).addTo(compMapObj);
+    addTiles(compMapObj, 19);               // F13: wählbare Hintergrundkarte
     const latlngs = [];
     located.forEach(e => {
       const ll = [e.location.lat, e.location.lng];
@@ -3498,8 +3633,7 @@ async function openMapView() {
   mp.located = (await fetchEvents()).filter(e => e.location && e.location.lat != null && e.date_start);
   if (!mapObj) {
     mapObj = L.map('map').setView([50, 6], 4);
-    mainTiles = L.tileLayer(tileUrl(),  // F9: Tile-Stil folgt dem Theme
-      { attribution: '© OpenStreetMap © CARTO', maxZoom: 19 }).addTo(mapObj);
+    addTiles(mapObj, 19);                   // F13: wählbare Hintergrundkarte
     mapMarkers = L.layerGroup().addTo(mapObj);
     // A5: Cluster-Layer für große Mengen — alle Punkte statt 300er-Deckel.
     // Fallback auf layerGroup, falls das Plugin (CDN) nicht geladen wurde.
@@ -3771,7 +3905,7 @@ document.querySelectorAll('[data-mode]').forEach(chip => {
 // Die Länderflächen liegen als GeoJSON im Frontend (Natural Earth 110m,
 // public domain) — der Schlüssel `iso` je Fläche ist derselbe, den das
 // Backend aus den Länder-Stammdaten liefert.
-let worldMap = null, worldLayer = null, worldGeo = null;   // worldTiles: siehe Theme-Block
+let worldMap = null, worldLayer = null, worldGeo = null;
 
 async function loadWorldGeo() {
   if (worldGeo) return worldGeo;
@@ -3869,8 +4003,7 @@ async function renderWorldMap(data) {
 
   if (!worldMap) {
     worldMap = L.map('world-map', { worldCopyJump: true }).setView([25, 10], 2);
-    worldTiles = L.tileLayer(tileUrl(),   // F9: Tile-Stil folgt dem Theme
-      { attribution: '© OpenStreetMap © CARTO', maxZoom: 8 }).addTo(worldMap);
+    addTiles(worldMap, 8);                  // F13: wählbare Hintergrundkarte
     window.addEventListener('resize', () => worldMap && worldMap.invalidateSize());
   }
   [60, 300].forEach(t => setTimeout(() => worldMap.invalidateSize(), t));
@@ -4625,7 +4758,40 @@ async function loadPlaceFormat() {
       catch (err) { toast(t('toast.savefail', 'Speichern fehlgeschlagen: ') + err.message, 'error'); loadPlaceFormat(); }
     }));
   } catch (_) { /* Standard-Häkchen bleiben */ }
+  loadTileSettings();
 }
+
+// F13: eigene Kachelquelle — bewusst nur lokal (kein Server-Setting), weil die
+// Kartenwahl ohnehin pro Gerät gilt: am Telefon will man oft eine andere Karte
+// als am Schreibtisch.
+function loadTileSettings() {
+  const url = document.getElementById('tile-url');
+  const attr = document.getElementById('tile-attr');
+  if (!url || !attr) return;
+  url.value = localStorage.getItem('lifedash_tileurl') || '';
+  attr.value = localStorage.getItem('lifedash_tileattr') || '';
+}
+document.getElementById('tile-save').addEventListener('click', () => {
+  const url = document.getElementById('tile-url').value.trim();
+  const attr = document.getElementById('tile-attr').value.trim();
+  if (url && !/\{z\}.*\{x\}.*\{y\}|\{z\}.*\{y\}.*\{x\}/.test(url)) {
+    toast(t('toast.tilebad', 'Die Kachel-URL braucht die Platzhalter {z}, {x} und {y}.'), 'error');
+    return;
+  }
+  localStorage.setItem('lifedash_tileurl', url);
+  localStorage.setItem('lifedash_tileattr', attr);
+  if (!url && basemapSetting() === 'auto') localStorage.removeItem('lifedash_basemap');
+  // Die Auswahlfelder auf den Karten neu aufbauen — „Eigene Karte" kommt
+  // hinzu oder fällt weg, je nachdem ob jetzt eine URL hinterlegt ist.
+  MAP_TILES.forEach(e => {
+    const old = e.map.getContainer().querySelector('.basemap-ctl');
+    if (old) old.closest('.leaflet-control').remove();
+    addBasemapControl(e.map);
+  });
+  applyBasemap();
+  toast(url ? t('toast.tilesaved', '✓ Eigene Karte gespeichert — oben rechts auf der Karte wählbar.')
+            : t('toast.tilecleared', '✓ Eigene Karte entfernt.'));
+});
 // Onboarding-Modal (A15): Auswahl speichern
 document.getElementById('track-save').addEventListener('click', async () => {
   const keys = [...document.querySelectorAll('#track-options [data-track]:checked')]

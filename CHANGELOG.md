@@ -15,6 +15,27 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.22.0] – 2026-07-20
+
+### Added
+- **🗺️ Choose your background map:** every map — timeline, collection and
+  world — now has a small selector in the top right. Besides the familiar
+  style that follows the light/dark theme there are **OpenStreetMap**,
+  **OpenTopoMap** for contour lines on hikes, and **satellite imagery**, which
+  is what a holiday map usually wants. The choice applies to all maps at once
+  and is kept per device, so the phone can show something different from the
+  desktop.
+- **Your own map source:** if you run your own tile server, or use a provider
+  that needs a key, enter its address under Settings → Background map. It then
+  appears in the selector like the built-in ones. There is a field for the
+  attribution next to it — nearly every tile provider requires that notice in
+  its terms of use, so Life-Dash shows it on the map.
+
+### Changed
+- Picking a map deliberately **overrides** the light/dark automation: if you
+  chose satellite, switching the theme no longer throws you back to the
+  street map. Only the “matching the theme” option keeps following it.
+
 ## [0.21.0] – 2026-07-20
 
 ### Added
