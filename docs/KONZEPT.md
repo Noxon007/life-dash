@@ -677,6 +677,7 @@ so the table below keeps one line per package rather than repeating it.
 
 | No. | Package | Effort | Content | Benefit |
 |---|---|---|---|---|
+| **A29** | **Complete backup including media** *(note 58)* | M | Once F15 exists, the JSON export is no longer a full backup — binary files do not fit in it. This package restores the property that one action saves everything: a **ZIP export** containing the existing JSON plus the media directory in a defined layout (`export.json` + `media/<id>.<ext>`), and — the half that is easy to forget — an **import side that round-trips it**: the archive is read back, files land in `MEDIA_DIR`, `MediaRef` rows are relinked by their stable IDs, and re-importing the same archive changes nothing (idempotent, as with all imports). The plain JSON export **stays** as a second option: fast, small, readable, diffable, and the right choice for anyone who backs up their media folder by other means. The selective export (`exclude_source`, A21) applies unchanged. Written as a **stream**, never assembled in memory — a life's worth of photos is gigabytes, not megabytes. | One button restores everything, on a new machine too. Without it, “self-hosted data sovereignty” has a hole exactly where the irreplaceable data sits. |
 | **A28** | **One place-name run instead of a scope selection** *(note 50)* | S | A25 merged the three buttons into one with a dropdown, but the run still has to be started three times — once per scope. Decision: **drop the selection entirely.** One run covers everything: the candidates are the **deduplicated union** of the three sets (`unnamed` = coordinate names/bare labels, `verbose` = over-long Nominatim chains, `nonlatin` = foreign-script names), processed with `unnamed` first — freshly fetched names already arrive in the chosen format, so the reformatting pass never has to touch them again. The scope-specific “did this actually improve anything?” checks (`tracks.py`) have to be generalised into one condition. `scope` may stay in the API as an optional parameter, but the UI no longer offers it. | One button, one run — and each place is geocoded **at most once** instead of up to three times. A place can be in several sets (a Greek address is often over-long as well); at Nominatim's 1.2 s throttle and ~10,000 places that is a difference of hours. |
 
 #### Group B — new features (order: features first, new import sources LAST — decision 2026-07-19)
@@ -735,30 +736,38 @@ rebuilt with every release.
 | **0.23.0** | **Weather** | **F11** (aggregations, weather achievements, average temperature per country in the world tab — no API call) and **F12** (feels-like temperature, precipitation hours, sunrise/sunset via re-enrichment). Shipped together so users run **one** re-enrichment pass, not two. | S–M + S–M |
 | **0.24.0** | **Photos by hand** | **F15**: upload onto events and days, thumbnails, lightbox, captions, EXIF as a suggestion, `MEDIA_DIR` as its own volume — plus the three decisions from note 57 (uploaded media belong to the life database and survive recomputation; the media directory is backed up separately from the JSON export; `MediaRef.user_id` closed). **Closes the remainder of F8** — printing with photos. | M–L |
 | **0.25.0** | **Immich** | **P2.1**: URL and API key per user, assets linked to events by time and geo, a thumbnail proxy, a re-enrichment button. Second stage (note 30) — photo clusters and albums as event **proposals** — may split off into 0.25.1 if it grows. Deliberately after F15: the same display surface is reused, and F15 has already proven it. | M |
-| **0.26.0** | **Demo mode** (R1a) | A seeded, entirely fictional dataset behind one flag: a plausible life with trips, places across several continents, sightings, concerts, journal entries, weather and achievements — **including a handful of freely licensed images**, so the screenshots show the product as it actually looks now that photos exist. **This is the release that unblocks everything public.** | M–L |
-| **0.27.0** | **Hardening & operations** (R1c/d/f) | `AUTH_MODE=dev` unstartable in a production-shaped environment · no secrets in logs · pinned base images · Dependabot · `SECURITY.md` · versioned ghcr images and a genuine `docker compose up` · **the upgrade path from an older database tested end to end** · backup and restore documented, media directory included. | M–L |
-| **0.28.0** | **Project surface** (R1b/e) | README with screenshots and a short GIF · the “why not X” comparison table from ch. 1.1 · `CONTRIBUTING.md` (single-author project, issues yes, pull requests not yet — note 55) · issue templates · questions routed to Discussions · a short “what this project deliberately does not do”. | S–M |
-| **0.29.0** | **Freeze & fresh-install pass** | No new features. Walk the stranger's path from an empty machine, fix what that turns up, tidy the docs, verify every `.env.example` key is real and every documented command works. Bug fixes only from here. | S–M |
+| **0.26.0** | **Complete backup** | **A29**: ZIP export containing JSON plus the media directory, a round-tripping import that relinks `MediaRef` rows, streamed rather than assembled in memory; the plain JSON export stays as the fast option. Deliberately straight after the two photo releases — the moment irreplaceable files exist, the backup story has to be whole again. | M |
+| **0.27.0** | **Statistics** | **P3.1**: statistics widgets rendered generically from the module YAML (`count`, `count_distinct`, `timeseries`), building on A7. Placed here because it pays off twice — new modules bring their own statistics, and the demo dataset in 0.28.0 then fills a complete statistics tab without a single hand-written widget. | M |
+| **0.28.0** | **Demo mode** (R1a) | A seeded, entirely fictional dataset behind one flag: a plausible life with trips, places across several continents, sightings, concerts, journal entries, weather and achievements — **including a handful of freely licensed images**, so the screenshots show the product as it actually looks now that photos exist. **This is the release that unblocks everything public.** | M–L |
+| **0.29.0** | **Hardening & operations** (R1c/d/f) | `AUTH_MODE=dev` unstartable in a production-shaped environment · no secrets in logs · pinned base images · Dependabot · `SECURITY.md` · versioned ghcr images and a genuine `docker compose up` · **the upgrade path from an older database tested end to end** · backup and restore documented, media directory included. | M–L |
+| **0.30.0** | **Project surface** (R1b/e) | README with screenshots and a short GIF · the “why not X” comparison table from ch. 1.1 · `CONTRIBUTING.md` (single-author project, issues yes, pull requests not yet — note 55) · issue templates · questions routed to Discussions · a short “what this project deliberately does not do”. | S–M |
+| **0.31.0** | **Freeze & fresh-install pass** | No new features. Walk the stranger's path from an empty machine, fix what that turns up, tidy the docs, verify every `.env.example` key is real and every documented command works. Bug fixes only from here. | S–M |
 | **1.0.0** | **Publication** | The promise above, kept. Then promotion in the order set out in note 54: selfh.st → r/selfhosted → awesome-selfhosted → Show HN → Fediverse/Lemmy/r/quantifiedself. | — |
 
-**Deliberately after 1.0 (the 1.x line).** The remaining import sources, per the
-decision of 2026-07-19 that they come last: **P2.10** (Trakt), **P2.11**
+**Deliberately after 1.0 (the 1.x line).** Only the remaining import sources, per
+the decision of 2026-07-19 that they come last: **P2.10** (Trakt), **P2.11**
 (Dawarich/Reitti/GPX), **P2.8** (OwnTracks), **P2.9** (import automation),
 **P4.1** (Health Connect), **P4.2** (PSN and Steam), plus **P5.1** (offline
-capture), **P5.2** (Whisper) and — moved here when photos moved forward
-(note 57) — **P3.1** (declarative statistics widgets). P3.1 is a builder's
-feature: it makes *future* modules bring their own statistics, which no first-time
-visitor can see. A bundled ZIP export including media files also belongs here.
+capture) and **P5.2** (Whisper).
 
 This defines 1.0 by exclusion: a complete tool for **capturing and exploring a
-life by hand — now with pictures** — with the Google Timeline import and Immich
-as the bulk sources. Every further connector widens the intake, not the concept.
+life by hand — with pictures, complete backups and statistics that follow the
+modules** — with the Google Timeline import and Immich as the bulk sources. Every
+further connector widens the intake, not the concept.
 
-**Risk to watch.** Five feature releases now sit ahead of the demo mode, which is
-the gate for everything public. If time runs short, the order of retreat is:
-**0.23.0** (weather refinements) first, then the **second stage of 0.25.0**
-(Immich as an event source — the plain photo linking is the part that matters).
-F15 and the demo mode are not negotiable; they are what a stranger sees.
+**Pace (decided 2026-07-20, note 58).** There is no deadline, and the plan is
+written accordingly: nothing that belongs in a 1.0 is deferred to make a date. Two
+packages that an earlier draft pushed into 1.x — P3.1 and the media-inclusive
+export — were pulled back in, because a tool that loses photos on restore, or whose
+statistics have to be hand-coded per module, is not a 1.0 whatever the label says.
+
+**Risk to watch.** Seven releases now sit ahead of the demo mode, which is the gate
+for everything public — the price of an unhurried plan is a long runway before any
+outside feedback arrives. Should that become uncomfortable, the order of retreat is:
+**0.23.0** (weather refinements) first, then the **second stage of 0.25.0** (Immich
+as an event source — the plain photo linking is the part that matters). F15, A29 and
+the demo mode are not negotiable: they are, respectively, what a stranger sees, what
+protects their data, and what lets them look before installing.
 
 ---
 
@@ -871,6 +880,9 @@ F15 and the demo mode are not negotiable; they are what a stranger sees.
     - **Layer assignment (important).** `MediaRef` is declared stage 3 in ch. 6.1 — *derived, disposable, rebuildable*. That is correct for Immich references (the asset lives in Immich; the link can be recomputed). It is **wrong for uploaded files**: a hand-uploaded photo is primary data that exists nowhere else, and a rebuild of the derived layer would destroy it. Decision: **uploaded media belong to the life database (layer 3 of ch. 3.1), Immich references stay derived (layer 4).** Concretely, `provider='local'` rows are never touched by a recomputation, `provider='immich'` rows may be dropped and rebuilt at will. This has to be enforced in the code that clears derivations, not merely documented.
     - **Backup stops being “the JSON export”.** Until now the export was the complete backup. Binary files do not fit in it. Decision: the export keeps carrying the **metadata** (filename, caption, capture time, event link), the media directory is backed up **separately and is documented as such** in DEPLOY, and the export dialog says so plainly. A bundled ZIP export including the files is a sensible 1.x addition, not a 1.0 requirement — but a user must never be able to believe a JSON export saved their photos.
     - **`MediaRef` lacks `user_id`.** Ch. 6.1 states that `user_id` applies to `MediaRef` as well; the model does not implement it. Harmless while media are only reachable through an event, but it must be closed before user-uploaded files exist — it is exactly the kind of gap that turns into a cross-user data leak. To be fixed as part of F15.
+
+**Feedback round 2026-07-20 — sixth round (58):**
+58. ✅ **No hurry to release; pull the ZIP export and the statistics widgets forward:** decided — both move ahead of 1.0. The ZIP export becomes package **A29** (group A, not B: a backup that silently omits the irreplaceable half of the data is an operational defect, not a missing feature), **P3.1** returns to the pre-1.0 line, and the release plan grows to 0.31.0. *Reasoning recorded because it will be tempting to reverse later:* with no deadline there is no reason to ship a 1.0 that has to apologise for itself. The two candidates for deferral in note 57 were only ever candidates *because* of an assumed hurry; once that is gone, the argument goes with it. What stays outside 1.0 is what was excluded on merit — the import connectors — not what was excluded for time.
 
 **Feedback round 2026-07-20 — fourth round (51–56):**
 51. ✅ **Several background maps, selectable:** decided — a small bundled set (OSM standard, light/dark, OpenTopoMap, satellite via Esri World Imagery) **plus a freely configurable tile URL template**, attribution per layer, the choice stored per device → package **F13**. The custom template is the A27-conforming part: the bundled set is convenience, not a hardwired preference, and anyone with their own tile server or an API key is not locked out.

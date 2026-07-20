@@ -55,8 +55,10 @@ und P5.1/P5.2 (Offline-Capture, Whisper).
 
 **Releaseplan bis 1.0 steht in KONZEPT Kap. 14.3** — Reihenfolge: 0.21 A28+F14 ·
 0.22 F13 · 0.23 F11+F12 · **0.24 F15 (Fotos manuell)** · **0.25 P2.1 (Immich)** ·
-0.26 Demo-Modus · 0.27 Härtung/Betrieb · 0.28 Projektoberfläche · 0.29 Freeze ·
-**1.0 = Veröffentlichung**. Übrige Import-Quellen und P3.1 erst nach 1.0.
+**0.26 A29 (ZIP-Backup mit Medien)** · 0.27 P3.1 · 0.28 Demo-Modus ·
+0.29 Härtung/Betrieb · 0.30 Projektoberfläche · 0.31 Freeze ·
+**1.0 = Veröffentlichung**. Nur noch die Import-Konnektoren nach 1.0.
+Kein Termindruck (Anmerkung 58) — nichts wird für ein Datum verschoben.
 Dort nachsehen statt Reihenfolge raten.
 
 **Medien-Invariante (Anmerkung 57, ab F15 bindend):** `provider='local'` sind
