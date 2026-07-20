@@ -9,6 +9,13 @@ event_categories: []
 prompt_rules: |
   - Entity movie: konkrete Filmtitel ("Oppenheimer", "Der Herr der Ringe", ...).
 
+# --- P3.1: deklarative Statistik ---
+statistics:
+  - id: movie_count
+    label: "Filme gesehen"
+    type: count_distinct
+    field: entity.name
+
 # --- F6: Erfolge ---
 achievements:
   - id: cinephile

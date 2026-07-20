@@ -9,6 +9,13 @@ event_categories: []
 prompt_rules: |
   - Entity book: konkrete Buchtitel ("Der Steppenwolf", "Harry Potter", ...).
 
+# --- P3.1: deklarative Statistik ---
+statistics:
+  - id: book_count
+    label: "Bücher gelesen"
+    type: count_distinct
+    field: entity.name
+
 # --- F6: Erfolge ---
 achievements:
   - id: bookworm

@@ -56,9 +56,8 @@ und P5.1/P5.2 (Offline-Capture, Whisper).
 **Releaseplan bis 1.0 steht in KONZEPT Kap. 14.3.** Fertig: 0.21 A28+F14 ·
 0.22 F13 · 0.23 F11+F12 · 0.24 F15 (Fotos) · 0.25 P2.1 (Immich, Stufe 1) ·
 0.26 A29 (ZIP-Backup). Offen: **0.27 Fixes (A31/A32/A30)** · 0.28 F16+A33+A34 ·
-0.29 A35 (lokale Konten, fertig) ·
-**0.30 P3.1** · 0.31 Demo-Modus · 0.32 Härtung · 0.33 Projektoberfläche ·
-0.34 Freeze · **1.0 = Veröffentlichung**. Import-Konnektoren erst danach.
+0.29 A35 (lokale Konten) · 0.30 P3.1 (deklarative Statistik) ·
+**0.31 Demo-Modus** · 0.32 Härtung · 0.33 Projektoberfläche · 0.34 Freeze · **1.0 = Veröffentlichung**. Import-Konnektoren erst danach.
 Kein Termindruck (Anmerkung 58). Dort nachsehen statt Reihenfolge raten.
 
 **F17 (Altersanzeige, offen, Anmerkung 72):** Geburtsdatum ist ein

@@ -9,6 +9,13 @@ event_categories: []
 prompt_rules: |
   - Entity game: konkrete Spieletitel ("Zelda: Tears of the Kingdom", "Elden Ring", ...).
 
+# --- P3.1: deklarative Statistik ---
+statistics:
+  - id: game_count
+    label: "Spiele gespielt"
+    type: count_distinct
+    field: entity.name
+
 # --- F6: Erfolge ---
 achievements:
   - id: gamer

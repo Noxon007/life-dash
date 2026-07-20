@@ -15,6 +15,22 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.30.0] – 2026-07-20
+
+### Added
+- **📊 Modules bring their own statistics.** Each trackable module (animals,
+  trips, concerts, games, films, books …) now declares its figures in its own
+  definition file, and the statistics view renders them automatically — a
+  number for “different games played”, a per-year chart for “trips per year”,
+  and so on. The upshot: **a new module gets statistics without any change to
+  the app**, and games, films and books — which had none until now — show up
+  on their own. Only modules you actually track appear, and a figure that would
+  read “0” is left out until there is something to count.
+
+### Notes
+- Purely a computed view — nothing new is stored, and it counts only confirmed
+  data, the same rule the achievements follow.
+
 ## [0.29.0] – 2026-07-20
 
 ### Added

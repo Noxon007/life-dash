@@ -953,6 +953,14 @@
             ohne neue Abfragen. Je mehr Ereignisse Wetter tragen, desto aussagekräftiger.</span>
           </div>
         </div>
+        <!-- P3.1: Kennzahlen der Module — kommen aus den Modul-YAMLs (statistics:),
+             nicht mehr aus fest verdrahteten Kacheln. Neues Modul = Statistik ohne
+             Frontend-Änderung. -->
+        <div class="panel" id="module-widgets" style="margin-bottom:20px; display:none">
+          <h3 data-i18n="widgets.title">📊 Aus deinen Modulen</h3>
+          <div class="grid cols-4" id="widget-tiles"></div>
+          <div id="widget-charts" style="margin-top:8px"></div>
+        </div>
         <div class="grid cols-2">
           <div class="panel" id="panel-rain-years" style="display:none">
             <h3 data-i18n="chart.raindays">Regentage pro Jahr</h3>
@@ -2092,6 +2100,7 @@ const I18N_EN = {
   'wipemine.ask': "All your entries, items, places, routes, photos and raw records will be permanently deleted. Type LOESCHEN to confirm.",
   'wipemine.done': "✓ {rows} rows and {files} image files deleted.",
   'btn.delete': "Delete",
+  'widgets.title': "📊 From your modules",
   'seed.title': "👋 Your first entries",
   'seed.desc': "A few details and the life database is no longer empty. All optional and changeable at any time.",
   'seed.birth': "Date of birth",
@@ -3522,6 +3531,39 @@ function renderWeatherSummary(events, metricOf, placeOf) {
   } else panel.style.display = 'none';
 }
 
+// P3.1: Modul-Kennzahlen. Zahlen-Widgets als Kacheln, Zeitreihen als
+// Balkendiagramm — alles aus dem, was die Modul-YAMLs deklarieren. Fehlt der
+// Endpunkt oder gibt es nichts, bleibt der Block unsichtbar.
+async function renderModuleWidgets() {
+  const box = document.getElementById('module-widgets');
+  if (!box) return;
+  let widgets = [];
+  try { widgets = await api('/api/stats/widgets'); }
+  catch (_) { box.style.display = 'none'; return; }
+  if (!widgets.length) { box.style.display = 'none'; return; }
+
+  const nums = widgets.filter(w => w.type !== 'timeseries');
+  const series = widgets.filter(w => w.type === 'timeseries');
+
+  document.getElementById('widget-tiles').innerHTML = nums.map(w => `
+    <div class="stat-card">
+      <div class="stat-num">${w.value.toLocaleString('de-DE')}</div>
+      <div class="stat-label">${w.emoji ? w.emoji + ' ' : ''}${esc(w.label)}</div>
+    </div>`).join('');
+
+  // Zeitreihen als eigene kleine Diagramm-Paneele
+  document.getElementById('widget-charts').innerHTML = series.map(w =>
+    `<div class="panel" style="margin-top:12px">
+       <h3>${w.emoji ? w.emoji + ' ' : ''}${esc(w.label)}</h3>
+       <div id="wchart-${esc(w.id)}"></div>
+     </div>`).join('');
+  series.forEach(w => {
+    const data = Object.entries(w.series).sort((a, b) => a[0] - b[0]);
+    renderBars(`wchart-${w.id}`, data.length ? data : [['—', 0]]);
+  });
+  box.style.display = '';
+}
+
 async function loadStats() {
   const [events, animals, countries, artists] = await Promise.all([
     fetchEvents(),
@@ -3609,6 +3651,7 @@ async function loadStats() {
   tempCard('stat-windy', metricMax('wind_max_kmh'), ' km/h', newDataHint);
   tempCard('stat-snowy', metricMax('snow_cm'), ' cm', newDataHint);
   renderWeatherSummary(events, metricOf, placeOf);
+  renderModuleWidgets();
 
   const perYear = {};
   events.forEach(e => { const y = eventYear(e); if (y) perYear[y] = (perYear[y]||0) + 1; });
