@@ -1,7 +1,9 @@
 """Event-Read-Endpoints (Stufe-3-Ansichten: Timeline & Karte)."""
 from __future__ import annotations
 
+from datetime import date as date_type
 from datetime import datetime, timedelta
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, selectinload
@@ -10,7 +12,7 @@ from app.auth import get_current_user
 from app.database import get_db
 from app.models import ConfirmState, DatePrecision, Event, EventEntityLink, User
 from app.routers._serialize import event_to_read
-from app.schemas import EventManualCreate, EventRead
+from app.schemas import EventManualCreate, EventRead, OnThisDayGroup
 from app.services.ingestion import create_manual_event
 
 router = APIRouter(prefix="/api/events", tags=["Events"])
@@ -130,6 +132,78 @@ def list_events(
 
     events = query.order_by(Event.date_start.desc().nullslast()).all()
     return [event_to_read(e) for e in events]
+
+
+# --------------------------------------------------------------------------- #
+# F14 — „An diesem Tag"
+# --------------------------------------------------------------------------- #
+# Reine Schicht-4-Ableitung: speichert nichts, rechnet bei jedem Aufruf neu.
+#
+# Nur `exact` und `day` zählen. `month` wurde bewusst ausgeschlossen, obwohl
+# das Konzept es zunächst mitnannte: bei Monatsgenauigkeit ist der Tag
+# unbekannt, „heute vor 5 Jahren" wäre also eine Behauptung, die die Daten
+# nicht hergeben — und Genauigkeit nicht zu überzeichnen ist die Grundregel
+# dieses Projekts (Kap. 3.1). Ein eigener „in diesem Monat"-Block kann das
+# später ehrlich nachholen.
+_ON_THIS_DAY_PRECISIONS = (DatePrecision.exact, DatePrecision.day)
+
+
+@router.get("/on-this-day", response_model=list[OnThisDayGroup])
+def on_this_day(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    # Annotated statt Query-als-Default: so bleiben es echte Python-Defaults,
+    # die auch beim direkten Aufruf gelten (Jobs, Tests) — nicht nur über HTTP.
+    date: Annotated[date_type | None, Query(description="Bezugstag (Default: heute)")] = None,
+    max_years: Annotated[int, Query(ge=1, le=200, description="Wie weit zurück")] = 50,
+) -> list[OnThisDayGroup]:
+    """Was ist an diesem Kalendertag in früheren Jahren passiert?
+
+    Trifft auch mehrtägige Events, die den Tag *überspannen* („du warst an
+    diesem Tag vor 5 Jahren auf Mallorca") — nicht nur solche, die an ihm
+    beginnen. Existiert zu einem Mehrtages-Event ein Tages-Kind (F7) im selben
+    Jahrgang, gewinnt das Kind: es ist der genauere Eintrag, und beide
+    nebeneinander wären dieselbe Erinnerung doppelt.
+    """
+    today = date or datetime.now().date()
+    events = (db.query(Event).options(*_EAGER)
+              .filter(Event.user_id == user.id,
+                      Event.date_start.isnot(None),
+                      Event.date_precision.in_(_ON_THIS_DAY_PRECISIONS))
+              .all())
+
+    by_year: dict[int, list[Event]] = {}
+    for e in events:
+        start = e.date_start.date()
+        end = (e.date_end or e.date_start).date()
+        if end < start:
+            start, end = end, start
+        # Jahrgänge, in denen dieser Event den Kalendertag berührt. Über die
+        # Spanne laufen statt zu rechnen: sie ist praktisch immer kurz, und
+        # Schaltjahre sowie Jahreswechsel erledigen sich damit von selbst.
+        if (end - start).days > 366:
+            continue
+        d = start
+        while d <= end:
+            years_ago = today.year - d.year
+            if d.month == today.month and d.day == today.day and 1 <= years_ago <= max_years:
+                by_year.setdefault(years_ago, []).append(e)
+                break
+            d += timedelta(days=1)
+
+    groups: list[OnThisDayGroup] = []
+    for years_ago in sorted(by_year):
+        chosen = by_year[years_ago]
+        # F7: Eltern verwerfen, deren Tages-Kind schon in diesem Jahrgang steht
+        child_parents = {e.parent_event_id for e in chosen if e.parent_event_id}
+        chosen = [e for e in chosen if e.id not in child_parents]
+        chosen.sort(key=lambda e: (e.date_start, e.title or ""))
+        groups.append(OnThisDayGroup(
+            years_ago=years_ago,
+            date=today.replace(year=today.year - years_ago),
+            events=[event_to_read(e) for e in chosen],
+        ))
+    return groups
 
 
 @router.get("/map", response_model=list[EventRead])

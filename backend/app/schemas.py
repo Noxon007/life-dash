@@ -1,6 +1,7 @@
 """Pydantic-Schemas für Request/Response."""
 from __future__ import annotations
 
+from datetime import date as date_type
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -164,6 +165,16 @@ class PlaceNameResolveResult(BaseModel):
     resolved: int
     failed: int
     remaining: int
+
+
+class OnThisDayGroup(BaseModel):
+    """F14: Ein Jahrgang des „An diesem Tag"-Rückblicks.
+
+    Ableitung (Schicht 4) — hält keine eigenen Daten, wird bei jedem Aufruf
+    frisch aus der Lebensdatenbank berechnet."""
+    years_ago: int
+    date: date_type
+    events: list[EventRead]
 
 
 # --------------------------------------------------------------------------- #

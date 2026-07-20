@@ -306,16 +306,19 @@ def _run_resolve_names(db: Session, job: Job) -> tuple[str, str]:
     from app.routers.tracks import resolve_place_names
 
     user = db.get(User, job.user_id)
-    scope = (job.params or {}).get("scope", "unnamed")
+    # A28: ohne scope läuft der Job über alle Mängel auf einmal. Alte
+    # Job-Einträge, die noch einen Scope tragen, laufen unverändert weiter.
+    scope = (job.params or {}).get("scope")
+    what = f" ({scope})" if scope else ""
     while True:
         r = resolve_place_names(limit=25, scope=scope, db=db, user=user)
         cont = _tick(db, job.id, r.resolved, r.remaining)
         if r.remaining <= 0:
-            return "done", f"{db.get(Job, job.id).done} Ortsnamen bearbeitet ({scope})"
+            return "done", f"{db.get(Job, job.id).done} Ortsnamen bearbeitet{what}"
         if not cont:
             return "stopped", "gestoppt"
         if r.resolved == 0:
-            return "stopped", f"{r.remaining} nicht auflösbar ({scope})"
+            return "stopped", f"{r.remaining} nicht auflösbar{what}"
 
 
 _RUNNERS = {
@@ -377,8 +380,7 @@ def run_due_schedules() -> None:
                         continue
                     if last.status in ("running", "stopping"):
                         continue
-                job = Job(user_id=user.id, type=jtype, unit="geplant",
-                          params={"scope": "unnamed"} if jtype == "resolve_names" else None)
+                job = Job(user_id=user.id, type=jtype, unit="geplant", params=None)
                 db.add(job)
                 db.commit()
                 log.info("Nachtplan: Job %s für %s gestartet", jtype,

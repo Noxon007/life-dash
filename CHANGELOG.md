@@ -15,6 +15,29 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.21.0] – 2026-07-20
+
+### Added
+- **🕰️ “On this day”:** the timeline now opens with a look-back — what
+  happened on this calendar day one, five or twenty years ago, shown above
+  today's entries. Multi-day trips count too: if you were in Mallorca on this
+  day five years ago, the trip shows up even though it began a week earlier.
+  The block appears only when there is actually something to show, stays out
+  of the way while you search or filter, and can be dismissed for good with
+  the ✕ (per device). Entries whose date is only known to the month or year
+  are deliberately left out — “on this day” would be claiming a precision the
+  data does not have.
+
+### Changed
+- **Resolving place names is one run again:** the drop-down asking whether to
+  fix missing names, shorten long addresses or transliterate foreign scripts
+  is gone. One button now handles all three in a single pass. Beyond the
+  simpler screen this is mainly faster: a place affected by several of those
+  problems — a Greek address is usually over-long as well — used to be looked
+  up once per run, that is up to three times. Now every place is looked up at
+  most once, which at OpenStreetMap's mandatory one-second delay saves hours
+  on a large history.
+
 ## [0.20.0] – 2026-07-20
 
 ### Added

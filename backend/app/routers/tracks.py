@@ -395,6 +395,42 @@ def _verbose_locations(db: Session, user_id: str, parts: list[str]) -> list[Loca
     return [l for l in rows if (l.name or "").count(",") > max_commas]
 
 
+def _name_defect(name: str | None, parts: list[str]) -> str | None:
+    """A28: Welchen Mangel hat dieser Ortsname — oder keinen (None)?
+
+    Die eine Bedingung, die die drei früheren Scopes ersetzt. Reihenfolge ist
+    bedeutsam: „unnamed" zuerst, denn ein frisch geholter Name kommt bereits
+    im gewählten Format und in der gewählten Sprache — er kann danach weder
+    zu lang noch fremdschriftlich sein. Wer hier nichts zurückgibt, ist fertig
+    und wird vom Lauf nicht noch einmal angefasst."""
+    n = name or ""
+    if n.startswith("Ort (") or n in SEMANTIC_LABELS or n in DROP_LABELS:
+        return "unnamed"
+    if geocode_svc.NON_LATIN_RE.search(n):
+        return "nonlatin"
+    if n.count(",") > len(parts) - 1:
+        return "verbose"
+    return None
+
+
+def _resolve_candidates(db: Session, user_id: str, parts: list[str]) -> list[Location]:
+    """A28: Alle Orte mit Namensmangel als EINE entduplizierte Liste,
+    „unnamed" zuerst.
+
+    Vorher lief der Job dreimal, einmal je Scope — ein Ort kann aber in
+    mehreren Mengen liegen (eine griechische Adresse ist meist auch zu lang)
+    und wurde dann bis zu dreimal geocodiert. Bei Nominatims 1,2-s-Drossel
+    ist das der eigentliche Gewinn, nicht der eine Klick."""
+    rows = (db.query(Location)
+            .filter(Location.user_id == user_id, Location.lat.isnot(None))
+            .all())
+    order = {"unnamed": 0, "nonlatin": 1, "verbose": 2}
+    scored = [(order[d], l) for l in rows
+              if (d := _name_defect(l.name, parts)) is not None]
+    scored.sort(key=lambda t: t[0])
+    return [l for _, l in scored]
+
+
 # --------------------------------------------------------------------------- #
 # Import-Endpoint
 # --------------------------------------------------------------------------- #
@@ -558,19 +594,21 @@ def import_timeline(
 @router.post("/import/timeline/resolve-names", response_model=PlaceNameResolveResult)
 def resolve_place_names(
     limit: int = 25,
-    scope: str = "unnamed",
+    scope: str | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> PlaceNameResolveResult:
-    """Löst Ortsnamen per Reverse-Geocoding auf.
+    """Löst Ortsnamen per Reverse-Geocoding auf — EIN Lauf für alles (A28).
 
-    scope="unnamed" (Default): Koordinaten-Namen („Ort (lat, lng)") und
-    semantische Labels ohne Adresse („Zuhause", „Arbeit" … — A12; das Label
-    bleibt als Präfix erhalten).
-    scope="nonlatin": Fremdschrift-Namen (z. B. Griechisch) erneut auflösen,
-    jetzt mit deutsch/englischer Sprach-Fallback-Kette (A10).
-    scope="verbose": Bestehende lange Nominatim-Adressen aufs gewählte
-    Anzeige-Format (place_name_parts) nachformatieren.
+    Kandidaten sind alle verorteten Orte mit Namensmangel, entdupliziert und
+    „unnamed" zuerst: Koordinaten-Namen („Ort (lat, lng)") und semantische
+    Labels ohne Adresse (A12, das Label bleibt Präfix), Fremdschrift-Namen
+    (A10) und zu lange Nominatim-Adressen. Ein Ort wird dabei höchstens
+    einmal geocodiert, auch wenn er mehrere Mängel hat.
+
+    `scope` bleibt als optionaler Parameter erhalten (Werte wie früher:
+    unnamed/nonlatin/verbose) — die UI bietet ihn nicht mehr an, aber
+    bestehende Job-Einträge und Skripte laufen damit weiter.
 
     Arbeitet einen Batch (max. `limit`, gedrosselt auf 1 Anfrage/s wegen
     Nominatim-Policy) ab und meldet, wie viele Orte noch offen sind — das
@@ -586,11 +624,13 @@ def resolve_place_names(
             return _nonlatin_locations(db, user.id)
         if scope == "verbose":
             return _verbose_locations(db, user.id, parts)
-        return (db.query(Location)
-                .filter(Location.user_id == user.id,
-                        _unresolved_name_filter(),
-                        Location.lat.isnot(None))
-                .all())
+        if scope == "unnamed":
+            return (db.query(Location)
+                    .filter(Location.user_id == user.id,
+                            _unresolved_name_filter(),
+                            Location.lat.isnot(None))
+                    .all())
+        return _resolve_candidates(db, user.id, parts)
 
     locs = _candidates()[:limit]
     resolved = failed = 0
@@ -600,25 +640,22 @@ def resolve_place_names(
         ok = _apply_resolved_name(db, loc, user.id, parts, lang)
         if ok:
             db.commit()
-        # Bleibt der Name trotz Auflösung fremdschriftlich (OSM kennt keinen
-        # de/en-Namen), ist das kein Fortschritt — sonst liefe der Batch-Lauf
-        # endlos über dieselben Orte.
-        if ok and scope == "nonlatin" and geocode_svc.NON_LATIN_RE.search(loc.name or ""):
-            ok = False
-        # Gleiches Prinzip fürs Nachformatieren: bleibt der Name länger als
-        # das Format (kein addressdetails-Treffer), zählt er als Fehlschlag.
-        if ok and scope == "verbose" and (loc.name or "").count(",") > len(parts) - 1:
+        # Eine Bedingung für alle Mängel (A28): hat der Name danach immer noch
+        # einen, war der Aufruf kein Fortschritt — sonst liefe der Batch-Lauf
+        # endlos über dieselben Orte. Deckt beides ab, was vorher zwei
+        # scope-spezifische Prüfungen waren: OSM kennt keinen de/en-Namen,
+        # oder addressdetails fehlen und der Name bleibt zu lang.
+        if ok and _name_defect(loc.name, parts) is not None:
             ok = False
         if ok:
             resolved += 1
         else:
             failed += 1
-    # Fremdschrift-Auflösung kann am selben Namen scheitern (kein de/en-Name
-    # in OSM) — Fehlschläge nicht als "offen" zählen, sonst dreht das
-    # Frontend Endlosrunden über dieselben Orte.
+    # Fehlschläge nicht als "offen" zählen, sonst dreht das Frontend
+    # Endlosrunden über dieselben, unauflösbaren Orte.
     remaining = max(0, len(_candidates()) - failed)
     log.info("Ortsnamen-Auflösung (%s): %d aufgelöst, %d fehlgeschlagen, %d offen",
-             scope, resolved, failed, remaining)
+             scope or "alle", resolved, failed, remaining)
     return PlaceNameResolveResult(resolved=resolved, failed=failed, remaining=remaining)
 
 

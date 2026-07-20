@@ -692,6 +692,8 @@
           <span class="filter-chip" id="tl-print-btn" data-i18n-title="tl.print.tip" title="Zeitraum wählen und drucken oder als PDF sichern — gedruckt wird hell, ohne Navigation und mit allen Ereignissen des Zeitraums" data-i18n="tl.print">🖨️ Drucken</span>
         </div>
         <div id="tl-search-note" class="hint" style="display:none"></div>
+        <!-- F14: „An diesem Tag" — Ableitung, wird bei jedem Timeline-Aufruf frisch geholt -->
+        <div id="otd-block" style="display:none"></div>
         <div class="timeline" id="timeline-list"></div>
       </div>
 
@@ -1157,27 +1159,24 @@
           </div>
         </div>
 
-        <!-- A25: EIN Ortsnamen-Lauf (gleicher Server-Job, Scope per Auswahl) -->
+        <!-- A28: EIN Ortsnamen-Lauf für alles — keine Scope-Auswahl mehr -->
         <div class="section-title" data-i18n="adm.placenames">Ortsnamen</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div style="flex-shrink:0; min-width:215px; display:flex; flex-direction:column; gap:8px">
-              <select id="resolve-scope" class="mf-select">
-                <option value="unnamed" data-i18n="pn.missing">Fehlende Namen auflösen</option>
-                <option value="verbose" data-i18n="pn.long">Lange Adressen kürzen</option>
-                <option value="nonlatin" data-i18n="pn.script">Fremdschrift übersetzen</option>
-              </select>
               <button class="btn secondary" id="btn-resolve-run" style="text-align:left" data-i18n="act.namerun">📍 Lauf starten</button>
             </div>
-            <div class="action-desc" data-i18n="act.namerun.desc"><b>Ein Lauf für alle Ortsnamen-Aufgaben</b> (Reverse-Geocoding
+            <div class="action-desc" data-i18n="act.namerun.desc"><b>Ein Lauf für alle Ortsnamen</b> (Reverse-Geocoding
               via OpenStreetMap, gedrosselt; läuft als Hintergrund-Job in Etappen und ist jederzeit
-              fortsetzbar; manuell umbenannte Einträge bleiben immer unangetastet).<br>
+              fortsetzbar; manuell umbenannte Einträge bleiben immer unangetastet). Der Lauf nimmt sich
+              jeden Ort vor, dessen Name noch nicht stimmt, und geocodiert ihn <b>höchstens einmal</b> —
+              auch wenn mehrere Punkte auf ihn zutreffen:<br>
               <b>Fehlende Namen:</b> importierte Besuche heißen „Ort (53.49, 10.00)" oder tragen nur
               ein Label wie „Zuhause" — der Lauf holt echte Adressen, Labels bleiben als Präfix
               („Zuhause — Musterstraße 1").<br>
-              <b>Lange Adressen:</b> formatiert bestehende Namen auf die unten gewählten Bausteine um.<br>
-              <b>Fremdschrift:</b> löst Namen in Lokalschrift (z. B. Griechisch) mit Sprach-Fallback
-              zur lateinischen Umschrift neu auf.</div>
+              <b>Lange Adressen:</b> werden auf die unten gewählten Bausteine gekürzt.<br>
+              <b>Fremdschrift:</b> Namen in Lokalschrift (z. B. Griechisch) werden mit Sprach-Fallback
+              zur lateinischen Umschrift neu aufgelöst.</div>
           </div>
           <div class="action-row">
             <div style="flex-shrink:0; min-width:215px"><b style="font-size:13px" data-i18n="adm.format">📐 Anzeige-Format</b></div>
@@ -1644,14 +1643,15 @@ const I18N_EN = {
   'adm.fuzzy': "⏳ Vague dates",
   'btn.preview': "🔍 Preview",
   'btn.confirmall': "✓ Confirm all",
+  'otd.title': "🕰️ On this day",
+  'otd.year': "one year ago",
+  'otd.years': "{n} years ago",
+  'otd.hide.tip': "Hide the look-back (stays off on this device)",
   'act.namerun': "📍 Start run",
   'adm.format': "📐 Display format",
   'opt.allcats': "All categories",
   'opt.allsources': "All sources",
   'opt.src.ai': "AI extraction",
-  'pn.missing': "Resolve missing names",
-  'pn.long': "Shorten long addresses",
-  'pn.script': "Transliterate foreign scripts",
   'pn.street': "Street",
   'pn.district': "District",
   'pn.city': "City",
@@ -1733,7 +1733,7 @@ const I18N_EN = {
   'act.export.desc': "<b>Backup as a JSON file.</b><br>Downloads all your data (raw inbox, events, items, places, weather) as a single JSON file. Embeddings are included. Do this regularly — this is your backup.",
   'act.import.desc': "<b>Restore an export file.</b><br>Imports a Life-Dash export file. Entries that already exist (same ID) are skipped — importing repeatedly creates no duplicates. Everything lands in your account.",
   'act.tlimport.desc': "<b>Location history &amp; routes from Google Maps.</b><br>Imports the timeline export from your phone (Android: Settings → Location → Location services → Timeline → “Export timeline data”; older Takeout exports work too). Visits become events, routes become tracks on the map. Importing repeatedly creates no duplicates.",
-  'act.namerun.desc': "<b>One run for every place-name task</b> (reverse geocoding via OpenStreetMap, rate limited; runs as a background job in stages and can be resumed at any time; manually renamed entries are always left alone).<br><b>Missing names:</b> imported visits are called “Place (53.49, 10.00)” or carry only a label such as “Home” — the run fetches real addresses, labels stay as a prefix (“Home — Example Street 1”).<br><b>Long addresses:</b> reformats existing names to the building blocks chosen below.<br><b>Foreign scripts:</b> re-resolves names in local scripts (e.g. Greek) with a language fallback to the Latin transliteration.",
+  'act.namerun.desc': "<b>One run for every place name</b> (reverse geocoding via OpenStreetMap, rate limited; runs as a background job in stages and can be resumed at any time; manually renamed entries are always left alone). The run takes on every place whose name is not yet right and geocodes it <b>at most once</b>, even when several points apply to it:<br><b>Missing names:</b> imported visits are called “Place (53.49, 10.00)” or carry only a label such as “Home” — the run fetches real addresses, labels stay as a prefix (“Home — Example Street 1”).<br><b>Long addresses:</b> are shortened to the building blocks chosen below.<br><b>Foreign scripts:</b> names in local scripts (e.g. Greek) are re-resolved with a language fallback to the Latin transliteration.",
   'adm.format.desc': "<b>Building blocks for resolved addresses</b> — instead of the long address chain with administrative regions and postcode:",
   'adm.track.desc': "<b>Choose modules for collection, statistics &amp; AI.</b><br>Deselected modules disappear from tabs, filters, forms and the AI prompt — existing data is kept and reappears immediately once you select them again.",
   'adm.fuzzy.hint': "Events with a vague date (month, season, year, decade or no date at all). Clicking one opens the quick editor — the more precise the dates, the better the timeline and map.",
@@ -2191,6 +2191,50 @@ function renderTimeline() {
     });
   } else note.style.display = 'none';
   renderTimelineList();
+  renderOnThisDay();
+}
+
+// --------------------------------------------------------------------------- //
+// F14 — „An diesem Tag"
+// --------------------------------------------------------------------------- //
+// Nur im ungefilterten Zeitstrahl: während einer Suche oder eines Kategorie-
+// Filters will man Treffer sehen, keinen Rückblick. Fehlschläge sind still —
+// ein Nostalgie-Block ist nichts, wofür man den Nutzer mit einem Fehler behelligt.
+let OTD_HIDDEN = localStorage.getItem('otd-hidden') === '1';
+async function renderOnThisDay() {
+  const box = document.getElementById('otd-block');
+  if (!box) return;
+  if (tl.query || OTD_HIDDEN) { box.style.display = 'none'; return; }
+  let groups;
+  try {
+    groups = await api('/api/events/on-this-day');
+  } catch (err) { box.style.display = 'none'; return; }
+  if (!groups.length) { box.style.display = 'none'; return; }
+
+  const years = n => n === 1
+    ? t('otd.year', 'vor einem Jahr')
+    : t('otd.years', 'vor {n} Jahren').replace('{n}', n);
+  box.style.display = '';
+  box.innerHTML = `
+    <div class="panel" style="margin-bottom:20px; padding:14px 16px">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px">
+        <b>${t('otd.title', '🕰️ An diesem Tag')}</b>
+        <span class="chip" id="otd-hide" style="cursor:pointer; margin-left:auto"
+              title="${t('otd.hide.tip', 'Rückblick ausblenden (bleibt auf diesem Gerät aus)')}">✕</span>
+      </div>
+      ${groups.map(g => `
+        <div style="margin-bottom:12px">
+          <div class="hint" style="margin:0 0 6px">${years(g.years_ago)} — ${
+            new Date(g.date + 'T12:00:00').toLocaleDateString(LANG === 'en' ? 'en-GB' : 'de-DE',
+              { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+          ${g.events.map(e => eventCard(e)).join('')}
+        </div>`).join('')}
+    </div>`;
+  box.querySelector('#otd-hide').addEventListener('click', () => {
+    OTD_HIDDEN = true;
+    localStorage.setItem('otd-hidden', '1');
+    box.style.display = 'none';
+  });
 }
 // DOM-Schutz: pro Zeitgruppe zunächst nur TL_GROUP_CAP Karten rendern —
 // nach einem Timeline-Import (10k+ Events) friert der Browser sonst ein.
@@ -4559,11 +4603,11 @@ document.getElementById('timeline-file').addEventListener('change', async ev => 
   }
 });
 
-// A25: EIN Ortsnamen-Lauf — der Scope kommt aus der Auswahl daneben
-// (serverseitiger Job, gleicher Lock-Typ für alle Scopes)
+// A28: EIN Ortsnamen-Lauf für alles — ohne Parameter deckt der Job die
+// entduplizierte Vereinigung aller Mängel ab (jeder Ort höchstens einmal
+// geocodiert). Der Server kennt `scope` weiterhin, die UI bietet ihn nicht an.
 document.getElementById('btn-resolve-run').addEventListener('click', e =>
-  startServerJob(e.target, 'resolve_names',
-    { scope: document.getElementById('resolve-scope').value }));
+  startServerJob(e.target, 'resolve_names'));
 
 // Ortsnamen-Format: Bausteine (Straße/Ortsteil/Stadt/Land) pro Nutzer gespeichert
 async function loadPlaceFormat() {
