@@ -11,7 +11,7 @@ import logging
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 from dateutil import parser as dateparser
 from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
@@ -211,6 +211,56 @@ def import_archive(
              restored, skipped, thumbs, user.email or user.id)
     return result | {"media_restored": restored, "media_skipped": skipped,
                      "thumbnails_created": thumbs}
+
+
+@router.post("/wipe-mine")
+def wipe_my_data(
+    confirm: Annotated[str, Body(embed=True)] = "",
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """A33: löscht ALLE eigenen Daten — das Gegenstück zum Export.
+
+    Der Admin-Rundumschlag (`/api/admin/wipe-data`) leert die ganze Instanz und
+    ist damit das falsche Werkzeug für „weg mit meinen Sachen". Hier geht nur,
+    was diesem Konto gehört; das Konto selbst bleibt bestehen.
+
+    Fragmente sind eingeschlossen: sie sind das Rohmaterial **dieses** Nutzers,
+    kein geteiltes Beweisarchiv. Wer geht, lässt es nicht zurück.
+
+    Reihenfolge wie in Anmerkung 59: erst die Dateinamen einsammeln, dann die
+    Zeilen löschen, **dann** die Dateien. Andersherum hinterließe ein Fehler
+    mittendrin den schlimmsten Zustand — Bilder weg, Daten noch da.
+    """
+    if confirm.strip().upper() != "LOESCHEN":
+        raise HTTPException(
+            400, "Zum Bestätigen bitte LOESCHEN eingeben — das lässt sich nicht rückgängig machen.")
+
+    event_ids = [i for (i,) in db.query(Event.id).filter(Event.user_id == user.id).all()]
+    doomed = media_svc.list_uploads_for_user(db, user.id)
+
+    # A34: je Tabelle protokollieren — bei großen Beständen dauert das
+    deleted: dict[str, int] = {}
+    log.warning("Eigene Daten löschen: beginne (%d Events, %d Bilddateien, user=%s)",
+                len(event_ids), len(doomed), user.email or user.id)
+    if event_ids:
+        for model, key in ((Metric, "metrics"), (MediaRef, "media_refs"),
+                           (EventEntityLink, "event_entity_links")):
+            deleted[key] = (db.query(model)
+                            .filter(model.event_id.in_(event_ids))
+                            .delete(synchronize_session=False))
+            log.info("  %s: %d Zeilen gelöscht", key, deleted[key])
+    for model, key in ((Track, "tracks"), (Event, "events"), (Entity, "entities"),
+                       (Location, "locations"), (Fragment, "fragments")):
+        deleted[key] = (db.query(model).filter(model.user_id == user.id)
+                        .delete(synchronize_session=False))
+        log.info("  %s: %d Zeilen gelöscht", key, deleted[key])
+    db.commit()
+    files = media_svc.purge_files(doomed)
+
+    log.warning("Eigene Daten gelöscht: %d Zeilen, %d Bilddateien (user=%s)",
+                sum(deleted.values()), files, user.email or user.id)
+    return {"deleted": deleted, "total": sum(deleted.values()), "media_files": files}
 
 
 @router.post("/import")

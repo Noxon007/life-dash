@@ -724,7 +724,8 @@
   <!-- SIDEBAR / BOTTOM-NAV -->
   <nav class="sidebar">
     <div class="logo"><span class="dot"></span> Life-Dash</div>
-    <div class="nav-item active" data-view="timeline"><span class="ico">📅</span> <span class="lbl" data-i18n="nav.timeline">Zeitstrahl</span></div>
+    <div class="nav-item active" data-view="today"><span class="ico">🕰️</span> <span class="lbl" data-i18n="nav.today">Heute</span></div>
+    <div class="nav-item" data-view="timeline"><span class="ico">📅</span> <span class="lbl" data-i18n="nav.timeline">Zeitstrahl</span></div>
     <div class="nav-item" data-view="map"><span class="ico">🗺️</span> <span class="lbl" data-i18n="nav.map">Karte</span></div>
     <div class="nav-item" data-view="input"><span class="ico">✍️</span> <span class="lbl" data-i18n="nav.input">Eingabe</span></div>
     <div class="nav-item" data-view="stats"><span class="ico">📊</span> <span class="lbl" data-i18n="nav.stats">Statistik</span></div>
@@ -755,7 +756,39 @@
     <div class="content">
 
       <!-- ===== TIMELINE ===== -->
-      <div class="view active" id="view-timeline">
+      <!-- F16: „Heute" — der Rückblick hat hier Platz, ohne den Zeitstrahl zu
+           begraben. Bewusst schlank: was ansteht, was damals war. -->
+      <div class="view active" id="view-today">
+        <div class="grid cols-4" style="margin-bottom:20px">
+          <div class="stat-card" data-go="input" style="cursor:pointer">
+            <div class="stat-num">✍️</div>
+            <div class="stat-label" data-i18n="today.capture">Etwas festhalten</div>
+            <div class="stat-sub" data-i18n="today.capture.sub">Freitext — die KI strukturiert</div>
+          </div>
+          <div class="stat-card" data-go="admin" style="cursor:pointer">
+            <div class="stat-num" id="today-unconfirmed">–</div>
+            <div class="stat-label" data-i18n="today.pending">Warten auf Prüfung</div>
+            <div class="stat-sub" data-i18n="today.pending.sub">Vorschläge in der Moderation</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" id="today-events">–</div>
+            <div class="stat-label" data-i18n="today.total">Ereignisse gesamt</div>
+            <div class="stat-sub" id="today-span">–</div>
+          </div>
+          <div class="stat-card" data-go="timeline" style="cursor:pointer">
+            <div class="stat-num">📅</div>
+            <div class="stat-label" data-i18n="today.timeline">Zum Zeitstrahl</div>
+            <div class="stat-sub" data-i18n="today.timeline.sub">Alles chronologisch</div>
+          </div>
+        </div>
+        <div id="otd-block"></div>
+        <div class="hint" id="otd-empty" style="display:none" data-i18n="today.empty">
+          An diesem Kalendertag ist in früheren Jahren noch nichts festgehalten.
+          Das ändert sich, sobald die Lebensdatenbank wächst — oder mit dem nächsten Import.
+        </div>
+      </div>
+
+      <div class="view" id="view-timeline">
         <div class="zoom-bar" id="tl-zoom">
           <div class="zoom-btn" data-zoom="day" data-i18n="zoom.day">Tag</div>
           <div class="zoom-btn" data-zoom="week" data-i18n="zoom.week">Woche</div>
@@ -770,8 +803,6 @@
           <span class="filter-chip" id="tl-print-btn" data-i18n-title="tl.print.tip" title="Zeitraum wählen und drucken oder als PDF sichern — gedruckt wird hell, ohne Navigation und mit allen Ereignissen des Zeitraums" data-i18n="tl.print">🖨️ Drucken</span>
         </div>
         <div id="tl-search-note" class="hint" style="display:none"></div>
-        <!-- F14: „An diesem Tag" — Ableitung, wird bei jedem Timeline-Aufruf frisch geholt -->
-        <div id="otd-block" style="display:none"></div>
         <div class="timeline" id="timeline-list"></div>
       </div>
 
@@ -1296,6 +1327,21 @@
               <span data-i18n="adm.format.desc2">Benannte Orte (Restaurant, Museum …) behalten ihren Eigennamen immer vorn.
               Die Auswahl gilt sofort für alle neuen Auflösungen; Bestandsdaten bringt der Lauf
               oben aufs gewählte Muster.</span></div>
+          </div>
+        </div>
+
+        <!-- A33: eigene Daten löschen — das Gegenstück zum Export -->
+        <div class="section-title" data-i18n="adm.wipemine">Meine Daten löschen</div>
+        <div class="panel" style="padding:0">
+          <div class="action-row">
+            <div style="flex-shrink:0; min-width:215px">
+              <button class="btn ghost" id="btn-wipe-mine" style="width:100%; text-align:left; color:var(--danger)"
+                      data-i18n="act.wipemine">🗑️ Alle meine Daten löschen</button>
+            </div>
+            <div class="action-desc"><span data-i18n="act.wipemine.desc"><b>Alles, was diesem Konto gehört</b> —
+              Ereignisse, Objekte, Orte, Routen, Wetter, hochgeladene Fotos und der Roh-Eingang.
+              Das Konto selbst bleibt bestehen, andere Nutzer sind nicht betroffen.
+              <b>Unwiderruflich.</b> Mach vorher ein Backup (oben, mit Fotos).</span></div>
           </div>
         </div>
 
@@ -1919,10 +1965,27 @@ const I18N_EN = {
   'toast.tilebad': "The tile URL needs the placeholders {z}, {x} and {y}.",
   'toast.tilesaved': "✓ Custom map saved — selectable in the top right of any map.",
   'toast.tilecleared': "✓ Custom map removed.",
+  'adm.wipemine': "Delete my data",
+  'act.wipemine': "🗑️ Delete all my data",
+  'act.wipemine.desc': "<b>Everything belonging to this account</b> — entries, items, places, routes, weather, uploaded photos and the raw inbox. The account itself stays, other users are unaffected. <b>This cannot be undone.</b> Take a backup first (above, with photos).",
+  'wipemine.ask': "All your entries, items, places, routes, photos and raw records will be permanently deleted. Type LOESCHEN to confirm.",
+  'wipemine.done': "✓ {rows} rows and {files} image files deleted.",
+  'btn.delete': "Delete",
+  'nav.today': "Today",
+  'view.today.title': "Today",
+  'view.today.sub': "What is waiting — and what happened on this day in earlier years",
+  'today.capture': "Capture something",
+  'today.capture.sub': "Free text — the AI structures it",
+  'today.pending': "Waiting for review",
+  'today.pending.sub': "suggestions in moderation",
+  'today.total': "Entries in total",
+  'today.timeline': "Go to the timeline",
+  'today.timeline.sub': "everything in order",
+  'today.empty': "Nothing has been recorded on this calendar day in earlier years yet. That changes as the life database grows — or with your next import.",
+  'otd.more': "+{n} more",
   'otd.title': "🕰️ On this day",
   'otd.year': "one year ago",
   'otd.years': "{n} years ago",
-  'otd.hide.tip': "Hide the look-back (stays off on this device)",
   'act.namerun': "📍 Start run",
   'adm.format': "📐 Display format",
   'opt.allcats': "All categories",
@@ -2574,7 +2637,6 @@ function renderTimeline() {
     });
   } else note.style.display = 'none';
   renderTimelineList();
-  renderOnThisDay();
 }
 
 // --------------------------------------------------------------------------- //
@@ -2583,41 +2645,53 @@ function renderTimeline() {
 // Nur im ungefilterten Zeitstrahl: während einer Suche oder eines Kategorie-
 // Filters will man Treffer sehen, keinen Rückblick. Fehlschläge sind still —
 // ein Nostalgie-Block ist nichts, wofür man den Nutzer mit einem Fehler behelligt.
-let OTD_HIDDEN = localStorage.getItem('otd-hidden') === '1';
 async function renderOnThisDay() {
   const box = document.getElementById('otd-block');
+  const empty = document.getElementById('otd-empty');
   if (!box) return;
-  if (tl.query || OTD_HIDDEN) { box.style.display = 'none'; return; }
-  let groups;
+  let groups = [];
   try {
+    // F16: Der Server deckelt auf 3 Einträge je Jahrgang und lässt importierte
+    // Standort-Besuche weg — sonst wird aus dem Rückblick eine Liste, und die
+    // Erinnerung geht darin unter.
     groups = await api('/api/events/on-this-day');
-  } catch (err) { box.style.display = 'none'; return; }
-  if (!groups.length) { box.style.display = 'none'; return; }
+  } catch (err) { box.innerHTML = ''; return; }
+  if (!groups.length) { box.innerHTML = ''; empty.style.display = ''; return; }
+  empty.style.display = 'none';
 
   const years = n => n === 1
     ? t('otd.year', 'vor einem Jahr')
     : t('otd.years', 'vor {n} Jahren').replace('{n}', n);
-  box.style.display = '';
   box.innerHTML = `
-    <div class="panel" style="margin-bottom:20px; padding:14px 16px">
-      <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px">
-        <b>${t('otd.title', '🕰️ An diesem Tag')}</b>
-        <span class="chip" id="otd-hide" style="cursor:pointer; margin-left:auto"
-              title="${t('otd.hide.tip', 'Rückblick ausblenden (bleibt auf diesem Gerät aus)')}">✕</span>
-      </div>
-      ${groups.map(g => `
-        <div style="margin-bottom:12px">
-          <div class="hint" style="margin:0 0 6px">${years(g.years_ago)} — ${
+    <div class="panel">
+      <h3>${t('otd.title', '🕰️ An diesem Tag')}</h3>
+      ${groups.map(g => {
+        const more = g.total > g.events.length
+          ? ` <span class="chip">${t('otd.more', '+{n} weitere').replace('{n}', g.total - g.events.length)}</span>`
+          : '';
+        return `<div style="margin:14px 0 4px">
+          <div class="hint" style="margin:0 0 8px">${years(g.years_ago)} — ${
             new Date(g.date + 'T12:00:00').toLocaleDateString(LANG === 'en' ? 'en-GB' : 'de-DE',
-              { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+              { day: '2-digit', month: 'long', year: 'numeric' })}${more}</div>
           ${g.events.map(e => eventCard(e)).join('')}
-        </div>`).join('')}
+        </div>`;
+      }).join('')}
     </div>`;
-  box.querySelector('#otd-hide').addEventListener('click', () => {
-    OTD_HIDDEN = true;
-    localStorage.setItem('otd-hidden', '1');
-    box.style.display = 'none';
-  });
+}
+
+// F16: Kennzahlen des Heute-Reiters — aus den ohnehin geladenen Ereignissen,
+// also ohne zusätzliche Anfrage.
+async function loadToday() {
+  renderOnThisDay();
+  try {
+    const events = await fetchEvents();
+    const years = events.filter(e => e.date_start).map(e => e.date_start.slice(0, 4)).sort();
+    document.getElementById('today-events').textContent = events.length.toLocaleString('de-DE');
+    document.getElementById('today-unconfirmed').textContent =
+      events.filter(e => e.confirmed !== 'confirmed').length.toLocaleString('de-DE');
+    document.getElementById('today-span').textContent = years.length
+      ? `${years[0]} – ${years[years.length - 1]}` : '–';
+  } catch (_) { /* Kacheln bleiben auf „–" */ }
 }
 // DOM-Schutz: pro Zeitgruppe zunächst nur TL_GROUP_CAP Karten rendern —
 // nach einem Timeline-Import (10k+ Events) friert der Browser sonst ein.
@@ -4595,6 +4669,7 @@ async function loadAchievements() {
 
 // ---------- NAVIGATION ----------
 const titles = {
+  today: ["Heute","Was ansteht — und was an diesem Tag früher war"],
   timeline: ["Zeitstrahl","Dein Leben als Ereignisstrom"],
   map: ["Karte","Orte, an denen du warst"],
   stats: ["Statistik","Dein Leben in Zahlen"],
@@ -4610,9 +4685,10 @@ function gotoView(v) {
   document.getElementById('view-'+v).classList.add('active');
   document.getElementById('view-title').textContent = t(`view.${v}.title`, titles[v][0]);
   document.getElementById('view-sub').textContent = t(`view.${v}.sub`, titles[v][1]);
+  if (v === 'today') loadToday();
   if (v === 'map') setTimeout(openMapView, 40);
   if (v === 'stats') loadStats();
-  if (v === 'compendium') { const t = document.querySelector('#comp-tabs .zoom-btn.active'); if (t) loadCompendium(t.dataset.type); }
+  if (v === 'compendium') { const tab = document.querySelector('#comp-tabs .zoom-btn.active'); if (tab) loadCompendium(tab.dataset.type); }
   if (v === 'world') loadWorld();
   if (v === 'achievements') loadAchievements();
   if (v === 'admin') loadAdminTab(adminTab);
@@ -5339,6 +5415,27 @@ async function saveImmich() {
     toast(t('im.saved', '✓ Immich-Zugang gespeichert.'));
   } catch (err) { toast(t('toast.savefail', 'Speichern fehlgeschlagen: ') + err.message, 'error'); }
 }
+// A33: eigene Daten löschen. Getippte Bestätigung statt bloßem OK — bei einer
+// unwiderruflichen Aktion soll ein Fehlklick nicht reichen.
+document.getElementById('btn-wipe-mine').addEventListener('click', async () => {
+  const typed = await uiPrompt(
+    t('wipemine.ask', 'Alle deine Ereignisse, Objekte, Orte, Routen, Fotos und Roh-Einträge werden endgültig gelöscht. '
+      + 'Zum Bestätigen LOESCHEN eingeben.'),
+    { title: t('act.wipemine', '🗑️ Alle meine Daten löschen'), okLabel: t('btn.delete', 'Löschen'),
+      danger: true, placeholder: 'LOESCHEN' });
+  if (typed === null) return;
+  try {
+    const r = await api('/api/data/wipe-mine', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm: typed }),
+    });
+    toast(t('wipemine.done', '✓ {rows} Zeilen und {files} Bilddateien gelöscht.')
+      .replace('{rows}', r.total).replace('{files}', r.media_files), 'ok', 9000);
+    await refreshAll();
+    await loadToday();
+  } catch (err) { toast(err.message, 'error', 9000); }
+});
+
 document.getElementById('im-save').addEventListener('click', saveImmich);
 document.getElementById('im-test').addEventListener('click', async ev => {
   const btn = ev.target;
@@ -5518,6 +5615,7 @@ document.getElementById('logout-link').addEventListener('click', async ev => {
     const list = document.getElementById('timeline-list');
     if (list && !list.children.length) list.innerHTML = skeletonRows();
     await loadTimeline();
+    await loadToday();      // F16: Startansicht ist „Heute"
     await loadModQueue();
   } catch (err) {
     showBanner(`⚠ Backend-Fehler: ${esc(err.message)}`);

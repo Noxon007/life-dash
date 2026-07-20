@@ -15,6 +15,29 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.28.0] – 2026-07-20
+
+### Added
+- **🕰️ A “Today” view.** The look-back moved out of the timeline into a place
+  of its own, together with what is waiting for you: how many suggestions need
+  reviewing, how many entries you have and the span they cover, and a shortcut
+  straight to capturing something. It is the view the app now opens on.
+- **Delete my own data.** Every account can now remove everything that belongs
+  to it — entries, items, places, routes, weather, uploaded photos and the raw
+  inbox — without touching anyone else's data, and without needing an
+  administrator. The account itself stays. It asks you to type a word first,
+  and it really is irreversible, so take a backup with photos beforehand.
+
+### Changed
+- **The look-back stays a look-back.** It now shows at most three entries per
+  year and says how many there were in total (“+9 more”), and it leaves out
+  imported location visits. A day five years ago can hold thirty of those, and
+  they were burying the memory the block exists to show.
+- **Long-running actions leave a trail.** Building a backup, restoring one and
+  deleting data now report their progress to the log as they go, table by table
+  and file by file, instead of falling silent for minutes. Without that, a slow
+  run and a stuck one look exactly the same.
+
 ## [0.27.0] – 2026-07-20
 
 ### Fixed

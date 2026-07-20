@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.models import ConfirmState, DatePrecision, Event, EventEntityLink, User
+from app.models import (ConfirmState, DatePrecision, Event, EventEntityLink,
+                        Source, User)
 from app.routers._serialize import event_to_read
 from app.schemas import EventManualCreate, EventRead, OnThisDayGroup
 from app.services.ingestion import create_manual_event
@@ -156,6 +157,12 @@ def on_this_day(
     # die auch beim direkten Aufruf gelten (Jobs, Tests) — nicht nur über HTTP.
     date: Annotated[date_type | None, Query(description="Bezugstag (Default: heute)")] = None,
     max_years: Annotated[int, Query(ge=1, le=200, description="Wie weit zurück")] = 50,
+    # F16: Ein Tag vor fünf Jahren kann dreißig importierte Besuche enthalten.
+    # Ungedeckelt wird aus dem Rückblick eine Liste, und die Erinnerung geht
+    # darin unter — genau der Grund, warum der Block aus dem Zeitstrahl musste.
+    max_per_year: Annotated[int, Query(ge=1, le=50, description="Einträge je Jahrgang")] = 3,
+    include_imported: Annotated[bool, Query(
+        description="Importierte Standort-Besuche mitzeigen")] = False,
 ) -> list[OnThisDayGroup]:
     """Was ist an diesem Kalendertag in früheren Jahren passiert?
 
@@ -166,11 +173,13 @@ def on_this_day(
     nebeneinander wären dieselbe Erinnerung doppelt.
     """
     today = date or datetime.now().date()
-    events = (db.query(Event).options(*_EAGER)
-              .filter(Event.user_id == user.id,
-                      Event.date_start.isnot(None),
-                      Event.date_precision.in_(_ON_THIS_DAY_PRECISIONS))
-              .all())
+    query = (db.query(Event).options(*_EAGER)
+             .filter(Event.user_id == user.id,
+                     Event.date_start.isnot(None),
+                     Event.date_precision.in_(_ON_THIS_DAY_PRECISIONS)))
+    if not include_imported:
+        query = query.filter(Event.source != Source.google_timeline)
+    events = query.all()
 
     by_year: dict[int, list[Event]] = {}
     for e in events:
@@ -198,10 +207,12 @@ def on_this_day(
         child_parents = {e.parent_event_id for e in chosen if e.parent_event_id}
         chosen = [e for e in chosen if e.id not in child_parents]
         chosen.sort(key=lambda e: (e.date_start, e.title or ""))
+        total = len(chosen)
         groups.append(OnThisDayGroup(
             years_ago=years_ago,
             date=today.replace(year=today.year - years_ago),
-            events=[event_to_read(e) for e in chosen],
+            events=[event_to_read(e) for e in chosen[:max_per_year]],
+            total=total,
         ))
     return groups
 

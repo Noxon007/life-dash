@@ -252,6 +252,15 @@ def list_uploads(db) -> list[tuple[str, str]]:
             for r in db.query(MediaRef).filter(MediaRef.provider == "local").all()]
 
 
+def list_uploads_for_user(db, user_id: str) -> list[tuple[str, str]]:
+    """Wie `list_uploads`, aber nur für einen Nutzer (A33)."""
+    from app.models import MediaRef
+
+    return [(r.user_id or user_id, r.external_id)
+            for r in db.query(MediaRef)
+            .filter(MediaRef.user_id == user_id, MediaRef.provider == "local").all()]
+
+
 def purge_files(files: list[tuple[str, str]]) -> int:
     """Löscht die eingesammelten Dateien und räumt leere Nutzerverzeichnisse ab.
 

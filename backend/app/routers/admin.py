@@ -310,10 +310,14 @@ def wipe_data() -> dict:
     # Reihenfolge beachtet die Fremdschlüssel (Kinder zuerst)
     order = ["metrics", "media_refs", "event_entity_links", "tracks", "events",
              "entities", "locations", "fragments"]
+    # A34: je Tabelle eine Zeile ins Log. Ein Rundumschlag über eine große
+    # Datenbank dauert; ohne Spur ist er von einem Hänger nicht zu unterscheiden.
+    log.warning("Alle Daten löschen: beginne (%d Bilddateien vorgemerkt)", len(doomed))
     with engine.begin() as conn:
         for table in order:
             result = conn.execute(text(f'DELETE FROM "{table}"'))
             deleted[table] = result.rowcount or 0
+            log.info("  %s: %d Zeilen gelöscht", table, deleted[table])
     files = media_svc.purge_files(doomed)
     log.warning("ALLE Lebensdaten gelöscht: %d Zeilen, %d Bilddateien (%s)",
                 sum(deleted.values()), files,

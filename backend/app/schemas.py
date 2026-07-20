@@ -202,6 +202,9 @@ class OnThisDayGroup(BaseModel):
     years_ago: int
     date: date_type
     events: list[EventRead]
+    # F16: wie viele es an dem Tag insgesamt waren — die Liste ist gedeckelt,
+    # und „3 von 12" ist ehrlicher als stillschweigend abzuschneiden
+    total: int = 0
 
 
 # --------------------------------------------------------------------------- #
