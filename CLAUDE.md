@@ -41,12 +41,16 @@ Entscheidungen/Anmerkungen in Kap. 15. Erst dort gezielt nachlesen statt Code ra
   etc. aus Config); `.env.example` ist die Setup-Referenz
 
 ## Stand
-Umgesetzt bis **v0.20.0** (2026-07-20). Gruppe A komplett. Von Gruppe B offen:
-**F10-Rest** (~70 Verwaltungs-Fließtexte + Doku-Übersetzung auf Englisch — der
-App-Mechanismus steht seit 0.20.0), **P3.1** (deklarative Statistik-Widgets),
-F8-Rest („Druck mit Fotos", wartet auf P2.1). Danach nur noch die großen
-Pakete: Import-Quellen (P2.1 Immich, P2.8 OwnTracks, P2.9 Automatisierung,
-P4.1 Health, P4.2 PSN) und P5.1/P5.2 (Offline-Capture, Whisper).
+Umgesetzt bis **v0.20.0** (2026-07-20). Gruppe A komplett, **F10 komplett**
+(App zweisprachig + Doku auf Englisch). Von Gruppe B offen: **P3.1**
+(deklarative Statistik-Widgets) und F8-Rest („Druck mit Fotos", wartet auf
+P2.1). Danach nur noch die großen Pakete: Import-Quellen (P2.1 Immich,
+P2.8 OwnTracks, P2.9 Automatisierung, P4.1 Health, P4.2 PSN) und
+P5.1/P5.2 (Offline-Capture, Whisper).
+
+**Doku ist ab 0.20.0 englisch** (README, backend/README, DEPLOY, KONZEPT,
+CHANGELOG). Diskussion/Input dürfen deutsch bleiben — übersetzt wird beim
+Schreiben. Diese Datei (CLAUDE.md) bleibt bewusst deutsch.
 
 ## Frontend-Übersetzung (F10)
 Deutsch steht im Quelltext und ist die Wahrheit; `I18N_EN` in `index.html`

@@ -1,642 +1,527 @@
 # Changelog
 
-Alle nennenswerten Änderungen an Life-Dash. Format nach
-[Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
-[Semantic Versioning](https://semver.org/lang/de/) (`MAJOR.MINOR.PATCH`).
+All notable changes to Life-Dash. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows
+[Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 
-Solange die Version bei `0.x` steht, gilt die App als in Entwicklung: neue
-Features erhöhen `MINOR`, Fehlerbehebungen `PATCH`; Breaking Changes können in
-jedem `MINOR` vorkommen.
+While the version stays at `0.x`, the app counts as in development: new
+features raise `MINOR`, bug fixes raise `PATCH`; breaking changes can occur in
+any `MINOR`.
+
+> This changelog is maintained in **English** from version 0.20.0 on. Earlier
+> entries were translated once at that point; entries before 0.12.0 were
+> additionally condensed, since they describe development history in internal
+> package codes (see note 39 in the concept document).
 
 ## [Unreleased]
 
-- **Zweisprachigkeit, zweiter Teil:** Rund 70 längere Erklärtexte im Reiter
-  Verwaltung stehen noch auf Deutsch, auch wenn die App auf Englisch steht.
-  Ebenso offen: die Umstellung der Dokumentation (README, Deployment-Anleitung,
-  Konzept, Changelog) auf Englisch.
-
 ## [0.20.0] – 2026-07-20
 
-### Hinzugefügt
-- **🇬🇧 Die App spricht Englisch:** Neuer Sprachumschalter oben rechts —
-  ein Klick wechselt zwischen Deutsch und Englisch, die Wahl gilt pro Gerät.
-  Beim allerersten Aufruf richtet sich die Sprache nach dem Browser.
-  Übersetzt sind Navigation, Zeitstrahl, Karte, Statistik, Welt, Erfolge,
-  Eingabe (KI und manuell), alle Dialoge, Meldungen und die Beschriftungen
-  der Verwaltungs-Reiter. Wo eine Übersetzung fehlt, erscheint weiterhin der
-  deutsche Text — es bleibt also nie ein Feld leer.
-- **Ortsnamen folgen der App-Sprache:** Bisher hat Life-Dash Adressen immer
-  auf Deutsch angefragt. Jetzt richtet sich die Auflösung nach deiner
-  Spracheinstellung: auf Englisch kommt „Corfu, Greece" statt „Korfu,
-  Griechenland", bei fremden Schriften entsprechend die englische Umschrift.
-  Die Einstellung wird im Konto gespeichert, damit auch der Ortsnamen-Lauf
-  im Hintergrund sie kennt.
+### Added
+- **🇬🇧 The app speaks English:** a new language switch in the top right —
+  one click toggles between German and English, and the choice is kept per
+  device. On the very first visit the language follows your browser.
+  Everything is translated: navigation, timeline, map, statistics, world,
+  achievements, capture (AI and manual), all dialogs, messages and the
+  explanatory texts in the settings area. Where a translation were ever to be
+  missing, the German text appears instead — so no field can end up blank.
+- **Place names follow the app language:** Life-Dash used to request
+  addresses in German always. Now lookups follow your language setting: in
+  English you get “Corfu, Greece” instead of “Korfu, Griechenland”, and for
+  foreign scripts the English transliteration accordingly. The setting is
+  stored on your account so the background place-name run knows it too.
 
-### Behoben
-- **Sprachwechsel blieb bei einem Fehler auf halber Strecke stehen:** Konnte
-  beim Umschalten ein Teil der Oberfläche nicht neu aufgebaut werden (etwa
-  weil das Backend gerade nicht antwortete), blieb der Rest in der alten
-  Sprache. Die Teile werden jetzt einzeln aufgebaut und stören sich nicht mehr.
+### Changed
+- **Documentation is now in English:** README, backend README, the deployment
+  guide, the concept document and this changelog were translated once and are
+  maintained in English from here on.
+
+### Fixed
+- **Switching language could stop halfway:** if part of the interface could not
+  be rebuilt while switching (for example because the backend did not answer),
+  the rest stayed in the old language. The parts are now rebuilt individually
+  and no longer block each other.
 
 ## [0.19.0] – 2026-07-20
 
-### Hinzugefügt
-- **🖨️ Drucken mit Zeitraum-Auswahl:** Der Drucken-Knopf im Zeitstrahl öffnet
-  jetzt einen Dialog: Zeitraum von/bis wählen (oder direkt **Alles**,
-  **Dieses Jahr**, **Letzte 12 Monate**), dazu Schalter für Beschreibungen,
-  Notizen und Tagebuch, importierte Standort-Besuche und unbestätigte
-  Vorschläge. Der Dialog zeigt vorab, wie viele Ereignisse er erfasst.
-  Gedruckt wird eine eigens aufgebaute Seite mit **allen** Ereignissen des
-  Zeitraums, nach Tagen gruppiert — eingeklappte Gruppen und „weitere
-  anzeigen" spielen keine Rolle mehr, was vorher die größte Einschränkung war.
+### Added
+- **🖨️ Printing with a date range:** the print button in the timeline now
+  opens a dialog: pick a range from/to (or go straight to **Everything**,
+  **This year**, **Last 12 months**), plus switches for descriptions, notes
+  and journal, imported location visits and unconfirmed proposals. The dialog
+  shows in advance how many events it covers. What gets printed is a dedicated
+  page containing **every** event in the range, grouped by day — collapsed
+  groups and “show more” no longer matter, which used to be the biggest
+  limitation.
 
-### Geändert
-- **Life-Dash lässt sich überall betreiben:** Die App war an mehreren Stellen
-  auf das Setup des Autors zugeschnitten — Anmeldedienst, KI-Anbieter und
-  Reverse Proxy waren in Beispielen, Vorgaben und Anleitungen fest verdrahtet.
-  Jetzt gilt durchgängig: Life-Dash spricht Standards (Anmeldung über OIDC,
-  KI über eine OpenAI-kompatible Schnittstelle, Ortsauflösung über Nominatim),
-  und welchen Anbieter du einsetzt, entscheidest allein du.
-  - `.env.example` ist die vollständige Setup-Referenz — **jede** Einstellung
-    steht dort, mit Beispielwerten für mehrere Anbieter statt einer Vorgabe.
-  - Ohne KI-Schlüssel startet die App im Modus „mock" (regelbasiert), statt
-    die Einrichtung mit einer Fehlermeldung abzubrechen.
-  - Die Nutzerverwaltung nennt den Namen deines Anmeldedienstes nur noch,
-    wenn du ihn konfiguriert hast — sonst steht dort ein neutraler Text.
-  - Anleitungen (README, Backend-README, Deployment) beschreiben das Vorgehen
-    allgemein und führen konkrete Produkte nur noch als Beispiele auf.
-- **Karte:** Die 2026 offengebliebene Ideensammlung „Karte allgemein
-  verbessern" ist abgeschlossen — Höhe und Vollbild sind seit 0.16.0 erledigt,
-  weitere Wünsche werden künftig einzeln aufgenommen.
+### Changed
+- **Life-Dash can be run anywhere:** the app was tailored to the author's own
+  setup in several places — the sign-in service, the AI vendor and the reverse
+  proxy were hardwired into examples, defaults and instructions. Now it holds
+  throughout: Life-Dash speaks standards (sign-in via OIDC, AI via an
+  OpenAI-compatible interface, place lookup via Nominatim), and which vendor
+  you use is entirely your decision.
+  - `.env.example` is the complete setup reference — **every** setting is
+    documented there, with example values for several vendors instead of one
+    default.
+  - Without an AI key the app starts in “mock” mode (rule-based) instead of
+    aborting the setup with an error.
+  - User management only names your sign-in service if you configured it —
+    otherwise a neutral text appears.
+  - The guides (README, backend README, deployment) describe the procedure
+    generally and list concrete products only as examples.
+- **Map:** the idea collection “improve the map generally”, left open in 2026,
+  is closed — height and fullscreen were done in 0.16.0, and further wishes
+  will be picked up individually.
 
-### Behoben
-- **Veraltete Beispiel-Konfiguration:** `backend/.env.example` beschrieb noch
-  Einstellungen, die es gar nicht mehr gibt (Ollama-Variablen aus einer frühen
-  Version), und ließ neuere weg. Die Datei ist jetzt auf die tatsächliche
-  Konfiguration abgeglichen; die zugehörigen toten Schalter sind entfernt.
-- Die Vorgabe-Version im Deployment zeigte noch auf 0.14.0 statt auf die
-  aktuelle Ausgabe.
+### Fixed
+- **Outdated example configuration:** `backend/.env.example` still described
+  settings that no longer exist (Ollama variables from an early version) and
+  left out newer ones. The file now matches the actual configuration; the
+  corresponding dead switches were removed.
+- The default version in the deployment still pointed at 0.14.0 instead of the
+  current release.
 
 ## [0.18.0] – 2026-07-20
 
-### Hinzugefügt
-- **🌍 Welt:** Ein neuer Reiter zeigt, wo du schon warst — eine **Weltkarte,
-  auf der besuchte Länder eingefärbt sind** (je kräftiger, desto mehr
-  Ereignisse; Klick aufs Land zeigt Anzahl, ersten und letzten Besuch) und
-  eine **Checkliste je Kontinent** („2 von 46 in Europa") mit den besuchten
-  Ländern. Ein Klick auf einen Kontinent klappt auf, was dir noch fehlt.
-  Oben stehen die Eckdaten: besuchte Länder, Kontinente, Anteil der Welt und
-  das zuletzt neu entdeckte Land. Gespeist wird das aus deinen Ländern im
-  Kompendium — die entstehen sowohl aus eigenen Einträgen als auch aus dem
-  Standort-Import. Verschiedene Schreibweisen desselben Landes („USA" und
-  „Vereinigte Staaten") zählen als eines; Namen, die zu keinem Land passen,
-  werden unter der Karte benannt, damit du sie korrigieren kannst.
-  Die Landesgrenzen liegen als Datei bei der App — es wird nichts nachgeladen.
-- **🏆 Erfolge:** Ein neuer Reiter mit Abzeichen in vier Stufen —
-  Bronze, Silber, Gold, Platin. Zum Start dabei: Weltenbummler,
-  Kontinent-Springer, Tier-Sammler, Beobachter, Konzertgänger,
-  Bühnen-Sammler, Feinschmecker, Vielreisender, Cineast, Leseratte,
-  Spieler und Lebenskapitel. Jedes Abzeichen zeigt den aktuellen Stand,
-  einen Fortschrittsbalken und wie viel noch bis zur nächsten Stufe fehlt;
-  oben stehen erreichte Erfolge, Punkte und was kurz bevorsteht.
-  Gezählt wird nur, was in deiner Lebensdatenbank bestätigt ist —
-  Vorschläge lösen keine Erfolge aus. Erfolge werden bei jedem Aufruf neu
-  berechnet und speichern selbst nichts; wer ein Thema nicht trackt,
-  bekommt dessen Abzeichen auch nicht angezeigt.
+### Added
+- **🌍 World:** a new tab shows where you have been — a **world map with
+  visited countries shaded** (the stronger the shade, the more events; clicking
+  a country shows the count and the first and last visit) and a **checklist per
+  continent** (“2 of 46 in Europe”) with the countries you visited. Clicking a
+  continent expands what you are still missing. At the top are the key figures:
+  countries visited, continents, share of the world and the most recently
+  discovered country. This is fed by your countries in the collection — which
+  come both from your own entries and from the location import. Different
+  spellings of the same country (“USA” and “United States”) count as one; names
+  that match no country are listed under the map so you can correct them.
+  The country borders ship with the app — nothing is loaded from elsewhere.
+- **🏆 Achievements:** a new tab with badges in four tiers — bronze, silver,
+  gold, platinum. Included at launch: globetrotter, continent hopper, animal
+  collector, observer, concert goer, stage collector, gourmet, frequent
+  traveller, cinephile, bookworm, gamer and life chapters. Every badge shows
+  the current value, a progress bar and how much is missing until the next
+  tier; at the top you see achievements earned, points and what is close.
+  Only what is confirmed in your life database counts — proposals trigger no
+  achievements. Achievements are recomputed on every visit and store nothing
+  themselves; if you do not track a topic, its badges are not shown.
 
 ## [0.17.0] – 2026-07-19
 
-### Hinzugefügt
-- **🖨️ Zeitstrahl drucken:** Neuer Knopf „Drucken" im Zeitstrahl — druckt
-  die aktuelle Ansicht (mit gewähltem Zoom, Filtern und Suche) in hellem,
-  druckfreundlichem Layout ohne Navigation; über den Browser-Druckdialog
-  auch als PDF sicherbar. Erste Ausbaustufe der Druckansicht: Zeitraum
-  wählst du über die normalen Filter, eingeklappte Gruppen vorher über
-  „weitere anzeigen" aufklappen.
+### Added
+- **🖨️ Print the timeline:** a new “print” button in the timeline — prints the
+  current view (with the chosen zoom, filters and search) in a light,
+  print-friendly layout without navigation; the browser print dialog can also
+  save it as a PDF. A first stage of the print view: you pick the range through
+  the normal filters, and collapsed groups need expanding via “show more”
+  beforehand.
 
 ## [0.16.0] – 2026-07-19
 
-### Geändert
-- **Karte nutzt den Bildschirm:** Statt fester 520 Pixel wächst die Karte
-  jetzt mit dem Fenster (die Stopp-Liste daneben auch), und ein neuer
-  Umschalter **„⛶ Vollbild"** zeigt sie bildschirmfüllend (Esc beendet).
-- **Ein Ortsnamen-Lauf statt drei Knöpfe:** „Ortsnamen auflösen",
-  „Adressen kürzen" und „Fremdschrift eindeutschen" waren serverseitig
-  schon derselbe Lauf — jetzt gibt es dafür einen Knopf mit Auswahl
-  (Fehlende Namen / Lange Adressen / Fremdschrift). Die Format-Bausteine
-  (Straße/Ortsteil/Stadt/Land) stehen direkt darunter.
-- **„Meine Daten" ist aufgeräumt:** Der Reiter gliedert sich jetzt in
-  klare Blöcke — **Sichern & Zurückspielen**, **Importe**, **Ortsnamen**
-  und **Tracking** — statt einer langen gewachsenen Liste.
-- **Login-Screen ist jetzt allgemeingültig:** Der Anmelde-Text nannte
-  hart „Pocket ID" — jetzt steht dort ein neutraler SSO-Hinweis; wer mag,
-  trägt den Namen seines Anmelde-Dienstes über `OIDC_PROVIDER_NAME` in
-  der `.env` ein.
+### Changed
+- **The map uses the screen:** instead of a fixed 520 pixels the map now grows
+  with the window (as does the stop list beside it), and a new **“⛶ fullscreen”**
+  toggle shows it filling the screen (Esc exits).
+- **One place-name run instead of three buttons:** “resolve place names”,
+  “shorten addresses” and “transliterate foreign scripts” were already the same
+  run on the server — now there is one button with a selection (missing names /
+  long addresses / foreign scripts). The format building blocks
+  (street/district/city/country) sit directly underneath.
+- **“My data” is tidied up:** the tab is now divided into clear blocks —
+  **backup & restore**, **imports**, **place names** and **tracking** — instead
+  of one long grown list.
+- **The login screen is now generic:** the sign-in text named a specific
+  product; now a neutral SSO hint appears there. If you like, enter the name of
+  your sign-in service via `OIDC_PROVIDER_NAME` in the `.env`.
 
 ## [0.15.2] – 2026-07-19
 
-### Behoben
-- **Ortsnamen-Auflösung geht besser mit der Nominatim-Drossel um:** Meldet
-  der Geocoding-Dienst „429 Too many requests", wartet Life-Dash jetzt die
-  angeforderte Zeit ab und versucht es einmal erneut, statt im Sekundentakt
-  gegen die Sperre weiterzufeuern; der Abstand zwischen Anfragen ist leicht
-  erhöht (1,2 s), damit die Sperre gar nicht erst greift.
+### Fixed
+- **Place-name resolution copes better with the Nominatim rate limit:** when
+  the geocoding service reports “429 Too many requests”, Life-Dash now waits
+  the requested time and tries once more, instead of firing against the block
+  every second; the gap between requests is slightly larger (1.2 s) so the
+  block does not kick in at all.
 
-### Hinzugefügt
-- **Optionaler schnellerer Geocoding-Dienst:** In der `.env` lässt sich ein
-  Nominatim-kompatibler Dienst mit API-Key eintragen (z. B. LocationIQ,
-  kostenlos 5.000 Anfragen/Tag statt ~1/Sekunde) — `GEOCODER_BASE_URL` +
-  `GEOCODER_API_KEY`, sonst ändert sich nichts. Ohne Eintrag bleibt alles
-  beim öffentlichen OpenStreetMap-Nominatim.
+### Added
+- **Optional faster geocoding service:** the `.env` can name a
+  Nominatim-compatible service with an API key (e.g. LocationIQ, free for 5,000
+  requests a day instead of ~1 per second) — `GEOCODER_BASE_URL` +
+  `GEOCODER_API_KEY`, nothing else changes. Without an entry everything stays
+  on the public OpenStreetMap Nominatim.
 
 ## [0.15.1] – 2026-07-19
 
-### Behoben
-- **Ältere Einträge bekommen jetzt auch die neuen Wetterwerte:** „Wetter
-  ergänzen" übersprang bisher jedes Ereignis, das schon irgendein Wetter
-  hatte — Einträge aus der Zeit vor 0.14.0 blieben deshalb dauerhaft ohne
-  Höchst-/Tiefsttemperatur, Sonnenstunden, Regen, Schnee und Wind. Der
-  Lauf rüstet die fehlenden Tageswerte jetzt **additiv** nach: Vorhandene
-  Werte (alte Temperatur, Wetterlage) bleiben unverändert stehen, es
-  kommen nur die fehlenden dazu. Einfach einmal „🌤️ Wetter ergänzen"
-  starten (oder den Nachtplan machen lassen).
-- **Wetter-Lauf stoppt sauber statt endlos zu probieren:** Kam der Lauf
-  nicht voran (z. B. Open-Meteo nicht erreichbar oder Datum ohne
-  Archivdaten), fragte er dieselben Ereignisse in Dauerschleife ab. Jetzt
-  endet er mit dem Hinweis, wie viele Ereignisse nicht anreicherbar waren.
+### Fixed
+- **Older entries now get the new weather values too:** “add weather” used to
+  skip every event that already had any weather — entries from before 0.14.0
+  therefore stayed permanently without max/min temperature, sunshine hours,
+  rain, snow and wind. The run now fills in the missing daily values
+  **additively**: existing values (old temperature, condition) stay untouched
+  and only the missing ones are added. Just start “🌤️ add weather” once (or let
+  the nightly schedule do it).
+- **The weather run stops cleanly instead of trying forever:** when the run
+  made no progress (e.g. Open-Meteo unreachable or a date without archive
+  data), it queried the same events in an endless loop. It now ends with a note
+  on how many events could not be enriched.
 
 ## [0.15.0] – 2026-07-19
 
-### Hinzugefügt
-- **📖 Reisetagebuch:** Im Zeitstrahl gibt es jetzt „Tagebuch schreiben" —
-  ein formatierter Eintrag pro Tag (Markdown: **fett**, Überschriften,
-  Listen, Zitate, Links), mit Vorschau im Schreibfenster. Der Eintrag
-  erscheint als Tageskopf über den Ereignissen des Tages; existiert für
-  den gewählten Tag schon einer, wird er zum Weiterschreiben geladen.
-  Die KI fasst Tagebuchtexte grundsätzlich nie an. Auch der Kommentar an
-  normalen Ereignissen kann jetzt länger sein und wird als Markdown
-  formatiert angezeigt (sicher gerendert, ohne fremde Bibliotheken).
-- **📅 Mehrtägige Ereignisse mit Tages-Einträgen:** Ein Urlaub bleibt EIN
-  Ereignis, bekommt aber im Bearbeiten-Dialog den Knopf „Tages-Einträge
-  anlegen": je Tag der Spanne entsteht ein eigenes Ereignis
-  („Mallorca — Tag 3"), das Ort und Bestätigung erbt und **eigenes Wetter
-  pro Tag** bekommt. Im Zeitstrahl bleiben die Tage eingeklappt unterm
-  Haupt-Ereignis (Chip „📅 N Tages-Einträge" klappt auf; der Tages-Zoom
-  zeigt sie einzeln). Der Knopf ist gefahrlos mehrfach nutzbar — er füllt
-  nur fehlende Tage auf. Beim Löschen des Haupt-Ereignisses fragt
-  Life-Dash, ob die Tages-Einträge mitgehen oder als eigenständige
-  Ereignisse bleiben.
-- **☀️ Heller Modus:** Neben dem dunklen gibt es jetzt ein helles
-  Erscheinungsbild. Der Knopf oben rechts wechselt zwischen **Auto**
-  (folgt der Systemeinstellung, auch live z. B. bei Sonnenuntergang),
-  **Hell** und **Dunkel**; die Wahl wird pro Gerät gespeichert. Die
-  Karten wechseln ihren Kartenstil mit.
+### Added
+- **📖 Travel journal:** the timeline now has “write journal” — one formatted
+  entry per day (Markdown: **bold**, headings, lists, quotes, links), with a
+  preview in the editor. The entry appears as a day header above that day's
+  events; if one already exists for the chosen day, it is loaded so you can
+  continue writing. The AI never touches journal text. Comments on normal
+  events can now be longer too and are displayed formatted as Markdown
+  (rendered safely, without third-party libraries).
+- **📅 Multi-day events with day entries:** a holiday stays ONE event but gets
+  a “create day entries” button in the edit dialog: one event per day of the
+  span (“Mallorca — day 3”), inheriting place and confirmation and getting
+  **its own weather per day**. In the timeline the days stay collapsed under
+  the main event (the chip “📅 N day entries” expands them; the day zoom shows
+  them individually). The button is safe to use repeatedly — it only fills in
+  missing days. When you delete the main event, Life-Dash asks whether the day
+  entries go with it or remain as standalone events.
+- **☀️ Light mode:** besides the dark one there is now a light appearance. The
+  button in the top right switches between **auto** (following the system
+  setting, live — e.g. at sunset), **light** and **dark**; the choice is stored
+  per device. The maps change their tile style along with it.
 
 ## [0.14.0] – 2026-07-19
 
-### Hinzugefügt
-- **📍 Standort beim Erfassen:** Beim Quick-Capture und in der manuellen
-  Eingabe gibt es jetzt einen Standort-Knopf — nie automatisch, nur auf
-  Klick. Bei der KI-Analyse wird der Gerätestandort zum Ortsvorschlag,
-  wenn der Text selbst keinen Ort nennt (Text hat immer Vorrang); die
-  Roh-Koordinaten wandern mit in den Roh-Eingang, damit eine spätere
-  Neuberechnung sie kennt. Im manuellen Formular füllt der Knopf das
-  Ortsfeld mit der aktuellen Adresse (überschreibbar). Braucht die
-  Standort-Freigabe des Browsers (HTTPS).
-- **Länder-Kompendium füllt sich aus Importen:** Beim Auflösen von
-  Ortsnamen wird das Land jetzt mitgenommen, am Ort gespeichert und als
-  Länder-Eintrag mit allen Besuchen dort verknüpft — rückwirkend über
-  „Ortsnamen auflösen"/„Adressen kürzen". Damit stimmt „In wie vielen
-  Ländern war ich?" endlich auch für importierte Bewegungsdaten.
+### Added
+- **📍 Location while capturing:** quick capture and manual entry now have a
+  location button — never automatic, only on click. In AI analysis your device
+  location becomes a place suggestion when the text itself names no place (the
+  text always wins); the raw coordinates travel into the raw inbox so a later
+  recomputation knows them. In the manual form the button fills the place field
+  with the current address (overwritable). Requires the browser's location
+  permission (HTTPS).
+- **The country collection fills up from imports:** when resolving place names
+  the country is now taken along, stored with the place and linked as a country
+  entry with all visits there — retroactively via “resolve place names” /
+  “shorten addresses”. That finally makes “how many countries have I been to?”
+  correct for imported movement data too.
 
-### Geändert
-- **Volleres, ehrlicheres Wetter:** Gespeichert werden jetzt die reinen
-  **Tageswerte**: Höchst- und Tiefsttemperatur getrennt, **Sonnenstunden**,
-  **Regen (mm)**, **Schnee (cm)**, **maximaler Wind (km/h)** und die
-  Tages-Wetterlage. In Event-Karten und Karten-Popups erscheint alles als
-  eine kompakte Zeile („12–17,4 °C · Nieselregen · ☀️ 9,1 h · 🌧️ 5,1 mm";
-  Wind nur, wenn nennenswert). Bereits geholtes Wetter bleibt unverändert —
-  Fakten werden nie überschrieben.
-- **Statistik mit Wetter-Extremen:** Neben „Heißester/Kältester Tag" (die
-  jetzt echte Tages-Höchst-/Tiefstwerte nutzen) gibt es neue Kacheln
-  **Sonnigster**, **Nassester**, **Windigster** und **Schneereichster Tag**
-  — Klick öffnet wie gewohnt das jeweilige Ereignis.
+### Changed
+- **Fuller, more honest weather:** the pure **daily values** are now stored:
+  max and min temperature separately, **sunshine hours**, **rain (mm)**,
+  **snow (cm)**, **maximum wind (km/h)** and the daily condition. In event
+  cards and map popups everything appears as one compact line (“12–17.4 °C ·
+  drizzle · ☀️ 9.1 h · 🌧️ 5.1 mm”; wind only when notable). Weather already
+  fetched stays unchanged — facts are never overwritten.
+- **Statistics with weather extremes:** besides “hottest/coldest day” (which
+  now use real daily max/min) there are new tiles for **sunniest**, **wettest**,
+  **windiest** and **snowiest day** — clicking opens the respective event as
+  usual.
 
-### Behoben
-- **„Was möchtest du tracken?"-Fenster ließ sich nicht schließen:** Der
-  Dialog verwendete eine falsche CSS-Klasse und blieb dauerhaft sichtbar.
+### Fixed
+- **The “what would you like to track?” window could not be closed:** the
+  dialog used a wrong CSS class and stayed permanently visible.
 
 ## [0.13.0] – 2026-07-19
 
-### Hinzugefügt
-- **Du bestimmst, was getrackt wird:** Beim ersten Start fragt Life-Dash,
-  welche Bereiche dich interessieren (Reisen, Tiere, Länder, Künstler,
-  Essen, Meilensteine, Filme, Spiele, Bücher) — jederzeit änderbar unter
-  Verwaltung → Meine Daten. Abgewählte Bereiche verschwinden aus
-  Kompendium, Filtern, Formularen, Statistik **und** aus dem KI-Prompt
-  (die KI schlägt sie nicht mehr vor); vorhandene Daten bleiben erhalten
-  und tauchen nach dem Wieder-Anwählen sofort wieder auf.
-- **Läufe laufen jetzt im Hintergrund auf dem Server:** Wetter ergänzen,
-  KI-Vorschläge neu berechnen, Embeddings und alle Ortsnamen-Läufe laufen
-  weiter, wenn du die Seite schließt. Im Jobs-Reiter gibt es dafür einen
-  **Stopp-Knopf** pro laufendem Job und eine Live-Aktualisierung. Neu:
-  **Nachtplan** — ausgewählte Läufe starten automatisch einmal täglich zur
-  eingestellten Stunde (pro Lauf ein-/ausschaltbar). Datei-Importe bleiben
-  browser-gebunden (die Datei liegt dort).
-- **Drei neue Sammel-Bereiche: Filme, Spiele, Bücher** — die KI erkennt
-  entsprechende Titel und legt Kompendium-Einträge an.
+### Added
+- **You decide what is tracked:** on first start Life-Dash asks which areas
+  interest you (trips, animals, countries, artists, food, milestones, films,
+  games, books) — changeable at any time under Settings → My data. Deselected
+  areas disappear from the collection, filters, forms, statistics **and** the
+  AI prompt (the AI stops proposing them); existing data is kept and reappears
+  immediately once you select them again.
+- **Runs now happen in the background on the server:** adding weather,
+  recomputing AI proposals, embeddings and all place-name runs continue when
+  you close the page. The jobs tab has a **stop button** per running job and a
+  live refresh. New: a **nightly schedule** — selected runs start automatically
+  once a day at the configured hour (switchable per run). File imports stay
+  tied to the browser (the file lives there).
+- **Three new collection areas: films, games, books** — the AI recognises such
+  titles and creates collection entries.
 
-### Geändert
-- **Module sind jetzt vollständig deklarativ:** Farben, Emojis,
-  Kategorie-Namen, Kompendium-Reiter, Formular-Optionen und die
-  KI-Erkennungsregeln kommen aus den Modul-Definitionsdateien — ein neuer
-  Bereich ist damit eine einzige YAML-Datei, ohne Code-Änderung (die drei
-  neuen Bereiche sind genau so entstanden).
+### Changed
+- **Modules are now fully declarative:** colours, emoji, category names,
+  collection tabs, form options and the AI recognition rules come from the
+  module definition files — a new area is therefore a single YAML file with no
+  code change (the three new areas were created exactly that way).
 
 ## [0.12.0] – 2026-07-19
 
-> Ab dieser Version sind Changelog-Einträge in Produktsprache geschrieben —
-> ohne interne Paketkürzel (die leben nur noch im Konzept).
-> Die Version 0.11.0 wurde übersprungen.
+> From this version on, changelog entries are written in product language —
+> without internal package codes (those live only in the concept).
+> Version 0.11.0 was skipped.
 
-### Behoben
-- **Karte auf dem Smartphone war unsichtbar:** Ein CSS-Fehler ließ die
-  Kartenfläche im mobilen Layout auf Höhe 0 zusammenfallen (die kleine
-  Kompendium-Karte war nicht betroffen). Die Karte hat mobil jetzt eine
-  feste Höhe von 55 % des Bildschirms.
-- **Suche ohne Rückmeldung:** Scheiterte die Server-Suche (z. B. weil der
-  KI-Dienst für die Bedeutungssuche nicht erreichbar war), sprang die App
-  zum Zeitstrahl, filterte aber still gar nichts. Jetzt greift in dem Fall
-  eine einfache Textsuche über Titel/Beschreibung/Ort als Ersatz, und ein
-  Hinweis erklärt die Einschränkung.
-- **„Gesuchte Adresse" verschwindet:** Dieses Google-Label beschreibt nur,
-  wie der Aufenthalt erkannt wurde, und hat keinen eigenen Wert. Neue
-  Importe legen solche Besuche als unbenannte Orte an (bekommen beim
-  Auflösen die reine Adresse); vorhandene „Gesuchte Adresse — …"-Namen und
-  Besuchs-Titel werden beim App-Start automatisch bereinigt, nackte
-  „Gesuchte Adresse"-Orte löst „Ortsnamen auflösen" in echte Adressen auf.
+### Fixed
+- **The map was invisible on a phone:** a CSS bug collapsed the map area to
+  height 0 in the mobile layout (the small collection map was not affected).
+  On mobile the map now has a fixed height of 55 % of the screen.
+- **Search without feedback:** when the server search failed (e.g. because the
+  AI service for meaning-based search was unreachable), the app jumped to the
+  timeline but silently filtered nothing. In that case a simple text search
+  over title/description/place now steps in, and a note explains the
+  limitation.
+- **“Searched address” disappears:** this Google label only describes how the
+  stay was detected and carries no value of its own. New imports create such
+  visits as unnamed places (which get the plain address when resolved);
+  existing “searched address — …” names and visit titles are cleaned up
+  automatically at app start, and bare “searched address” places are resolved
+  into real addresses by “resolve place names”.
 
-### Hinzugefügt
-- **Export mit Auswahl:** Beim Daten-Export lässt sich per Häkchen der
-  komplette Google-Timeline-Anteil weglassen (importierte Besuche, Routen
-  und deren Roh-Belege) — für ein handliches Backup der handgepflegten
-  Einträge ohne zehntausende Import-Zeilen.
+### Added
+- **Export with a selection:** when exporting data, a checkbox can leave out
+  the entire Google Timeline part (imported visits, routes and their raw
+  records) — for a handy backup of hand-curated entries without tens of
+  thousands of import rows.
 
-### Sonstiges
-- **Lizenz:** Life-Dash ist seit diesem Release offiziell freie Software
-  unter **AGPL-3.0-or-later** (LICENSE-Datei + README-Abschnitt; vorher
-  keine Lizenz = „alle Rechte vorbehalten").
+### Changed
+- **Understandable language instead of jargon:** the interface no longer talks
+  about “stage 1/2/3” — instead: **raw inbox** (your unchanged texts),
+  **proposals** (AI drafts to confirm), **life database** (confirmed entries
+  including facts such as weather) and **views** (everything computed). This
+  affects statistics tiles, capture hints, admin actions and the database view;
+  the button “recompute stage 2” is now called “recompute AI proposals”.
 
-### Geändert
-- **Verständliche Sprache statt Fachjargon:** Die Oberfläche spricht nicht
-  mehr von „Stufe 1/2/3" — stattdessen: **Roh-Eingang** (deine
-  unveränderten Texte), **Vorschläge** (KI-Entwürfe zum Bestätigen),
-  **Lebensdatenbank** (bestätigte Einträge samt Fakten wie Wetter) und
-  **Ansichten** (alles Berechnete). Betrifft u. a. Statistik-Kacheln,
-  Eingabe-Hinweise, Admin-Aktionen und die Datenbank-Ansicht; der Knopf
-  „Stufe 2 neu berechnen" heißt jetzt „KI-Vorschläge neu berechnen".
+### Other
+- **License:** as of this release Life-Dash is officially free software under
+  **AGPL-3.0-or-later** (LICENSE file + README section; before that, no license
+  meant “all rights reserved”).
 
 ## [0.10.1] – 2026-07-16
 
-## [0.10.1] – 2026-07-16
-
-### Geändert
-- **Karten-Clustering weniger aggressiv:** Cluster-Radius von 45 auf 30 px
-  gesenkt — nahe Punkte bündeln sich erst, wenn sie sich wirklich drängen;
-  Mini-Bubbles („3") über halbe Kontinente werden deutlich seltener.
-  Dazu erklärt der Tooltip an „Cluster ab N Punkten" jetzt die Semantik:
-  Die Schwelle schaltet zwischen Einzelmarker/Route und Cluster-Modus um;
-  innerhalb des Cluster-Modus bündelt die Karte zoomabhängig (Klick/Zoom
-  teilt Bubbles auf).
-- **Konzept:** Lizenz-Vorschlag ergänzt (Kap. 15, Anmerkung 31) — Empfehlung
-  **AGPL-3.0** (Repo hat bisher keine LICENSE = „alle Rechte vorbehalten").
+### Changed
+- **Map clustering less aggressive:** the cluster radius was lowered from 45 to
+  30 px — nearby points only bundle when they really crowd each other, and mini
+  bubbles (“3”) spanning half a continent became far rarer. The tooltip on
+  “cluster from N points” now explains the semantics: the threshold switches
+  between individual markers/route and cluster mode; within cluster mode the
+  map bundles depending on zoom (click/zoom splits bubbles).
+- **Concept:** a license proposal was added (ch. 15, note 31) — recommending
+  **AGPL-3.0** (the repo had no LICENSE = “all rights reserved”).
 
 ## [0.10.0] – 2026-07-16
 
-### Hinzugefügt
-- **A14 — Verwaltung mit Reitern statt Scroll-Seite:** Die frühere
-  „Admin & Moderation"-Seite heißt jetzt **„Verwaltung"** und ist in Reiter
-  gegliedert: **📋 Moderation** (Queue, Bulk-Bestätigen, unscharfe Zeiten),
-  **📦 Meine Daten** (Export/Import, Ortsnamen-Aktionen, Anzeige-Format),
-  **⏱️ Jobs** — für alle Nutzer; **⚙️ System** (Drei-Schichten-Erklärung,
-  Neuberechnung/Wetter/Embeddings, Daten-Wipe), **👥 Nutzer**,
-  **🗄️ Datenbank** und **📜 Logs** nur für Admins. Jeder Reiter lädt seine
-  Daten beim Öffnen.
-- **A17 — Log-Ansicht in der UI:** Neuer Admin-Reiter „Logs" zeigt die
-  letzten App-Log-Zeilen (Ring-Puffer im Speicher, max. 500 seit
-  Prozessstart) mit Mindest-Level-Filter (DEBUG–ERROR) und Aktualisieren-
-  Knopf (`GET /api/admin/logs`). Kein Datei-Zugriff, nichts wird
-  persistiert — `docker logs` bleibt die vollständige Quelle.
+### Added
+- **A14 — settings with tabs instead of a scrolling page:** the former “admin &
+  moderation” page is now called **“Settings”** and is divided into tabs:
+  **📋 moderation** (queue, bulk confirm, vague dates), **📦 my data**
+  (export/import, place-name actions, display format), **⏱️ jobs** — for all
+  users; **⚙️ system** (the layer explanation, recomputation/weather/embeddings,
+  data wipe), **👥 users**, **🗄️ database** and **📜 logs** for admins only.
+  Every tab loads its data when opened.
+- **A17 — log view in the UI:** a new admin tab “logs” shows the most recent
+  app log lines (an in-memory ring buffer, max. 500 since process start) with a
+  minimum level filter (DEBUG–ERROR) and a refresh button
+  (`GET /api/admin/logs`). No file access, nothing is persisted —
+  `docker logs` remains the complete source.
 
 ## [0.9.0] – 2026-07-16
 
-### Hinzugefügt
-- **A11 — Jobs mit Sperre + Job-Ansicht:** Lang laufende Aktionen (Wetter,
-  Stufe-2-Neuberechnung, Embeddings, Ortsnamen-Läufe, Timeline-/JSON-Import)
-  sind jetzt als **Jobs** registriert (`/api/jobs`): Typ, Status, Fortschritt,
-  gestartet von/wann, Ergebnis. **Ein Lock pro Job-Typ** — startet eine zweite
-  Instanz denselben Typ (zweiter Browser, zweiter Nutzer), kommt „läuft
-  bereits (gestartet von …)" statt eines Doppel-Laufs mit doppelten
-  API-Kosten. Verwaiste Läufe (Browser zu) blockieren nach 3 Minuten ohne
-  Heartbeat nicht mehr. Neue **Jobs-Tabelle** im Admin-Bereich zeigt laufende
-  und letzte Läufe (alle Nutzer sehen sie — der Lock ist global).
-  Dazu **DB-seitiger Wetter-Dubletten-Schutz**: partieller Unique-Index
-  (`event_id`+`key` für `source=weather`) inkl. einmaliger Bereinigung
-  vorhandener Doppel-Metriken; die Anreicherung committet pro Event und
-  übergeht Kollisionen paralleler Läufe sauber.
-- **A4 — DB-Rohansicht mit Leitplanken:** Rohes Bearbeiten validiert jetzt
-  gegen das Modell (Enums nur mit gültigen Werten, JSON muss parsen, Zeiten/
-  Zahlen typgeprüft, Pflichtspalten nicht leerbar) — 400 mit klarer Meldung
-  statt stiller Datenkorruption. **Folge-Neuberechnungen** laufen automatisch
-  und werden im Toast angezeigt: Titel/Beschreibung geändert → Embedding
-  zurückgesetzt; Zeit/Ort geändert → Wetter folgt den neuen Fakten (P2.4-
-  Pfad). **Lösch-Leitplanken:** Fragmente (Beweisarchiv) und Nutzer (→
-  Nutzerverwaltung) sind in der Rohansicht gesperrt; Event-Löschung räumt
-  Metriken/Medien/Verknüpfungen mit ab, Entity-Löschung ihre Links,
-  Orts-Löschung hängt betroffene Events sauber ab (statt verwaister Verweise).
-- **A18 — Karten-Clustering erst ab Schwelle (einstellbar):** Neues Feld
-  „Cluster ab N Punkten" auf der Karte (Standard 50). Darunter Einzelmarker
-  bzw. die nummerierte Route, darüber Bündelung. Pro Nutzer gespeichert
-  (`map_cluster_min` in den Einstellungen), begrenzt auf **10–300** — die
-  Obergrenze schützt die Performance (mehr Einzelmarker frieren den Browser
-  nach großen Importen ein).
+### Added
+- **A11 — jobs with a lock plus a job view:** long-running actions (weather,
+  stage-2 recomputation, embeddings, place-name runs, timeline/JSON import) are
+  now registered as **jobs** (`/api/jobs`): type, status, progress, started
+  by/when, result. **One lock per job type** — if a second instance starts the
+  same type (a second browser, a second user), it gets “already running
+  (started by …)” instead of a double run with double API costs. Orphaned runs
+  (browser closed) stop blocking after 3 minutes without a heartbeat. A new
+  **jobs table** in the admin area shows running and recent runs (all users see
+  it — the lock is global). Plus **DB-side duplicate protection for weather**: a
+  partial unique index (`event_id`+`key` for `source=weather`) including a
+  one-off cleanup of existing duplicate metrics; enrichment commits per event
+  and skips collisions from parallel runs cleanly.
+- **A4 — raw DB view with guard rails:** raw editing now validates against the
+  model (enums only with valid values, JSON must parse, times/numbers are type
+  checked, required columns cannot be emptied) — a 400 with a clear message
+  instead of silent data corruption. **Follow-up recomputations** run
+  automatically and are shown in the toast: title/description changed →
+  embedding reset; time/place changed → weather follows the new facts.
+  **Deletion guard rails:** fragments (the evidence archive) and users (→ user
+  management) are locked in the raw view; deleting an event also clears
+  metrics/media/links, deleting an entity clears its links, and deleting a place
+  detaches affected events cleanly (instead of leaving orphaned references).
+- **A18 — map clustering only above a threshold (configurable):** a new field
+  “cluster from N points” on the map (default 50). Below it, individual markers
+  or the numbered route; above it, bundling. Stored per user
+  (`map_cluster_min` in the settings), limited to **10–300** — the upper bound
+  protects performance (more individual markers freeze the browser after large
+  imports).
 
-### Behoben
-- **A16 — Monats-Präzision fehlte bei den unscharfen Zeiten:** „Juni Urlaub
-  Dänemark" (korrekt als `month` gespeichert) tauchte nicht in der
-  Unscharfe-Zeiten-Liste auf — sie filterte nur Jahreszeit/Jahr/Jahrzehnt/
-  ohne Datum. `month` zählt jetzt mit.
-- **API-Fehlermeldungen im UI:** Das Frontend zeigt jetzt die Backend-
-  Begründung (`detail`) statt nacktem Statuscode — wichtig für Validierungs-
-  fehler (A4) und „Job läuft bereits" (A11).
+### Fixed
+- **A16 — month precision was missing from the vague dates:** “June holiday
+  Denmark” (correctly stored as `month`) did not appear in the vague-date list —
+  it filtered only season/year/decade/no date. `month` now counts.
+- **API error messages in the UI:** the frontend now shows the backend reason
+  (`detail`) instead of a bare status code — important for validation errors
+  (A4) and “job already running” (A11).
 
 ### Tests
-- Neue Offline-Tests für A4 (Enum-/JSON-/Zeit-Validierung, Embedding-Reset,
-  Wetter-Nachzug, Lösch-Leitplanken und Aufräumen), A11 (Job-Lock, Stale-
-  Aufräumung, Wetter-Unique-Index) und A18 (Schwellen-Klemmung 10–300).
+- New offline tests for A4 (enum/JSON/time validation, embedding reset, weather
+  follow-up, deletion guard rails and cleanup), A11 (job lock, stale cleanup,
+  weather unique index) and A18 (threshold clamping 10–300).
 
 ## [0.8.0] – 2026-07-16
 
-### Hinzugefügt
-- **A5 (Rest) — Besuchs-Verdichtung:** Wiederholte Besuche desselben Orts
-  werden gebündelt statt einzeln gelistet. **Karte:** ab Monats-Ansicht ein
-  Marker + eine Listenzeile je Ort („59× Zuhause — …", mit Zeitspanne),
-  Alltagsorte fallen damit automatisch zusammen; abschaltbar über den neuen
-  Chip **„🔁 Orte bündeln"**. In Tag/Woche bleibt die nummerierte Route.
-  **Timeline:** gleiche Google-Besuche einer Zeitgruppe erscheinen als eine
-  Sammelkarte („🔁 59× Besuch: X"), die per Klick zu Einzelkarten aufklappt —
-  vorher füllten Alltagsorte die 25-Karten-Kappe der Gruppen komplett.
-- **A12 — Timeline-Import: semantische Orte → echte Adressen:** Orte, die der
-  Geräte-Export nur als Label kennt („Zuhause", „Arbeit", „Gesuchte
-  Adresse" …), werden jetzt mit reverse-geocodet — das Label bleibt als
-  Präfix erhalten („Zuhause — Musterstraße 1, Detmold"); Ort-Typ (z. B.
-  `home`) und getrennte `place_id`s (mehrere Wohnorte im Lebenslauf) bleiben
-  unverändert. Gilt beim Import (Auto-Auflösung kleiner Mengen) und
-  rückwirkend über „Ortsnamen auflösen". Dazu ein optionaler Import-Filter
-  **Mindest-Ortssicherheit** (`min_probability`): Besuche mit unsicherer
-  Ortszuordnung (häufig bei „Gesuchte Adresse") lassen sich beim Import
-  überspringen; der Ergebnis-Toast weist sie aus.
-- **Kompakte Ortsnamen (konfigurierbar):** Aufgelöste Adressen werden nicht
-  mehr als volle Nominatim-Kette gespeichert („…, Gemeinde Korfu-Mitte und
-  Inseln, Regionalbezirk Korfu, …, 491 00, Griechenland"), sondern aus
-  strukturierten Bausteinen zusammengesetzt: **Straße · Ortsteil · Stadt ·
-  Land** — per Checkboxen im Admin-Bereich pro Nutzer wählbar
-  (`GET/PATCH /api/auth/me/settings`, Whitelist). Benannte Orte (Restaurant,
-  Museum, Bahnhof …) behalten ihren Eigennamen immer vorn. Gilt für
-  Timeline-Auflösung **und** Vorwärts-Geocoding (KI-Pipeline, manuelle
-  Eingabe, Bearbeiten-Dialog). Neue Aktion **„📐 Adressen kürzen"**
-  formatiert bestehende lange Adressen nach (`resolve-names?scope=verbose`,
-  Batch-Lauf mit Stopp-Knopf); Besuchs-Events werden mit umbenannt, manuell
-  umbenannte bleiben unangetastet. Besuchs-Titel tragen jetzt das volle
-  Kurzformat (vorher nur das erste Adress-Segment ohne Stadt).
-- **A6 — Nutzerverwaltungs-UI:** Neuer Admin-Bereich „Nutzer": Liste aller
-  Konten (Name, E-Mail, Rolle, Datenumfang, dabei seit), Rolle per Auswahl
-  ändern, Nutzer **mitsamt all ihren Daten** löschen (mit Sicherheitsabfrage).
-  Leitplanken: das eigene Konto kann weder gelöscht noch herabgestuft werden,
-  der letzte Admin bleibt immer erhalten
+### Added
+- **A5 (remainder) — visit condensation:** repeated visits to the same place
+  are bundled instead of listed individually. **Map:** from month view up, one
+  marker and one list row per place (“59× home — …”, with a time span), so
+  everyday places collapse automatically; switchable via the new chip
+  **“🔁 merge places”**. In day/week the numbered route remains.
+  **Timeline:** identical Google visits within a time group appear as one
+  collective card (“🔁 59× visit: X”) that expands into individual cards on
+  click — previously everyday places filled the 25-card cap of the groups
+  entirely.
+- **A12 — timeline import: semantic places → real addresses:** places the
+  device export knows only as a label (“home”, “work”, “searched address” …)
+  are now reverse geocoded — the label stays as a prefix (“home — Example
+  Street 1, Detmold”); the place type (e.g. `home`) and separate `place_id`s
+  (several homes over a lifetime) stay unchanged. This applies during import
+  (auto-resolution of small amounts) and retroactively via “resolve place
+  names”. Plus an optional import filter for **minimum location certainty**
+  (`min_probability`): visits with an uncertain place assignment can be skipped
+  during import; the result toast reports them.
+- **Compact place names (configurable):** resolved addresses are no longer
+  stored as the full Nominatim chain but assembled from structured building
+  blocks: **street · district · city · country** — selectable per user via
+  checkboxes in the admin area (`GET/PATCH /api/auth/me/settings`, a
+  whitelist). Named places (restaurant, museum, station …) always keep their
+  proper name in front. This applies to timeline resolution **and** forward
+  geocoding (AI pipeline, manual entry, edit dialog). A new action
+  **“📐 shorten addresses”** reformats existing long addresses
+  (`resolve-names?scope=verbose`, a batch run with a stop button); visit events
+  are renamed along with them, manually renamed ones stay untouched.
+- **A6 — user management UI:** a new admin area “users”: a list of all accounts
+  (name, email, role, data volume, member since), change the role via a
+  dropdown, delete a user **together with all their data** (with a
+  confirmation). Guard rails: your own account can neither be deleted nor
+  demoted, and the last admin always remains
   (`GET/PATCH/DELETE /api/admin/users`).
 
-### Behoben
-- **Import-Auto-Auflösung benannte frische Besuchs-Events nicht um:** Beim
-  direkten Reverse-Geocoding kleiner Ortsmengen im Import wurden die gerade
-  angelegten Events nicht gefunden (Session ohne Autoflush) — ihre Titel
-  blieben „Besuch: Ort (lat, lng)", obwohl der Ort aufgelöst war.
+### Fixed
+- **Import auto-resolution did not rename fresh visit events:** during direct
+  reverse geocoding of small place sets in the import, the just-created events
+  were not found (a session without autoflush) — their titles stayed
+  “visit: place (lat, lng)” even though the place had been resolved.
 
 ### Tests
-- Neue Offline-Tests für A12 (Label-Präfix, Idempotenz, `field_overrides`-
-  Schutz, `min_probability`), A6 (Letzter-Admin-Guard, Löschen inkl.
-  Datenzeilen, Selbstlösch-Sperre) und das Ortsnamen-Format (`short_name`-
-  Bausteine, POI-Eigenname, Nutzer-Einstellung, `scope=verbose`,
-  Settings-Whitelist) in `backend/tests/`.
+- New offline tests for A12 (label prefix, idempotency, `field_overrides`
+  protection, `min_probability`), A6 (last-admin guard, deletion including data
+  rows, self-deletion block) and the place-name format (`short_name` building
+  blocks, POI proper name, user setting, `scope=verbose`, settings whitelist).
 
 ## [0.7.0] – 2026-07-16
 
-### Hinzugefügt
-- **A9 — Logging & Beobachtbarkeit:** Zentrale Logging-Konfiguration
-  (`lifedash.*`-Logger, einheitliches Format mit Zeitstempel), steuerbar über
-  `LOG_LEVEL` (.env / Compose). Geloggt werden jetzt u. a. App-Start (Version,
-  Auth-/KI-/DB-Modus), Export/Import mit Zeilenzahlen, Admin-Aktionen
-  (Neuberechnung, Wetter-/Embedding-Batches, Rohansicht-Änderungen,
-  Daten-Wipe), Geocoding-/Open-Meteo-Fehler und die Ortsnamen-Auflösung.
-  Docker Compose bekommt Log-Rotation (`max-size: 10m`, `max-file: 5`).
-- **A10 — Ortsnamen konsequent auf Deutsch/Latein:** Nominatim wird mit
-  Sprach-Fallback `de,en` angefragt; liefert OSM keinen deutschen Namen,
-  kommt die englische/lateinische Umschrift statt Lokalschrift (z. B.
-  Griechisch). Zusätzlich bevorzugt `namedetails` den besten lateinischen
-  Namen. Neue Admin-Aktion **„Fremdschrift-Namen eindeutschen"** löst
-  bestehende Orte mit nicht-lateinischer Schrift erneut auf
-  (`resolve-names?scope=nonlatin`); Besuchs-Events werden mit umbenannt,
-  manuell umbenannte Einträge bleiben unangetastet.
-- **A13 — Uhrzeiten anzeigen & bearbeiten:** Events mit `date_precision =
-  exact` zeigen jetzt Datum **und Uhrzeit** („12.07.2026, 14:30–16:05") —
-  damit werden importierte Timeline-Besuche als Tagesablauf lesbar. Der
-  Bearbeiten-Dialog bekommt optionale Uhrzeit-Felder und die Präzision
-  „Tag + Uhrzeit"; eine eingegebene Uhrzeit hebt die Präzision automatisch
-  auf `exact`. Uhrzeiten bleiben lokale Wanduhrzeit („wie erlebt", keine
-  UTC-Umrechnung).
-- **A5 (Karten-Teil) — Marker-Clustering statt 300er-Deckel:** Die Karte
-  zeigt jetzt **alle** Punkte eines Zeitraums. Bis 300 Stopps bleibt die
-  nummerierte Tagesroute; darüber werden die Marker gebündelt
-  (Leaflet.markercluster) statt abgeschnitten. Die Stopp-Liste bleibt als
-  DOM-Schutz gedeckelt und sagt das dazu.
-- **A8 — Export-Rückmeldung:** Der Daten-Export meldet Erfolg per Toast
-  (Anzahl Events/Fragmente/Objekte/Orte/Routen/Metriken, Dateigröße,
-  Dateiname) bzw. Fehler als Fehler-Toast; der Button ist während des
-  Exports deaktiviert.
+### Added
+- **A9 — logging & observability:** a central logging configuration
+  (`lifedash.*` loggers, a uniform format with timestamps), controlled via
+  `LOG_LEVEL` (.env / Compose). Now logged: app start (version, auth/AI/DB
+  mode), export/import with row counts, admin actions (recomputation,
+  weather/embedding batches, raw-view changes, data wipe), geocoding/Open-Meteo
+  errors and place-name resolution.
+- **A10 — place names consistently in Latin script:** Nominatim is queried with
+  a language chain plus `namedetails`, so names in local scripts (e.g. Greek)
+  arrive transliterated. A new admin action resolves existing foreign-script
+  names retroactively (`scope=nonlatin`).
+- **A13 — show & edit times:** events with `date_precision = exact` now display
+  their time (“12/07/2026, 14:30–16:05”), and the edit dialog has time fields.
+- **A5 (map part) — marker clustering instead of a 300 cap:** the map now draws
+  all points of a range and bundles nearby ones into clusters, instead of
+  cutting off after 300 markers.
+- **A8 — export feedback:** the data export reports success via a toast with
+  content, size and filename — and reports failures too.
 
-### Behoben
-- **Stiller Präzisions-Downgrade beim Bearbeiten:** Der Bearbeiten-Dialog
-  stufte `exact`-Events beim Speichern unbemerkt auf `day` herab (die
-  Uhrzeit ging verloren). Jetzt bleibt `exact` erhalten und ist wählbar.
+### Fixed
+- **Silent precision downgrade while editing:** the edit dialog reset
+  `exact` to `day` when saving, so times were lost.
 
 ## [0.6.0] – 2026-07-16
 
-### Hinzugefügt
-- **A1 — Saubere UI-Dialoge statt Browser-Popups:** Alle nativen
-  `alert()`/`confirm()`/`prompt()`-Dialoge (~20 Stellen: Export, Import,
-  Batch-Läufe, Löschen …) ersetzt durch **Toasts** im App-Stil (Erfolg /
-  Warnung / Fehler, Klick schließt) und ein **Bestätigungs-Modal** — inkl.
-  Tipp-Bestätigung („LÖSCHEN") beim Daten-Wipe. Auf Mobil erscheinen Toasts
-  über der Bottom-Navigation.
-- **A2 — Fortschrittsbalken bei großen Importen:** Google-Timeline-Import
-  und JSON-Restore laufen bei großen Dateien in Etappen mit echtem
-  Fortschritt („12.000 / 48.500 Segmente") statt unbestimmtem Spinner —
-  gefahrlos, weil beide Importe idempotent sind. Beim Etappen-Import wird
-  das automatische Reverse-Geocoding übersprungen (neuer Query-Param
-  `auto_resolve=false`); Chunk-Grenzen halten zusammengehörige
-  Geräte-Export-Segmente (Route + Aktivität) beieinander.
-- **A3 — Versionsnummer im UI:** Die Sidebar zeigt unten links die laufende
-  Version (z. B. „Life-Dash v0.6.0"). Eine Quelle der Wahrheit:
-  `backend/app/version.py` speist UI, `/health` und die OpenAPI-Doku
-  (dort stand bis jetzt fälschlich 0.2.0).
+### Added
+- **A1 — proper UI dialogs instead of browser popups:** all native
+  `alert()`/`confirm()`/`prompt()` calls (~20 places) were replaced by toasts
+  and a confirmation modal in the app's own style — including a typed
+  confirmation for the data wipe.
+- **A2 — progress bars for large imports:** the Google Timeline import and the
+  JSON import run in stages with a visible progress bar; the import is
+  idempotent, so an interrupted run can simply be repeated.
+- **A3 — version number in the UI:** the sidebar shows the running version at
+  the bottom left; it also appears in `/health` and in the OpenAPI document.
+  The single source of truth is `backend/app/version.py`.
 
 ## [0.5.0] – 2026-07-16
 
-### Hinzugefügt
-- **P2.5 — Bulk-Bestätigen:** Die Moderations-Queue kann viele korrekte
-  KI-Vorschläge auf einmal übernehmen — Filter nach Kategorie, Quelle,
-  Mindest-Confidence und Zeitraum, immer zweistufig: erst **Vorschau** der
-  betroffenen Events, dann Bestätigen. Neue Endpoints
-  `POST /api/moderation/bulk-confirm/preview` und `…/bulk-confirm`.
-- **P2.6 — Invarianten-Test „Bestätigtes ist unantastbar":** Automatische
-  Tests (`backend/tests/`, pytest) fahren alle Recompute-/Enrichment-/
-  Import-Pfade gegen die Invariante aus KONZEPT Kap. 3.1: Neuberechnung
-  verschont bestätigte Fragmente samt Geschwister-Events, Wetter ist additiv
-  und idempotent, Bulk-Bestätigen kippt nur den Status, Re-Import erzeugt
-  keine Duplikate und fasst Bestätigtes nicht an, die Ortsnamen-Auflösung
-  respektiert manuell umbenannte Titel, Embedding-Neuberechnung ändert nur
-  das Embedding.
-- **P2.7 — Bestätigungs-Provenienz:** Jedes Event speichert jetzt, **wann**
-  und **wodurch** es bestätigt wurde (`confirmed_at`, `confirmed_by`:
-  manuell / Sammel-Bestätigung / Import) — sichtbar im Bearbeiten-Dialog.
-  Bestandsdaten werden migriert (Import-Besuche → „Import", Rest → „manuell",
-  Zeitpunkt = letzte Änderung); erneutes Bestätigen/Bearbeiten überschreibt
-  die ursprüngliche Provenienz nicht.
-- **P2.4 — Auto-Enrichment nach der Eingabe:** Neue Events (KI-Analyse und
-  manuelle Eingabe) bekommen ihr Wetter sofort beim Anlegen statt erst über
-  den Admin-Knopf (best effort — schlägt der Abruf fehl, trägt der Admin-Lauf
-  später nach); Embeddings entstehen weiterhin direkt beim Anlegen. Korrigiert
-  der Nutzer Zeit oder Ort eines Events, wird dessen Wetter passend zu den
-  neuen Fakten neu geholt (nutzergestartete Korrektur — keine
-  Maschinen-Änderung an Bestätigtem).
-- **P2.2 — Google-Timeline-Import:** Upload des Timeline-Exports (Geräte-Export
-  `semanticSegments` und altes Takeout-Format `timelineObjects`) unter
-  Admin → „Meine Daten". Besuche werden zu bestätigten Events
-  (source `google_timeline`), Bewegungen zu `Track`-Zeilen (Stufe 3, Punkte
-  unvereinfacht). Re-Import ist idempotent (Segment-Hash als `external_id`).
-  Neue Endpoints: `POST /api/import/timeline`, `GET /api/tracks?start=&end=`.
-- **Routen als Karten-Layer:** Timeline-Routen erscheinen auf der Karte als
-  farbige Linien nach Aktivität (zu Fuß/Rad/Auto/Transit), zuschaltbar über
-  den Chip „🛰️ Timeline-Routen", gefiltert auf den angezeigten Zeitraum.
-- **Vier-Schichten-Modell präzisiert** (KONZEPT Kap. 3.1): Eingang →
-  Vorschlagsraum → **Lebensdatenbank (fix)** → Ableitungen. Harte Invariante:
-  Maschinen ändern Bestätigtes nie, nur additiv ergänzen. Konsequenz:
-  **Wetter ist Fakten-Anreicherung** — der Knopf „Stufe 3 neu berechnen"
-  (der Wetter verwarf und neu holte) ist entfernt; Wetter wird nur noch
-  ergänzt, wo es fehlt. Embeddings bleiben als Ableitung neu berechenbar.
-- **Stopp-Knopf & Anfragen-Ticker für alle Admin-Läufe:** Stufe-2-Neuberechnung,
-  Stufe 3, Wetter, Embeddings und Ortsnamen laufen jetzt in Etappen — der
-  Aktions-Knopf zeigt live die verbrauchten Anfragen („⏹ Stoppen — 120
-  KI-Anfragen · noch ~340") und stoppt auf Klick nach dem laufenden Batch.
-  Fortschritt bleibt erhalten, derselbe Knopf setzt fort. Die Stufe-2-Neuberechnung
-  fasst Import-Fragmente (Timeline) nicht mehr an — KI-Extraktion über
-  Import-Zusammenfassungen hätte Unsinn erzeugt.
-- **Ortsnamen für importierte Besuche:** Der Geräte-Export enthält keine
-  Ortsnamen — neuer Button „📍 Ortsnamen auflösen" (Admin → Meine Daten) holt
-  Adressen per Reverse-Geocoding (Nominatim, 1 Anfrage/s, etappenweise
-  fortsetzbar) und benennt Orte samt Besuchs-Events um; manuell geänderte
-  Titel bleiben geschützt. Kleine Folge-Importe (≤ 30 neue Orte) lösen Namen
-  direkt beim Import auf.
-- **P2.3 — Unscharfe-Zeiten-Review:** Admin-Bereich listet alle Events mit
-  grober Zeitangabe (Jahreszeit/Jahr/Jahrzehnt/ohne Datum); Klick öffnet die
-  Schnellbearbeitung.
-- **Statistik ist klickbar** (wie im Kompendium): Kacheln führen zu
-  Kompendium/Timeline (kategorie-gefiltert)/Karte/Moderation, der heißeste/
-  kälteste Tag öffnet das Event, Chart-Balken (Kategorien, Tiere) springen zu
-  Timeline-Filter bzw. Kompendium-Detailseite.
+### Added
+- **P2.5 — bulk confirm:** the moderation queue can move many correct AI
+  proposals into the life database at once — filtered by category, source,
+  confidence and time range, with a mandatory preview before confirming.
+- **P2.6 — invariant test “confirmed data is untouchable”:** automated offline
+  tests ensure that recomputation never changes confirmed events.
+- **P2.7 — confirmation provenance:** every event now stores **when** and
+  **how** it was confirmed (manual/bulk/import), visible in the edit dialog;
+  existing data was migrated.
+- **P2.4 — auto enrichment after capture:** new events (AI analysis and manual
+  entry) get their weather immediately; correcting time or place afterwards
+  makes the weather follow.
+- **P2.2 — Google Timeline import:** upload of the timeline export (device
+  export and older Takeout formats), visits become events, routes become
+  tracks. Idempotent — repeated imports create no duplicates.
+- **Routes as a map layer:** timeline routes appear on the map as lines.
+- **The four-layer model was refined** (concept ch. 3.1): inbox → proposal
+  space → life database → derived.
+- **A stop button and a request ticker for all admin runs:** stage-2
+  recomputation, weather and embeddings can be stopped mid-run.
+- **Place names for imported visits:** the device export contains no place
+  names, so a resolution run fetches real addresses.
+- **P2.3 — vague-date review:** the admin area lists all events with an
+  imprecise date so they can be sharpened.
+- **Statistics are clickable** (as in the collection): tiles lead to the
+  matching events.
 
-### Geändert
-- **PostgreSQL ist jetzt der Compose-Standard** (kein `--profile postgres`
-  mehr): `docker compose up -d` startet App + DB, `POSTGRES_PASSWORD` in
-  `.env` genügt. Version: **`postgres:18-alpine`** (Support bis Nov. 2030,
-  Async-I/O). Achtung Image-Eigenheit ab 18: Der Daten-Mount zeigt auf
-  `/var/lib/postgresql` (nicht mehr `…/data`) — Upgrade von einer
-  bestehenden 16er-DB via JSON-Export (docs/DEPLOY.md Kap. 6).
-- **Daten liegen als Ordner neben der Compose-Datei** (Bind-Mounts statt
-  Docker-Volumes): `./db` = PostgreSQL-Datenverzeichnis, `./data` =
-  App-Daten (SQLite beim Minimal-Setup). Backup = Ordner sichern oder
-  `pg_dump`; bestehende Volume-Installationen ziehen per JSON-Export um. **Migration von SQLite:** JSON-Export ziehen, `DATABASE_URL`
-  aus `.env` entfernen, `up -d`, Export importieren (docs/DEPLOY.md Kap. 6).
-  SQLite bleibt via `DATABASE_URL`-Override + `up -d --no-deps app` möglich.
-- **Performance für importierte Massendaten** (>10k Timeline-Events):
-  - `/api/events` lädt Verknüpfungen jetzt eager (Sammel-Queries statt
-    N+1-Lazy-Loading): 11,7k Events in 0,7 s statt 4,4 s.
-  - Timeline, Karte, Statistik und Unscharfe-Zeiten teilen sich **einen**
-    Events-Abruf (vorher 4 × mehrere MB).
-  - Timeline rendert pro Zeitgruppe zunächst 25 Karten („▼ weitere anzeigen"),
-    statt 10k+ DOM-Knoten auf einmal.
-  - Importierte Google-Besuche sind im Zeitstrahl standardmäßig ausgeblendet
-    (Toggle „🛰️ Besuche") — auf der Karte bleiben sie immer sichtbar.
-  - Karte deckelt Marker/Stopp-Liste bei 300 pro Zeitraum; Timeline-Routen
-    werden nur bis Monats-Zoom gezeichnet; `/api/tracks` hat ein Server-Limit
-    (Default 1000, max. 5000).
-- Datenexport/-import und „Alle Daten löschen" erfassen jetzt auch Tracks;
-  Schema-Migration ergänzt `events.external_id` in Bestands-DBs automatisch.
+### Changed
+- **PostgreSQL is now the Compose default** (no `--profile postgres` needed).
+- **Data lives in folders next to the Compose file** (bind mounts instead of
+  Docker volumes) — simpler to back up.
+- **Performance for large imported data sets** (>10k timeline events).
 
 ## [0.4.0] – 2026-07-15
 
-### Hinzugefügt
-- **Verknüpfte Objekte im Bearbeiten-Dialog editierbar** (z. B. „Seeadler" →
-  „Adler" korrigieren, Objekte ergänzen/entfernen). `PATCH /api/moderation/{id}`
-  akzeptiert dazu ein `entities`-Feld, das die Verknüpfungen vollständig
-  ersetzt; verwaiste Entities werden aufgeräumt, die Änderung ist als Override
-  vor KI-Neuberechnungen geschützt.
+### Added
+- **Linked items editable in the edit dialog** (e.g. “sea eagle” → “eagle”),
+  so duplicates can be resolved by hand.
 
 ## [0.3.2] – 2026-07-15
 
-### Behoben
-- **Karte wurde auf Mobilgeräten nicht angezeigt.** Leaflet vermisst sich jetzt
-  mehrfach neu (`invalidateSize` nach Einblenden) und reagiert auf
-  Drehen/Resize — Mobil meldete direkt nach dem Einblenden oft Höhe 0.
-- **Eingabe-Symbol in der Mobil-Navigation** hatte einen blauen runden
-  FAB-Hintergrund; entfernt, das Icon sieht jetzt aus wie die übrigen Tabs.
+### Fixed
+- **The map was not displayed on mobile devices.** Leaflet now measures itself
+  again after the view is shown.
+- **The capture icon in the mobile navigation** had a stray blue circular
+  background.
 
-### Hinzugefügt
-- **Sichtbarer Lade-Overlay während der KI-Analyse** (Spinner + Text). Auf Mobil
-  war die einzige Rückmeldung bisher der Button-Text, der oft außerhalb des
-  Sichtfelds lag.
+### Added
+- **A visible loading overlay during AI analysis** (spinner plus text).
 
 ## [0.3.1] – 2026-07-15
 
-### Behoben
-- **OIDC-Login scheiterte hinter dem Reverse Proxy mit HTTP 403.** Die
-  Server-zu-Server-Aufrufe an Pocket ID (Discovery, JWKS, Token-Tausch) senden
-  jetzt einen expliziten `User-Agent`; der Default `Python-urllib/…` wurde von
-  Bot-Filtern (Traefik/Pangolin, CrowdSec) geblockt.
+### Fixed
+- **OIDC login failed behind the reverse proxy with HTTP 403.** Server-to-server
+  calls to the OIDC provider now send their own user agent, because some proxies
+  and bot filters block urllib's default.
 
 ## [0.3.0] – 2026-07-15
 
-### Geändert
-- **Versionierung auf SemVer umgestellt** (`vMAJOR.MINOR.PATCH`) + dieses
-  CHANGELOG eingeführt. Der Release-Workflow erzeugt aus einem Git-Tag `vX.Y.Z`
-  automatisch die Image-Tags `X.Y.Z`, `X.Y` und `latest`.
-- KI-Stack aufgeräumt: **Gemini API als Standardweg**, Defaults auf
-  `gemini-3.5-flash` / `gemini-embedding-2` gesetzt.
-- **Ollama-Service aus dem Compose-Stack entfernt** (lokales Ollama bleibt als
-  Alternative dokumentiert, ist aber nicht Teil des ausgelieferten Stacks).
+### Changed
+- **Versioning switched to SemVer** (`vMAJOR.MINOR.PATCH`) plus this changelog.
+- **The Ollama service was removed from the Compose stack** (a local Ollama
+  remains possible as an external endpoint).
 
 ## [0.2.0] – 2026-07-15
 
-### Behoben
-- **Multi-Arch-Image** (`linux/amd64` + `linux/arm64`); v0.1 war amd64-only und
-  auf dem Raspberry Pi 5 (ARM64) nicht lauffähig.
+### Fixed
+- **Multi-arch image** (`linux/amd64` + `linux/arm64`); v0.1 was amd64-only and
+  would not start on ARM64 boards.
 
 ## [0.1.0] – 2026-07-15
 
-### Hinzugefügt
-- Erstveröffentlichung (P0 + P1): FastAPI-Backend, responsive PWA-Frontend,
-  OIDC-Multi-User (Pocket ID), Homelab-Deployment via Docker Compose und
-  GHCR-Release-Workflow.
-
-<!-- Die Tags v0.1/v0.2 (zweistellig) stammen aus der Zeit vor der
-     SemVer-Umstellung; ab v0.3.0 gilt durchgehend MAJOR.MINOR.PATCH. -->
+### Added
+- First release: the three-stage foundation (fragment → event/entity → views),
+  AI extraction with a preview, timeline, map, statistics, collection, search,
+  OIDC login with multi-user separation, Docker deployment.

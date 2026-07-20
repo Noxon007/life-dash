@@ -1,282 +1,265 @@
-﻿# Life-Dash — Konzept & MVP
+# Life-Dash — concept & MVP
 
-> **Status:** In Betrieb — P0 & P1 fertig, D1 live im Homelab, P2.2–P2.7 umgesetzt (siehe Kap. 14)
-> **Dokumenttyp:** Architektur- & Produktkonzept
-> **Zielumgebung:** Self-hosted / Homelab (Docker-basiert)
-> **Letzte Aktualisierung:** 2026-07-16
+> **Status:** In operation — P0 & P1 done, D1 live on the server, P2.2–P2.7 implemented (see ch. 14)
+> **Document type:** architecture & product concept
+> **Target environment:** self-hosted (Docker-based)
+> **Last updated:** 2026-07-20
 
 ---
 
 ## 1. Vision
 
-**Life-Dash ist eine durchsuchbare, auswertbare und visuell erlebbare Datenbank über das eigene Leben.**
+**Life-Dash is a searchable, analysable and visually explorable database about your own life.**
 
-Das Ziel ist es, verstreute Lebensdaten (Erinnerungen, Orte, Fotos, Fitnessdaten, Ereignisse) in einer zentralen, strukturierten Datenbank zusammenzuführen und über verschiedene Ansichten erfahrbar zu machen: einen Zeitstrahl, eine Karte, Statistiken und ein Kompendium.
+The goal is to bring scattered life data (memories, places, photos, fitness data, events) together into one central, structured database and make it tangible through several views: a timeline, a map, statistics and a collection.
 
-Der entscheidende Unterschied zu klassischen Journaling-Apps: **Die Dateneingabe erfolgt niedrigschwellig über Freitext oder Sprache. Eine KI strukturiert, verortet, datiert und verknüpft die Fragmente automatisch.**
+The decisive difference to classic journaling apps: **capture is low-friction, via free text or voice. An AI structures, locates, dates and links the fragments automatically.**
 
-### Leitprinzipien
+### Guiding principles
 
-| Prinzip | Bedeutung |
+| Principle | Meaning |
 |---|---|
-| **Capture first, structure later** | Eingabe muss reibungslos sein. Struktur entsteht durch KI, nicht durch Formularzwang. |
-| **Drei-Stufen-Modell** | Roh-Input (Stufe 1) → moderierte Struktur (Stufe 2) → berechnete Ansichten (Stufe 3). Jede Stufe leitet sich reproduzierbar aus der vorherigen ab. |
-| **Rohdaten sind die Wahrheit** | Alles bezieht sich immer auf den unveränderten Roh-Input. Struktur & Ansichten sind jederzeit neu berechenbar (z. B. mit besseren Modellen). |
-| **Alles konfigurierbar** | Ein Admin-Panel erlaubt das Anpassen von Modulen, Prompts, Modellen, Enrichment-Quellen und Ansichten — ohne Code-Änderung. |
-| **Modular erweiterbar** | Neue trackbare Kategorien (z. B. „Konzerte", „Bücher", „Krankheiten") ohne Code-Umbau. |
-| **Self-hosted & Datenhoheit** | Alle Daten bleiben im Homelab. Externe KI nur optional/austauschbar. |
-| **Bestätigt vs. unbestätigt** | Bevorzugt werden konkrete Zeitangaben. KI-Ableitungen sind als „unbestätigt" markiert, bis der Nutzer sie moderiert. |
-| **Ein Datenmodell, viele Ansichten** | Timeline, Karte, Statistik, Kompendium sind nur berechnete Projektionen (Stufe 3) derselben Daten. |
-| **Mobile first** | Erfassung passiert unterwegs. Das UI ist eine responsive PWA; Quick-Capture, Timeline und Karte sind für das Smartphone genauso ausgelegt wie für den Desktop. |
-| **Multi-User von Anfang an** | Jede Zeile in Stufe 1–3 gehört einem Nutzer (`user_id`). Login via **OIDC** (SSO im Homelab). Nachrüsten von Auth ist teuer — daher ab P0 im Datenmodell verankert. |
+| **Capture first, structure later** | Entering data must be frictionless. Structure comes from the AI, not from mandatory forms. |
+| **Three-stage model** | Raw input (stage 1) → moderated structure (stage 2) → computed views (stage 3). Every stage is derived reproducibly from the previous one. |
+| **Raw data is the truth** | Everything always refers back to the unchanged raw input. Structure and views can be recomputed at any time (e.g. with better models). |
+| **Everything configurable** | An admin panel allows adjusting modules, prompts, models, enrichment sources and views — without code changes. |
+| **Modular and extensible** | New trackable categories (e.g. “concerts”, “books”, “illnesses”) without rebuilding code. |
+| **Self-hosted & data sovereignty** | All data stays on your own machine. External AI only optionally and interchangeably. |
+| **Confirmed vs. unconfirmed** | Concrete dates are preferred. AI-derived values are marked “unconfirmed” until the user moderates them. |
+| **One data model, many views** | Timeline, map, statistics and collection are only computed projections (stage 3) of the same data. |
+| **Mobile first** | Capture happens on the go. The UI is a responsive PWA; quick capture, timeline and map are built for a phone just as much as for a desktop. |
+| **Multi-user from the start** | Every row in stages 1–3 belongs to a user (`user_id`). Sign-in via **OIDC** (SSO). Retrofitting auth is expensive — so it is anchored in the data model from P0 on. |
 
 ---
 
-## 2. Glossar & Kernkonzepte
+## 2. Glossary & core concepts
 
-| Begriff | Definition |
+| Term | Definition |
 |---|---|
-| **Event (Ereignis)** | Zentrale Entität. Etwas, das zu einem Zeitpunkt/-raum an einem Ort passiert ist. „Urlaub in Frankreich", „Adler in Detmold gesehen". |
-| **Entity (Kompendium-Objekt)** | Ein wiederkehrendes „Ding" im Leben: ein Tier, ein Film, ein Land, ein Spiel. Events referenzieren Entities. |
-| **Fragment** | Rohe, unstrukturierte Eingabe (Text/Sprache/API), bevor die KI sie verarbeitet hat. **Stufe 1 — die unveränderliche Quelle der Wahrheit.** |
-| **Trackable / Modul** | Ein registrierter Typ, den man tracken kann (z. B. `movie`, `animal`, `trip`). Definiert Schema, Icons, Statistiken. |
-| **Fuzzy Date** | Zeitangabe mit Präzisionsstufe (`exact`, `day`, `month`, `season`, `year`, `decade`) + Zeitspanne. Bevorzugt werden konkrete Zeiten; Unschärfe ist der Ausnahmefall. |
-| **Confirmed-Status** | Kennzeichnet, ob ein strukturierter Wert vom Nutzer moderiert/bestätigt wurde (`confirmed`) oder KI-Ableitung ist (`unconfirmed`). |
-| **Source (Quelle)** | Herkunft eines Datensatzes: `manual`, `ai`, `immich`, `google_timeline`, `health_connect`, `psn`, `weather`, `api`. |
-| **Track (Routenverlauf)** | Ein aufgezeichneter Bewegungspfad (LineString) aus Google Timeline oder Fitness-Workouts. Stufe-3-Daten, auf der Karte als Linien-Layer dargestellt. |
-| **User** | Ein angemeldeter Nutzer (OIDC-Identität). Alle Fragmente, Events, Entities und Anreicherungen sind nutzergebunden. |
-| **Enrichment** | Automatische Anreicherung eines Events mit Fotos, Fitnessdaten, Wetter etc. anhand von Zeit & Ort — auch **nachträglich** (Re-Enrichment). |
-| **Admin-Panel** | Zentrale Konfigurationsoberfläche: Module, KI-Prompts/Modelle, Enrichment-Quellen, Ansichts-Regeln, Neuberechnung. |
+| **Event** | The central entity. Something that happened at a point or span of time in a place. “Holiday in France”, “saw an eagle in Detmold”. |
+| **Entity (collection item)** | A recurring “thing” in your life: an animal, a film, a country, a game. Events reference entities. |
+| **Fragment** | Raw, unstructured input (text/voice/API) before the AI has processed it. **Stage 1 — the immutable source of truth.** |
+| **Trackable / module** | A registered type you can track (e.g. `movie`, `animal`, `trip`). Defines schema, icons, statistics. |
+| **Fuzzy date** | A date with a precision level (`exact`, `day`, `month`, `season`, `year`, `decade`) plus a time span. Concrete times are preferred; vagueness is the exception. |
+| **Confirmed status** | Marks whether a structured value has been moderated/confirmed by the user (`confirmed`) or is AI-derived (`unconfirmed`). |
+| **Source** | Where a record came from: `manual`, `ai`, `immich`, `google_timeline`, `health_connect`, `psn`, `weather`, `api`. |
+| **Track (route)** | A recorded movement path (LineString) from Google Timeline or fitness workouts. Stage-3 data, drawn on the map as a line layer. |
+| **User** | A signed-in user (OIDC identity). All fragments, events, entities and enrichments are user-scoped. |
+| **Enrichment** | Automatic augmentation of an event with photos, fitness data, weather etc. based on time and place — also **retroactively** (re-enrichment). |
+| **Admin panel** | The central configuration surface: modules, AI prompts/models, enrichment sources, view rules, recomputation. |
 
 ---
 
-## 3. Drei-Stufen-Architektur (Kernprinzip)
+## 3. Three-stage architecture (core principle)
 
-Das gesamte System ist als **Pipeline aus drei klar getrennten Stufen** aufgebaut. Jede Stufe leitet sich **reproduzierbar** aus der vorherigen ab. Nichts „Berechnetes" ist je die Quelle der Wahrheit — es kann jederzeit verworfen und neu erzeugt werden (z. B. mit einem besseren KI-Modell).
+The whole system is built as a **pipeline of three clearly separated stages**. Every stage is derived **reproducibly** from the previous one. Nothing “computed” is ever the source of truth — it can be discarded and regenerated at any time (e.g. with a better AI model).
 
 ```mermaid
 flowchart LR
-    S1["Stufe 1\nRoh-Input\n(Fragmente: Text/Sprache/API/Import)"]
-    S2["Stufe 2\nStrukturierte Daten\n(KI-erzeugt, vom Nutzer moderiert)"]
-    S3["Stufe 3\nAnsichten & Auswertungen\n(berechnet, jederzeit neu)"]
-    S1 -- "KI-Extraktion" --> S2
-    S2 -- "Moderation / Bestätigung" --> S2
-    S2 -- "Berechnung / Aggregation" --> S3
-    S1 -. "Referenz bleibt erhalten" .-> S3
+    S1["Stage 1\nRaw input\n(fragments: text/voice/API/import)"]
+    S2["Stage 2\nStructured data\n(AI-generated, moderated by the user)"]
+    S3["Stage 3\nViews & analyses\n(computed, rebuildable at any time)"]
+    S1 -- "AI extraction" --> S2
+    S2 -- "moderation / confirmation" --> S2
+    S2 -- "computation / aggregation" --> S3
+    S1 -. "reference is kept" .-> S3
 ```
 
-### Stufe 1 — Roh-Input (unveränderlich)
-- Jede Eingabe wird **verlustfrei und unverändert** als `Fragment` gespeichert (Originaltext, Audio, importierte Rohdaten).
-- Wird **nie überschrieben**. Alle späteren Stufen behalten eine Rückreferenz auf ihr Ursprungs-Fragment.
-- Konsequenz: Man kann das gesamte System jederzeit „von Null" aus den Rohdaten neu aufbauen.
+### Stage 1 — raw input (immutable)
+- Every input is stored **losslessly and unchanged** as a `Fragment` (original text, audio, imported raw data).
+- It is **never overwritten**. All later stages keep a back-reference to their originating fragment.
+- Consequence: the entire system can be rebuilt “from zero” out of the raw data at any time.
 
-### Stufe 2 — Strukturierte Datenbank (moderiert)
-- Die KI erzeugt aus Stufe 1 strukturierte `Event`- und `Entity`-Einträge (Datum, Ort, Kategorie, verknüpfte Objekte).
-- Jeder abgeleitete Wert trägt einen **`confirmed`-Status**: `unconfirmed` (KI-Vorschlag) oder `confirmed` (vom Nutzer moderiert).
-- Der Nutzer moderiert im Review-/Admin-Panel: bestätigen, korrigieren, verwerfen, zusammenführen.
-- Manuelle Korrekturen sind „klebrig": Eine erneute KI-Verarbeitung darf bestätigte Werte **nicht** überschreiben.
+### Stage 2 — structured database (moderated)
+- From stage 1 the AI generates structured `Event` and `Entity` records (date, place, category, linked items).
+- Every derived value carries a **`confirmed` status**: `unconfirmed` (AI proposal) or `confirmed` (moderated by the user).
+- The user moderates in the review/admin panel: confirm, correct, discard, merge.
+- Manual corrections are “sticky”: repeated AI processing must **not** overwrite confirmed values.
 
-### Stufe 3 — Ansichten & Auswertungen (berechnet, neu erzeugbar)
-- Timeline, Karte, Statistik und Kompendium sind **berechnete Projektionen** aus Stufe 2.
-- Enthalten zusätzlich KI-Anreicherungen (Fotos, Fitness, Wetter) und Aggregationen (Statistik-Widgets).
-- **Vollständig neu berechenbar** — per Knopfdruck im Admin-Panel, z. B. nach Modellwechsel, neuen Enrichment-Quellen oder Modul-Updates.
+### Stage 3 — views & analyses (computed, rebuildable)
+- Timeline, map, statistics and collection are **computed projections** of stage 2.
+- They additionally contain AI enrichments (photos, fitness, weather) and aggregations (statistics widgets).
+- **Fully recomputable** — at the push of a button in the admin panel, e.g. after a model change, new enrichment sources or module updates.
 
-### Warum diese Trennung?
-| Vorteil | Erklärung |
+### Why this separation?
+| Benefit | Explanation |
 |---|---|
-| **Reproduzierbarkeit** | Bessere Modelle → einfach Stufe 2/3 neu berechnen, Rohdaten bleiben. |
-| **Vertrauen** | Klare Trennung zwischen „was ich gesagt habe" (S1), „was die KI daraus machte" (S2) und „wie es dargestellt wird" (S3). |
-| **Sicherheit** | Keine stille Datenkorruption: Roh-Input ist immer die Rückfallebene. |
-| **Moderation** | Der Nutzer hat volle Kontrolle über Stufe 2, ohne die Rohdaten zu verlieren. |
+| **Reproducibility** | Better models → simply recompute stages 2/3, the raw data stays. |
+| **Trust** | A clear separation between “what I said” (S1), “what the AI made of it” (S2) and “how it is presented” (S3). |
+| **Safety** | No silent data corruption: raw input is always the fallback. |
+| **Moderation** | The user has full control over stage 2 without losing the raw data. |
 
-### 3.1 Präzisierung: Vier Schichten (Entscheidung 2026-07-15)
+### 3.1 Refinement: four layers (decision 2026-07-15)
 
-Die „Stufe 2" vermischt begrifflich zwei Dinge, die getrennt gedacht werden
-müssen. Konzeptionell besteht das System aus **vier Schichten** (über
-denselben Tabellen — der `confirmed`-Status ist die Trennlinie, kein
-DB-Umbau nötig):
+“Stage 2” conceptually mixes two things that must be thought of separately. Conceptually the system consists of **four layers** (over the same tables — the `confirmed` status is the dividing line, no DB rebuild needed):
 
-| Schicht | Was | Lebensdauer |
+| Layer | What | Lifetime |
 |---|---|---|
-| **1 · Eingang** | Rohe Fragmente (Text, Sprache, Import-Zusammenfassungen). | Unveränderlich, dauerhaft. Beweisarchiv. |
-| **2 · Vorschlagsraum** | Unbestätigte KI-Ableitungen (`confirmed = unconfirmed`). *Behauptungen, keine Wahrheit.* | Wegwerfbar — wird bei Neuberechnung verworfen und neu erzeugt. |
-| **3 · Lebensdatenbank** | Bestätigte Events/Entities/Locations (`confirmed`) **plus faktische Anreicherungen**: Wetter, Medien-Referenzen, Tracks. Fakten ändern sich nicht — einmal geholt, für immer wahr. | **Fix.** Das eigentliche Ziel des Systems. |
-| **4 · Ableitungen** | Ansichten, Statistik, Aggregationen, **Embeddings** (modellabhängig). | Jederzeit wegwerfbar und neu berechenbar; kein Backup nötig. |
+| **1 · Inbox** | Raw fragments (text, voice, import summaries). | Immutable, permanent. An evidence archive. |
+| **2 · Proposal space** | Unconfirmed AI derivations (`confirmed = unconfirmed`). *Claims, not truth.* | Disposable — discarded and regenerated on recomputation. |
+| **3 · Life database** | Confirmed events/entities/locations (`confirmed`) **plus factual enrichments**: weather, media references, tracks. Facts do not change — once fetched, true forever. | **Fixed.** The actual goal of the system. |
+| **4 · Derived** | Views, statistics, aggregations, **embeddings** (model-dependent). | Disposable and recomputable at any time; no backup needed. |
 
-**Die harte Invariante:** *Bestätigte Daten werden von Maschinen nie
-verändert, nur additiv ergänzt (Metriken, Medien-Referenzen).* Neuberechnung
-betrifft ausschließlich Schicht 2 und 4. Bestätigen ist der Übergang 2 → 3
-(dieselbe Zeile, Status kippt); `field_overrides` schützt zusätzlich einzelne
-manuell korrigierte Felder.
-*Dokumentierte Ausnahme:* „Ortsnamen auflösen" ersetzt generierte
-Koordinaten-Titel („Besuch: Ort (53.49…)") auch an bestätigten
-Import-Besuchen — das ist eine nutzergestartete Datenverbesserung, keine
-KI-Neubewertung; manuell umbenannte Titel bleiben geschützt.
+**The hard invariant:** *confirmed data is never changed by machines, only extended additively (metrics, media references).* Recomputation touches layers 2 and 4 exclusively. Confirming is the transition 2 → 3 (same row, the status flips); `field_overrides` additionally protects individual manually corrected fields.
+*Documented exception:* “resolve place names” replaces generated coordinate titles (“Visit: place (53.49…)”) even on confirmed imported visits — that is a user-initiated data improvement, not an AI re-evaluation; manually renamed titles stay protected.
 
-**Verknüpfung & Löschbarkeit:** Jede Schicht-2/3-Zeile referenziert ihr
-Eingangs-Fragment (`origin_fragment_id`, n:1 — ein Fragment kann mehrere
-Events erzeugen). Der Vorschlagsraum räumt sich selbst (Bestätigen wandelt
-um, Verwerfen löscht). Der **Eingang wird bewusst nicht gelöscht**, auch
-wenn alles bestätigt ist: Er kostet fast nichts (Text), ist der
-Herkunftsnachweis der Lebensdatenbank und die einzige Quelle für spätere
-Re-Extraktion/Vergleiche. Legitim ist allenfalls ein manuelles Aufräumen
-*verwaister* Fragmente (alle Events verworfen) — nie automatisch.
+**Linking & deletability:** every layer-2/3 row references its inbox fragment (`origin_fragment_id`, n:1 — one fragment can produce several events). The proposal space cleans itself up (confirming converts, discarding deletes). The **inbox is deliberately not deleted**, even when everything is confirmed: it costs almost nothing (text), is the provenance record of the life database and the only source for later re-extraction or comparison. At most a manual cleanup of *orphaned* fragments (all events discarded) is legitimate — never automatic.
 
 ---
 
-## 4. Nutzer-Szenarien (User Stories)
+## 4. User scenarios (user stories)
 
-### Eingabe
-- *Als Nutzer* öffne ich Life-Dash auf dem **Smartphone** (installierte PWA), tippe unterwegs zwei Sätze ins Quick-Capture und bin fertig — Moderation mache ich später am Desktop.
-- *Als Nutzer* tippe ich „12.07.2026 war in Detmold und habe einen Adler gesehen", damit die KI ein Event mit Datum, Ort (Detmold) und einer Tier-Sichtung (Adler) anlegt.
-- *Als Nutzer* diktiere ich per Sprache „Sommer 2002 Urlaub in Frankreich", damit ein Event mit Zeitangabe (Sommer 2002, als `unconfirmed` markiert), Ort (Frankreich) und Kategorie „Reise" entsteht.
-- *Als Nutzer* moderiere ich KI-Vorschläge: Ich sehe, welche Werte `unconfirmed` sind, und bestätige/korrigiere sie, bevor sie als Fakt gelten.
-- *Als Nutzer* möchte ich bei mehrdeutigen Eingaben eine Rückfrage/Vorschau bekommen, bevor der Datensatz übernommen wird.
-- *Als Nutzer* schreibe ich zu einem Reisetag einen **formatierten Tagebucheintrag** (Markdown) — als Tages-Zusammenfassung über den Einzel-Events, damit Life-Dash auch als Reisetagebuch mit eigener Stimme funktioniert (→ Paket F1). Die KI fasst den Text nie an.
-- *Als Nutzer* tippe ich unterwegs „gerade einen Eisvogel gesehen" und übernehme **optional per Knopf meinen Handy-Standort** als Ort — ohne Tippen, aber nie automatisch (→ Paket F2).
+### Capture
+- *As a user* I open Life-Dash on my **phone** (installed PWA), type two sentences into quick capture while out and about, and I am done — I moderate later on the desktop.
+- *As a user* I type “12/07/2026 was in Detmold and saw an eagle”, so that the AI creates an event with a date, a place (Detmold) and an animal sighting (eagle).
+- *As a user* I dictate “summer 2002 holiday in France”, so that an event appears with a date (summer 2002, marked `unconfirmed`), a place (France) and the category “trip”.
+- *As a user* I moderate AI proposals: I see which values are `unconfirmed` and confirm or correct them before they count as fact.
+- *As a user* I want a follow-up question or preview for ambiguous input before the record is accepted.
+- *As a user* I write a **formatted journal entry** (Markdown) for a travel day — as a daily summary above the individual events, so that Life-Dash also works as a travel diary in my own voice (→ package F1). The AI never touches this text.
+- *As a user* I type “just saw a kingfisher” while out and **optionally take my phone location** as the place at the push of a button — without typing, but never automatically (→ package F2).
 
-### Ansichten
-- *Als Nutzer* zoome ich im Zeitstrahl von der Dekaden- auf die Tagesebene, um Ereignisdichte und Details zu sehen.
-- *Als Nutzer* sehe ich auf einer Karte alle Orte, an denen ich war, gefiltert nach Zeitraum.
-- *Als Nutzer* öffne ich den Statistik-Reiter und sehe „In wie vielen Ländern war ich?", „Wie viele km bin ich 2025 gelaufen?", „Welche Tiere habe ich gesehen?".
-- *Als Nutzer* öffne ich im Kompendium das Tier „Adler" und sehe alle Sichtungen, Fotos und Orte, die damit verknüpft sind.
+### Views
+- *As a user* I zoom the timeline from decade level down to day level to see event density and detail.
+- *As a user* I see all the places I have been on a map, filtered by time range.
+- *As a user* I open the statistics tab and see “how many countries have I been to?”, “how many km did I run in 2025?”, “which animals have I seen?”.
+- *As a user* I open the animal “eagle” in the collection and see all sightings, photos and places linked to it.
 
-### Anreicherung & Import
-- *Als Nutzer* verknüpft das System automatisch Immich-Fotos vom 12.07.2026 mit dem Detmold-Event (Immich läuft bereits als Dienst im Homelab).
-- *Als Nutzer* importiere ich meinen **Google-Timeline-Export** vom Smartphone und sehe besuchte Orte als Events und meine **Routenverläufe** als Linien auf der Karte.
-- *Als Nutzer* importiere ich meine **Health-Connect-Daten** (Schritte, Herzfrequenz, Workouts) und sehe zu einer Wanderung die Schritte/Herzfrequenz.
-- *Als Nutzer* importiere ich meine **PSN-Spielehistorie** (gespielte Spiele, Trophäen, Spielzeiten) und sehe im Kompendium unter „Spiele", wann ich was gespielt habe.
-- *Als Nutzer* sehe ich zu jedem verorteten Event das **Wetter** an diesem Tag/Ort (automatisch angereichert).
-- *Als Nutzer* reichere ich **nachträglich** an: Wenn ich später neue Fotos, Fitness- oder Wetterdaten importiere, werden bestehende Events automatisch aktualisiert (Re-Enrichment).
+### Enrichment & import
+- *As a user* the system automatically links Immich photos from 12/07/2026 to the Detmold event (Immich already runs as a service).
+- *As a user* I import my **Google Timeline export** from my phone and see visited places as events and my **routes** as lines on the map.
+- *As a user* I import my **Health Connect data** (steps, heart rate, workouts) and see steps and heart rate for a hike.
+- *As a user* I import my **PSN game history** (games played, trophies, play time) and see under “games” in the collection when I played what.
+- *As a user* I see the **weather** for that day and place on every located event (enriched automatically).
+- *As a user* I enrich **retroactively**: if I import new photos, fitness or weather data later, existing events are updated automatically (re-enrichment).
 
-### Konto & Zugriff
-- *Als Nutzer* melde ich mich per **SSO (OIDC)** an — dieselbe Anmeldung wie bei den übrigen Homelab-Diensten.
-- *Als Nutzer* sehe ich ausschließlich meine eigenen Daten; weitere Nutzer (z. B. Familienmitglieder) führen ihre eigene, getrennte Lebensdatenbank.
+### Account & access
+- *As a user* I sign in via **SSO (OIDC)** — the same sign-in as for my other services.
+- *As a user* I see only my own data; other users (e.g. family members) keep their own, separate life database.
 
-### Suche
-- *Als Nutzer* suche ich „alle Male, in denen ich am Meer war" und bekomme semantisch passende Events, nicht nur Volltext-Treffer.
-
----
-
-## 5. Feature-Bereiche (Views)
-
-### 5.1 Zeitstrahl (Timeline)
-Die zentrale Ansicht. Horizontaler oder vertikaler Strahl mit stufenlosem Zoom.
-
-- **Zoomstufen:** Tag → Woche → Monat → Jahr → Jahrzehnt.
-- **Aggregation:** Auf hohen Ebenen werden Events zu „Heat"-Clustern verdichtet (Ereignisdichte, Kategorien-Farben).
-- **Unscharfe Events** (z. B. „Sommer 2002") werden als Balken/Spanne dargestellt, nicht als Punkt, und als `unconfirmed` gekennzeichnet.
-- **Filter:** Nach Kategorie, Ort, Quelle, Tag, Confirmed-Status.
-- **Interaktion:** Klick auf Event → Detail-Panel mit Fotos, Ort, Wetter, verknüpften Entities.
-
-### 5.2 Karte (Map)
-- Alle verorteten Events als Marker / Cluster / Heatmap.
-- **Zeitschieberegler**, synchronisiert mit der Timeline.
-- Ebenen: **Routenverläufe (Tracks)** aus Google Timeline & Workouts als Linien-Layer, Reisen, einzelne Orte, Wohnorte, „besondere Momente".
-- Datenquellen: manuelle Orte, Google-Timeline-Import (Besuche **und** Routen), Geo-Tags aus Immich-Fotos, GPS-Tracks aus Fitness-Workouts.
-
-### 5.3 Statistik
-Konfigurierbares Dashboard aus „Widgets". Jedes Modul kann eigene Statistiken beisteuern. Die Widgets sind **berechnete Stufe-3-Projektionen** und jederzeit neu berechenbar.
-
-- Beispiele: Länder-Zähler, Reisekilometer, gesehene Tierarten, Filme pro Jahr, Fitness-Trends, „Lebensjahre in Zahlen".
-- Zeitraumfilter, Vergleich zwischen Jahren.
-
-### 5.4 Kompendium
-Strukturierte Sammlungen von Entities, gruppiert nach Typ.
-
-- Reiter/Kategorien: **Tiere, Filme, Spiele, Länder, Orte, Bücher, …** (modul-getrieben).
-- Detailseite pro Entity: Beschreibung, Metadaten, verknüpfte Events, Timeline-Mini-Ansicht, Fotos.
-- Beispiel: „Adler" → alle Sichtungen, Karte der Sichtungsorte.
-
-### 5.5 Dateneingabe (Ingestion)
-- Freitext-Feld, Sprachaufnahme (Speech-to-Text), API-Endpoint.
-- Jede Eingabe wird zuerst als **Stufe-1-Fragment** verlustfrei gespeichert.
-- **KI-Vorschau:** Zeigt, wie die KI das Fragment interpretiert hat (Datum, Ort, Entities, Kategorie) → Nutzer bestätigt oder korrigiert (→ Stufe 2).
-- Batch-Import (z. B. altes Tagebuch, Chatverläufe).
-
-### 5.6 Admin-Panel & Moderation
-Zentrale Steuerungsoberfläche für das gesamte System.
-
-> **Geplante Aufteilung (A14):** „Verwaltung" (jeder Nutzer — Moderation,
-> Jobs, Export/Import, Tracking-Auswahl) und „Admin" (nur Rolle admin —
-> Nutzerverwaltung, System, DB-Rohansicht, Logs), jeweils mit Reitern.
-
-- **Moderations-Queue:** Alle `unconfirmed` Stufe-2-Einträge sichten, bestätigen, korrigieren, verwerfen, zusammenführen.
-- **Modul-Verwaltung:** Trackables aktivieren/definieren, Schemas, Icons, Statistik-Widgets.
-- **KI-Konfiguration:** Provider/Modell wählen, Prompts anpassen, Confidence-Schwellen setzen.
-- **Enrichment-Quellen:** Immich, Google Timeline, Fitness, Wetter konfigurieren und Verknüpfungsregeln festlegen.
-- **Neuberechnung:** Stufe 2 und/oder Stufe 3 gezielt oder komplett neu berechnen (z. B. nach Modellwechsel) — bestätigte Werte bleiben erhalten.
-- **Roh-Daten-Einsicht:** Zu jedem Event zurück zum ursprünglichen Fragment (Stufe 1) navigieren.
-- **Nutzerverwaltung:** OIDC-Provider-Konfiguration, Nutzerliste, Rollen (`admin` | `user`). Import-Konfiguration (Immich-API-Key, PSN-Token) ist **pro Nutzer** hinterlegt.
-
-### 5.7 Mobile Nutzung (Smartphone)
-
-Das UI wird von Anfang an **responsive** entworfen — nicht als nachträgliche Anpassung. Der wichtigste mobile Anwendungsfall ist das **Erfassen unterwegs**; Auswertung und Moderation passieren eher am Desktop, müssen mobil aber funktionieren.
-
-- **PWA:** Installierbar auf dem Homescreen, App-Manifest, Offline-Queue für Quick-Capture (Fragmente werden lokal gepuffert und bei Verbindung synchronisiert — passt zum Stufe-1-Prinzip „Capture first").
-- **Layout:** Desktop = Sidebar-Navigation; Mobil = **Bottom-Navigation** (Timeline · Karte · ➕ Capture · Statistik · Kompendium) mit Quick-Capture als zentralem, prominentem Button.
-- **Timeline mobil:** vertikal scrollend statt horizontal; Detail-Panel als Bottom-Sheet statt Seitenpanel.
-- **Karte mobil:** Vollbild mit einblendbarem Zeitfilter; Touch-Gesten (Pinch-Zoom).
-- **Sprach-Eingabe** ist mobil der natürlichste Kanal (Phase 2, Whisper serverseitig).
-- **Share Target (später):** Text/Fotos aus anderen Apps direkt an Life-Dash teilen → wird Fragment.
+### Search
+- *As a user* I search “all the times I was by the sea” and get semantically matching events, not just full-text hits.
 
 ---
 
-## 6. Datenmodell (Kern)
+## 5. Feature areas (views)
 
-Das Herzstück. Bewusst schlank und generisch gehalten, damit Module ohne Schema-Migration andocken können.
+### 5.1 Timeline
+The central view. A horizontal or vertical line with continuous zoom.
 
-### 6.1 Entitäten (konzeptionell)
+- **Zoom levels:** day → week → month → year → decade.
+- **Aggregation:** at high levels events are condensed into “heat” clusters (event density, category colours).
+- **Vague events** (e.g. “summer 2002”) are drawn as bars/spans rather than points, and marked `unconfirmed`.
+- **Filters:** by category, place, source, day, confirmed status.
+- **Interaction:** click an event → detail panel with photos, place, weather, linked entities.
+
+### 5.2 Map
+- All located events as markers / clusters / heatmap.
+- **Time slider**, synchronised with the timeline.
+- Layers: **routes (tracks)** from Google Timeline and workouts as a line layer, trips, individual places, homes, “special moments”.
+- Data sources: manual places, Google Timeline import (visits **and** routes), geo tags from Immich photos, GPS tracks from fitness workouts.
+
+### 5.3 Statistics
+A configurable dashboard of “widgets”. Every module can contribute its own statistics. The widgets are **computed stage-3 projections** and recomputable at any time.
+
+- Examples: country counter, travel kilometres, animal species seen, films per year, fitness trends, “years of life in numbers”.
+- Time-range filter, comparison between years.
+
+### 5.4 Collection
+Structured collections of entities, grouped by type.
+
+- Tabs/categories: **animals, films, games, countries, places, books, …** (module-driven).
+- A detail page per entity: description, metadata, linked events, mini timeline view, photos.
+- Example: “eagle” → all sightings, a map of the sighting locations.
+
+### 5.5 Data capture (ingestion)
+- Free-text field, voice recording (speech-to-text), API endpoint.
+- Every input is first stored losslessly as a **stage-1 fragment**.
+- **AI preview:** shows how the AI interpreted the fragment (date, place, entities, category) → the user confirms or corrects (→ stage 2).
+- Batch import (e.g. an old diary, chat logs).
+
+### 5.6 Admin panel & moderation
+The central control surface for the whole system.
+
+> **Planned split (A14):** “Settings” (every user — moderation, jobs,
+> export/import, tracking choice) and “Admin” (admin role only — user
+> management, system, raw DB view, logs), each with tabs.
+
+- **Moderation queue:** review, confirm, correct, discard and merge all `unconfirmed` stage-2 records.
+- **Module management:** activate/define trackables, schemas, icons, statistics widgets.
+- **AI configuration:** choose provider/model, adjust prompts, set confidence thresholds.
+- **Enrichment sources:** configure Immich, Google Timeline, fitness, weather and define linking rules.
+- **Recomputation:** recompute stage 2 and/or stage 3 selectively or completely (e.g. after a model change) — confirmed values are kept.
+- **Raw data inspection:** navigate from any event back to its originating fragment (stage 1).
+- **User management:** OIDC provider configuration, user list, roles (`admin` | `user`). Import configuration (Immich API key, PSN token) is stored **per user**.
+
+### 5.7 Mobile use (phone)
+
+The UI is designed **responsive** from the start — not as an afterthought. The most important mobile use case is **capturing on the go**; analysis and moderation happen more on the desktop but must work on mobile too.
+
+- **PWA:** installable on the home screen, app manifest, offline queue for quick capture (fragments are buffered locally and synchronised when a connection returns — matching the stage-1 principle “capture first”).
+- **Layout:** desktop = sidebar navigation; mobile = **bottom navigation** (timeline · map · ➕ capture · statistics · collection) with quick capture as the central, prominent button.
+- **Timeline on mobile:** scrolls vertically instead of horizontally; the detail panel is a bottom sheet instead of a side panel.
+- **Map on mobile:** fullscreen with a time filter that can be shown or hidden; touch gestures (pinch zoom).
+- **Voice input** is the most natural channel on mobile (phase 2, Whisper server-side).
+- **Share target (later):** share text/photos from other apps directly to Life-Dash → becomes a fragment.
+
+---
+
+## 6. Data model (core)
+
+The heart of the system. Deliberately lean and generic so that modules can dock on without schema migrations.
+
+### 6.1 Entities (conceptual)
 
 ```
-User                     (Identität — via OIDC)
+User                     (identity — via OIDC)
   id
-  oidc_subject         (stabile `sub`-Claim aus dem OIDC-Token)
+  oidc_subject         (stable `sub` claim from the OIDC token)
   email
   display_name
   role                 (admin | user)
-  settings             (JSON: z. B. Immich-API-Key, PSN-Token, Import-Präferenzen)
+  settings             (JSON: e.g. Immich API key, PSN token, import preferences)
   created_at
 
-Fragment                 (STUFE 1 — unveränderlich)
+Fragment                 (STAGE 1 — immutable)
   id
-  user_id              (FK → User; gilt ebenso für Event, Entity,
-                        MediaRef, Metric, Track — hier nicht wiederholt)
+  user_id              (FK → User; applies equally to Event, Entity,
+                        MediaRef, Metric, Track — not repeated there)
   raw_text
   audio_ref            (optional)
   source               (manual | voice | api | import)
   status               (pending | processed | needs_review | discarded)
   created_at
-  processed_event_ids  (Ergebnis der KI-Verarbeitung)
+  processed_event_ids  (result of the AI processing)
 
-Event                    (STUFE 2 — strukturiert, moderiert)
+Event                    (STAGE 2 — structured, moderated)
   id
-  title                (KI- oder nutzergeneriert)
+  title                (AI- or user-generated)
   description
   date_start           (timestamp)
   date_end             (timestamp, optional)
   date_precision       (exact | day | month | season | year | decade)
   location_id          (FK → Location, optional)
-  category             (trackable key, z. B. "trip", "sighting")
-  confidence           (0..1, wie sicher ist die KI)
-  confirmed            (unconfirmed | confirmed)  ← vom Nutzer moderiert?
-  field_overrides      (JSON: welche Felder manuell bestätigt/korrigiert
-                        wurden → vor Re-Processing geschützt)
+  category             (trackable key, e.g. "trip", "sighting")
+  confidence           (0..1, how sure the AI is)
+  confirmed            (unconfirmed | confirmed)  ← moderated by the user?
+  field_overrides      (JSON: which fields were manually confirmed/corrected
+                        → protected from re-processing)
   source               (manual | ai | immich | google_timeline | fitness | weather)
-  origin_fragment_id   (FK → Fragment, Stufe-1-Rückreferenz)
-  embedding            (Vektor für semantische Suche)
+  origin_fragment_id   (FK → Fragment, stage-1 back-reference)
+  embedding            (vector for semantic search)
   created_at / updated_at
 
-Entity            (Kompendium-Objekt, STUFE 2)
+Entity            (collection item, STAGE 2)
   id
   type              (animal | movie | game | country | place | book | ...)
   name
-  attributes        (JSON, schemaabhängig vom Modul)
+  attributes        (JSON, schema depends on the module)
   confirmed         (unconfirmed | confirmed)
   embedding
   created_at
 
-EventEntityLink   (n:m zwischen Event und Entity)
+EventEntityLink   (n:m between Event and Entity)
   event_id
   entity_id
   role              (subject | location | mentioned)
@@ -284,19 +267,19 @@ EventEntityLink   (n:m zwischen Event und Entity)
 Location
   id
   name
-  geo               (PostGIS Point/Polygon)
+  geo               (PostGIS point/polygon)
   type              (city | country | poi | home)
-  external_ref      (z. B. OSM-ID)
+  external_ref      (e.g. OSM ID)
 
-MediaRef          (STUFE 3 — Enrichment; Verweis auf externe Medien, KEINE Kopie)
+MediaRef          (STAGE 3 — enrichment; a reference to external media, NOT a copy)
   id
   event_id
   provider          (immich | local | url)
-  external_id       (z. B. Immich Asset-ID)
+  external_id       (e.g. Immich asset ID)
   captured_at
-  geo               (optional, für Auto-Verknüpfung)
+  geo               (optional, for automatic linking)
 
-Metric            (STUFE 3 — Enrichment; generische Kennzahlen: Fitness, Wetter)
+Metric            (STAGE 3 — enrichment; generic figures: fitness, weather)
   id
   event_id
   key               (steps | heart_rate_avg | distance_km |
@@ -305,193 +288,194 @@ Metric            (STUFE 3 — Enrichment; generische Kennzahlen: Fitness, Wette
   value
   unit
   source            (health_connect | weather | psn | ...)
-  enriched_at       (wann angereichert → erlaubt Re-Enrichment)
+  enriched_at       (when enriched → enables re-enrichment)
 
-Track             (STUFE 3 — Routenverlauf; aus Google Timeline / Workouts)
+Track             (STAGE 3 — route; from Google Timeline / workouts)
   id
   date_start / date_end
-  geo               (PostGIS LineString, vereinfacht/komprimiert
-                     z. B. per Douglas-Peucker)
+  geo               (PostGIS LineString, simplified/compressed
+                     e.g. via Douglas-Peucker)
   activity_type     (walk | drive | cycle | run | transit | unknown)
   distance_m
   source            (google_timeline | health_connect)
-  event_id          (optional, FK → Event — z. B. Wanderung)
-  origin_fragment_id (FK → Fragment, Roh-Import-Rückreferenz)
+  event_id          (optional, FK → Event — e.g. a hike)
+  origin_fragment_id (FK → Fragment, raw import back-reference)
 ```
 
-### 6.2 Design-Entscheidungen
+### 6.2 Design decisions
 
-- **Drei-Stufen-Herkunft im Modell verankert:** `Fragment` = Stufe 1, `Event`/`Entity` = Stufe 2, `MediaRef`/`Metric` = Stufe 3. Jede Stufe-2/3-Zeile referenziert zurück auf Stufe 1.
-- **`confirmed` + `field_overrides`:** Trennung von KI-Vorschlag (`unconfirmed`) und moderiertem Fakt (`confirmed`). `field_overrides` schützt einzelne, manuell korrigierte Felder vor Überschreiben bei einer Neuberechnung.
-- **Konkrete Zeiten bevorzugt:** `date_precision` erlaubt Unschärfe („Sommer 2002" → `season`), aber unscharfe/abgeleitete Zeiten sind `unconfirmed`, bis der Nutzer sie bestätigt. Ziel ist, möglichst konkrete, bestätigte Zeitangaben zu haben.
-- **Event ↔ Entity als n:m:** Ein Event kann mehrere Tiere/Objekte referenzieren; eine Entity taucht in vielen Events auf. Grundlage für Kompendium **und** Statistik. (Personen bewusst vorerst ausgeklammert — siehe Kap. 8.3.)
-- **`attributes` als JSON:** Modul-spezifische Felder (z. B. Film-Rating, Tier-Art) in flexiblem JSON-Feld mit vom Modul definiertem Schema (JSON-Schema-Validierung). Kein DB-Umbau bei neuen Modulen.
-- **Embeddings für semantische Suche:** Events und Entities bekommen Vektor-Embeddings (pgvector) → „alle Male am Meer" findet auch „Strandtag in Italien".
-- **Medien & Metriken sind Stufe 3:** Referenziert, nicht kopiert (Immich bleibt Single Source of Truth). `enriched_at` erlaubt **nachträgliches Re-Enrichment**, ohne Stufe 2 zu verändern.
-- **`user_id` überall, Mandanten-Trennung strikt:** Jede Stufe-1/2/3-Zeile gehört genau einem Nutzer. Die API filtert **immer** nach dem angemeldeten Nutzer — es gibt keine geteilten Events/Entities (bewusst einfach gehalten; „Sharing" wäre ein späteres Feature). Auch Locations sind zunächst nutzergebunden.
-- **Tracks getrennt von Events:** Ein Routenverlauf ist kein Event (kein „Erlebnis"), sondern Kontext. Rohe Timeline-/GPS-Daten bleiben als Fragment (S1) erhalten; `Track` ist die berechnete, vereinfachte Geometrie (S3) — bei besseren Vereinfachungs-Algorithmen neu erzeugbar.
+- **Three-stage provenance anchored in the model:** `Fragment` = stage 1, `Event`/`Entity` = stage 2, `MediaRef`/`Metric` = stage 3. Every stage-2/3 row references back to stage 1.
+- **`confirmed` + `field_overrides`:** separating an AI proposal (`unconfirmed`) from a moderated fact (`confirmed`). `field_overrides` protects individual, manually corrected fields from being overwritten during recomputation.
+- **Concrete dates preferred:** `date_precision` allows vagueness (“summer 2002” → `season`), but vague or derived dates stay `unconfirmed` until the user confirms them. The goal is to hold dates that are as concrete and confirmed as possible.
+- **Event ↔ Entity as n:m:** one event can reference several animals/items; one entity appears in many events. This is the basis for the collection **and** the statistics. (People are deliberately left out for now — see ch. 8.3.)
+- **`attributes` as JSON:** module-specific fields (e.g. film rating, animal species) live in a flexible JSON field with a schema defined by the module (JSON-Schema validation). No DB rebuild for new modules.
+- **Embeddings for semantic search:** events and entities get vector embeddings (pgvector) → “all the times by the sea” also finds “beach day in Italy”.
+- **Media and metrics are stage 3:** referenced, not copied (Immich stays the single source of truth). `enriched_at` enables **retroactive re-enrichment** without changing stage 2.
+- **`user_id` everywhere, strict tenant separation:** every stage-1/2/3 row belongs to exactly one user. The API **always** filters by the signed-in user — there are no shared events/entities (deliberately kept simple; “sharing” would be a later feature). Locations are user-scoped too for now.
+- **Tracks separate from events:** a route is not an event (not an “experience”) but context. Raw timeline/GPS data is kept as a fragment (S1); `Track` is the computed, simplified geometry (S3) — regenerable with better simplification algorithms.
 
 ---
 
-## 7. KI-Pipeline (Ingestion)
+## 7. AI pipeline (ingestion)
 
-Der Weg vom Fragment (Stufe 1) zum moderierten Event (Stufe 2) und zur angereicherten Ansicht (Stufe 3).
+The path from fragment (stage 1) to moderated event (stage 2) to enriched view (stage 3).
 
 ```mermaid
 flowchart LR
-    A[Eingabe<br/>Text / Sprache / API] --> B[Speech-to-Text<br/>optional]
-    B --> C[Fragment gespeichert<br/>STUFE 1 · status: pending]
-    C --> D[KI-Extraktion<br/>LLM + strukturiertes Output-Schema]
-    D --> E[Entity-Resolution<br/>bekannter Ort/Tier/Film?]
-    E --> F[Geocoding<br/>Ortsname → Koordinaten]
-    F --> G[Enrichment<br/>Immich / Fitness / Wetter]
-    G --> H{Confidence<br/>hoch?}
-    H -- ja --> I[Event gespeichert<br/>STUFE 2 · unconfirmed]
-    H -- nein --> J[needs_review<br/>Nutzer-Moderation]
+    A[Input<br/>text / voice / API] --> B[Speech-to-text<br/>optional]
+    B --> C[Fragment stored<br/>STAGE 1 · status: pending]
+    C --> D[AI extraction<br/>LLM + structured output schema]
+    D --> E[Entity resolution<br/>known place/animal/film?]
+    E --> F[Geocoding<br/>place name → coordinates]
+    F --> G[Enrichment<br/>Immich / fitness / weather]
+    G --> H{Confidence<br/>high?}
+    H -- yes --> I[Event stored<br/>STAGE 2 · unconfirmed]
+    H -- no --> J[needs_review<br/>user moderation]
     J --> I
 ```
 
-### 7.1 Schritte im Detail
+### 7.1 Steps in detail
 
-1. **Capture (Stufe 1):** Fragment wird sofort roh gespeichert (nie Datenverlust, auch offline-fähig).
-2. **Speech-to-Text** (optional): z. B. `whisper` lokal.
-3. **Strukturierte Extraktion (Stufe 2):** LLM erhält das Fragment + ein **strukturiertes Ausgabeschema** (Function-Calling / JSON-Schema). Output: Titel, Datum(-sspanne) + Präzision, Orte, erkannte Entities mit Typ, Kategorie, Confidence. Alle Werte zunächst `unconfirmed`.
-4. **Entity-Resolution:** Abgleich erkannter Namen mit bestehenden Entities („Adler" → existierende Tier-Entity? „Frankreich" → Land?). Fuzzy-Matching + Embedding-Ähnlichkeit. Neue Entities werden als Kandidaten angelegt.
-5. **Geocoding:** Ortsnamen → Koordinaten (lokaler Nominatim/OSM-Dienst, keine externe Abhängigkeit nötig).
-6. **Enrichment (Stufe 3):** Anhand Zeit+Ort werden Immich-Fotos, Fitness-Metriken und **Wetterdaten** verknüpft. Läuft auch **nachträglich** als Re-Enrichment-Job, wenn neue Quelldaten dazukommen.
-7. **Review-Gate:** Bei niedriger Confidence oder Mehrdeutigkeit → `needs_review`. Der Nutzer moderiert und setzt Werte auf `confirmed`.
-8. **Neuberechnung:** Stufe 2 und 3 sind jederzeit aus Stufe 1 reproduzierbar (z. B. mit neuem Modell) — `confirmed`-Werte bleiben dabei geschützt.
+1. **Capture (stage 1):** the fragment is stored raw immediately (never lose data, works offline too).
+2. **Speech-to-text** (optional): e.g. `whisper` locally.
+3. **Structured extraction (stage 2):** the LLM receives the fragment plus a **structured output schema** (function calling / JSON schema). Output: title, date (span) + precision, places, recognised entities with type, category, confidence. All values are `unconfirmed` at first.
+4. **Entity resolution:** matching recognised names against existing entities (“eagle” → existing animal entity? “France” → country?). Fuzzy matching plus embedding similarity. New entities are created as candidates.
+5. **Geocoding:** place names → coordinates (a local Nominatim/OSM service, no external dependency needed).
+6. **Enrichment (stage 3):** based on time and place, Immich photos, fitness metrics and **weather data** are linked. Also runs **retroactively** as a re-enrichment job when new source data arrives.
+7. **Review gate:** on low confidence or ambiguity → `needs_review`. The user moderates and sets values to `confirmed`.
+8. **Recomputation:** stages 2 and 3 are reproducible from stage 1 at any time (e.g. with a new model) — `confirmed` values stay protected.
 
-### 7.2 Austauschbarer KI-Provider
+### 7.2 Interchangeable AI provider
 
-Die KI ist hinter einem **Provider-Interface** gekapselt:
+The AI is encapsulated behind a **provider interface**:
 
 ```
-LLMProvider (Interface)
+LLMProvider (interface)
   extract_structured(fragment, schema) -> StructuredResult
   embed(text) -> vector
 
-Implementierungen:
-  - OllamaProvider   (lokal, z. B. Llama/Mistral)  ← Default Homelab
-  - OpenAIProvider   (optional, höhere Qualität)
+Implementations:
+  - OllamaProvider   (local, e.g. Llama/Mistral)
+  - OpenAIProvider   (any OpenAI-compatible endpoint)
   - AnthropicProvider
 ```
 
-So bleibt Datenhoheit gewahrt, und man kann je nach Aufgabe (Extraktion vs. Embedding) unterschiedliche Modelle wählen.
+This keeps data sovereignty intact and lets you pick different models per task (extraction vs. embedding).
 
 ---
 
-## 8. Modularität / Erweiterbarkeit
+## 8. Modularity / extensibility
 
-Das zentrale Nicht-funktionale Ziel: **Neues tracken, ohne den Kern anzufassen.**
+The central non-functional goal: **track something new without touching the core.**
 
-### 8.1 Modul-Konzept („Trackable")
+### 8.1 Module concept (“trackable”)
 
-Ein Modul registriert einen neuen Typ deklarativ:
+A module registers a new type declaratively:
 
 ```yaml
 # module: animals
 key: animal
-label: Tiere
+label: Animals
 icon: paw
-entity_schema:            # JSON-Schema für Entity.attributes
+entity_schema:            # JSON schema for Entity.attributes
   species: string
   wild: boolean
   first_seen: date
 event_categories:
-  - sighting              # "Adler gesehen"
+  - sighting              # "saw an eagle"
 statistics:
   - id: species_count
-    label: "Beobachtete Arten"
+    label: "Species observed"
     type: count_distinct
     field: entity.species
   - id: sightings_per_year
-    label: "Sichtungen pro Jahr"
+    label: "Sightings per year"
     type: timeseries
 compendium_view:
   group_by: species
-  detail_map: true        # zeigt Sichtungsorte auf Karte
+  detail_map: true        # shows sighting locations on a map
 ```
 
-### 8.2 Was ein Modul beisteuern kann
+### 8.2 What a module can contribute
 
-| Bereich | Beitrag des Moduls |
+| Area | The module's contribution |
 |---|---|
-| **Datenmodell** | JSON-Schema für `Entity.attributes` (validiert, aber keine DB-Migration). |
-| **Ingestion** | Hinweise/Prompts, wie die KI diesen Typ erkennt. |
-| **Statistik** | Deklarative Widgets (count, timeseries, distinct, sum). |
-| **Kompendium** | Gruppierung, Detailansicht, Kartenoption. |
-| **UI** | Icon, Label, Farbe. |
+| **Data model** | JSON schema for `Entity.attributes` (validated, but no DB migration). |
+| **Ingestion** | Hints/prompts for how the AI recognises this type. |
+| **Statistics** | Declarative widgets (count, timeseries, distinct, sum). |
+| **Collection** | Grouping, detail view, map option. |
+| **UI** | Icon, label, colour. |
+| **Achievements** | Metric plus four thresholds (bronze/silver/gold/platinum), see F6. |
 
-### 8.3 Beispiel-Module (Startset)
+### 8.3 Example modules (starter set)
 
-**Umgesetzt:** `trip` (Reisen) · `animal` (Tiere) · `country` (Länder) · `artist` (Künstler/Konzerte) · `food` (Essen/Mahlzeiten) · `milestone` (Meilensteine: Hochzeit, Geburt, Umzug, Abschluss …).
-**Geplant:** `movie` · `game` · `book` · `place` · `sport_activity` · `health_event`.
+**Implemented:** `trip` · `animal` · `country` · `artist` (artists/concerts) · `food` (meals) · `milestone` (weddings, births, moving, graduation …) · `movie` · `game` · `book`.
+**Planned:** `place` · `sport_activity` · `health_event`.
 
-> Erfahrung aus der Umsetzung: Eine neue Kategorie besteht aus **drei Stellen** — Modul-YAML (Backend), Regeln/Beispiel im KI-Prompt und Frontend (Label, Farbe, Kompendium-Tab, Formular-Optionen). Das deklarative Ziel „nur YAML" ist noch nicht ganz erreicht (siehe Kap. 15, Frage 3).
+> Lesson from implementation: a new category touches **three places** — the module YAML (backend), rules/examples in the AI prompt and the frontend (label, colour, collection tab, form options). The declarative goal of “YAML only” is not fully reached yet (see ch. 15, question 3).
 
-> **Personen bewusst ausgeklammert (vorerst):** Ein `person`-Modul ist konzeptionell reizvoll, in der Pflege aber zu komplex (Dubletten, Beziehungen, Datenschutz Dritter, ständige Zuordnungsentscheidungen). Fokus liegt zunächst auf **konkreten, bestätigbaren Fakten** (Zeit, Ort, Objekt). Das n:m-Datenmodell bleibt so ausgelegt, dass Personen später als weiteres Modul ergänzt werden können, ohne Umbau.
+> **People deliberately left out (for now):** a `person` module is conceptually appealing but too complex to maintain (duplicates, relationships, third-party privacy, constant assignment decisions). The focus is first on **concrete, confirmable facts** (time, place, item). The n:m data model stays laid out so that people can be added later as another module without a rebuild.
 
 ---
 
-## 9. Integrationen
+## 9. Integrations
 
-| Quelle | Zweck | Ansatz |
+| Source | Purpose | Approach |
 |---|---|---|
-| **Immich** | Fotos & Videos, Geo-Tags, Zeitstempel | **Läuft bereits als Dienst im Homelab** → erste umzusetzende Integration. Immich-API (`/api/search/metadata`: Assets nach Zeitraum/Geo abfragen), Auth per API-Key (pro Nutzer in `User.settings`). Verknüpfung per `MediaRef` — **nur Referenzen, keine Kopien**; Thumbnails werden über einen Backend-Proxy von Immich durchgereicht. |
-| **Google Timeline** | Besuchte Orte **und Routenverläufe** | ⚠️ Timeline liegt seit 2024 **nur noch auf dem Gerät** (Takeout „Semantic Location History" gibt es nicht mehr). Import über den **Geräte-Export**: Android → Einstellungen → Standort → Zeitachse → „Zeitachse exportieren" (JSON, `semanticSegments`). Datei-Upload im UI → roh als Fragment (S1) → `visit`-Segmente werden Events/Locations, `activity`-/`timelinePath`-Segmente werden `Track`s (S3). Kein Live-Zugriff möglich, wiederkehrender manueller Upload. |
-| **Google Health / Health Connect** | Schritte, Distanz, HF, Workouts (inkl. GPS) | ⚠️ Google Fit REST API ist eingestellt (2025); Nachfolger **Health Connect** speichert nur **on-device**, ohne Cloud-API. Import daher per Datei: Health-Connect-Export (ZIP) oder Sync-App (z. B. Health Connect → Home Assistant / GadgetBridge-Export), alternativ direkt Garmin-/Fitbit-Export. Tageswerte & Workouts → `Metric` an Events; Workout-GPS → `Track`. |
-| **PSN (PlayStation Network)** | Gespielte Spiele, Trophäen, Spielzeiten | Keine offizielle öffentliche API. Ansatz: inoffizielle API via **NPSSO-Token** (z. B. Python-Lib `psnawp`) — Token pro Nutzer in `User.settings`. Periodischer Sync: Titel → `game`-Entities, Sessions/„zuletzt gespielt" → Events, Trophäen & Spielzeit → `Metric`. Fallback: reiner Trophäen-Verlauf (Zeitstempel je Trophäe) als Ereignisquelle. Risiko: inoffizielle API kann brechen → Connector isoliert halten, Sync-Ergebnisse als Fragmente (S1) sichern. |
-| **Wetter** | Kontext-Anreicherung (Temperatur, Bedingungen) | Historische Wetter-API (Open-Meteo-Tagesarchiv) anhand Zeit+Ort. Als `Metric` an verortete Events gehängt — auch nachträglich. Aktuelle Logik: Temperatur = Mittel aus Tagesmax/-min, Bedingung = signifikantester Wettercode des Tages (Verfeinerung → Paket F3). |
-| **Geocoding** | Ortsname ↔ Koordinaten | Self-hosted Nominatim (OSM), keine externe Abhängigkeit. |
+| **Immich** | Photos & videos, geo tags, timestamps | **Already running as a service** → the first integration to implement. Immich API (`/api/search/metadata`: query assets by time range/geo), auth via API key (per user in `User.settings`). Linked via `MediaRef` — **references only, no copies**; thumbnails are passed through from Immich by a backend proxy. |
+| **Google Timeline** | Visited places **and routes** | ⚠️ Since 2024 the timeline lives **on the device only** (Takeout “Semantic Location History” is gone). Import via the **device export**: Android → Settings → Location → Timeline → “Export timeline” (JSON, `semanticSegments`). File upload in the UI → stored raw as a fragment (S1) → `visit` segments become events/locations, `activity`/`timelinePath` segments become `Track`s (S3). No live access possible, so a recurring manual upload. |
+| **Google Health / Health Connect** | Steps, distance, HR, workouts (incl. GPS) | ⚠️ The Google Fit REST API was shut down (2025); its successor **Health Connect** stores **on-device only**, without a cloud API. Import therefore happens by file: a Health Connect export (ZIP) or a sync app, alternatively a direct Garmin/Fitbit export. Daily values and workouts → `Metric` on events; workout GPS → `Track`. |
+| **PSN (PlayStation Network)** | Games played, trophies, play time | No official public API. Approach: an unofficial API via an **NPSSO token** (e.g. the Python library `psnawp`) — a token per user in `User.settings`. Periodic sync: titles → `game` entities, sessions/“last played” → events, trophies and play time → `Metric`. Fallback: the pure trophy history (a timestamp per trophy) as an event source. Risk: an unofficial API can break → keep the connector isolated and store sync results as fragments (S1). |
+| **Weather** | Context enrichment (temperature, conditions) | A historical weather API (Open-Meteo daily archive) based on time and place. Attached as a `Metric` to located events — retroactively too. |
+| **Geocoding** | Place name ↔ coordinates | Nominatim (OSM) or any compatible service, self-hostable. |
 
-**Integrationsprinzip:** Jede Quelle ist ein **Connector** mit einheitlichem Interface (`fetch`, `map_to_events`, `enrich`). Neue Quellen andockbar ohne Kernänderung. Alle Connector-Ergebnisse sind **Stufe-3-Anreicherungen** und jederzeit neu berechenbar.
+**Integration principle:** every source is a **connector** with a uniform interface (`fetch`, `map_to_events`, `enrich`). New sources dock on without core changes. All connector results are **stage-3 enrichments** and recomputable at any time.
 
-**Zwei Connector-Arten:**
-- **Pull-Connectoren** (Immich, PSN, Wetter): Backend fragt die Quelle aktiv/periodisch ab.
-- **Upload-Connectoren** (Google Timeline, Health Connect): Nutzer lädt Export-Dateien hoch — mobiltauglicher Upload-Flow im UI (vom Smartphone direkt teilbar). Roh-Dateien werden als Fragmente (S1) archiviert, damit Re-Processing möglich bleibt.
+**Two kinds of connector:**
+- **Pull connectors** (Immich, PSN, weather): the backend queries the source actively/periodically.
+- **Upload connectors** (Google Timeline, Health Connect): the user uploads export files — a mobile-friendly upload flow in the UI (shareable directly from a phone). Raw files are archived as fragments (S1) so that re-processing stays possible.
 
-**Dubletten-Schutz beim Re-Import:** Importe sind **idempotent** — jeder importierte Datensatz trägt einen stabilen `external_id`-Schlüssel (Immich-Asset-ID, Timeline-Segment-Hash, PSN-Trophäen-ID), sodass wiederholte Uploads/Syncs keine Duplikate erzeugen.
+**Duplicate protection on re-import:** imports are **idempotent** — every imported record carries a stable `external_id` key (Immich asset ID, timeline segment hash, PSN trophy ID), so repeated uploads/syncs create no duplicates.
 
 ---
 
-## 10. Technische Architektur
+## 10. Technical architecture
 
 ```mermaid
 flowchart TB
     subgraph Clients
-      UI[Web-Frontend / PWA<br/>responsive: Desktop & Smartphone<br/>Timeline · Karte · Statistik · Kompendium]
-      ADMIN[Admin-Panel<br/>Moderation · Module · Nutzer · Neuberechnung]
-      VOICE[Sprach-/Quick-Capture]
+      UI[Web frontend / PWA<br/>responsive: desktop & phone<br/>timeline · map · statistics · collection]
+      ADMIN[Admin panel<br/>moderation · modules · users · recomputation]
+      VOICE[Voice / quick capture]
     end
 
     subgraph Auth
-      OIDC[OIDC-Provider<br/>z. B. Authentik / Pocket ID / Keycloak]
+      OIDC[OIDC provider<br/>e.g. Authentik / Keycloak / Pocket ID]
     end
 
     subgraph Backend["Backend (API)"]
-      API[REST/GraphQL API<br/>validiert OIDC-Token · scoped per user_id]
-      ING[Ingestion-Service<br/>KI-Pipeline]
-      MOD[Modul-Registry]
-      CONN[Connector-Layer<br/>Immich · Google Timeline · Health Connect · PSN · Wetter]
-      SEARCH[Such-Service<br/>Volltext + semantisch]
+      API[REST/GraphQL API<br/>validates OIDC token · scoped per user_id]
+      ING[Ingestion service<br/>AI pipeline]
+      MOD[Module registry]
+      CONN[Connector layer<br/>Immich · Google Timeline · Health Connect · PSN · weather]
+      SEARCH[Search service<br/>full text + semantic]
     end
 
     subgraph Data
       PG[(PostgreSQL<br/>+ PostGIS + pgvector)]
-      MEDIA[(Immich<br/>externe Medien — läuft bereits)]
+      MEDIA[(Immich<br/>external media — already running)]
     end
 
     subgraph AI
-      LLM[LLM-Provider<br/>Ollama / OpenAI]
-      STT[Speech-to-Text<br/>Whisper]
+      LLM[LLM provider<br/>Ollama / OpenAI-compatible]
+      STT[Speech-to-text<br/>Whisper]
     end
 
-    UI -- "Login (OIDC Code Flow)" --> OIDC
+    UI -- "login (OIDC code flow)" --> OIDC
     UI --> API
     ADMIN --> API
     VOICE --> ING
-    API -- "Token-Validierung (JWKS)" --> OIDC
+    API -- "token validation (JWKS)" --> OIDC
     API --> PG
     ING --> LLM
     ING --> STT
@@ -502,379 +486,299 @@ flowchart TB
     SEARCH --> PG
 ```
 
-### Schichten
+### Layers
 
-- **Frontend:** Ansichten als Stufe-3-Projektionen desselben API. State-Sync zwischen Timeline & Karte über gemeinsamen Zeitraum-Filter. **Responsive PWA** — eine Codebasis für Desktop und Smartphone (Sidebar ↔ Bottom-Navigation, Panels ↔ Bottom-Sheets).
-- **Auth:** OIDC Authorization Code Flow (PKCE) im Frontend; das Backend validiert Tokens gegen den JWKS-Endpoint des Providers und legt beim ersten Login automatisch den `User`-Datensatz an (JIT-Provisioning über den `sub`-Claim).
-- **Admin-Panel:** Eigene Oberfläche für Moderation (Stufe 2), Modul-/KI-Konfiguration, Nutzerverwaltung und Neuberechnung.
-- **API:** Dünn, autorisierend, delegiert an Services. Jede Query ist per `user_id` gescoped.
-- **Ingestion-Service:** Orchestriert die KI-Pipeline (Kap. 7). Asynchron (Queue) für Batch-Importe und Re-Enrichment.
-- **Modul-Registry:** Lädt Modul-Definitionen, stellt Schemas/Statistiken bereit.
-- **Connector-Layer:** Kapselt externe Quellen (inkl. Wetter).
-- **Datenhaltung:** Ein PostgreSQL mit PostGIS (Geo) + pgvector (Embeddings) deckt relationale, geografische und semantische Anforderungen in **einer** DB ab — ideal fürs Homelab.
+- **Frontend:** views as stage-3 projections of the same API. State sync between timeline and map through a shared time-range filter. A **responsive PWA** — one codebase for desktop and phone (sidebar ↔ bottom navigation, panels ↔ bottom sheets).
+- **Auth:** OIDC authorization code flow (PKCE) in the frontend; the backend validates tokens against the provider's JWKS endpoint and creates the `User` record automatically on first login (JIT provisioning via the `sub` claim).
+- **Admin panel:** its own surface for moderation (stage 2), module/AI configuration, user management and recomputation.
+- **API:** thin, authorising, delegating to services. Every query is scoped by `user_id`.
+- **Ingestion service:** orchestrates the AI pipeline (ch. 7). Asynchronous (queue) for batch imports and re-enrichment.
+- **Module registry:** loads module definitions, provides schemas and statistics.
+- **Connector layer:** encapsulates external sources (including weather).
+- **Storage:** one PostgreSQL with PostGIS (geo) and pgvector (embeddings) covers relational, geographic and semantic needs in **one** database — ideal for self-hosting.
 
 ---
 
-## 11. Tech-Stack Empfehlung (Homelab)
+## 11. Recommended tech stack
 
-| Ebene | Empfehlung | Begründung |
+| Layer | Recommendation | Rationale |
 |---|---|---|
-| **Backend** | Python + **FastAPI** | Passt zur bestehenden Python-Umgebung; exzellent für KI-Integration; async. |
-| **DB** | **PostgreSQL** + **PostGIS** + **pgvector** | Eine DB für relational, geo und semantisch. Weniger bewegliche Teile. |
-| **ORM/Migration** | SQLAlchemy + Alembic | Etabliert, migrationssicher. |
-| **Queue** | Redis / RQ (oder DB-basiert zum Start) | Asynchrone Ingestion & Batch-Import. |
-| **KI (LLM)** | **Ollama** (lokal), Provider-abstrahiert | Datenhoheit; austauschbar gegen OpenAI. |
-| **STT** | **Whisper** (lokal) | Sprach-Eingabe ohne Cloud. |
-| **Geocoding** | **Nominatim** (self-hosted) | Keine externe Abhängigkeit. |
-| **Auth** | **OIDC** — bestehender Homelab-Provider (Authentik/Keycloak) oder leichtgewichtig **Pocket ID**; Backend: `python-jose`/`authlib` für Token-Validierung | SSO über alle Homelab-Dienste; Life-Dash verwaltet keine Passwörter. |
-| **Frontend** | **React** (o. Svelte) als **responsive PWA** + Karten-Lib (MapLibre/Leaflet) + Timeline-Lib | Reiches interaktives UI; eine Codebasis für Desktop & Smartphone; installierbar, Offline-Capture. |
-| **PSN-Connector** | `psnawp` (Python, NPSSO-Token) | Etablierteste inoffizielle PSN-Lib; isoliert im Connector-Layer. |
-| **Deployment** | **Docker Compose** | Homelab-Standard; reproduzierbar. Immich läuft bereits separat — nur URL + API-Key nötig. |
+| **Backend** | Python + **FastAPI** | Fits the existing Python environment; excellent for AI integration; async. |
+| **DB** | **PostgreSQL** + **PostGIS** + **pgvector** | One database for relational, geo and semantic. Fewer moving parts. |
+| **ORM/migration** | SQLAlchemy + Alembic | Established, migration-safe. |
+| **Queue** | Redis / RQ (or DB-based to start) | Asynchronous ingestion and batch import. |
+| **AI (LLM)** | Any **OpenAI-compatible endpoint**, provider-abstracted | Data sovereignty when run locally; interchangeable with cloud vendors. |
+| **STT** | **Whisper** (local) | Voice input without the cloud. |
+| **Geocoding** | **Nominatim** (public or self-hosted) | No mandatory external dependency. |
+| **Auth** | **OIDC** — any standards-compliant provider (Authentik, Keycloak, Pocket ID, Zitadel …); backend: `python-jose`/`authlib` for token validation | SSO across all your services; Life-Dash manages no passwords. |
+| **Frontend** | A **responsive PWA** + map library (MapLibre/Leaflet) + timeline rendering | A rich interactive UI; one codebase for desktop and phone; installable, offline capture. |
+| **PSN connector** | `psnawp` (Python, NPSSO token) | The most established unofficial PSN library; isolated in the connector layer. |
+| **Deployment** | **Docker Compose** | The self-hosting standard; reproducible. Immich runs separately — only a URL and API key are needed. |
 
-> Bewusst **eine** Datenbank statt separatem Vector-Store/Geo-Store, um die Betriebskomplexität im Homelab gering zu halten.
-
----
-
-## 12. Sicherheit & Datenschutz
-
-- **Self-hosted only:** Standardmäßig kein Datenabfluss. Externe KI-Provider sind opt-in und klar gekennzeichnet.
-- **Auth: Multi-User via OIDC von Anfang an.** Life-Dash speichert keine Passwörter; Anmeldung läuft über den Homelab-OIDC-Provider (SSO). Jeder Nutzer hat eine strikt getrennte Datenbasis (`user_id`-Scoping in jeder Query); Rollen: `admin` (Systemkonfiguration) und `user`.
-- **Nutzer-Secrets:** Verbindungsdaten pro Nutzer (Immich-API-Key, PSN-NPSSO-Token) werden verschlüsselt in `User.settings` abgelegt und nie ans Frontend ausgeliefert.
-- **Sensible Daten:** Lebensdaten sind hochsensibel → Backups verschlüsselt, DB nicht öffentlich exponiert (nur via Reverse Proxy/VPN). Bewegungsprofile (Tracks) und Gesundheitsdaten (Metrics) sind die sensibelsten Kategorien — Export/Löschung muss sie vollständig erfassen.
-- **KI-Transparenz:** KI-abgeleitete Aussagen sind über `confidence`, `source` und `confirmed` als solche erkennbar; das Moderations-/Review-Gate verhindert stille Falschdaten.
-- **Rohdaten als Rückfallebene:** Da Stufe 1 unveränderlich ist, kann eine fehlerhafte KI-Verarbeitung jederzeit gefahrlos verworfen und neu berechnet werden.
-- **Datenkontrolle:** Vollständiger Export (Rohdaten + strukturiert) und Löschung jederzeit möglich.
+> Deliberately **one** database rather than a separate vector store or geo store, to keep operational complexity low.
 
 ---
 
-## 13. MVP-Definition
+## 12. Security & privacy
 
-Ziel des MVP: **Der Kernloop über alle drei Stufen funktioniert** — Fragment eingeben (S1) → KI strukturiert + Nutzer moderiert (S2) → auf Zeitstrahl & Karte sehen + durchsuchen (S3).
+- **Self-hosted only:** no data leaves by default. External AI providers are opt-in and clearly marked.
+- **Auth: multi-user via OIDC from the start.** Life-Dash stores no passwords; sign-in goes through your OIDC provider (SSO). Every user has a strictly separate data set (`user_id` scoping in every query); roles: `admin` (system configuration) and `user`.
+- **User secrets:** per-user connection data (Immich API key, PSN NPSSO token) is stored encrypted in `User.settings` and never delivered to the frontend.
+- **Sensitive data:** life data is highly sensitive → encrypted backups, the DB never publicly exposed (only via a reverse proxy/VPN). Movement profiles (tracks) and health data (metrics) are the most sensitive categories — export and deletion must cover them completely.
+- **AI transparency:** AI-derived statements are recognisable as such through `confidence`, `source` and `confirmed`; the moderation/review gate prevents silently wrong data.
+- **Raw data as a fallback:** because stage 1 is immutable, faulty AI processing can be discarded and recomputed safely at any time.
+- **Data control:** a full export (raw plus structured) and deletion are possible at any time.
 
-### 13.1 MVP-Scope (In)
+---
 
-| Bereich | MVP-Umfang |
+## 13. MVP definition
+
+The goal of the MVP: **the core loop across all three stages works** — enter a fragment (S1) → the AI structures it and the user moderates (S2) → see it on the timeline and map and search it (S3).
+
+### 13.1 MVP scope (in)
+
+| Area | MVP scope |
 |---|---|
-| **Drei-Stufen-Fundament** | `Fragment` (S1) unveränderlich → `Event`/`Entity` (S2) mit `confirmed`-Status → Ansichten (S3) neu berechenbar. |
-| **Dateneingabe** | Freitext-Eingabe + KI-Vorschau mit Bestätigung/Korrektur. (Sprache: Phase 2) |
-| **KI-Pipeline** | Extraktion (Datum + Präzision, Ort, Kategorie, einfache Entities), Geocoding, Confidence + Review-Gate. |
-| **Datenmodell** | `Fragment`, `Event`, `Entity`, `EventEntityLink`, `Location` inkl. `confirmed`/`field_overrides`. |
-| **Moderation / Admin** | Einfaches Moderations-Panel: `unconfirmed` sichten, bestätigen, korrigieren; Neuberechnung auslösen. |
-| **Timeline** | Zoom Jahr → Monat → Tag; Events als Punkte/Spannen; Klick-Detail; `unconfirmed` sichtbar markiert. |
-| **Karte** | Verortete Events als Marker + Zeitraumfilter. |
-| **Suche** | Volltext + semantische Suche (Embeddings). |
-| **Kompendium** | Typ **Tiere** als Nachweis der Modularität. |
-| **Module** | Modul-Registry mit 2–3 fest definierten Modulen (`trip`, `animal`, `country`). |
-| **Auth & Multi-User** | OIDC-Login + `user_id` in allen Tabellen + JIT-Provisioning. Kein Nutzer-Management-UI im MVP — Nutzer entstehen durch Login. |
-| **Responsive Grundlayout** | Mobile-taugliches Layout (Bottom-Navigation, Quick-Capture) von Beginn an; PWA-Manifest. Offline-Queue: Phase 2. |
-| **Deployment** | Docker Compose (App + Postgres + Ollama). |
+| **Three-stage foundation** | `Fragment` (S1) immutable → `Event`/`Entity` (S2) with a `confirmed` status → views (S3) recomputable. |
+| **Data capture** | Free-text input plus an AI preview with confirmation/correction. (Voice: phase 2.) |
+| **AI pipeline** | Extraction (date + precision, place, category, simple entities), geocoding, confidence plus review gate. |
+| **Data model** | `Fragment`, `Event`, `Entity`, `EventEntityLink`, `Location` including `confirmed`/`field_overrides`. |
+| **Moderation / admin** | A simple moderation panel: review, confirm and correct `unconfirmed` records; trigger recomputation. |
+| **Timeline** | Zoom year → month → day; events as points/spans; click for detail; `unconfirmed` visibly marked. |
+| **Map** | Located events as markers plus a time-range filter. |
+| **Search** | Full text plus semantic search (embeddings). |
+| **Collection** | The **animals** type as proof of modularity. |
+| **Modules** | A module registry with 2–3 fixed modules (`trip`, `animal`, `country`). |
+| **Auth & multi-user** | OIDC login plus `user_id` in all tables plus JIT provisioning. No user management UI in the MVP — users appear by logging in. |
+| **Responsive base layout** | A mobile-capable layout (bottom navigation, quick capture) from the start; PWA manifest. Offline queue: phase 2. |
+| **Deployment** | Docker Compose (app + Postgres + AI endpoint). |
 
-### 13.2 Bewusst NICHT im MVP (Out)
+### 13.2 Deliberately NOT in the MVP (out)
 
-- Sprach-Eingabe / Whisper, Offline-Capture-Queue (PWA-Grundlage aber gelegt)
-- Immich-, Google-Timeline-, Health-Connect-, PSN-, Wetter-Integration (Datenmodell & Stufe-3-Konzept aber vorbereitet)
-- Statistik-Dashboard (nur rudimentäre Zähler)
-- Personen-Modul (bewusst ausgeklammert)
-- Vollständiges Module-Set, Dekaden-Aggregation
-- Nutzerverwaltungs-UI, Sharing zwischen Nutzern (OIDC-Login + Datentrennung sind aber **im** MVP)
+- Voice input / Whisper, offline capture queue (though the PWA foundation is laid)
+- Immich, Google Timeline, Health Connect, PSN and weather integration (though the data model and stage-3 concept are prepared)
+- Statistics dashboard (only rudimentary counters)
+- A people module (deliberately left out)
+- A complete module set, decade aggregation
+- User management UI, sharing between users (OIDC login and data separation *are* in the MVP)
 
-### 13.3 Definition of Done (MVP)
+### 13.3 Definition of done (MVP)
 
-1. Ich tippe „12.07.2026 war in Detmold und habe einen Adler gesehen" → sehe eine KI-Vorschau (Stufe 2, `unconfirmed`) → bestätige (→ `confirmed`).
-2. Das Event erscheint korrekt datiert auf dem Zeitstrahl **und** als Marker in Detmold auf der Karte.
-3. „Sommer 2002 Urlaub in Frankreich" wird als Spanne (Sommer 2002, `season`, `unconfirmed`) mit Ort Frankreich gespeichert.
-4. Im Kompendium erscheint „Adler" (Tier) mit der Sichtung.
-5. Ich kann „Frankreich" suchen und finde das Event (Volltext + semantisch).
-6. Ich kann im Admin-Panel die Stufe-2/3-Daten löschen und **aus den Rohdaten neu berechnen** — bestätigte Werte bleiben erhalten.
-7. Ich melde mich per OIDC an; ein zweiter Nutzer meldet sich an und sieht **keine** meiner Daten.
-8. Auf dem Smartphone kann ich über die Bottom-Navigation ein Fragment erfassen und die Timeline lesen, ohne horizontal zu scrollen.
+1. I type “12/07/2026 was in Detmold and saw an eagle” → see an AI preview (stage 2, `unconfirmed`) → confirm it (→ `confirmed`).
+2. The event appears correctly dated on the timeline **and** as a marker in Detmold on the map.
+3. “Summer 2002 holiday in France” is stored as a span (summer 2002, `season`, `unconfirmed`) with the place France.
+4. “Eagle” (animal) appears in the collection together with the sighting.
+5. I can search for “France” and find the event (full text plus semantic).
+6. In the admin panel I can delete the stage-2/3 data and **recompute it from the raw data** — confirmed values are kept.
+7. I sign in via OIDC; a second user signs in and sees **none** of my data.
+8. On a phone I can capture a fragment via the bottom navigation and read the timeline without scrolling horizontally.
 
 ---
 
-## 14. Roadmap & Umsetzungsstand
+## 14. Roadmap & implementation status
 
-### 14.1 Was bereits läuft (Stand 2026-07-16)
+### 14.1 What already works
 
-**P0 + P1 vollständig, D1 (Deployment) live**, dazu P2.2–P2.7:
+**P0 + P1 complete, D1 (deployment) live**, plus P2.2–P2.7:
 
-| Bereich | Umgesetzt |
+| Area | Implemented |
 |---|---|
-| **Fundament** | Drei-Stufen-Datenmodell mit `user_id`, `confirmed`, `field_overrides`; Fragment→Event-Pipeline; Mini-Migration (`migrate.py`). |
-| **Deployment (D1, live)** | Läuft produktiv im Homelab: Raspberry Pi 5 (ARM64), Multi-Arch-Image aus GHCR (GitHub Actions), Reverse Proxy Pangolin (Traefik), Pocket ID live (`AUTH_MODE=oidc`), PostgreSQL 18 als Compose-Standard, alle Daten als Bind-Mounts neben der Compose (`./db`, `./data`), Runbook docs/DEPLOY.md. |
-| **Auth** | OIDC (Pocket ID, Code Flow + PKCE), JIT-Provisioning, erster Nutzer = Admin + Altdaten-Adoption, Dev-Modus für lokale Entwicklung. Läuft live hinter dem Reverse Proxy. |
-| **KI** | Provider-Abstraktion (Mock / OpenAI-kompatibel); aktuell **Gemini** (`gemini-3.5-flash` + `gemini-embedding-2`); ausgearbeiteter Prompt mit Few-Shot-Beispielen; Retry mit Backoff; Quota-Schutz (Batch bricht sauber ab, Capture-first-Fallback beim Einzel-Ingest). |
-| **Ansichten** | Timeline (Zoom Tag→Jahrzehnt, Kategorie-Filter); Karte (Modi Tag→Alles, Kategorie-Filter, Kalender-Sprung, Tagesrouten); Statistik (12 Kacheln inkl. Alter/Umzüge/heißester/kältester Tag, 4 Charts); Kompendium (Zähler, Detailseite mit Karte + **Wikipedia-Beschreibung** via Wikidata-Konzeptsuche). |
-| **Eingabe & Moderation** | KI-Vorschau mit Korrektur; **manuelle Eingabe** (Formular, sofort bestätigt); **Bearbeiten-Dialog** an jeder Event-Karte (inkl. Ort→Geocoding bis Hausnummer, Kommentarfeld); Moderations-Queue; Bestätigen zieht verknüpfte Entities mit. |
-| **Stufe 3** | Wetter-Enrichment (Open-Meteo, on-demand + force); Embeddings + hybride Suche (Volltext + semantisch); Admin-Aktionen mit Beschreibungen. |
-| **Datenkontrolle** | **Export/Import** (JSON, idempotent, pro Nutzer) = Backup/Restore/Umzug; „Alle Daten löschen" mit doppelter Nachfrage. |
-| **Lebensdatenbank-Werkzeuge** (2026-07-16) | **P2.5** Bulk-Bestätigen mit Filter (Kategorie/Quelle/Confidence/Zeitraum) + Pflicht-Vorschau; **P2.6** Invarianten-Tests „Bestätigtes ist unantastbar" (`backend/tests/`, pytest, offline); **P2.7** Bestätigungs-Provenienz `confirmed_at`/`confirmed_by` (manuell/bulk/import) inkl. Bestandsdaten-Migration, sichtbar im Bearbeiten-Dialog; **P2.4** Auto-Wetter direkt nach Eingabe/KI-Analyse, Wetter-Nachzug bei Zeit-/Ort-Korrektur durch den Nutzer. |
-| **UX & Betrieb (A1–A3, v0.6.0)** | Toasts + Bestätigungs-Modal im App-Stil statt nativer Browser-Popups (alle ~20 Stellen, inkl. Tipp-Bestätigung beim Daten-Wipe); Fortschrittsbalken für Timeline-/JSON-Import (Etappen-Import, idempotent, `auto_resolve`-Param); Versionsnummer aus `backend/app/version.py` in Sidebar, `/health` und OpenAPI. |
-| **Nutzung & Betrieb (v0.7.0, 2026-07-16)** | **A8** Export-Rückmeldung (Toast mit Inhalt/Größe/Dateiname); **A9** zentrales Logging (`lifedash.*`, `LOG_LEVEL`, Log-Rotation in Compose, Admin-/Import-/Geocoding-/Wetter-Logs); **A10** Ortsnamen-Sprachfallback de→en + `namedetails` + Admin-Aktion „Fremdschrift-Namen eindeutschen" (`scope=nonlatin`); **A13** Uhrzeiten bei `exact` sichtbar („12.07.2026, 14:30–16:05") + Uhrzeit-Felder im Bearbeiten-Dialog (Fix: stiller `exact`→`day`-Downgrade); **A5-Karten-Teil** Marker-Clustering — alle Punkte statt 300er-Deckel (nummerierte Route bis 300 Stopps bleibt). |
-| **Standort, Wetter & Länder (v0.14.0, 2026-07-19)** | **F2** 📍-Knopf bei KI-Analyse (Koordinaten ins Fragment, Ortsvorschlag nur wenn der Text keinen Ort nennt) und manueller Eingabe (Adresse ins Ortsfeld, `/api/ingest/reverse-location`). **F3** *(Nutzer-Entscheidung: reine Tageswerte)*: `temp_min_c`/`temp_max_c`, `sunshine_h`, `rain_mm`, `snow_cm`, `wind_max_kmh` + Tages-Wetterlage; UI bündelt alles zu einer Zeile; Statistik-Kacheln Sonnigster/Nassester/Windigster/Schneereichster Tag, Heiß/Kalt nutzt echte Max/Min; Bestand bleibt unangetastet. **F4** Land aus addressdetails → `Location.country` + `country`-Entity mit Links auf alle Events des Orts (idempotent), greift bei Ortsauflösung, Vorwärts-Geocoding und Standort-Erfassung; rückwirkend über die Auflösungs-Läufe. |
-| **Module, Tracking & Background-Jobs (v0.13.0, 2026-07-19)** | **A7** Module voll deklarativ: Label/Farbe/Emoji/Kompendium/Formulare/KI-Regeln aus dem YAML (`/api/modules` + `prompt_rules` → dynamischer System-Prompt); neue Module movie/game/book als Beweis (je eine Datei). **A15** Tracking-Auswahl: Onboarding-Modal beim ersten Start + Einstellung in der Verwaltung; blendet UI aus und filtert KI-Prompt (`tracked_modules`). **A22** Server-Jobs: Worker-Threads für Wetter/Embeddings/Ortsnamen/Neuberechnung (laufen ohne offenen Browser), Stopp-Knopf + 4-s-Auto-Refresh im Jobs-Reiter, Nachtplan pro Typ+Nutzer (`job_schedule`, Minuten-Ticker in main.py). **Damit ist Gruppe A komplett.** |
-| **Feinschliff & Mobile (v0.12.0, 2026-07-19; 0.11.0 übersprungen)** | **A20** Mobile-Fixes: Karten-Reiter zeigte auf dem Handy nichts (CSS-Flex-Kollaps auf Höhe 0), Suche fiel still aus (jetzt lokaler Textsuche-Fallback + Hinweis). **A19** „Gesuchte Adresse"-Label abgeschafft (neue Importe unbenannt → reine Adresse; Start-Migration bereinigt Bestandsnamen/-titel). **A21** Export-Auswahl („ohne Google-Timeline-Daten", `exclude_source`). **A23** Klartext im UI: Roh-Eingang/Vorschläge/Lebensdatenbank/Ansichten statt „Stufe 1/2/3". Changelog ab jetzt in Produktsprache ohne Paketkürzel (Anm. 39); Lizenz AGPL-3.0 in diesem Release wirksam. |
-| **Verwaltung & Logs (v0.10.0, 2026-07-16)** | **A14** „Verwaltung" mit Reitern: Moderation / Meine Daten / Jobs (alle Nutzer) + System / Nutzer / Datenbank / Logs (nur Admin) — umgesetzt als eine Seite mit rollen-gegateten Reitern statt zwei getrennter Bereiche (deckt das Ziel ab: Nutzer sehen nur ihre Werkzeuge). **A17** Log-Ansicht: Admin-Reiter „Logs" mit Ring-Puffer (letzte 500 Zeilen, Level-Filter, `GET /api/admin/logs`). |
-| **Betrieb & Robustheit (v0.9.0, 2026-07-16)** | **A11** Jobs mit Sperre: Lang-Läufer (Wetter, Neuberechnung, Embeddings, Ortsnamen, Importe) als Jobs registriert (`/api/jobs`), ein Lock pro Typ (409 „läuft bereits" statt Doppel-Lauf), Jobs-Tabelle im Admin-Bereich, Stale-Aufräumung nach 3 min ohne Heartbeat; DB-seitiger Wetter-Dubletten-Schutz (partieller Unique-Index + Bereinigung). **A4** Rohansicht mit Leitplanken: Enum-/JSON-/Zeit-Validierung, Folge-Neuberechnungen (Titel→Embedding-Reset, Zeit/Ort→Wetter-Nachzug) sichtbar im Toast, Fragmente/Nutzer-Löschung gesperrt, Löschen räumt abhängige Zeilen auf. **A18** Cluster-Schwelle einstellbar (10–300, Default 50, `map_cluster_min`). **A16** (Fix) `month` zählt zu den unscharfen Zeiten. API-Fehlerdetails erreichen jetzt das UI. |
-| **Nutzung & Betrieb (v0.8.0, 2026-07-16)** | **A5-Rest** Besuchs-Verdichtung: Karte bündelt ab Monats-Ansicht wiederholte Besuche desselben Orts („59× Zuhause — …", Toggle „🔁 Orte bündeln"); Timeline fasst gleiche Google-Besuche einer Zeitgruppe zu aufklappbaren Sammelkarten zusammen. **A12** Semantische Orte („Zuhause"/„Arbeit"/„Gesuchte Adresse") werden reverse-geocodet, Label bleibt Präfix („Zuhause — Musterstraße 1"); Bestandsdaten über „Ortsnamen auflösen"; optionaler Import-Filter Mindest-Ortssicherheit (`min_probability`). **A6** Nutzerverwaltung im Admin-Panel (Rollen ändern, Nutzer inkl. Daten löschen; Letzter-Admin- und Selbstlösch-Schutz). **Kompakte Ortsnamen:** Anzeige-Namen werden aus wählbaren Bausteinen (Straße/Ortsteil/Stadt/Land, pro Nutzer via `/api/auth/me/settings`) statt der vollen Nominatim-Kette gebaut; POI-Eigennamen bleiben vorn; Aktion „Adressen kürzen" (`scope=verbose`) formatiert Bestandsdaten nach. Offline-Tests für A12/A6/Ortsnamen-Format. |
-| **Module** | trip, animal, country, artist (Konzerte), food (Mahlzeiten), milestone (Lebensereignisse). |
+| **Foundation** | Three-stage data model with `user_id`, `confirmed`, `field_overrides`; fragment→event pipeline; mini migration (`migrate.py`). |
+| **Deployment (D1, live)** | Running in production: ARM64 single-board server, multi-arch image from GHCR (GitHub Actions), a reverse proxy in front, OIDC live (`AUTH_MODE=oidc`), PostgreSQL 18 as the Compose default, all data as bind mounts next to the Compose file (`./db`, `./data`), runbook in docs/DEPLOY.md. |
+| **Auth** | OIDC (code flow + PKCE), JIT provisioning, first user = admin plus legacy data adoption, dev mode for local development. Runs live behind the reverse proxy. |
+| **AI** | Provider abstraction (mock / OpenAI-compatible); a worked-out prompt with few-shot examples; retry with backoff; quota protection (a batch stops cleanly, capture-first fallback on single ingest). |
+| **Views** | Timeline (zoom day→decade, category filter); map (modes day→all, category filter, calendar jump, daily routes); statistics (12 tiles including age/moves/hottest/coldest day, 4 charts); collection (counters, detail page with map and **Wikipedia description** via a Wikidata concept lookup). |
+| **Capture & moderation** | AI preview with correction; **manual capture** (form, confirmed immediately); an **edit dialog** on every event card (including place→geocoding down to house number, comment field); moderation queue; confirming pulls linked entities along. |
+| **Stage 3** | Weather enrichment (Open-Meteo, on demand + force); embeddings plus hybrid search (full text + semantic); admin actions with descriptions. |
+| **Data control** | **Export/import** (JSON, idempotent, per user) = backup/restore/migration; “delete all data” with a double confirmation. |
+| **Life-database tools** | **P2.5** bulk confirm with filters (category/source/confidence/time range) plus a mandatory preview; **P2.6** invariant tests “confirmed data is untouchable” (`backend/tests/`, pytest, offline); **P2.7** confirmation provenance `confirmed_at`/`confirmed_by` (manual/bulk/import) including a migration for existing data, visible in the edit dialog; **P2.4** automatic weather right after capture/AI analysis, weather follow-up when the user corrects time or place. |
+| **UX & operations (A1–A3, v0.6.0)** | Toasts plus a confirmation modal in the app's own style instead of native browser popups (all ~20 places, including a typed confirmation for the data wipe); progress bars for timeline/JSON import (staged import, idempotent, `auto_resolve` parameter); version number from `backend/app/version.py` in the sidebar, `/health` and OpenAPI. |
+| **Use & operations (v0.7.0)** | **A8** export feedback (a toast with content/size/filename); **A9** central logging (`lifedash.*`, `LOG_LEVEL`, log rotation in Compose, admin/import/geocoding/weather logs); **A10** place-name language fallback plus `namedetails` plus the admin action “transliterate foreign-script names” (`scope=nonlatin`); **A13** times visible for `exact` (“12/07/2026, 14:30–16:05”) plus time fields in the edit dialog (fix: a silent `exact`→`day` downgrade); **A5 map part** marker clustering — all points instead of a 300 cap (the numbered route up to 300 stops remains). |
+| **Location, weather & countries (v0.14.0)** | **F2** a 📍 button in AI analysis (coordinates into the fragment, a place suggestion only when the text names no place) and in manual capture (address into the place field, `/api/ingest/reverse-location`). **F3** *(user decision: pure daily values)*: `temp_min_c`/`temp_max_c`, `sunshine_h`, `rain_mm`, `snow_cm`, `wind_max_kmh` plus the daily condition; the UI bundles it all into one line; statistics tiles for sunniest/wettest/windiest/snowiest day, hot/cold uses the real max/min; existing data stays untouched. **F4** country from addressdetails → `Location.country` plus a `country` entity linked to all events at that place (idempotent), applied during place resolution, forward geocoding and location capture; retroactively via the resolution runs. |
+| **Modules, tracking & background jobs (v0.13.0)** | **A7** modules fully declarative: label/colour/emoji/collection/forms/AI rules from the YAML (`/api/modules` + `prompt_rules` → a dynamic system prompt); the new modules movie/game/book as proof (one file each). **A15** tracking choice: an onboarding modal on first start plus a setting in the admin area; hides UI and filters the AI prompt (`tracked_modules`). **A22** server jobs: worker threads for weather/embeddings/place names/recomputation (running without an open browser), a stop button plus a 4-second auto refresh in the jobs tab, a nightly schedule per type and user (`job_schedule`, a minute ticker in main.py). **This completes group A.** |
+| **Polish & mobile (v0.12.0; 0.11.0 skipped)** | **A20** mobile fixes: the map tab showed nothing on a phone (a CSS flex collapse to height 0), search failed silently (now a local text-search fallback plus a hint). **A19** the “searched address” label was abolished (new imports stay unnamed → a plain address; a startup migration cleans up existing names/titles). **A21** export selection (“without Google Timeline data”, `exclude_source`). **A23** plain language in the UI: raw inbox/proposals/life database/views instead of “stage 1/2/3”. From here on the changelog is written in product language without package codes (note 39); the AGPL-3.0 license took effect with this release. |
+| **Admin & logs (v0.10.0)** | **A14** “Settings” with tabs: moderation / my data / jobs (all users) plus system / users / database / logs (admin only) — implemented as one page with role-gated tabs rather than two separate areas (this meets the goal: users see only their own tools). **A17** log view: an admin tab “logs” with a ring buffer (the last 500 lines, level filter, `GET /api/admin/logs`). |
+| **Operations & robustness (v0.9.0)** | **A11** jobs with a lock: long runners (weather, recomputation, embeddings, place names, imports) registered as jobs (`/api/jobs`), one lock per type (409 “already running” instead of a double run), a jobs table in the admin area, stale cleanup after 3 minutes without a heartbeat; DB-side duplicate protection for weather (a partial unique index plus cleanup). **A4** raw view with guard rails: enum/JSON/time validation, follow-up recomputations (title→embedding reset, time/place→weather follow-up) visible in the toast, fragment/user deletion blocked, deleting cleans up dependent rows. **A18** cluster threshold configurable (10–300, default 50, `map_cluster_min`). **A16** (fix) `month` counts as a vague date. API error details now reach the UI. |
+| **Use & operations (v0.8.0)** | **A5 remainder** visit condensation: from month view up, the map bundles repeated visits to the same place (“59× home — …”, toggle “🔁 merge places”); the timeline groups identical Google visits within a time group into expandable collective cards. **A12** semantic places (“home”/“work”/“searched address”) are reverse geocoded, the label stays as a prefix (“home — Example Street 1”); existing data via “resolve place names”; an optional import filter for minimum location certainty (`min_probability`). **A6** user management in the admin panel (change roles, delete users including their data; last-admin and self-deletion protection). **Compact place names:** display names are built from selectable building blocks (street/district/city/country, per user via `/api/auth/me/settings`) rather than the full Nominatim chain; POI proper names stay in front; the action “shorten addresses” (`scope=verbose`) reformats existing data. Offline tests for A12/A6/place-name formatting. |
+| **World & achievements (v0.18.0)** | **F5** a “world” tab: a choropleth world map (Leaflet plus a bundled GeoJSON, Natural Earth 110m, public domain) plus a per-continent checklist with an expandable list of what is missing; country reference data (`backend/app/data/countries.py`, name → ISO → continent) connects the name-only `country` entities to the map shapes and merges aliases. **F6** an “achievements” tab: bronze/silver/gold/platinum, declared in the module YAMLs (metric plus four thresholds), a pure layer-4 derivation counting only confirmed data and respecting the tracked modules. |
+| **Print & portability (v0.19.0)** | **F8** a print dialog with a date range, presets and content switches; printing builds a dedicated page containing every event in the range instead of the on-screen view. **A27** the generality audit: `.env.example` is the complete setup reference, Compose no longer forces an AI key or hardwires vendor defaults, README/backend README/DEPLOY rewritten for portability. |
+| **Bilingual (v0.20.0)** | **F10** the interface can be switched between German and English (a catalog mechanism where German stays the source of truth), the language is stored per device and on the account, and place-name lookups follow it (`Accept-Language`, the remainder of A25). Documentation switched to English. |
+| **Modules** | trip, animal, country, artist (concerts), food (meals), milestone (life events), movie, game, book. |
 
-### 14.2 Fahrplan (Stand 2026-07-16)
+### 14.2 Roadmap
 
-**Prinzip:** Zwei Gruppen — **A: notwendig/sinnvoll für die allgemeine
-Nutzung** (Betrieb, Bedienbarkeit, Datensicherheit) und **B: neue Features**.
-**Der Fokus liegt auf Gruppe A**; Features aus B kommen danach oder als
-bewusste Ausnahme dazwischen.
+**Principle:** two groups — **A: necessary/sensible for general use** (operations, usability, data safety) and **B: new features**. **The focus is on group A**; features from B come afterwards or as a deliberate exception in between.
 
-Aufwand: S = Stunden · M = ~1 Tag · L = mehrere Tage. Kein Paket blockiert ein anderes, außer wo vermerkt.
+Effort: S = hours · M = ~1 day · L = several days. No package blocks another except where noted.
 
-**Bereits erledigt** (Details in 14.1): D1 Deployment · P2.2 Timeline-Import ·
-P2.3 Unscharfe-Zeiten-Review · P2.4 Auto-Enrichment · P2.5 Bulk-Bestätigen ·
-P2.6 Invarianten-Test · P2.7 Bestätigungs-Provenienz · **A1–A3 (v0.6.0):**
-UI-Dialoge/Toasts statt Browser-Popups, Fortschrittsbalken bei großen
-Importen (Etappen-Import, idempotent), Versionsnummer in Sidebar + `/health` ·
-**A8/A9/A10/A13 + A5-Karten-Teil (v0.7.0):** Export-Rückmeldung, zentrales
-Logging, Ortsnamen-Sprachfallback + Fremdschrift-Auflösung, Uhrzeiten
-sichtbar/bearbeitbar, Marker-Clustering statt 300er-Deckel ·
-**A5-Rest/A12/A6 (v0.8.0):** Besuchs-Verdichtung (Karte + Timeline),
-semantische Orte → echte Adressen inkl. `min_probability`-Filter,
-Nutzerverwaltungs-UI.
+**Already done** (details in 14.1): D1 deployment · P2.2 timeline import · P2.3 vague-date review · P2.4 auto enrichment · P2.5 bulk confirm · P2.6 invariant test · P2.7 confirmation provenance · **A1–A3 (v0.6.0)** · **A8/A9/A10/A13 plus the A5 map part (v0.7.0)** · **A5 remainder/A12/A6 (v0.8.0)** · **A4/A11/A16/A18 (v0.9.0)** · **A14/A17 (v0.10.0)** · **A19–A21/A23 (v0.12.0)** · **A7/A15/A22 (v0.13.0)** · **F2–F4 (v0.14.0)** · **F1/F7/F9 (v0.15.0)** · **A24–A26 (v0.16.0)** · **F8 first stage (v0.17.0)** · **F5/F6 (v0.18.0)** · **F8 selection dialog/A27 (v0.19.0)** · **F10 (v0.20.0)**.
 
-#### Gruppe A — Notwendig & sinnvoll für die Nutzung (Fokus)
+#### Group A — necessary & sensible for everyday use
 
-| Nr. | Paket | Aufwand | Inhalt | Nutzen |
+**✅ Group A is complete.** All packages are implemented; the detailed record
+of what each one changed lives in 14.1 and in [CHANGELOG.md](../CHANGELOG.md),
+so the table below keeps one line per package rather than repeating it.
+
+| No. | Package | Done in | Content |
+|---|---|---|---|
+| **A1–A3** | UI dialogs/toasts instead of browser popups · progress bars for large imports · version number in sidebar and `/health` | v0.6.0 | — |
+| **A4** | Guard rails for the raw DB view: enum/JSON/time validation, visible follow-up recomputations, protected fragments/users | v0.9.0 | — |
+| **A5** | Decade aggregation & visit condensation (map and timeline), marker clustering instead of a 300 cap | v0.7.0/v0.8.0 | — |
+| **A6** | User management UI (roles, deletion, last-admin and self-deletion protection) | v0.8.0 | — |
+| **A7** | Full module build-out: label/colour/emoji/forms/AI rules from the module YAML | v0.13.0 | — |
+| **A8** | Export feedback (toast with content, size, filename) | v0.7.0 | — |
+| **A9** | Central logging (`lifedash.*`, `LOG_LEVEL`, log rotation) | v0.7.0 | — |
+| **A10** | Place-name language fallback plus foreign-script resolution | v0.7.0 | — |
+| **A11** | Jobs with a lock (`/api/jobs`), one lock per type, stale cleanup | v0.9.0 | — |
+| **A12** | Timeline import: semantic places → real addresses, label kept as a prefix | v0.8.0 | — |
+| **A13** | Times visible and editable for `exact` precision | v0.7.0 | — |
+| **A14** | Admin split into role-gated tabs (moderation/my data/jobs vs. system/users/DB/logs) | v0.10.0 | — |
+| **A15** | Tracking choice by the user (onboarding modal plus setting) | v0.13.0 | — |
+| **A16** | Fix: month precision counts as a vague date | v0.9.0 | — |
+| **A17** | Log view in the UI (ring buffer, level filter) | v0.10.0 | — |
+| **A18** | Map clustering only above a configurable threshold (10–300) | v0.9.0 | — |
+| **A19** | “Searched address” label abolished, existing data cleaned by migration | v0.12.0 | — |
+| **A20** | Mobile fixes: map tab and search | v0.12.0 | — |
+| **A21** | Export with a selection (`exclude_source`) | v0.12.0 | — |
+| **A22** | Server-side background jobs plus a nightly schedule per type and user | v0.13.0 | — |
+| **A23** | Plain language in the UI instead of “stage 1/2/3” | v0.12.0 | — |
+| **A24** | Map height coupled to the viewport plus a fullscreen toggle | v0.16.0 | Closed in v0.19.0: “improve generally” held no decision and is no longer kept open. |
+| **A25** | One place-name run with a scope selection instead of three buttons | v0.16.0 | The F10 part (`Accept-Language` follows the app language) landed in v0.20.0. |
+| **A26** | “My data” tab regrouped into clear blocks | v0.16.0 | — |
+| **A27** | Generality audit: `.env.example` as the complete setup reference, no vendor defaults hardwired, portable docs | v0.16.0/v0.19.0 | — |
+
+#### Group B — new features (order: features first, new import sources LAST — decision 2026-07-19)
+
+| No. | Package | Effort | Content | Benefit |
 |---|---|---|---|---|
-| **A4** | ✅ **DB-Rohansicht absichern** *(fertig v0.9.0)* | M | Rohes Ändern/Löschen im Admin bekommt Leitplanken: (b) Validierung von Enums/JSON/Zeiten/Zahlen (400 mit klarer Meldung); (c) Folge-Neuberechnungen automatisch + sichtbar — Titel/Beschreibung → Embedding-Reset, Ort/Datum → Wetter-Nachzug (P2.4-Pfad), Entity/Event/Ort gelöscht → abhängige Zeilen aufgeräumt; (d) Fragment-Löschen gesperrt (Eingang = Beweisarchiv, Kap. 3.1), Nutzer-Löschen nur über die Nutzerverwaltung. *(a — Umleitung auf Moderation-Endpoints — bewusst nicht nötig: die Validierung + Folgeaktionen decken das ab.)* | Admin-Eingriffe können die Invarianten nicht mehr still verletzen. |
-| **A5** | ✅ **Dekaden-Aggregation & Besuchs-Verdichtung** *(vorher P3.2; fertig v0.8.0)* | M | Heat-/Dichte-Darstellung auf Jahrzehnt-/Jahres-Ebene statt langer Kartenlisten; wiederholte Besuche desselben Orts gruppieren („59× Besuch: X"), Alltagsorte (Zuhause/Arbeit) optional zusammenfassen. **Dazu (Frage 14):** ✅ *(v0.7.0)* der harte Karten-Deckel (max. 300 Marker pro Zeitraum) ist durch **Marker-Clustering** ersetzt — alle Punkte werden repräsentiert, bei Dichte gebündelt statt abgeschnitten. ✅ *(v0.8.0)* Besuchs-Verdichtung: Karte bündelt ab Monats-Ansicht pro Ort (Toggle „🔁 Orte bündeln", Dichte über Cluster), Timeline fasst gleiche Besuche einer Zeitgruppe zu aufklappbaren Sammelkarten zusammen. | Übersicht trotz zehntausender Timeline-Events — aktuell die größte Nutzungs-Bremse. |
-| **A6** | ✅ **Nutzerverwaltungs-UI** *(vorher P5.3; fertig v0.8.0)* | S | Nutzerliste, Rollen ändern, Nutzer löschen (Admin-Panel). Umgesetzt inkl. Leitplanken: eigenes Konto nicht löschbar, letzter Admin nicht herabstufbar; Löschen entfernt alle Daten des Nutzers (Stufe 1–3). | Komfort für den realen Multi-User-Betrieb. |
-| **A7** | ✅ **Modul-Vollausbau** *(aus Frage 3; fertig v0.13.0)* | M | Kategorie-Label/Farbe/Emoji kommen jetzt aus dem Modul-YAML ins Frontend (Filter-Chips, Karten-Farben, Kompendium-Reiter, Formular-Optionen werden zur Laufzeit aus `/api/modules` gebaut), Modul-Regeln (`prompt_rules`) fließen automatisch in den KI-Prompt. Ein neues Modul ist wirklich „nur eine YAML-Datei" — bewiesen mit den neuen Modulen `movie`/`game`/`book` (je eine Datei). | Neue Kategorien ohne Code-Änderung — senkt die Hürde, das System wachsen zu lassen. |
-| **A11** | ✅ **Job-Übersicht & Gleichzeitigkeit** *(Frage 17; fertig v0.9.0)* | M | Lang laufende Admin-Aktionen (Wetter ergänzen, Neuberechnen, Embeddings, Ortsnamen auflösen, große Importe) laufen als **Jobs** (`/api/jobs`): Job-Tabelle (Typ, Status, Fortschritt, gestartet von/wann, Ergebnis), **ein Lock pro Job-Typ** — startet eine zweite Instanz denselben Job, bekommt sie „läuft bereits" (409) statt eines Doppel-Laufs; verwaiste Läufe geben den Lock nach 3 min ohne Heartbeat frei. Dazu DB-seitiger Dubletten-Schutz (partieller Unique-Index: Wetter-Metrik pro Event+Kennzahl einmalig, inkl. Alt-Bereinigung). Die **Jobs-Tabelle** im Admin-Bereich zeigt laufende und letzte Läufe (wird mit A14 ein eigener Reiter). | Zwei offene Browser/Rechner können keine doppelten Anreicherungen, Duplikate oder doppelte API-Kosten mehr erzeugen. |
-| **A12** | ✅ **Timeline-Import: semantische Orte → echte Adressen** *(Fragen 19+20; fertig v0.8.0)* | S–M | Der Geräte-Export kennt keine Ortsnamen, nur `semanticType` — der Import setzte Labels („Zuhause", „Arbeit", „Gesuchte Adresse"), die **nie** reverse-geocodet wurden (die Auflösung griff nur bei „Ort (lat, lng)"). Umgesetzt: auch semantische Orte werden aufgelöst — Label bleibt als Präfix erhalten („Zuhause — Musterstraße 1, Detmold"; `type=home` bleibt, mehrere Wohnorte im Lebenslauf bleiben durch getrennte `place_id`s getrennt). Bestandsdaten zieht „Ortsnamen auflösen" mit. Dazu der Import-Filter nach Mindest-`probability` (Eingabefeld am Import), um unsichere Ortszuordnungen (häufig bei „Gesuchte Adresse") auszusortieren. | Besuche zeigen echte Adressen statt generischer Labels. |
-| **A14** | ✅ **Admin aufteilen: „Verwaltung" + „Admin", mit Reitern** *(Anmerkung 23; fertig v0.10.0 — als EINE Seite „Verwaltung" mit rollen-gegateten Reitern: Moderation/Meine Daten/Jobs für alle, System/Nutzer/Datenbank/Logs nur Admin)* | M | Die heutige „Admin & Moderation"-Seite ist ein langer Mischmasch. Neu: zwei Bereiche mit **Reitern** statt einer Scroll-Seite. **„Verwaltung"** (jeder Nutzer, alles nutzergebunden): Moderations-Queue + Bulk-Bestätigen, unscharfe Zeiten, Export/Import, Ortsnamen-Aktionen + Ortsnamen-Format, eigene Anreicherungs-Läufe/Jobs (Reiter „Jobs" aus A11), Tracking-Auswahl (A15). **„Admin"** (nur Rolle admin, übergeordnet): Nutzerverwaltung (A6), KI-Provider/Systemstatus, Daten-Wipe, DB-Rohansicht, Log-Ansicht (A17). *Festgelegt:* Die DB-Rohansicht bleibt im Admin-Bereich — sie ist nutzerübergreifend; nutzereigene Korrekturen laufen weiter über Bearbeiten-Dialog/Moderation (Leitplanken → A4). | Übersicht statt Scroll-Wüste; normale Nutzer bekommen ihre Werkzeuge, ohne Systemthemen zu sehen. |
-| **A15** | ✅ **Tracking-Auswahl durch den Nutzer** *(Anmerkung 24; fertig v0.13.0 — Onboarding-Modal beim ersten Start, änderbar unter Verwaltung → Meine Daten; blendet Reiter/Filter/Formulare/Statistik aus und filtert die KI-Prompt-Regeln; `tracked_modules` in User.settings)* | S–M | Der Nutzer entscheidet, was in Kompendium und Statistik auftaucht: Beim **ersten Start** eine Frage „Was möchtest du tracken?" (Auswahl aus der Modul-Registry: Tiere, Länder, Künstler, Essen, Filme, Spiele, Bücher …), danach jederzeit änderbar unter Verwaltung (A14). Abwahl blendet Kompendium-Reiter, Statistik-Widgets und Formular-Optionen aus (Daten bleiben erhalten, nur Anzeige); die KI-Prompt-Regeln nicht gewählter Module entfallen (baut auf A7 auf). Gespeichert in `User.settings` (wie `place_name_parts`). | Das UI zeigt nur, was einen interessiert — statt fester Modul-Liste für alle. |
-| **A16** | ✅ **Monats-Präzision zählt als unscharf** *(Anmerkung 25, Bugfix; fertig v0.9.0)* | S | „Juni Urlaub Dänemark" wird korrekt als `month` (01.06.–30.06.) gespeichert, tauchte aber **nicht** in der Unscharfe-Zeiten-Liste auf — die filterte nur `season`/`year`/`decade`/ohne Datum (P2.3-Lücke). Behoben: `month` zählt mit; Grundsatz aus Kap. 6.2 gilt unverändert (unscharfe KI-Zeiten sind `unconfirmed`, bis der Nutzer sie bestätigt oder konkretisiert). | Monatsgenaue Events landen in der Nachschärf-Liste, wie es das Konzept vorsieht. |
-| **A17** | ✅ **Log-Ansicht in der UI** *(Anmerkung 29; fertig v0.10.0)* | S–M | Die zentralen `lifedash.*`-Logs (A9) zusätzlich in einem **Ring-Puffer** halten (z. B. letzte 500 Zeilen, In-Memory-Logging-Handler) und als Admin-Reiter anzeigen: Level-Filter (DEBUG–ERROR), Logger-Filter (Import, Geocoding, Wetter, KI …), Auto-Refresh. Kein Persistieren, kein Log-File-Zugriff — `docker logs` bleibt die vollständige Quelle. Leitplanke: Logs enthalten keine Secrets (gilt bereits) und sind nur für Admins sichtbar (Logs sind nutzerübergreifend). | Was das System gerade tut (Importe, Batch-Läufe, Fehler) ist ohne SSH/Docker-Zugriff sichtbar. |
-| **A18** | ✅ **Karten-Clustering erst ab Schwelle (einstellbar)** *(Anmerkung 26; fertig v0.9.0)* | S | Clustering greift erst, wenn der Zeitraum mehr Punkte enthält als die Schwelle; darunter Einzelmarker bzw. nummerierte Route. **Vom Nutzer einstellbar** (Feld „Cluster ab N Punkten" auf der Karte, gespeichert als `map_cluster_min`), aber im Rahmen **10–300** — die Obergrenze schützt die Performance (zu viele Einzelmarker frieren den Browser ein). Gilt für die normale und die gebündelte Ansicht (A5). | Kleine Zeiträume zeigen sofort echte Marker statt Zahlenblasen. |
-| **A19** | ✅ **„Gesuchte Adresse" bereinigen** *(Anmerkung 32; fertig v0.12.0 — Label abgeschafft, Alt-Daten per Start-Migration bereinigt, nackte Labels laufen über die Auflösung)* | S | Das Label „Gesuchte Adresse" stiftet keinen Mehrwert (anders als Zuhause/Arbeit): (a) beim Auflösen wird das Präfix künftig **komplett entfernt** — es bleibt die reine Adresse; Bestandsdaten zieht „Ortsnamen auflösen"/„Adressen kürzen" mit; (b) Besuche, deren Ort dauerhaft **ohne auflösbare Adresse** bleibt (nur nacktes Label), werden beim Import übersprungen bzw. per Aufräum-Aktion entfernt (zusätzlich hilft der `min_probability`-Filter, A12). | Keine kryptischen „Gesuchte Adresse"-Einträge mehr in Karte und Zeitstrahl. |
-| **A20** | ✅ **Mobile-Bugfixes: Suche + Karten-Reiter** *(Anmerkungen 33+34; fertig v0.12.0 — Karte: CSS-Flex-Kollaps auf Höhe 0 behoben; Suche: lokaler Textsuche-Fallback + Hinweis, wenn die Server-Suche scheitert)* | S–M | (a) Die globale Suche springt auf dem Handy zwar zum Zeitstrahl, **filtert aber nichts**; (b) der Karten-Reiter zeigt auf dem Handy **keine Karte** (die Kompendium-Detailkarte funktioniert — Verdacht: Höhe/`invalidateSize` beim Einblenden des Karten-Views im mobilen Layout). Beides debuggen und fixen; mobile Smoke-Checks ergänzen. | Die zwei wichtigsten mobilen Funktionen (Suchen, Karte) funktionieren unterwegs. |
-| **A21** | ✅ **Export mit Auswahl** *(Anmerkung 35; fertig v0.12.0 — Häkchen „ohne Google-Timeline-Daten", generischer exclude_source-Parameter)* | S | Vor dem JSON-Export wählen, was hineinkommt: nach **Quelle** (z. B. ohne `google_timeline`-Besuche/Tracks), optional „nur Bestätigtes" und Zeitraum. Voreinstellung bleibt „alles" (Backup-Fall); der Export-Toast zeigt die aktive Auswahl. | Handliche Exporte (z. B. nur die handgepflegte Lebensdatenbank ohne 10k Import-Besuche). |
-| **A22** | ✅ **Jobs serverseitig (Background)** *(Anmerkung 36; fertig v0.13.0 — Worker-Threads für Wetter/Embeddings/Ortsnamen/Neuberechnung, Stopp-Knopf + Auto-Refresh im Jobs-Reiter, Nachtplan pro Typ und Nutzer ein-/ausschaltbar inkl. Uhrzeit; Importe bleiben client-getrieben, die Datei liegt im Browser)* | M–L | Batch-Läufe laufen heute als Browser-Schleife — Seite zu = Lauf stoppt. Neu: Jobs laufen **im Backend** (Background-Task pro Job, Fortschritt in der Job-Tabelle) und damit auch bei geschlossener Seite; der Jobs-Reiter bekommt einen **Stopp-Knopf** je laufendem Job. Dazu optionaler **Zeitplan**: bestimmte Job-Typen (Wetter, Embeddings, Ortsnamen) nachts automatisch laufen lassen — pro Typ vom Nutzer ein-/ausschaltbar inkl. Uhrzeit. Baut auf A11 auf (Lock/Job-Tabelle bleiben). | Lange Läufe (10k Ortsnamen ≈ 3 h wegen Nominatim-Drossel) brauchen keinen offenen Browser mehr. |
-| **A23** | ✅ **Klartext statt Stufen-Jargon im UI** *(Anmerkung 40; fertig v0.12.0)* | S | „Stufe 1/2/3", „S1/S2" etc. verschwinden aus der Oberfläche — stattdessen sprechende Begriffe: **Roh-Eingang**, **Vorschläge**, **Lebensdatenbank**, **Ansichten**. Die Stufen-Terminologie bleibt Konzept-/Entwickler-Sprache (KONZEPT, Code-Kommentare). | Die App ist ohne Lektüre des Konzepts verständlich. |
-| **A24** | ✅ **Karte größer & besser** *(Anmerkung 45; fertig v0.16.0 — Höhe an den Viewport gekoppelt + Vollbild-Umschalter. Mit v0.19.0 abgeschlossen: „allgemein verbessern" war nur eine Ideensammlung ohne Entscheidung und wird nicht weiter offengehalten — konkrete Karten-Wünsche kommen künftig als neues Paket)* | S–M | Die Karte ist auf großen Bildschirmen zu klein (fix 520 px hoch): Höhe an den Viewport koppeln, dazu ein Vollbild-Umschalter. „Allgemein verbessern" bleibt bewusst offen — Ideen werden erst gesammelt (z. B. Popup-Inhalte, gemerkte Layer-Auswahl, Dichte-Ansicht), bevor hier mehr entschieden wird. | Die Karte nutzt den vorhandenen Platz; das Desktop-Erlebnis zieht mit dem mobilen gleich. |
-| **A25** | ✅ **Ein Ortsnamen-Lauf statt drei Knöpfe** *(Anmerkung 46; fertig v0.16.0 — ein Knopf mit Scope-Auswahl; der F10-Teil (Accept-Language folgt der App-Sprache) kommt mit F10)* | S | „Ortsnamen auflösen", „Adressen kürzen" und „Fremdschrift eindeutschen" sind serverseitig längst EIN Job (`resolve_names` mit drei Scopes) — die UI legt sie zu einem Knopf zusammen (Auswahl oder automatisch alle Scopes nacheinander). Achtung Wechselwirkung F10: Mit umschaltbarer UI-Sprache muss „eindeutschen" ohnehin generisch werden (Accept-Language folgt der App-Sprache statt fest de,en). | Weniger Knöpfe, weniger Erklärtext — ein Lauf räumt alles auf. |
-| **A26** | ✅ **„Meine Daten" aufräumen** *(Anmerkung 47; fertig v0.16.0)* | S | Der Reiter Verwaltung → Meine Daten ist eine gewachsene Liste — neu gruppieren in klare Blöcke: **Sichern & Zurückspielen** (Export/Import), **Importe** (Google Timeline …), **Ortsnamen** (Lauf aus A25 + Format-Bausteine), **Tracking-Auswahl**. | Der meistgenutzte Verwaltungs-Reiter ist auf einen Blick verständlich. |
-| **A27** | ✅ **Allgemeingültigkeits-Audit** *(Anmerkung 48; Login-Teil fertig v0.16.0, volles Audit fertig v0.19.0 — `.env.example` ist jetzt die vollständige Setup-Referenz (jedes Setting dokumentiert, Anbieter nur als Beispiellisten); `docker-compose.yml` erzwingt keinen KI-Key mehr und verdrahtet keine anbieterspezifischen Defaults (ohne Konfiguration: `mock`); Provider-Name auch in der Nutzerverwaltung aus der Config; README/backend-README/DEPLOY auf Übertragbarkeit umgeschrieben (Reverse Proxy statt Pangolin, OIDC-Provider statt Pocket ID, eigenes Image-Bauen optional); tote Ollama-Settings entfernt. Die Doku-Sprache selbst folgt mit F10)* | S–M | Life-Dash sollen auch Fremde sauber deployen: Audit über UI-Texte, Docs und Defaults auf Homelab-/Personen-Spezifisches — z. B. nennt der Login-Screen hart „Pocket ID" (generisch „per SSO anmelden", Provider-Name aus der Config), Beschreibungen im UI dürfen keine instanz-spezifischen Annahmen machen, README/DEPLOY auf Übertragbarkeit prüfen, `.env.example` als einzige Setup-Wahrheit. Ergänzt F10 (englische Doku). | Jede fremde Instanz fühlt sich „richtig" an — nichts verweist aufs Ursprungs-Homelab. |
-
-**✅ Gruppe A ist mit v0.13.0 abgeschlossen** (A1–A23; die Feedback-Runde
-vom 2026-07-19 abends hat mit **A24–A27** vier neue Verbesserungs-Pakete
-nachgelegt, Anmerkungen 43–48). Weiter geht es in
-Gruppe B — **Entscheidung 2026-07-19: erst die Feature-Pakete (F1–F10,
-P3.1, P5.x), neue Import-Quellen (Immich P2.1, Health P4.1, PSN P4.2)
-kommen bewusst ZULETZT**, wenn der Rest fertig ist.
-
-#### Gruppe B — Neue Features (Reihenfolge: Features zuerst, neue Import-Quellen ZULETZT — Entscheidung 2026-07-19)
-
-| Nr. | Paket | Aufwand | Inhalt | Nutzen |
-|---|---|---|---|---|
-| **F1** | ✅ **Reisetagebuch (formatierter Text)** *(fertig v0.15.0 — Journal-Kategorie mit Tageskopf, Markdown eigenhändig sanitisiert gerendert, KI-Vorschlag der Tages-Zusammenfassung noch offen)* | M–L | Ausbau des Kommentar-Gedankens (`note`-Feld existiert, wird nie von der KI angefasst) zu echten Tagebucheinträgen: **formatierter Text (Markdown)** statt einzeiliger Notiz, längere Texte pro Event; dazu **Tagesebene** — ein Journal-Eintrag pro Tag (z. B. eigene Kategorie `journal` mit `date_precision=day`, passt ohne Schema-Umbau ins Event-Modell), in der Timeline als Tageskopf über den Einzel-Events gerendert. Optional später: KI schlägt eine Tages-Zusammenfassung aus den Events des Tages vor (landet als Vorschlag im Vorschlagsraum, Kap. 3.1). Markdown wird sanitisiert gerendert. | Aus der Faktensammlung wird ein echtes Reisetagebuch — Erinnerungen mit eigener Stimme statt nur strukturierter Daten. |
-| **F2** | ✅ **Handy-Standort beim Erfassen übernehmen (optional)** *(fertig v0.14.0)* | S–M | Beim Quick-Capture (KI-Analyse **und** manuelle Eingabe) den aktuellen Gerätestandort per Geolocation-API anbieten: Knopf „📍 Standort verwenden" bzw. opt-in Toggle — **nie automatisch** (Standort ist sensibel, und Einträge betreffen oft die Vergangenheit oder andere Orte). Koordinaten → Reverse-Geocoding (Nominatim, vorhanden) → Ortsvorschlag im Vorschau-/Formularfeld, vom Nutzer überschreibbar; nennt der Text selbst einen Ort, hat der Text Vorrang. Ins Fragment (S1) wandern die Roh-Koordinaten mit, damit Re-Processing sie kennt. Braucht HTTPS (liegt hinter dem Reverse Proxy vor). | Unterwegs entfällt das Eintippen des Orts — der häufigste Capture-Fall („bin gerade hier und sehe X") wird ein Zwei-Tap-Eintrag. |
-| **F3** | ✅ **Wetter-Logik verfeinern** *(Frage 18; fertig v0.14.0)* | S–M | Heute: `temperature_c` = Mittel aus Tagesmax/-min, `weather` = **signifikantester Wettercode des Tages** (Open-Meteo-Tagesarchiv — 1 Std. Morgenregen überdeckt einen sonnigen Tag). Neu: `temp_min_c`/`temp_max_c` als eigene Metriken (Statistik „heißester/kältester Tag" wird ehrlicher), Bedingung aus **Stundendaten** ableiten (dominantes Wetter tagsüber, z. B. 8–20 Uhr), optional Niederschlagssumme/-stunden. Bestandsdaten per Re-Enrichment additiv ergänzbar (Wetter bleibt Fakten-Anreicherung, Kap. 3.1). | Das angezeigte Wetter entspricht dem gefühlten Tag; präzisere Statistik. |
-| **F4** | ✅ **Import füttert das Kompendium (Länder)** *(Frage 21; fertig v0.14.0)* | M | Der Timeline-Import erzeugt heute nur Events + Locations — **keine Entities/Links**, daher bleiben Länder-Kompendium und Länder-Statistik von Importen unberührt. Neu: Beim (Reverse-)Geocoding das Land aus den `addressdetails` mitnehmen (werden bereits angefragt, aber verworfen), an der `Location` speichern und je Besuchsland eine `country`-Entity anlegen/verknüpfen — als Teil der Ortsauflösung, rückwirkend über „Ortsnamen auflösen". Baut auf A10/A12 auf. Später erweiterbar auf Städte/Orte als eigene Kompendium-Typen (`place`-Modul). | „In wie vielen Ländern war ich?" stimmt endlich — gespeist aus echten Bewegungsdaten. |
-| **F5** | ✅ **Welt-Reiter: Länder-Karte & Kontinente-Checkliste** *(Anmerkung 27; fertig v0.18.0 — eigener Navi-Reiter „Welt"; Choropleth über Leaflet + mitgeliefertes GeoJSON (Natural Earth 110m, public domain, `frontend/world-countries.geojson`); Länder-Stammdaten `backend/app/data/countries.py` (ISO/dt./engl./Alias → Kontinent) verbinden die nur namentlich gespeicherten `country`-Entities mit den Kartenflächen und führen Aliasse zusammen; Checkliste je Kontinent inkl. aufklappbarer Fehlliste; nicht zuordenbare Namen werden ausgewiesen)* | M | Neuer Reiter (unter Statistik oder eigenständig): **Weltkarte mit eingefärbten besuchten Ländern** (Choropleth über Leaflet + Länder-GeoJSON, gespeist aus den `country`-Entities) und **Checklisten**: Kontinente (7/7?), Länder pro Kontinent, „zuletzt neu besucht". Braucht F4 (Import erzeugt Länder-Entities), sonst bleibt die Karte bei Import-Daten leer. | „Wo war ich schon?" auf einen Blick — motiviert, Lücken zu füllen. |
-| **F6** | ✅ **Achievements (Bronze/Silber/Gold/Platin)** *(Anmerkung 28; fertig v0.18.0 — eigener Navi-Reiter „Erfolge"; deklarativ im Block `achievements:` der Modul-YAMLs (Metrik + vier Schwellwerte), Metriken `entity_count`/`event_count`/`country_count`/`continent_count` in `services/achievements.py`; reine Schicht-4-Ableitung ohne eigenen Datenbestand, zählt nur Bestätigtes und respektiert die getrackten Module (A15); Fortschrittsbalken misst ab der erreichten Stufe. „Erreicht am" bewusst weggelassen — bräuchte doch eigene Persistenz)* | M | Neuer Reiter mit Erfolgen in vier Stufen, **deklarativ aus den Modul-YAMLs** (baut auf A7/P3.1 auf): je Achievement eine Metrik + Schwellwerte, z. B. „Tier-Sammler" (5/25/100/500 Arten gesehen), „Weltenbummler" (Länder), „Konzertgänger", „Feinschmecker". Berechnet aus Stufe 2 (Schicht-4-Ableitung, jederzeit neu berechenbar, kein eigener Datenbestand außer optional „erreicht am"). Anzeige mit Fortschrittsbalken zur nächsten Stufe. | Spielerischer Anreiz, Erlebnisse zu erfassen — macht die Lebensdatenbank „belohnend". |
-| **F7** | ✅ **Mehrtages-Events mit Tages-Unterereignissen** *(Anmerkung 37, entschieden: „beides"; fertig v0.15.0 — `parent_event_id`, Knopf im Bearbeiten-Dialog, Wetter je Kind, Timeline-Einklappen, Lösch-Dialog mit/ohne Kinder)* | M–L | Ein mehrtägiges Event („Mallorca 05.–12.07.") bleibt EIN Reise-Event, bekommt aber **verknüpfte Tages-Events** (Eltern-Kind). **Datenmodell-Folge ist klein:** eine neue Spalte `Event.parent_event_id` (Self-FK, nullable) — kein neuer Tabellentyp. Die Arbeit steckt im Verhalten: Tages-Kinder werden auf Knopfdruck (oder beim Bestätigen) für die Spanne erzeugt („Mallorca — Tag 3", `day`-Präzision, erben Ort + Bestätigung); **Anreicherung (Wetter, später Fotos) hängt an den Kindern** = pro Tag; das Eltern-Event zeigt die Tagesleiste aggregiert; Timeline zeigt Kinder eingeklappt unterm Eltern-Event (Tages-Zoom zeigt sie einzeln); Löschen des Eltern-Events fragt, ob die Kinder mitgehen; Export/Import und Neuberechnungs-Schutz (`confirmed`) gelten unverändert — Kinder sind normale Lebensdatenbank-Events, nur mit Herkunftsverweis. Passt direkt zum Reisetagebuch (F1: Journal pro Tag). | Jeder Urlaubstag trägt eigenes Wetter, eigene Fotos, eigene Notizen — ohne den Zeitstrahl mit Duplikaten zu fluten. |
-| **F8** | ⏸️ **Druckansicht ausgewählter Tage** *(Anmerkung 38; erste Ausbaustufe fertig v0.17.0, Auswahl-Dialog fertig v0.19.0 — Zeitraum von/bis + Presets, Schalter für Beschreibungen/Notizen/importierte Besuche/Vorschläge, Trefferzahl vorab; gedruckt wird ein eigens aufgebauter `#print-area` statt der Bildschirmansicht, damit eingeklappte Gruppen keine Rolle mehr spielen. **Rest blockiert:** „Druck mit Fotos" setzt P2.1 (Immich) voraus und wartet auf dieses Paket)* | M | Zeitraum wählen → druckfreundliche Seite (helles Layout, keine Navigation): Events chronologisch mit Ort, Wetter, Notizen, später Fotos; Browser-Druckdialog (PDF). Sinnvoll nach F1/F7 (Tagesebene). | Erinnerungen physisch: Urlaubstage ausdrucken oder als PDF teilen. |
-| **F9** | ✅ **Heller Modus** *(Anmerkung 41; fertig v0.15.0 — Umschalter Auto/Hell/Dunkel im Topbar, pro Gerät in localStorage, Karten-Tiles wechseln mit)* | S–M | Die App ist bisher dunkel; die Farben liegen bereits in CSS-Variablen. Neu: helles Theme + Umschalter (Auto nach Systemeinstellung, manuell übersteuerbar, pro Gerät gespeichert). Karte wechselt den Tile-Stil mit (hell/dunkel). | Lesbarkeit bei Tageslicht; Grundlage für die Druckansicht (F8). |
-| **F10** | ⏸️ **Zweisprachigkeit: App de/en, Doku englisch** *(Anmerkung 42, entschieden; **App-Teil weitgehend fertig v0.20.0**, Rest offen)* — Umgesetzt: Katalog-Mechanismus in `index.html` (Deutsch bleibt Quelltext-Wahrheit, `I18N_EN` enthält nur Englisch, fehlender Schlüssel ⇒ deutscher Text statt leerem Label), Umschalter im Topbar, Wahl in `localStorage` **und** im Konto (`User.settings["lang"]`), 228 markierte Elemente + `t()`-Aufrufe im JS; Kategorie-/Job-/Track-Labels über `catLabel()`/`t()`. Damit ist auch der **A25-Rest** erledigt: `Accept-Language` folgt der UI-Sprache (`de,en` ⇄ `en,de`), ebenso die Namenswahl aus `namedetails` — vorher fest „de,en". **Offen:** ~70 längere Erklärtexte im Verwaltungs-Reiter (Fließtext mit Inline-Markup) und die komplette **Doku-Umstellung auf Englisch** (README, backend/README, DEPLOY, KONZEPT ~900 Z., CHANGELOG ~700 Z.) — bewusst als eigenes Paket, weil reine Übersetzungsarbeit ohne Code-Risiko. | M–L | **App-UI** bekommt einen Sprachumschalter Deutsch/Englisch (String-Katalog statt hartcodierter Texte — die eigentliche Arbeit, da alle Texte inline liegen; KI-Prompts bleiben davon unberührt). **Doku (README, CHANGELOG, KONZEPT) wird auf Englisch umgestellt**: einmalige Übersetzung, danach nur noch englisch gepflegt. Diskussion/Input dürfen weiterhin deutsch sein — übersetzt wird beim Schreiben; einzige Kosten: die einmalige KONZEPT-Übersetzung (~750 Zeilen) und konsistente Begriffe (Glossar: z. B. Lebensdatenbank → *life database*, Vorschlagsraum → *proposal space*). | Erreichbarkeit für die internationale Self-Hosted-Community (AGPL + englische Doku = GitHub-Standard). |
-| **P3.1** | **Deklarative Statistik-Widgets** | M | Widgets aus Modul-YAML (`count`, `count_distinct`, `timeseries`) generisch rendern statt hart codiert. Baut sinnvoll auf A7 auf. | Neue Module bringen ihre Statistik automatisch mit. |
-| **P5.1** | **Offline-Capture + Share-Target** | M | PWA: Fragmente offline puffern & synchronisieren; Teilen aus anderen Apps → Fragment. | Erfassen unterwegs ohne Netz. |
-| **P5.2** | **Whisper-Sprach-Eingabe** | M | Serverseitiges Speech-to-Text (statt Browser-API), auch für Sprachmemos als Datei. | Bessere Diktat-Qualität, unabhängig vom Browser. |
-| | *— Neue Import-Quellen (bewusst zuletzt, wenn der Rest fertig ist):* | | | |
-| **P2.1** | **Immich-Connector** | M | Immich-URL/API-Key pro Nutzer (Einstellungen), Assets nach Zeit+Geo zu Events verknüpfen (`MediaRef`), Thumbnail-Proxy, Fotos in Event-Karte/Detail, Re-Enrichment-Button. **Ausbaustufe 2 (Anmerkung 30): Immich als Ereignis-QUELLE,** nicht nur Anreicherung — (a) Foto-Cluster nach Datum+Ort zu Event-**Vorschlägen** verdichten („34 Fotos am 12.07. in Detmold" → Vorschlag im Vorschlagsraum, `unconfirmed`, Kap. 3.1); (b) **Alben analysieren**: Album-Name + Zeitspanne + Orte der enthaltenen Fotos → Reise-/Ereignis-Vorschlag (Album „Dänemark 2024" → `trip`). Dubletten-Schutz über Asset-/Album-IDs als `external_id`; nichts wird automatisch bestätigt. | Fotos erscheinen automatisch an Erinnerungen — größter „Wow"-Effekt der Import-Quellen. |
-| **P4.1** | **Health-Connect-Import** | M | Upload des Health-Connect-Exports, Schritte/HF/Workouts → `Metric`, Workout-GPS → `Track`. | Fitness-Kontext an Events. |
-| **P4.2** | **PSN-Connector** | M | NPSSO-Token pro Nutzer, Sync via `psnawp`: Spiele→`game`-Entities, Trophäen/Spielzeit→Metrics. | Gaming-Historie im Kompendium (`game`-Modul existiert seit v0.13.0). |
-| **P2.8** | **Live-Standort via OwnTracks/Overland** *(Anmerkung 43, entschieden 2026-07-19)* | M | Eigener OwnTracks-/Overland-kompatibler Empfangs-Endpoint (Token pro Nutzer): Handy-Apps pushen den Standort laufend; daraus entstehen Besuche/Tracks wie beim Timeline-Import (gleiche Verdichtungs- und Dubletten-Regeln) — das manuelle Google-Export-Ritual entfällt perspektivisch. **Dawarich wird bewusst NICHT parallel betrieben** (kein zweiter Dienst, keine doppelte Datenhaltung); es dient als Format-/API-Referenz (AGPL-kompatibel; Ruby → keine direkte Code-Übernahme). | Standort-Historie läuft automatisch ein — ohne Google, ohne Export. |
-| **P2.9** | **Import-Automatisierung** *(Anmerkung 44 — „mitdenken, später umsetzen")* | M | Sobald Connectoren stehen: wiederkehrende Importe ohne Handarbeit — geplante Pulls (Immich, PSN) über den Job-Zeitplan (A22), Watch-Ordner/Upload-Ziel für Datei-Exporte (Health Connect), Live-Push via P2.8. Regel ab sofort: Bei jedem neuen Connector wird die Automatisierbarkeit MITGEDACHT (Voraussetzung idempotente Importe existiert bereits). | Die Lebensdatenbank füllt sich von selbst statt per Erinnerung ans Exportieren. |
+| **F1** | ✅ **Travel journal (formatted text)** *(done v0.15.0 — a journal category with a day header, Markdown rendered with hand-written sanitising; an AI-suggested daily summary is still open)* | M–L | Expanding the comment idea (the `note` field exists and is never touched by the AI) into real diary entries: **formatted text (Markdown)** instead of a one-line note, longer texts per event; plus a **day level** — one journal entry per day (its own `journal` category with `date_precision=day`, which fits the event model without a schema rebuild), rendered in the timeline as a day header above the individual events. Markdown is rendered sanitised. | The fact collection becomes a real travel diary — memories in your own voice instead of only structured data. |
+| **F2** | ✅ **Take the phone location when capturing (optional)** *(done v0.14.0)* | S–M | Offer the current device location via the geolocation API during quick capture (both AI analysis **and** manual entry): a “📍 use my location” button — **never automatic** (location is sensitive, and entries often concern the past or other places). Coordinates → reverse geocoding → a place suggestion in the preview/form field, overwritable by the user; if the text names a place itself, the text wins. The raw coordinates travel into the fragment (S1) so re-processing knows them. Requires HTTPS. | On the go, typing the place is unnecessary — the most common capture case becomes a two-tap entry. |
+| **F3** | ✅ **Refine the weather logic** *(done v0.14.0)* | S–M | Previously: `temperature_c` = the mean of the daily max/min, `weather` = the most significant weather code of the day (one hour of morning rain would mask a sunny day). New: `temp_min_c`/`temp_max_c` as their own metrics, the condition derived from hourly data (the dominant weather during the day), optionally precipitation totals/hours. Existing data can be extended additively by re-enrichment. | The weather shown matches how the day felt; more precise statistics. |
+| **F4** | ✅ **Imports feed the collection (countries)** *(done v0.14.0)* | M | The timeline import used to create only events and locations — no entities or links, so the country collection and country statistics stayed untouched by imports. New: take the country from the `addressdetails` during (reverse) geocoding, store it on the `Location` and create/link a `country` entity per visited country — as part of place resolution, retroactively via “resolve place names”. | “How many countries have I been to?” is finally correct — fed from real movement data. |
+| **F5** | ✅ **World tab: country map & continent checklist** *(note 27; done v0.18.0)* | M | A tab of its own: a **world map with visited countries shaded** (choropleth over Leaflet plus a bundled country GeoJSON, fed from the `country` entities) and **checklists**: continents (7/7?), countries per continent, “most recently new”. Country reference data (`backend/app/data/countries.py`, ISO/German/English/alias → continent) connects the name-only entities to the map shapes and merges aliases; names that match nothing are surfaced instead of silently dropped. | “Where have I been?” at a glance — and it motivates filling the gaps. |
+| **F6** | ✅ **Achievements (bronze/silver/gold/platinum)** *(note 28; done v0.18.0)* | M | A tab with achievements in four tiers, **declared in the module YAMLs**: one metric plus thresholds per achievement, e.g. “animal collector” (5/25/100/500 species seen), “globetrotter” (countries), “concert goer”, “gourmet”. Computed from layer 2 (a layer-4 derivation, recomputable at any time, holding no data of its own). Displayed with a progress bar toward the next tier, which measures from the tier reached rather than from zero. Counts confirmed data only and respects the tracked modules (A15). | A playful incentive to record experiences — it makes the life database rewarding. |
+| **F7** | ✅ **Multi-day events with day sub-events** *(note 37, decided: “both”; done v0.15.0)* | M–L | A multi-day event (“Mallorca 05–12 July”) stays ONE trip event but gains **linked day events** (parent–child). **The data-model consequence is small:** one new column `Event.parent_event_id` (self FK, nullable) — no new table type. The work is in the behaviour: day children are created for the span at the push of a button (“Mallorca — day 3”, `day` precision, inheriting place and confirmation); **enrichment (weather, later photos) hangs on the children** = per day; the parent shows the day bar aggregated; the timeline shows children collapsed under the parent (day zoom shows them individually); deleting the parent asks whether the children go too; export/import and recomputation protection (`confirmed`) apply unchanged — children are normal life-database events, only with a provenance link. | Every holiday day carries its own weather, photos and notes — without flooding the timeline with duplicates. |
+| **F8** | ⏸️ **Print view for selected days** *(note 38; first stage done v0.17.0, selection dialog done v0.19.0)* | M | Pick a range → a print-friendly page (light layout, no navigation): events chronologically with place, weather, notes, later photos; the browser print dialog (PDF). Implemented: a dialog with from/to plus presets, switches for descriptions/notes/imported visits/proposals and a live count; printing builds a dedicated `#print-area` instead of the on-screen view, so collapsed groups no longer matter. **Remainder blocked:** “printing with photos” requires P2.1 (Immich) and waits for that package. | Memories physically: print holiday days or share them as a PDF. |
+| **F9** | ✅ **Light mode** *(note 41; done v0.15.0)* | S–M | The app used to be dark only; the colours already live in CSS variables. New: a light theme plus a switch (auto following the system setting, manually overridable, stored per device). The map switches tile style with it. | Readability in daylight; the basis for the print view (F8). |
+| **F10** | ✅ **Bilingual: app de/en, docs in English** *(note 42, decided; done v0.20.0)* | M–L | The **app UI** has a German/English switch (a string catalog instead of hard-coded text — the actual work, since all text lives inline; AI prompts are unaffected). German stays the source of truth in the markup, the `I18N_EN` catalog holds English only, and a missing key falls back to German so no label can ever be empty. The language is stored per device and on the account, and drives `Accept-Language` for place-name lookups (this also completes A25). The **docs (README, CHANGELOG, KONZEPT) are switched to English**: a one-off translation, maintained in English from then on. Discussion and input may stay in any language — translation happens when writing. | Reachability for the international self-hosting community (AGPL + English docs = the GitHub standard). |
+| **P3.1** | **Declarative statistics widgets** | M | Render widgets generically from the module YAML (`count`, `count_distinct`, `timeseries`) instead of hard-coding them. Builds sensibly on A7. | New modules bring their statistics along automatically. |
+| **P5.1** | **Offline capture + share target** | M | PWA: buffer fragments offline and synchronise them; sharing from other apps → a fragment. | Capturing on the go without a network. |
+| **P5.2** | **Whisper voice input** | M | Server-side speech-to-text (instead of the browser API), also for voice memos as a file. | Better dictation quality, independent of the browser. |
+| | *— New import sources (deliberately last, once the rest is done):* | | | |
+| **P2.1** | **Immich connector** | M | An Immich URL/API key per user (settings), linking assets to events by time and geo (`MediaRef`), a thumbnail proxy, photos in the event card and detail, a re-enrichment button. **Stage 2 (note 30): Immich as an event SOURCE,** not only enrichment — (a) condense photo clusters by date and place into event **proposals** (“34 photos on 12 July in Detmold” → a proposal in the proposal space, `unconfirmed`); (b) **analyse albums**: album name + time span + places of the contained photos → a trip/event proposal (album “Denmark 2024” → `trip`). Duplicate protection via asset/album IDs as `external_id`; nothing is confirmed automatically. | Photos appear automatically next to memories — the biggest “wow” effect among the import sources. |
+| **P4.1** | **Health Connect import** | M | Upload of the Health Connect export, steps/HR/workouts → `Metric`, workout GPS → `Track`. | Fitness context on events. |
+| **P4.2** | **PSN connector** | M | An NPSSO token per user, sync via `psnawp`: games → `game` entities, trophies/play time → metrics. | Gaming history in the collection (the `game` module exists since v0.13.0). |
+| **P2.8** | **Live location via OwnTracks/Overland** *(note 43, decided 2026-07-19)* | M | An OwnTracks/Overland-compatible receiving endpoint (a token per user): phone apps push the location continuously, and from that visits and tracks are built as in the timeline import (the same condensation and duplicate rules) — the manual Google export ritual eventually disappears. **Dawarich is deliberately NOT run alongside** (no second service, no duplicated data); it serves as a format/API reference (AGPL-compatible; Ruby → no direct code reuse). | Location history flows in automatically — without Google, without exports. |
+| **P2.9** | **Import automation** *(note 44 — “think it through, implement later”)* | M | Once connectors exist: recurring imports without manual work — scheduled pulls (Immich, PSN) via the job schedule (A22), a watch folder/upload target for file exports (Health Connect), live push via P2.8. Rule from now on: for every new connector, automatability is **considered up front** (the prerequisite of idempotent imports already exists). | The life database fills itself instead of relying on a reminder to export. |
 
 ---
 
-## 15. Offene Fragen & zu schärfende Entscheidungen
+## 15. Open questions & decisions to sharpen
 
-**Bereits entschieden (aus Konzeptionsphase):**
-- ✅ **Drei-Stufen-Architektur:** Roh-Input (S1, unveränderlich) → moderierte Struktur (S2, `confirmed`) → berechnete Ansichten (S3, neu erzeugbar).
-- ✅ **Rückwirkende Anreicherung:** Ja — Re-Enrichment-Jobs reichern bestehende Events nachträglich an (Immich, Fitness, Wetter).
-- ✅ **Wetter:** Wird als `Metric` an verortete Events angereichert.
-- ✅ **Personen:** Vorerst ausgeklammert (zu komplex/pflegeintensiv); Fokus auf konkrete, bestätigbare Fakten. Später als Modul nachrüstbar.
-- ✅ **Konfliktauflösung:** `field_overrides` schützt manuell bestätigte Felder vor Überschreiben bei Neuberechnung.
+**Already decided (from the concept phase):**
+- ✅ **Three-stage architecture:** raw input (S1, immutable) → moderated structure (S2, `confirmed`) → computed views (S3, rebuildable).
+- ✅ **Retroactive enrichment:** yes — re-enrichment jobs enrich existing events afterwards (Immich, fitness, weather).
+- ✅ **Weather:** enriched onto located events as a `Metric`.
+- ✅ **People:** left out for now (too complex/maintenance-heavy); the focus is on concrete, confirmable facts. Can be added later as a module.
+- ✅ **Conflict resolution:** `field_overrides` protects manually confirmed fields from being overwritten during recomputation.
 
-**Neu entschieden (2026-07-14):**
-- ✅ **Mobile first:** Responsive PWA von Beginn an (Bottom-Navigation, Bottom-Sheets, Quick-Capture); kein nachträglicher Mobile-Umbau.
-- ✅ **Multi-User via OIDC ab P0:** `user_id` in allen Tabellen, OIDC-Login mit JIT-Provisioning, strikte Datentrennung pro Nutzer. Nutzerverwaltungs-UI und Sharing erst später.
-- ✅ **Immich zuerst:** Immich läuft bereits als Dienst → erster umzusetzender Connector (P2), nur Referenzen, Thumbnails via Backend-Proxy.
-- ✅ **Google Timeline inkl. Routen:** Import über den Geräte-Export (JSON); Besuche → Events, Routenverläufe → neue Entität `Track` mit eigenem Karten-Layer.
-- ✅ **Fitness via Health Connect (Datei-Import):** Google Fit API ist eingestellt; Health Connect ist on-device → Upload-Connector statt Live-API.
-- ✅ **PSN-Import:** Über inoffizielle API (NPSSO-Token, `psnawp`); als isolierter, optionaler Connector wegen Bruchrisiko.
-- ✅ **OIDC-Provider: Pocket ID** — läuft bereits im Homelab. Life-Dash nutzt den Authorization Code Flow mit PKCE (Public Client möglich); Redirect-URI: `<PUBLIC_BASE_URL>/api/auth/callback`. *(Damit ist Frage 8 beantwortet; P0+P1 sind seit 2026-07-14 umgesetzt — siehe backend/README.md.)*
+**Decided 2026-07-14:**
+- ✅ **Mobile first:** a responsive PWA from the start (bottom navigation, bottom sheets, quick capture); no retrofitted mobile rebuild.
+- ✅ **Multi-user via OIDC from P0:** `user_id` in all tables, OIDC login with JIT provisioning, strict data separation per user. A user management UI and sharing come later.
+- ✅ **Immich first:** Immich already runs as a service → the first connector to implement (P2), references only, thumbnails via a backend proxy.
+- ✅ **Google Timeline including routes:** import via the device export (JSON); visits → events, routes → the new `Track` entity with its own map layer.
+- ✅ **Fitness via Health Connect (file import):** the Google Fit API is discontinued; Health Connect is on-device → an upload connector instead of a live API.
+- ✅ **PSN import:** via the unofficial API (NPSSO token, `psnawp`); as an isolated, optional connector because it may break.
+- ✅ **OIDC provider:** any standards-compliant provider. Life-Dash uses the authorization code flow with PKCE (a public client is possible); redirect URI: `<PUBLIC_BASE_URL>/api/auth/callback`.
 
-**Beantwortet am 2026-07-15:**
-0. ✅ **Vier-Schichten-Präzisierung** (siehe Kap. 3.1): Eingang → Vorschlagsraum → **Lebensdatenbank (fix, inkl. Fakten-Anreicherung wie Wetter)** → Ableitungen (wegwerfbar, inkl. Embeddings). Konsequenz: Wetter wird nicht mehr bei „Stufe 3 neu berechnen" verworfen, sondern nur ergänzt, wo es fehlt; Eingang wird nie automatisch gelöscht. Operative Folgepakete: **P2.5** (Bulk-Bestätigen), **P2.6** (Invarianten-Test), **P2.7** (Bestätigungs-Provenienz) — alle drei am 2026-07-16 umgesetzt, ebenso **P2.4** (Auto-Enrichment).
-1. ✅ **Datums-Granularität:** Die Stufen `exact/day/month/season/year/decade` **reichen**. Angaben wie „Anfang der 90er" werden als `decade` gespeichert und mit einem Hinweis „Zeit nicht genau genug" versehen; ein eigener Admin-Bereich listet alle grob datierten Events zur Nachbearbeitung (→ Paket **P2.3**).
-2. ✅ **Entity-Dubletten:** **Kein automatisches Zusammenführen.** Dubletten („Seeadler"/„Adler") werden manuell über die vorhandene Bearbeitung aufgelöst.
-5. ✅ **UI für Unsicherheit:** Die umgesetzten Badges reichen — „⚠ unbestätigt · XX %" (orange) vs. „✓ bestätigt" (grün).
-7. ✅ **Versionierung von Stufe-2-Ergebnissen:** Vorerst **nein** — der JSON-Export/-Import deckt Sicherung & Wiederherstellung ab; wer Modellvergleiche will, exportiert vor der Neuberechnung.
-8. ✅ **OIDC-Provider:** **Pocket ID** läuft bereits im Homelab.
-9. ✅ **Timeline-Import-Routine:** **Manueller Upload reicht** fürs Erste (kein Sync-Ordner-Automatismus).
-10. ✅ **Health-Connect-Weg:** **Direkter Export-Upload, manuell** (keine Zwischenschicht).
-11. ✅ **Track-Speicherung:** **Gar nicht vereinfachen** — Routen werden in voller Punktdichte gespeichert; erst bei Performance-Problemen wird nachjustiert.
-12. ✅ **PSN-Sync:** „Zuletzt gespielt" + Trophäen-Zeitstempel **reichen** als Ereignisquelle.
+**Answered 2026-07-15:**
+0. ✅ **Four-layer refinement** (see ch. 3.1): inbox → proposal space → **life database (fixed, including factual enrichment such as weather)** → derived (disposable, including embeddings).
+1. ✅ **Date granularity:** the levels `exact/day/month/season/year/decade` **are enough**. Statements like “early nineties” are stored as `decade` with a hint that the time is not exact.
+2. ✅ **Entity duplicates:** **no automatic merging.** Duplicates (“sea eagle”/“eagle”) are resolved manually through the existing editing tools.
+5. ✅ **UI for uncertainty:** the implemented badges are enough — “⚠ unconfirmed · XX %” (orange) vs. “✓ confirmed” (green).
+7. ✅ **Versioning stage-2 results:** **no** for now — the JSON export/import covers backup and restore; anyone wanting model comparisons exports before recomputing.
+9. ✅ **Timeline import routine:** **a manual upload is enough** for now (no sync-folder automation).
+10. ✅ **Health Connect path:** **a direct export upload, manual** (no intermediate layer).
+11. ✅ **Track storage:** **no simplification at all** — routes are stored at full point density; this is only revisited if performance suffers.
+12. ✅ **PSN sync:** “last played” plus trophy timestamps **are enough** as an event source.
 
-**Beantwortet am 2026-07-16** (Empfehlungen angenommen):
-3. ✅ **Modul-Definition (YAML vs. Python-Plugin):** **Gestuft — YAML bleibt der Standard.** Schema, Keywords und Statistik sind dort gut aufgehoben. Was noch fehlt (Kategorie-Label/Farbe/Emoji aus dem YAML ins Frontend, Modul-Regeln automatisch in den KI-Prompt), wird als Paket **A7 „Modul-Vollausbau"** umgesetzt — danach ist ein neues Modul wirklich „nur eine YAML-Datei". Python-Plugins erst, wenn ein Modul eigene Logik braucht (z. B. eigener Import-Parser); das ist faktisch der Connector-Layer und bleibt dort.
-4. ✅ **Frontend-Framework:** **Vanilla-JS bleibt**, solange es trägt — kein Build-Schritt, eine Datei, PWA funktioniert, bewusst wenig bewegliche Teile im Homelab. Ein Framework-Rewrite lohnt erst, wenn die UI-Komplexität spürbar wächst; falls doch: Svelte (schlank, nah am jetzigen Stil) oder React (größtes Ökosystem). Die API bleibt identisch — die Entscheidung ist jederzeit nachholbar und blockiert nichts.
+**Answered 2026-07-16 (recommendations accepted):**
+3. ✅ **Module definition (YAML vs. Python plugin):** **staged — YAML stays the standard.** Schema, keywords and statistics belong there. What was still missing (category label/colour/emoji from the module) was delivered by A7.
+4. ✅ **Frontend framework:** **vanilla JS stays** as long as it carries — no build step, one file, the PWA works, deliberately few moving parts. A framework rewrite only pays off later.
 
-**Feedback-Runde 2026-07-16 (aus der laufenden Nutzung):**
-13. ✅ **Export ohne Rückmeldung:** Der Export funktioniert, gibt aber kein Feedback (stiller Datei-Download). → Paket **A8** (Toast mit Inhaltsangabe + Fehlerfall).
-14. ✅ **Karten-Limit:** Ja, es gibt eines — pro angezeigtem Zeitraum werden max. **300 Marker** gezeichnet (DOM-Schutz nach großen Timeline-Importen, mit Hinweis „Zeige die ersten 300"). Entscheidung: **Alle Punkte anzeigen; bei Performance-Problemen clustern statt abschneiden** → in Paket **A5** aufgenommen (Marker-Clustering ersetzt den Deckel).
-15. ✅ **Zu wenig Logs:** Das Backend loggt bisher nur punktuell (KI, Ingestion, Timeline-Import); `docker logs` ist wenig aussagekräftig. → Paket **A9** (zentrale Logging-Konfiguration, `LOG_LEVEL`, Log-Rotation in Compose).
-16. ✅ **Ortsnamen in Lokalschrift (z. B. Griechisch):** Geocoding fragt bereits mit `Accept-Language: de` an; existiert aber kein deutscher OSM-Name, fällt Nominatim auf den lokalen Namen zurück. → Paket **A10** (Fallback de → en/lateinische Umschrift + Re-Resolve-Aktion für Bestandsdaten).
-17. ✅ **Zwei Instanzen desselben Nutzers gleichzeitig** (z. B. 2× „Wetter ergänzen"): Admin-Aktionen laufen heute synchron im Request ohne Lock — zwei parallele Läufe können dieselben Kandidaten sehen und **doppelte Wetter-Metriken + doppelte API-Aufrufe** erzeugen. Bestätigte Daten (Schicht 3) sind nicht gefährdet, aber Duplikate/Kosten möglich. Entscheidung: **Ja, ein Job-Reiter kommt** → Paket **A11** (Job-Registry, Lock pro Job-Typ, Dubletten-Schutz in der DB).
-18. ✅ **Wetter-Logik (dokumentiert):** Quelle ist das Open-Meteo-**Tagesarchiv**. Gespeichert werden `temperature_c` = **Mittel aus Tagesmaximum und -minimum** (nicht Max und Min getrennt) und `weather` = der **signifikanteste/schwerste Wettercode des Tages** — regnet es morgens 1 Std. und scheint danach den ganzen Tag die Sonne, steht dort „leichter Regen". Verfeinerung (Min/Max getrennt, dominantes Tagwetter aus Stundendaten, Niederschlagsdauer) → optionales Paket **F3** in Gruppe B.
+**Feedback round 2026-07-16 (from live use):**
+13. ✅ **Export without feedback:** the export works but gives no feedback (a silent file download). → package **A8**.
+14. ✅ **Map limit:** yes, there was one — a maximum of **300 markers** per displayed range (DOM protection after large timeline imports). Decision: clustering instead of a cap → **A5/A18**.
+15. ✅ **Too few logs:** the backend only logged selectively (AI, ingestion, timeline import). → package **A9**.
+16. ✅ **Place names in local scripts (e.g. Greek):** geocoding already requested a specific language; if no name exists in it, Nominatim falls back to the local name. → package **A10**, made language-neutral by **F10**.
+17. ✅ **Two instances of the same user at once** (e.g. “add weather” twice): admin actions ran synchronously in the request without a lock — two parallel runs could grab the same candidates. → package **A11**.
+18. ✅ **Weather logic (documented):** the source is the Open-Meteo **daily archive**. Refined by **F3**.
 
-**Feedback-Runde 2026-07-16 — Google-Timeline-Import (Fragen 19–22):**
-19. ✅ **„Zuhause" statt Adresse:** Der Geräte-Export enthält keine Ortsnamen — nur `semanticType` (home/work/…), die der Import in Labels übersetzt. Weil diese Orte damit einen Namen haben, greift „Ortsnamen auflösen" dort nie. Entscheidung: Auch semantische Orte reverse-geocoden, Label als Präfix behalten („Zuhause — Adresse") → Paket **A12**.
-20. ✅ **„Gesuchte Adresse" — was ist das?** Keine Suchhistorie: Der Import erzeugt Events ausschließlich aus `visit`-Segmenten, also **echten Aufenthalten laut Gerät**. `SEARCHED_ADDRESS` beschreibt nur, *wie* Google den Aufenthaltsort erkannt hat (Match auf eine früher gesuchte Adresse). Diese Besuche bleiben deshalb drin — aber sie bekommen echte Adressen (A12), und ein optionaler Import-Filter nach Mindest-`probability` sortiert unsichere Zuordnungen aus (die `probability` wird bereits als `confidence` gespeichert).
-21. ✅ **Kompendium/Länder bleiben leer:** Stimmt — der Import erzeugt nur Events + Locations, keine Entities/Links. Entscheidung: Land beim (Reverse-)Geocoding mitnehmen und `country`-Entities anlegen/verknüpfen → Paket **F4** (Gruppe B, baut auf A10/A12 auf).
-22. ✅ **Uhrzeiten:** Ja, der Export liefert exakte Start-/Endzeiten; sie werden als lokale Wanduhrzeit mit `date_precision=exact` gespeichert — aber nirgends angezeigt (`exact` rendert wie `day`). Grundsatz-Entscheidung zum Umgang mit Uhrzeiten: **Wanduhrzeit „wie erlebt"** (keine UTC-Umrechnung); `exact` zeigt Datum+Uhrzeit, `day` bleibt Standard für manuelle Eingaben; KI darf `exact` setzen, wenn der Text eine Uhrzeit nennt → Paket **A13**.
+**Feedback round 2026-07-16 — Google Timeline import (questions 19–22):**
+19. ✅ **“Home” instead of an address:** the device export contains no place names — only `semanticType` (home/work/…), which the import translated into labels. → package **A12**.
+20. ✅ **“Searched address” — what is that?** Not a search history: the import creates events exclusively from `visit` segments, i.e. **real stays according to the device**. → packages **A12/A19**.
+21. ✅ **Collection/countries stay empty:** correct — the import created only events and locations, no entities/links. Decision: take the country during (reverse) geocoding and create `country` entities → package **F4**.
+22. ✅ **Times:** yes, the export delivers exact start/end times; they are stored as local wall-clock time with `date_precision=exact` — but were displayed nowhere. → package **A13**.
 
-**Feedback-Runde 2026-07-16 — Anmerkungen aus der Nutzung (23–30):**
-23. ✅ **Admin-Seite unübersichtlich → aufteilen:** Entscheidung: Trennung in
-    **„Verwaltung"** (jeder Nutzer: Moderation, Jobs/Anreicherung, Export/Import,
-    Ortsnamen, Tracking-Auswahl) und **„Admin"** (nur Rolle admin: Nutzer, System,
-    DB-Rohansicht, Logs), beides mit Reitern → Paket **A14**. Präzisierung zur
-    Anmerkung „Verwaltung … auch DB anpassen": Die **rohe** DB-Ansicht bleibt
-    Admin-Sache (sie ist nutzerübergreifend und umgeht die Invarianten-Leitplanken,
-    Kap. 3.1/A4); normale Nutzer ändern ihre Daten über Bearbeiten-Dialog,
-    Moderation und Bulk-Aktionen — das deckt denselben Bedarf nutzergebunden ab.
-24. ✅ **Was getrackt wird, entscheidet der Nutzer:** Onboarding-Frage beim ersten
-    Start + Einstellmöglichkeit unter Verwaltung, Auswahl aus der Modul-Registry;
-    Abwahl blendet aus (löscht nie Daten) → Paket **A15** (baut auf A7 auf).
-25. ✅ **„Juni Urlaub Dänemark" fehlt bei den unscharfen Zeiten:** Die Speicherung
-    ist korrekt (`month`, 01.06.–30.06., `unconfirmed`) — aber die
-    Unscharfe-Zeiten-Liste (P2.3) filtert nur `season`/`year`/`decade`/ohne Datum
-    und übersieht `month`. Bugfix → Paket **A16**.
-26. ✅ **Karten-Clustering zu aggressiv:** Cluster erst aktivieren, wenn der
-    Zeitraum mehr als **~50 Punkte** enthält; darunter Einzelmarker → Paket **A18**.
-27. ✅ **Besuchte Kontinente/Länder sichtbar machen:** Neuer Welt-Reiter mit
-    eingefärbter Länderkarte + Kontinente-/Länder-Checkliste → Paket **F5**
-    (braucht F4, damit Importe Länder-Entities liefern).
-28. ✅ **Achievements:** Erfolge in Bronze/Silber/Gold/Platin („Tier-Sammler":
-    5/25/100/500 Arten …), deklarativ aus Modul-YAML, eigener Reiter,
-    reine Schicht-4-Ableitung → Paket **F6**.
-29. ✅ **Logs in der UI — sollte man das machen?** Ja: Als Admin-Reiter mit
-    Ring-Puffer (letzte ~500 Zeilen, Level-/Logger-Filter) ist es fürs Homelab
-    echter Mehrwert (kein SSH nötig) und billig umzusetzen; `docker logs` bleibt
-    die vollständige Quelle. Nur für Admins, da Logs nutzerübergreifend sind
-    → Paket **A17**.
-30. ✅ **Immich-Ausbau:** Über die reine Foto-Anreicherung (P2.1) hinaus sollen
-    Datum+Ort aus Bildern **Event-Vorschläge** erzeugen und **Alben** als
-    Reise-/Ereignis-Vorschläge analysiert werden (Name, Zeitspanne, Orte).
-    Wichtig: landet als `unconfirmed` im Vorschlagsraum, nie automatisch
-    bestätigt → in Paket **P2.1** als Ausbaustufe 2 aufgenommen.
+**Feedback round 2026-07-16 — notes from use (23–30):**
+23. ✅ **Admin page cluttered → split it:** decision: separate **“Settings”** (every user: moderation, jobs/enrichment, export/import, place names, tracking choice) and **“Admin”** (admin role only: users, system, raw DB view, logs), both with tabs → package **A14**. A refinement on the note “settings … should also adjust the DB”: the **raw** DB view stays an admin matter (it spans users and bypasses the invariant guard rails, ch. 3.1/A4); normal users change their data through the edit dialog, moderation and bulk actions — which covers the same need in a user-scoped way.
+24. ✅ **The user decides what is tracked:** an onboarding question on first start plus a setting in the admin area, choosing from the module registry; deselecting hides (never deletes data) → package **A15** (builds on A7).
+25. ✅ **“June holiday Denmark” missing from the vague dates:** storage was correct (`month`, 01–30 June, `unconfirmed`) — but the vague-date list (P2.3) filtered only `season`/`year`/`decade`/no date and missed `month`. Bug fix → package **A16**.
+26. ✅ **Map clustering too aggressive:** only enable clusters once the range holds more than ~50 points; below that, individual markers → package **A18**.
+27. ✅ **Make visited continents/countries visible:** a new world tab with a shaded country map and a continent/country checklist → package **F5** (needs F4 so imports deliver country entities).
+28. ✅ **Achievements:** bronze/silver/gold/platinum (“animal collector”: 5/25/100/500 species …), declared in the module YAML, its own tab, a pure layer-4 derivation → package **F6**.
+29. ✅ **Logs in the UI — should we?** Yes: as an admin tab with a ring buffer (the last ~500 lines, level/logger filter) it is real value when self-hosting (no SSH needed) and cheap to build; `docker logs` remains the complete source. Admins only, since logs span users → package **A17**.
+30. ✅ **Immich expansion:** beyond pure photo enrichment (P2.1), date and place from images should produce **event proposals** and **albums** should be analysed as trip/event proposals (name, time span, places). Important: this lands as `unconfirmed` in the proposal space, never confirmed automatically.
 
-**Lizenz & Monetarisierung (Anmerkung 31, 2026-07-16 — ✅ entschieden: AGPL-3.0,
-LICENSE-Datei + README-Hinweis sind im Repo; der User ist erklärter Fan von
-echtem Open Source):**
-31. **Das Repo hatte keine LICENSE-Datei** — damit galt rechtlich „alle Rechte
-    vorbehalten": öffentlich sichtbar, aber niemand darf den Code legal
-    nutzen, forken oder weiterverbreiten. Für ein Self-Hosted-Tool, dessen
-    Wert auf Vertrauen und Community beruht, ist das die schlechteste
-    Variante. **Vorschlag: AGPL-3.0.**
-    - **AGPL-3.0 (empfohlen):** Copyleft, das auch bei *Netzwerk-Nutzung*
-      greift — wer Life-Dash als Dienst hostet (auch verändert), muss den
-      Quellcode offenlegen. Verhindert, dass Dritte kommerzielles Hosting
-      auf dem Projekt aufbauen, ohne zurückzugeben. Der **Rechteinhaber
-      selbst** bleibt frei: Dual-Licensing, eigener Managed-Service oder
-      Hosting-Beteiligungen (z. B. PikaPods) bleiben jederzeit möglich,
-      solange alle Beiträge vom Autor stammen (kein CLA nötig, solange
-      Solo-Projekt; ab externen Contributors CLA/DCO erwägen).
-    - *Alternativen, bewusst nicht empfohlen:* **MIT/Apache-2.0** = maximale
-      Verbreitung, aber jeder Hoster darf kommerzialisieren ohne Gegenleistung;
-      **BSL/„fair source"** = kommerzieller Schutz, aber kein Open Source im
-      OSI-Sinn — kostet genau das Community-Vertrauen, von dem Adoption lebt.
-    - *Umsetzung:* `LICENSE`-Datei (AGPL-3.0-Volltext) ins Repo, Lizenz-Hinweis
-      in README + `pyproject`/Docker-Labels; gilt ab dem Commit der Aufnahme
-      (rückwirkend bleiben alte Stände „all rights reserved").
+**License & monetisation (note 31, 2026-07-16 — ✅ decided: AGPL-3.0):**
+31. **The repo had no LICENSE file** — legally that meant “all rights reserved”: publicly visible, but nobody may legally use, fork or redistribute the code. For a self-hosted tool whose value rests on trust and community, that is the worst option. **Decision: AGPL-3.0.**
+    - **AGPL-3.0:** copyleft that also applies to *network use* — anyone hosting Life-Dash as a service (even modified) must publish the source. This prevents third parties from building commercial hosting on the project without giving back. The **rights holder** stays free: dual licensing, an own managed service or hosting partnerships remain possible as long as all contributions come from the author (no CLA needed while it is a solo project; consider a CLA/DCO once there are external contributors).
+    - *Alternatives, deliberately not chosen:* **MIT/Apache-2.0** = maximum reach, but any host may commercialise without giving back; **BSL/“fair source”** = commercial protection, but not open source in the OSI sense — which costs exactly the community trust adoption depends on.
+    - *Implementation:* a `LICENSE` file (full AGPL-3.0 text) in the repo, a license note in the README and `pyproject`/Docker labels; effective from the commit that added it (earlier states remain “all rights reserved”).
 
-**Feedback-Runde 2026-07-19 — Anmerkungen aus der Nutzung (32–42):**
-32. ✅ **„Gesuchte Adresse" taucht weiter auf:** Label wird abgeschafft — nach
-    Auflösung bleibt nur die Adresse; nicht auflösbare Label-Besuche werden
-    gefiltert/aufgeräumt → Paket **A19**.
-33. ✅ **Handy: Suche filtert nicht** (springt nur zum Zeitstrahl) → Bugfix,
-    Paket **A20**.
-34. ✅ **Handy: Karten-Reiter zeigt keine Karte** (Kompendium-Karte geht —
-    Verdacht: Größen-Berechnung beim Einblenden) → Bugfix, Paket **A20**.
-35. ✅ **Export-Auswahl** (z. B. ohne Google-Import) → Paket **A21**.
-36. ✅ **Jobs sollen ohne offene Seite laufen:** serverseitige Background-Jobs
-    + Stopp-Knopf im Jobs-Reiter + optionaler Nachtplan pro Job-Typ
-    (vom Nutzer ein-/ausschaltbar) → Paket **A22** (baut auf A11 auf).
-37. ✅ **Mehrtägige Events pro Tag anreichern:** Entscheidung **„beides"** —
-    ein Reise-Event plus Tages-Unterereignisse (`parent_event_id`, eine
-    Spalte, kein Umbau); Anreicherung hängt an den Tages-Kindern
-    → Paket **F7**. Details/Datenmodell-Folgen dort.
-38. ✅ **Druckansicht ausgewählter Tage** → Paket **F8**.
-39. ✅ **CHANGELOG versteht keiner (A1/P2.5 …):** Prozessregel ab sofort —
-    Changelog-Einträge in verständlicher Produktsprache ohne Paketkürzel;
-    die Kürzel leben nur noch hier im KONZEPT (Zuordnung übers Datum).
-40. ✅ **UI spricht von „Stufe 1/2/3":** Klartext-Begriffe im UI
-    (Roh-Eingang / Vorschläge / Lebensdatenbank / Ansichten) → Paket **A23**.
-41. ✅ **Heller Modus** (+ Umschalter, Auto nach System) → Paket **F9**.
-42. ✅ **Sprachen:** App-UI umschaltbar de/en; README/CHANGELOG/KONZEPT werden
-    **einmalig auf Englisch umgestellt** und danach englisch gepflegt.
-    Deutscher Input bleibt ausdrücklich okay (wird beim Schreiben übersetzt) —
-    keine Komplikation, nur die einmalige KONZEPT-Übersetzung und ein
-    Begriffs-Glossar sind der Preis → Paket **F10**.
+**Feedback round 2026-07-19 — notes from use (32–42):**
+32. ✅ **“Searched address” still appears:** the label is abolished — after resolution only the address remains; unresolvable label visits are filtered/cleaned up → package **A19**.
+33. ✅ **Phone: search does not filter** (it only jumps to the timeline) → bug fix, package **A20**.
+34. ✅ **Phone: the map tab shows no map** (the collection map works — suspicion: size calculation when shown) → bug fix, package **A20**.
+35. ✅ **Export selection** (e.g. without the Google import) → package **A21**.
+36. ✅ **Jobs should run without an open page:** server-side background jobs plus a stop button in the jobs tab plus an optional nightly schedule per job type (user-switchable) → package **A22** (builds on A11).
+37. ✅ **Enrich multi-day events per day:** decision **“both”** — one trip event plus day sub-events (`parent_event_id`, one column, no rebuild); enrichment hangs on the day children → package **F7**.
+38. ✅ **Print view for selected days** → package **F8**.
+39. ✅ **Nobody understands the CHANGELOG (A1/P2.5 …):** a process rule from now on — changelog entries in understandable product language without package codes; the codes live only here in the concept (matched by date).
+40. ✅ **The UI talks about “stage 1/2/3”:** plain terms in the UI (raw inbox / proposals / life database / views) → package **A23**.
+41. ✅ **Light mode** (plus a switch, auto following the system) → package **F9**.
+42. ✅ **Languages:** the app UI switchable de/en; README/CHANGELOG/KONZEPT switched to English **once** and maintained in English afterwards. German input stays explicitly fine (translated when writing) — no complication, the price is only the one-off concept translation and a glossary of terms → package **F10**.
 
-**Feedback-Runde 2026-07-19 abends — zweite Runde (43–48):**
-43. ✅ **Dawarich nutzen?** Entschieden: **nicht parallel betreiben**, sondern
-    die gute Idee übernehmen — Life-Dash bekommt einen eigenen
-    OwnTracks/Overland-kompatiblen Live-Endpoint; Dawarich (AGPL, Ruby)
-    bleibt reine Format-/API-Referenz → Paket **P2.8**.
-44. ✅ **Importe automatisieren:** vorerst nur mitdenken (idempotente Importe
-    als Grundlage existieren); umgesetzt wird, wenn die Connectoren stehen
-    → Paket **P2.9** (bewusst zuletzt, wie alle Import-Themen).
-45. ✅ **Karte auf großen Bildschirmen zu klein** (+ „allgemein verbessern" —
-    konkrete Ideen bewusst noch offen, werden gesammelt) → Paket **A24**.
-46. ✅ **Ortsnamen auflösen / Adressen kürzen / Fremdschrift eindeutschen
-    zusammenlegen:** serverseitig schon ein Job mit drei Scopes, die UI
-    folgt; spätestens mit F10 (de/en) muss „eindeutschen" sprachneutral
-    werden → Paket **A25**.
-47. ✅ **„Meine Daten" unter Verwaltung besser sortieren** → Paket **A26**.
-48. ✅ **Allgemeingültigkeit prüfen:** UI-Texte, Docs und Defaults dürfen
-    nichts Homelab-Spezifisches hart verdrahten (z. B. „Pocket ID" im
-    Login-Screen) — andere sollen das Projekt sauber deployen können
-    → Paket **A27**.
+**Feedback round 2026-07-19, evening — second round (43–48):**
+43. ✅ **Use Dawarich?** Decided: **do not run it alongside**, but adopt the good idea — Life-Dash gets its own OwnTracks/Overland-compatible live endpoint; Dawarich (AGPL, Ruby) stays a pure format/API reference → package **P2.8**.
+44. ✅ **Automate imports:** for now only keep it in mind (idempotent imports already exist as the basis); implementation follows once the connectors are in place → package **P2.9** (deliberately last, like all import topics).
+45. ✅ **Map too small on large screens** (plus “improve generally”) → package **A24**. Closed with v0.19.0: the “improve generally” collection held no decision and is no longer kept open; concrete map wishes will come as a new package.
+46. ✅ **Merge resolve place names / shorten addresses / transliterate foreign scripts:** server-side this was already one job with three scopes, and the UI follows; with F10 (de/en) “transliterate” had to become language-neutral → package **A25** (completed with F10 in v0.20.0).
+47. ✅ **Sort “my data” under settings better** → package **A26**.
+48. ✅ **Check generality:** UI texts, docs and defaults must not hardwire anything instance-specific (e.g. a provider name on the login screen) — other people should be able to deploy the project cleanly → package **A27**.
 
-**Noch offen / zu entscheiden:**
-6. **Neuberechnungs-Granularität & Kosten:** Bleibt offen — hängt vom endgültigen Modell ab (lokal = Laufzeit, API = Kontingent/Kosten). Der Quota-Schutz (Abbruch mit Erhalt des Altbestands) ist umgesetzt; einzelne Fragmente gezielt neu verarbeiten wäre der nächste Schritt, wenn die Datenmenge wächst.
+**Still open / to be decided:**
+6. **Recomputation granularity & cost:** stays open — it depends on the final model (local = runtime, API = quota/cost). The quota protection (stopping while keeping what was already computed) covers the acute case.
 
 ---
 
-## Anhang A — Beispiel: Fragment → strukturiertes Event
+## Appendix A — example: fragment → structured event
 
-**Eingabe:**
-> „12.07.2026 war in Detmold und habe einen Adler gesehen"
+**Input:**
+> “12/07/2026 was in Detmold and saw an eagle”
 
-**KI-Ergebnis (strukturiert):**
+**AI result (structured):**
 
 ```json
 {
-  "title": "Adler in Detmold gesehen",
+  "title": "Saw an eagle in Detmold",
   "date_start": "2026-07-12",
   "date_end": "2026-07-12",
   "date_precision": "day",
   "category": "sighting",
   "location": { "name": "Detmold", "type": "city" },
   "entities": [
-    { "type": "animal", "name": "Adler", "attributes": { "species": "Adler", "wild": true } }
+    { "type": "animal", "name": "Eagle", "attributes": { "species": "Eagle", "wild": true } }
   ],
   "confidence": 0.94,
   "source": "ai",
@@ -882,19 +786,19 @@ echtem Open Source):**
 }
 ```
 
-**Zweites Beispiel:**
-> „Sommer 2002 Urlaub in Frankreich"
+**Second example:**
+> “Summer 2002 holiday in France”
 
 ```json
 {
-  "title": "Urlaub in Frankreich",
+  "title": "Holiday in France",
   "date_start": "2002-06-01",
   "date_end": "2002-08-31",
   "date_precision": "season",
   "category": "trip",
-  "location": { "name": "Frankreich", "type": "country" },
+  "location": { "name": "France", "type": "country" },
   "entities": [
-    { "type": "country", "name": "Frankreich" }
+    { "type": "country", "name": "France" }
   ],
   "confidence": 0.72,
   "source": "ai",

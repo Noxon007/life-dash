@@ -1,111 +1,110 @@
-# Life-Dash — Deployment
+# Life-Dash — deployment
 
-Runbook für ein eigenes Deployment: GHCR-Image → Server mit Docker Compose →
-HTTPS über einen Reverse Proxy → Login über deinen OIDC-Provider.
+Runbook for your own deployment: GHCR image → server with Docker Compose →
+HTTPS behind a reverse proxy → sign-in via your OIDC provider.
 
-Die genannten Produkte sind **Beispiele, keine Voraussetzung**. Life-Dash
-spricht nur Standards: OIDC fürs Login, eine OpenAI-kompatible API für die KI,
-Nominatim fürs Geocoding. Womit du die belegst, entscheidest du in der `.env` —
-die vollständige Referenz dazu ist [.env.example](../.env.example).
+The products named here are **examples, not requirements**. Life-Dash speaks
+standards only: OIDC for sign-in, an OpenAI-compatible API for the AI,
+Nominatim for geocoding. What you fill those slots with is decided in your
+`.env` — the complete reference for it is [.env.example](../.env.example).
 
-Wer das Image nicht selbst bauen will, überspringt Schritt 1: die offiziellen
-Images liegen öffentlich unter `ghcr.io/noxon007/life-dash`.
+If you do not want to build the image yourself, skip step 1: the official
+images are public at `ghcr.io/noxon007/life-dash`.
 
 ---
 
-## 1. Eigenes Image bauen (optional)
+## 1. Build your own image (optional)
 
-Nur nötig, wenn du einen Fork betreibst oder eigene Änderungen ausrollst.
-Repo auf GitHub anlegen, Code und einen SemVer-Tag pushen:
+Only needed if you run a fork or roll out your own changes. Create a repo on
+GitHub, push the code and a SemVer tag:
 
 ```bash
-git remote add origin https://github.com/<dein-account>/life-dash.git
+git remote add origin https://github.com/<your-account>/life-dash.git
 git push -u origin main
-git push origin v0.19.0
+git push origin v0.20.0
 ```
 
-Der Tag-Push startet die Action **Docker Release**: sie baut das Multi-Arch-Image
-(`linux/amd64` + `linux/arm64`) und pusht es als
-`ghcr.io/<dein-account>/life-dash:0.19.0`, `:0.19` und `:latest`. Status unter
-*Repo → Actions*. Nach dem ersten Lauf prüfen, dass das Package öffentlich ist
-(*Profil → Packages → life-dash → Package settings → Visibility*) — dann zieht
-der Server es ohne Registry-Login. In der `docker-compose.yml` den `image:`-Pfad
-auf deinen Account umstellen.
+Pushing the tag starts the **Docker Release** action: it builds the multi-arch
+image (`linux/amd64` + `linux/arm64`) and pushes it as
+`ghcr.io/<your-account>/life-dash:0.20.0`, `:0.20` and `:latest`. Status under
+*Repo → Actions*. After the first run, check that the package is public
+(*Profile → Packages → life-dash → Package settings → Visibility*) — then your
+server pulls it without a registry login. Point the `image:` path in
+`docker-compose.yml` at your account.
 
-**Neue Version veröffentlichen** (Versionsschema: [CHANGELOG.md](../CHANGELOG.md)):
-committen, CHANGELOG ergänzen, `git tag v0.19.1` (Bugfix) bzw. `v0.20.0`
-(Feature), Tag pushen. Auf dem Server dann `LIFEDASH_VERSION` in `.env`
-hochsetzen und `docker compose pull && docker compose up -d`.
+**Publishing a new version** (versioning scheme: [CHANGELOG.md](../CHANGELOG.md)):
+commit, update the CHANGELOG, `git tag v0.20.1` (fix) or `v0.21.0` (feature),
+push the tag. On the server, raise `LIFEDASH_VERSION` in `.env` and run
+`docker compose pull && docker compose up -d`.
 
-## 2. OIDC-Client anlegen
+## 2. Create an OIDC client
 
-Life-Dash funktioniert mit jedem standardkonformen OIDC-Provider — Authentik,
-Keycloak, Pocket ID, Zitadel, Auth0 und andere. Dort einen Client anlegen:
+Life-Dash works with any standards-compliant OIDC provider — Authentik,
+Keycloak, Pocket ID, Zitadel, Auth0 and others. Create a client there:
 
-| Feld | Wert |
+| Field | Value |
 |---|---|
 | Name | Life-Dash |
-| Callback-URL | `https://life.example.com/api/auth/callback` (= `PUBLIC_BASE_URL` + `/api/auth/callback`) |
-| Public Client (PKCE) | ja → `OIDC_CLIENT_SECRET` bleibt leer |
+| Callback URL | `https://life.example.com/api/auth/callback` (= `PUBLIC_BASE_URL` + `/api/auth/callback`) |
+| Public client (PKCE) | yes → leave `OIDC_CLIENT_SECRET` empty |
 
-`OIDC_ISSUER` ist die Basis-URL des Providers (dort muss
-`/.well-known/openid-configuration` erreichbar sein), `OIDC_CLIENT_ID` die
-generierte Client-ID. Mit `OIDC_PROVIDER_NAME` kannst du den Namen deines
-Anmeldedienstes auf dem Login-Screen anzeigen lassen; ohne die Variable steht
-dort ein neutraler SSO-Hinweis.
+`OIDC_ISSUER` is the provider's base URL (`/.well-known/openid-configuration`
+must be reachable there), `OIDC_CLIENT_ID` the generated client ID. With
+`OIDC_PROVIDER_NAME` you can show the name of your sign-in service on the login
+screen; without it, a neutral SSO hint is displayed.
 
-Kein OIDC-Provider zur Hand? `AUTH_MODE=dev` startet ohne Login mit einem festen
-Admin-Nutzer — nur für lokale Tests, **niemals öffentlich erreichbar betreiben**.
+No OIDC provider at hand? `AUTH_MODE=dev` starts without a login using a fixed
+admin user — for local tests only, **never run it publicly reachable**.
 
-## 2a. Hinweis: ARM64 / Einplatinenrechner
+## 2a. Note: ARM64 / single-board computers
 
-Das Image wird als Multi-Arch-Manifest gebaut (`linux/amd64` + `linux/arm64`) —
-`docker compose pull` zieht automatisch die passende Variante, kein Extra-Schritt.
+The image is built as a multi-arch manifest (`linux/amd64` + `linux/arm64`) —
+`docker compose pull` picks the right variant automatically, no extra step.
 
-Für FastAPI + SQLite/Postgres reicht ein Einplatinenrechner (z. B. Raspberry Pi 5)
-locker, solange die KI über eine externe API läuft und kein LLM lokal rechnet.
-Der `db`-Service (offizielles `postgres:18-alpine`) läuft nativ auf ARM64.
+A single-board computer (e.g. a Raspberry Pi 5) is plenty for FastAPI +
+SQLite/Postgres, as long as the AI runs through an external API and no LLM
+computes locally. The `db` service (official `postgres:18-alpine`) runs
+natively on ARM64.
 
-## 3. Server vorbereiten
+## 3. Prepare the server
 
-Docker + Compose-Plugin vorausgesetzt — das Image ist öffentlich, ein
-Registry-Login ist nicht nötig:
+Docker and the Compose plugin are assumed — the image is public, so no registry
+login is needed:
 
 ```bash
 mkdir -p /opt/life-dash && cd /opt/life-dash
-# docker-compose.yml und .env.example aus dem Repo hierher kopieren
-# (scp vom Dev-Rechner oder Download über die GitHub-Weboberfläche)
+# copy docker-compose.yml and .env.example from the repo here
+# (scp from your dev machine or download via the GitHub web UI)
 cp .env.example .env
 ```
 
-`.env` ausfüllen — Minimum:
+Fill in `.env` — the minimum:
 
 ```ini
-LIFEDASH_VERSION=0.19.0
+LIFEDASH_VERSION=0.20.0
 PUBLIC_BASE_URL=https://life.example.com
 OIDC_ISSUER=https://id.example.com
-OIDC_CLIENT_ID=<Client-ID aus deinem OIDC-Provider>
+OIDC_CLIENT_ID=<client ID from your OIDC provider>
 SESSION_SECRET=<python -c "import secrets; print(secrets.token_urlsafe(48))">
-POSTGRES_PASSWORD=<eigenes DB-Passwort — PostgreSQL ist der Standard>
+POSTGRES_PASSWORD=<your own DB password — PostgreSQL is the default>
 ```
 
-Damit läuft die App bereits — die KI bleibt im Modus `mock` (regelbasiert,
-kein Schlüssel nötig). Für echte KI-Analyse zusätzlich einen
-OpenAI-kompatiblen Endpoint eintragen, zum Beispiel:
+That is enough to run the app — the AI stays in `mock` mode (rule-based, no key
+needed). For real AI analysis, add an OpenAI-compatible endpoint, for example:
 
 ```ini
 AI_PROVIDER=openai
 OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_API_KEY=<dein Schlüssel>
+OPENAI_API_KEY=<your key>
 OPENAI_MODEL=gpt-4o-mini
-# Optional: semantische Suche
+# Optional: semantic search
 OPENAI_EMBED_MODEL=text-embedding-3-small
 ```
 
-Andere Anbieter (Gemini, lokales Ollama, LM Studio …) unterscheiden sich nur in
-Basis-URL und Modellnamen — Beispiele stehen in [.env.example](../.env.example).
-Wer Embeddings nutzt, sollte `SEMANTIC_MIN_SIMILARITY` zum Modell passend
-nachziehen; der Standard 0.4 ist für bge-m3 kalibriert.
+Other vendors (Gemini, local Ollama, LM Studio …) differ only in base URL and
+model name — examples are in [.env.example](../.env.example). If you use
+embeddings, retune `SEMANTIC_MIN_SIMILARITY` to your model; the default of 0.4
+is calibrated for bge-m3.
 
 Start:
 
@@ -115,91 +114,88 @@ docker compose up -d
 curl -s http://127.0.0.1:8000/health   # -> {"status": ...}
 ```
 
-## 4. Reverse Proxy einrichten
+## 4. Set up the reverse proxy
 
-Life-Dash lauscht auf `LIFEDASH_PORT` (Standard 8000) und erwartet davor einen
-Reverse Proxy, der TLS terminiert — Traefik, Caddy, nginx, Pangolin oder was du
-sonst betreibst. Nötig ist nur:
+Life-Dash listens on `LIFEDASH_PORT` (8000 by default) and expects a reverse
+proxy in front of it terminating TLS — Traefik, Caddy, nginx, Pangolin or
+whatever you run. All it needs is:
 
-- **Ziel:** `http://<server-ip>:8000` (der `LIFEDASH_PORT` aus `.env`).
-- **HTTPS** für die öffentliche Domain.
-- **Weiterreichen der Proxy-Header** (`X-Forwarded-Proto`, `X-Forwarded-For`):
-  Uvicorn läuft mit `--proxy-headers`, damit Scheme und Client-IP stimmen.
+- **Target:** `http://<server-ip>:8000` (the `LIFEDASH_PORT` from `.env`).
+- **HTTPS** for the public domain.
+- **Forwarded proxy headers** (`X-Forwarded-Proto`, `X-Forwarded-For`):
+  uvicorn runs with `--proxy-headers` so scheme and client IP are correct.
 
-Zwei Stolperfallen:
+Two pitfalls:
 
-- Die Domain muss **exakt** `PUBLIC_BASE_URL` entsprechen, sonst schlägt der
-  OIDC-Callback fehl.
-- Falls dein Proxy eine **eigene Authentifizierung** davorschalten kann
-  (Traefik ForwardAuth, Authelia, Pangolin-Auth …), schalte sie für diese
-  Anwendung **ab**. Life-Dash bringt seinen eigenen OIDC-Login mit; sonst gibt
-  es einen Doppel-Login, und die PWA-/API-Aufrufe vom Handy scheitern am
-  Auth-Redirect des Proxys.
+- The domain must match `PUBLIC_BASE_URL` **exactly**, otherwise the OIDC
+  callback fails.
+- If your proxy can put its **own authentication** in front (Traefik
+  ForwardAuth, Authelia, Pangolin auth …), turn it **off** for this
+  application. Life-Dash brings its own OIDC login; otherwise you get a double
+  login, and PWA/API calls from a phone fail on the proxy's auth redirect.
 
-## 5. Erster Login & Datenübernahme
+## 5. First login & migrating data
 
-- **Der erste OIDC-Login wird Admin** und adoptiert vorhandene
-  Single-User-Altdaten (`app/migrate.py`) — also zuerst selbst einloggen,
-  bevor andere Nutzer eingeladen werden.
-- Bestandsdaten vom Dev-Rechner umziehen (Export/Import, JSON):
-  1. Lokal (AUTH_MODE=dev): im Frontend **Einstellungen → Export** oder
-     `GET /api/data/export` → JSON-Datei sichern.
-  2. Auf dem Server einloggen und die Datei über **Einstellungen → Import**
-     bzw. `POST /api/data/import` einspielen.
+- **The first OIDC login becomes admin** and adopts existing single-user legacy
+  data (`app/migrate.py`) — so log in yourself before inviting other users.
+- Moving existing data from a dev machine (export/import, JSON):
+  1. Locally (AUTH_MODE=dev): in the frontend **Settings → Export** or
+     `GET /api/data/export` → save the JSON file.
+  2. Log in on the server and load the file via **Settings → Import** or
+     `POST /api/data/import`.
 
-## 6. Datenbank: PostgreSQL (Standard) & Migration von SQLite
+## 6. Database: PostgreSQL (default) & migrating from SQLite
 
-**PostgreSQL ist der Standard** — `docker compose up -d` startet App + DB,
-das Schema wird beim ersten Start automatisch angelegt. Es genügt,
-`POSTGRES_PASSWORD` in `.env` zu setzen; die `DATABASE_URL` baut die Compose
-daraus selbst.
+**PostgreSQL is the default** — `docker compose up -d` starts app + DB, and the
+schema is created automatically on first start. Setting `POSTGRES_PASSWORD` in
+`.env` is enough; Compose builds the `DATABASE_URL` from it.
 
-**Alle Daten liegen als Ordner neben der `docker-compose.yml`** (Bind-Mounts,
-keine Docker-Volumes): `./db` ist das PostgreSQL-Datenverzeichnis, `./data`
-sind die App-Daten (SQLite-DB beim Minimal-Setup). Die Ordner entstehen beim
-ersten Start automatisch; `./db` gehört danach dem Container-User (uid 70) —
-Lesen/Sichern also mit `sudo`.
+**All data lives in folders next to `docker-compose.yml`** (bind mounts, not
+Docker volumes): `./db` is the PostgreSQL data directory, `./data` holds app
+data (the SQLite DB in a minimal setup). The folders appear on first start;
+`./db` then belongs to the container user (uid 70) — read and back it up with
+`sudo`.
 
-**Bestehende SQLite-Installation migrieren** (ohne Dump-Konvertierung, über
-den JSON-Export):
+**Migrating an existing SQLite installation** (no dump conversion, via the JSON
+export):
 
-1. Vor dem Update: einloggen und JSON-Export ziehen (**Einstellungen → Export**).
-2. In `.env`: `POSTGRES_PASSWORD` setzen und eine eventuell vorhandene
-   `DATABASE_URL=sqlite:...`-Zeile **entfernen** (sonst bleibt SQLite aktiv).
-3. `docker compose pull && docker compose up -d` — Postgres startet, Schema
-   wird angelegt, die App wartet auf den DB-Healthcheck.
-4. Einloggen (erster Login in der leeren DB = Admin) und den JSON-Export
-   importieren. Die alte SQLite-DB (`./data/lifedash.db` bzw. das frühere
-   Docker-Volume `lifedash-data`) bleibt als Rückfall erhalten, bis du sie
-   löschst.
+1. Before updating: log in and take a JSON export (**Settings → Export**).
+2. In `.env`: set `POSTGRES_PASSWORD` and **remove** any
+   `DATABASE_URL=sqlite:...` line (otherwise SQLite stays active).
+3. `docker compose pull && docker compose up -d` — Postgres starts, the schema
+   is created, the app waits for the DB health check.
+4. Log in (first login into the empty DB = admin) and import the JSON export.
+   The old SQLite DB (`./data/lifedash.db`, or the earlier Docker volume
+   `lifedash-data`) stays as a fallback until you delete it.
 
-**SQLite weiterhin nutzen** (Minimal-Setup): `DATABASE_URL=sqlite:////data/lifedash.db`
-in `.env` lassen und mit `docker compose up -d --no-deps app` nur die App starten.
+**Keep using SQLite** (minimal setup): leave
+`DATABASE_URL=sqlite:////data/lifedash.db` in `.env` and start only the app
+with `docker compose up -d --no-deps app`.
 
-**Upgrade von einem älteren Setup** (postgres:16 und/oder Docker-Volumes
-statt Ordner): Postgres-Datenverzeichnisse sind nicht major-versions-
-kompatibel, und ab Image-Version 18 zeigt der Mount auf `/var/lib/postgresql`
-statt `.../data`. Der einfache Weg läuft über den JSON-Export:
+**Upgrading from an older setup** (postgres:16 and/or Docker volumes instead of
+folders): Postgres data directories are not compatible across major versions,
+and from image version 18 the mount points at `/var/lib/postgresql` instead of
+`.../data`. The simple path goes through the JSON export:
 
-1. Einloggen, JSON-Export ziehen (**Einstellungen → Export**).
-2. `docker compose down` und Altbestand entfernen: früheres Docker-Volume
-   mit `docker volume rm life-dash_lifedash-pg` (bzw. einen schon
-   vorhandenen `./db`-Ordner mit `sudo rm -rf ./db`).
-3. Aktualisierte `docker-compose.yml` deployen, `docker compose up -d` —
-   Postgres 18 startet mit leerer DB im neuen Ordner `./db`, Schema wird
-   angelegt.
-4. Einloggen (erster Login = Admin) und den JSON-Export importieren.
+1. Log in, take a JSON export (**Settings → Export**).
+2. `docker compose down` and remove the old state: the earlier Docker volume
+   with `docker volume rm life-dash_lifedash-pg` (or an existing `./db` folder
+   with `sudo rm -rf ./db`).
+3. Deploy the updated `docker-compose.yml`, run `docker compose up -d` —
+   Postgres 18 starts with an empty DB in the new `./db` folder and the schema
+   is created.
+4. Log in (first login = admin) and import the JSON export.
 
-## 7. Betrieb
+## 7. Operations
 
 ```bash
-docker compose logs -f app        # Logs
-docker compose ps                 # Health-Status (Container hat HEALTHCHECK)
-docker compose pull && docker compose up -d   # Update auf neuen Tag
+docker compose logs -f app        # logs
+docker compose ps                 # health status (the container has a HEALTHCHECK)
+docker compose pull && docker compose up -d   # update to a new tag
 ```
 
-Backup-Minimum: die Ordner `./db` (PostgreSQL, mit `sudo` — gehört uid 70)
-bzw. `./data` (SQLite) neben der Compose-Datei sichern — oder regelmäßig den
-JSON-Export ziehen, der ist vollständig und versionsunabhängig. Sauberer ist
-ein Dump statt des rohen Ordners:
+Backup minimum: save the folders `./db` (PostgreSQL, with `sudo` — owned by
+uid 70) or `./data` (SQLite) next to the Compose file — or regularly take the
+JSON export, which is complete and version-independent. Cleaner than the raw
+folder is a dump:
 `docker compose exec db pg_dump -U lifedash lifedash > backup.sql`.

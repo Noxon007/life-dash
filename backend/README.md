@@ -1,30 +1,30 @@
-# Life-Dash Backend
+# Life-Dash backend
 
-FastAPI-Backend für Life-Dash — die durchsuchbare Lebensdatenbank.
-Aktuelle Version und Änderungen: [../CHANGELOG.md](../CHANGELOG.md).
+FastAPI backend for Life-Dash — the searchable life database.
+Current version and changes: [../CHANGELOG.md](../CHANGELOG.md).
 
-## Schicht-Architektur
+## Layer architecture
 
-- **Roh-Eingang** (`Fragment`) — unveränderlich, wird nie automatisch gelöscht.
-- **Vorschläge** (`unconfirmed`) — KI-strukturiert, warten auf Moderation.
-- **Lebensdatenbank** (`confirmed`) — Maschinen ändern Bestätigtes nie;
-  Anreicherung (z. B. Wetter) ist ausschließlich additiv.
-- **Ableitungen** — Timeline, Karte, Suche, Statistik, Welt, Erfolge:
-  jederzeit neu berechenbar, kein eigener Datenbestand.
+- **Raw inbox** (`Fragment`) — immutable, never deleted automatically.
+- **Proposals** (`unconfirmed`) — AI-structured, waiting for moderation.
+- **Life database** (`confirmed`) — machines never change what is confirmed;
+  enrichment (e.g. weather) is strictly additive.
+- **Derived** — timeline, map, search, statistics, world, achievements:
+  rebuildable at any time, holding no data of their own.
 
-## Multi-User & Auth (OIDC)
+## Multi-user & auth (OIDC)
 
-- Alle Daten sind nutzergebunden (`user_id` auf allen Schichten); jede API-Query ist gescoped.
-- `AUTH_MODE=dev` (Default): kein Login, fester Dev-User mit Admin-Rolle — für lokale Entwicklung.
-- `AUTH_MODE=oidc`: Authorization Code Flow mit **PKCE** gegen einen beliebigen
-  standardkonformen OIDC-Provider (Authentik, Keycloak, Pocket ID, Zitadel, Auth0, …).
-  - Beim Provider einen Client anlegen; Callback-URL: `<PUBLIC_BASE_URL>/api/auth/callback`.
-  - Public Client reicht (Secret optional). Nötige Variablen: `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `SESSION_SECRET`, `PUBLIC_BASE_URL` (siehe `../.env.example`).
-  - Nutzer entstehen beim ersten Login (JIT). **Der erste Nutzer wird Admin** und übernimmt vorhandene Single-User-Altdaten.
-  - `OIDC_PROVIDER_NAME` setzt optional den Anzeigenamen auf dem Login-Screen.
-- API-Clients können alternativ ein `Authorization: Bearer <token>` des Providers senden.
+- All data is user-scoped (`user_id` on every layer); every API query is scoped.
+- `AUTH_MODE=dev` (default): no login, a fixed dev user with the admin role — for local development.
+- `AUTH_MODE=oidc`: authorization code flow with **PKCE** against any
+  standards-compliant OIDC provider (Authentik, Keycloak, Pocket ID, Zitadel, Auth0, …).
+  - Create a client at your provider; callback URL: `<PUBLIC_BASE_URL>/api/auth/callback`.
+  - A public client is enough (secret optional). Required variables: `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `SESSION_SECRET`, `PUBLIC_BASE_URL` (see `../.env.example`).
+  - Users are created on first login (JIT). **The first user becomes admin** and adopts any existing single-user legacy data.
+  - `OIDC_PROVIDER_NAME` optionally sets the display name on the login screen.
+- API clients may alternatively send an `Authorization: Bearer <token>` from the provider.
 
-## Schnellstart (lokal, ohne Docker)
+## Quick start (local, without Docker)
 
 ```powershell
 cd backend
@@ -34,65 +34,77 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Danach:
-- **Frontend (PWA):** http://127.0.0.1:8000/ — responsive, auf dem Smartphone installierbar
-- API-Docs: http://127.0.0.1:8000/docs
+Then:
+- **Frontend (PWA):** http://127.0.0.1:8000/ — responsive, installable on a phone
+- API docs: http://127.0.0.1:8000/docs
 - Health: http://127.0.0.1:8000/health
 
-Beim ersten Start werden im Dev-Modus Beispieldaten geseedet (`SEED_DEMO=true`).
+On first start in dev mode, demo data is seeded (`SEED_DEMO=true`).
 
 ## Docker
 
 ```bash
-cp .env.example .env   # OIDC_*, SESSION_SECRET, POSTGRES_PASSWORD setzen
-docker compose up -d   # App + PostgreSQL (SQLite: DATABASE_URL überschreiben)
+cp .env.example .env   # set OIDC_*, SESSION_SECRET, POSTGRES_PASSWORD
+docker compose up -d   # app + PostgreSQL (SQLite: override DATABASE_URL)
 ```
 
-Vollständiges Server-Deployment (GHCR-Image, Reverse Proxy, OIDC,
-Datenübernahme): [../docs/DEPLOY.md](../docs/DEPLOY.md)
+Full server deployment (GHCR image, reverse proxy, OIDC, data migration):
+[../docs/DEPLOY.md](../docs/DEPLOY.md)
 
-## Suche
+## Search
 
 `GET /api/search?q=…` — hybrid:
-- **Volltext** über Titel, Beschreibung, Ortsname, Entity-Namen (immer aktiv).
-- **Semantisch** über Event-Embeddings (Cosine) — aktiv, sobald `OPENAI_EMBED_MODEL`
-  gesetzt ist; das Modell liefert derselbe OpenAI-kompatible Endpoint wie den Chat
-  (oder ein eigener, siehe `OPENAI_EMBED_BASE_URL`). Ohne Embeddings: reiner Volltext.
-  `SEMANTIC_MIN_SIMILARITY` ist modellabhängig und will nachkalibriert werden.
-  Nach Modellwechsel: Admin → „🧠 Embeddings berechnen" (bzw. `POST /api/admin/reindex-embeddings?force=true`).
+- **Full text** across title, description, place name, item names (always on).
+- **Semantic** across event embeddings (cosine) — active as soon as
+  `OPENAI_EMBED_MODEL` is set; the model is served by the same OpenAI-compatible
+  endpoint as the chat (or a separate one, see `OPENAI_EMBED_BASE_URL`).
+  Without embeddings: full text only. `SEMANTIC_MIN_SIMILARITY` depends on the
+  model and wants recalibrating.
+  After a model change: Settings → “🧠 Build embeddings” (or
+  `POST /api/admin/reindex-embeddings?force=true`).
+
+## Interface language (F10)
+
+German is the source of truth in `frontend/index.html`; the `I18N_EN` catalog
+holds English only. A missing key falls back to the German text, so a lagging
+catalog can never produce an empty label. Three ways to mark text:
+`data-i18n` (HTML content), `data-i18n-title` / `data-i18n-ph` (attributes),
+`t('key', 'German text')` (JavaScript). AI prompts are unaffected — they live
+in the backend. The chosen language is also stored on the account and drives
+`Accept-Language` for place-name lookups.
 
 ## Stack
 
-| Ebene | Aktuell | Später (Konzept) |
+| Layer | Today | Later (concept) |
 |---|---|---|
-| DB | SQLite (Datei) oder PostgreSQL | PostgreSQL + PostGIS + pgvector |
-| KI | OpenAI-kompatible API (Anbieter frei) oder Mock-Provider | — |
-| Auth | OIDC (beliebiger Provider) oder Dev-Modus | — |
-| Geo | lat/lng-Felder + Nominatim-kompatibler Dienst | PostGIS |
+| DB | SQLite (file) or PostgreSQL | PostgreSQL + PostGIS + pgvector |
+| AI | OpenAI-compatible API (any vendor) or mock provider | — |
+| Auth | OIDC (any provider) or dev mode | — |
+| Geo | lat/lng fields + Nominatim-compatible service | PostGIS |
 | Deployment | uvicorn / Docker Compose | Docker Compose |
 
-Die Modelle sind Postgres-kompatibel gehalten; `app/migrate.py` ergänzt neue Spalten
-in bestehenden DBs (MVP-Migration, später Alembic).
+The models are kept Postgres-compatible; `app/migrate.py` adds new columns to
+existing databases (MVP migration, Alembic later).
 
-## Struktur
+## Structure
 
 ```
 app/
-  main.py            App-Setup, Migration, Seed, Frontend-Mount
-  config.py          Settings (.env) inkl. Auth/OIDC
-  database.py        Engine/Session
-  migrate.py         Mini-Migration (fehlende Spalten, Altdaten-Adoption)
-  models.py          SQLAlchemy-Modelle (User + Stufe 1/2/3)
-  schemas.py         Pydantic-Schemas
-  auth.py            OIDC (PKCE, JWKS), Session-Cookies, Dependencies
-  seed.py            Demo-Daten (Dev-Modus)
-  ai/                KI-Provider (Mock, OpenAI-kompatibel, Embeddings)
-  modules/           Modul-Registry (lädt YAML)
-  data/              Statische Stammdaten (Länder: Name -> ISO -> Kontinent)
-  services/          Ingestion-Pipeline, Geocoding, Wetter-Enrichment, Erfolge
-  routers/           API-Endpoints (auth, ingest, events, search, moderation,
+  main.py            app setup, migration, seed, frontend mount
+  config.py          settings (.env) incl. auth/OIDC
+  database.py        engine/session
+  migrate.py         mini migration (missing columns, legacy data adoption)
+  models.py          SQLAlchemy models (user + all layers)
+  schemas.py         Pydantic schemas
+  auth.py            OIDC (PKCE, JWKS), session cookies, dependencies
+  seed.py            demo data (dev mode)
+  ai/                AI providers (mock, OpenAI-compatible, embeddings)
+  modules/           module registry (loads YAML)
+  data/              static reference data (countries: name -> ISO -> continent)
+  services/          ingestion pipeline, geocoding, weather enrichment, achievements
+  routers/           API endpoints (auth, ingest, events, search, moderation,
                      modules, tracks, jobs, data, world, achievements, admin)
-modules/             YAML-Modul-Definitionen (trip, animal, country, … inkl. Erfolge)
-../frontend/         Responsive PWA (wird vom Backend unter / ausgeliefert)
-                     + world-countries.geojson (Länderflächen für die Weltkarte)
+modules/             YAML module definitions (trip, animal, country, … incl. achievements)
+../frontend/         responsive PWA (served by the backend at /)
+                     + world-countries.geojson (country shapes for the world map)
 ```

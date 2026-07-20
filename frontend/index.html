@@ -665,8 +665,8 @@
   <div class="main">
     <div class="topbar">
       <div>
-        <h1 id="view-title">Zeitstrahl</h1>
-        <div class="sub" id="view-sub">Dein Leben als Ereignisstrom</div>
+        <h1 id="view-title" data-i18n="view.timeline.title">Zeitstrahl</h1>
+        <div class="sub" id="view-sub" data-i18n="view.timeline.sub">Dein Leben als Ereignisstrom</div>
       </div>
       <input class="search" id="global-search" data-i18n-ph="search.placeholder"
         placeholder="🔍 Suche: „am Meer&quot;, „Frankreich&quot; …">
@@ -725,7 +725,7 @@
               <span class="filter-chip active" id="mp-tracks-toggle" data-i18n="map.tracks">🛰️ Timeline-Routen</span>
               <span class="filter-chip active" id="mp-group-toggle" data-i18n-title="map.group.tip" title="Ab Monats-Ansicht: wiederholte Besuche desselben Orts zu einem Eintrag bündeln" data-i18n="map.group">🔁 Orte bündeln</span>
               <span class="filter-chip" id="mp-fullscreen" data-i18n-title="map.fs.tip" title="Karte im Vollbild (Esc beendet)" data-i18n="map.fs">⛶ Vollbild</span>
-              <label class="stat-label" style="display:flex; align-items:center; gap:6px" title="Hat der Zeitraum höchstens so viele Punkte, gibt es Einzelmarker + nummerierte Route. Darüber schaltet die Karte in den Cluster-Modus — dort bündeln sich nahe Punkte je nach Zoom (Klick/Zoom teilt Bubbles auf). Rahmen 10–300 schützt die Performance.">
+              <label class="stat-label" style="display:flex; align-items:center; gap:6px" data-i18n-title="map.cluster.tip" title="Hat der Zeitraum höchstens so viele Punkte, gibt es Einzelmarker + nummerierte Route. Darüber schaltet die Karte in den Cluster-Modus — dort bündeln sich nahe Punkte je nach Zoom (Klick/Zoom teilt Bubbles auf). Rahmen 10–300 schützt die Performance.">
                 Cluster ab
                 <input id="mp-cluster-min" type="number" min="10" max="300" step="10" value="50"
                        style="width:64px; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:4px 6px; color:var(--text)">
@@ -809,7 +809,7 @@
             <div id="chart-animals"></div>
           </div>
         </div>
-        <div class="hint" style="margin-top:24px">
+        <div class="hint" style="margin-top:24px" data-i18n="stats.hint">
           💡 Statistiken sind <b>berechnete Ansichten</b> — jederzeit neu berechenbar. Jedes Modul (Reisen, Tiere …) liefert eigene Widgets.
         </div>
       </div>
@@ -817,13 +817,13 @@
       <!-- ===== COMPENDIUM ===== -->
       <div class="view" id="view-compendium">
         <div class="comp-tabs" id="comp-tabs">
-          <div class="zoom-btn active" data-type="animal">🦅 Tiere</div>
-          <div class="zoom-btn" data-type="country">🌍 Länder</div>
-          <div class="zoom-btn" data-type="artist">🎤 Künstler</div>
-          <div class="zoom-btn" data-type="food">🍽️ Essen</div>
-          <div class="zoom-btn" data-type="movie">🎬 Filme</div>
-          <div class="zoom-btn" data-type="game">🎮 Spiele</div>
-          <div class="zoom-btn" data-type="book">📖 Bücher</div>
+          <div class="zoom-btn active" data-type="animal" data-i18n="module.animal.tab">🦅 Tiere</div>
+          <div class="zoom-btn" data-type="country" data-i18n="module.country.tab">🌍 Länder</div>
+          <div class="zoom-btn" data-type="artist" data-i18n="module.artist.tab">🎤 Künstler</div>
+          <div class="zoom-btn" data-type="food" data-i18n="module.food.tab">🍽️ Essen</div>
+          <div class="zoom-btn" data-type="movie" data-i18n="module.movie.tab">🎬 Filme</div>
+          <div class="zoom-btn" data-type="game" data-i18n="module.game.tab">🎮 Spiele</div>
+          <div class="zoom-btn" data-type="book" data-i18n="module.book.tab">📖 Bücher</div>
         </div>
         <div class="grid cols-4" id="compendium-grid"></div>
         <div id="compendium-detail" style="display:none"></div>
@@ -832,7 +832,7 @@
       <!-- ===== WELT (F5) ===== -->
       <div class="view" id="view-world">
         <div class="grid cols-4" style="margin-bottom:20px">
-          <div class="stat-card"><div class="stat-num" id="world-countries">–</div><div class="stat-label" data-i18n="stat.countries">Länder besucht</div><div class="stat-sub" id="world-countries-sub">von –</div></div>
+          <div class="stat-card"><div class="stat-num" id="world-countries">–</div><div class="stat-label" data-i18n="stat.countries">Länder besucht</div><div class="stat-sub" id="world-countries-sub" data-i18n="of.dash">von –</div></div>
           <div class="stat-card"><div class="stat-num" id="world-continents">–</div><div class="stat-label" data-i18n="world.continents">Kontinente</div><div class="stat-sub" data-i18n="world.of7">von 7</div></div>
           <div class="stat-card"><div class="stat-num" id="world-share">–</div><div class="stat-label" data-i18n="world.share">Welt entdeckt</div><div class="stat-sub" data-i18n="world.share.sub">Anteil aller Länder</div></div>
           <div class="stat-card"><div class="stat-num" id="world-newest">–</div><div class="stat-label" data-i18n="world.newest">Zuletzt neu</div><div class="stat-sub" id="world-newest-sub" data-i18n="world.newest.sub">erstmals besucht</div></div>
@@ -857,7 +857,7 @@
       <!-- ===== ERFOLGE (F6) ===== -->
       <div class="view" id="view-achievements">
         <div class="grid cols-4" style="margin-bottom:20px">
-          <div class="stat-card"><div class="stat-num" id="ach-earned">–</div><div class="stat-label" data-i18n="ach.earned">Erfolge erreicht</div><div class="stat-sub" id="ach-earned-sub">von –</div></div>
+          <div class="stat-card"><div class="stat-num" id="ach-earned">–</div><div class="stat-label" data-i18n="ach.earned">Erfolge erreicht</div><div class="stat-sub" id="ach-earned-sub" data-i18n="of.dash">von –</div></div>
           <div class="stat-card"><div class="stat-num" id="ach-points">–</div><div class="stat-label" data-i18n="ach.points">Punkte</div><div class="stat-sub" data-i18n="ach.points.sub">Bronze 1 · Silber 2 · Gold 3 · Platin 4</div></div>
           <div class="stat-card"><div class="stat-num" id="ach-platin">–</div><div class="stat-label" data-i18n="ach.platinum">Platin</div><div class="stat-sub" data-i18n="ach.platinum.sub">voll ausgereizt</div></div>
           <div class="stat-card"><div class="stat-num" id="ach-close">–</div><div class="stat-label" data-i18n="ach.close">Kurz davor</div><div class="stat-sub" data-i18n="ach.close.sub">über 75 % zur nächsten Stufe</div></div>
@@ -928,7 +928,7 @@
               </select></div></div>
             <div class="field-row"><div class="field-key" data-i18n="field.category">Kategorie</div>
               <div class="field-val"><select id="mf-category" class="mf-select">
-                <option value="event" selected>Ereignis</option>
+                <option value="event" selected data-i18n="cat.event">Ereignis</option>
                 <option value="trip" data-i18n="cat.trip">Reise</option>
                 <option value="sighting" data-i18n="cat.sighting">Sichtung</option>
                 <option value="sport" data-i18n="cat.sport">Aktivität</option>
@@ -992,7 +992,7 @@
           <div class="stage">
             <div class="stage-num" data-i18n="layer.mid">VORSCHLAG → WAHRHEIT</div>
             <h4 data-i18n="layer.mid.title">Lebensdatenbank</h4>
-            <p>KI-Vorschläge (unbestätigt, wegwerfbar) werden durch dein Bestätigen zur fixen Lebensdatenbank — inkl. Fakten wie Wetter, Fotos, Routen. Maschinen ändern Bestätigtes nie.</p>
+            <p data-i18n="layer.mid.text">KI-Vorschläge (unbestätigt, wegwerfbar) werden durch dein Bestätigen zur fixen Lebensdatenbank — inkl. Fakten wie Wetter, Fotos, Routen. Maschinen ändern Bestätigtes nie.</p>
           </div>
           <div class="stage-arrow">→</div>
           <div class="stage">
@@ -1007,13 +1007,13 @@
             Aktionen
             <span class="chip" style="margin-left:auto; text-transform:none; letter-spacing:0">KI-Provider: <b style="color:var(--text)" id="ki-provider">&nbsp;…</b></span>
           </div>
-          <div class="hint">Diese Läufe starten <b>im Hintergrund auf dem Server</b> — du kannst
+          <div class="hint" data-i18n="adm.runs.hint">Diese Läufe starten <b>im Hintergrund auf dem Server</b> — du kannst
             die Seite schließen. Fortschritt, Stopp-Knopf und Nachtplan findest du im Reiter
             <b>„Jobs"</b>; Fortschritt bleibt beim Stoppen erhalten, ein Neustart setzt fort.</div>
           <div class="panel" style="padding:0">
             <div class="action-row">
               <button class="btn secondary" id="btn-recompute-2" data-i18n="act.recompute">🔄 KI-Vorschläge neu berechnen</button>
-              <div class="action-desc"><b>KI-Extraktion wiederholen.</b><br>
+              <div class="action-desc" data-i18n="act.recompute.desc"><b>KI-Extraktion wiederholen.</b><br>
                 Verwirft alle <i>unbestätigten</i> Events und erzeugt sie neu aus dem Roh-Eingang —
                 mit dem aktuellen KI-Modell und Prompt. Bestätigte Events und manuell korrigierte Felder bleiben
                 unangetastet. Sinnvoll nach Modell- oder Prompt-Änderungen. Bricht bei erschöpftem
@@ -1021,7 +1021,7 @@
             </div>
             <div class="action-row">
               <button class="btn secondary" id="btn-enrich" data-i18n="act.weather">🌤️ Wetter ergänzen</button>
-              <div class="action-desc"><b>Fehlendes Wetter nachtragen (Fakten-Anreicherung).</b><br>
+              <div class="action-desc" data-i18n="act.weather.desc"><b>Fehlendes Wetter nachtragen (Fakten-Anreicherung).</b><br>
                 Holt historisches Wetter (via Open-Meteo) für Events, die noch <i>keins</i> haben —
                 z. B. nach neuen Einträgen oder Importen. Ältere Events mit Wetter im Alt-Format
                 (nur Temperatur + Bedingung) bekommen dabei die fehlenden <i>Tageswerte</i>
@@ -1030,14 +1030,14 @@
             </div>
             <div class="action-row">
               <button class="btn secondary" id="btn-embed" data-i18n="act.embed">🧠 Embeddings berechnen</button>
-              <div class="action-desc"><b>Semantische Suche neu aufbauen (Ableitung).</b><br>
+              <div class="action-desc" data-i18n="act.embed.desc"><b>Semantische Suche neu aufbauen (Ableitung).</b><br>
                 Verwirft die Vektoren aller Events und berechnet sie mit dem aktuellen Embedding-Modell neu.
                 Nötig nach jedem Modellwechsel, sonst findet die „Bedeutungs-Suche" nichts oder Falsches.
                 Bricht ohne Fortschritt ab, wenn kein Embedding-Modell konfiguriert ist.</div>
             </div>
             <div class="action-row" style="border-top:1px solid var(--danger)">
               <button class="btn danger" id="btn-wipe" data-i18n="act.wipe">🗑️ Alle Daten löschen</button>
-              <div class="action-desc"><b style="color:var(--danger)">Unwiderruflich!</b><br>
+              <div class="action-desc" data-i18n="act.wipe.desc"><b style="color:var(--danger)">Unwiderruflich!</b><br>
                 Löscht sämtliche Lebensdaten — Roh-Eingang, Ereignisse &amp; Objekte,
                 Orte, Wetter &amp; Embeddings. Nutzer-Konten bleiben bestehen. Es gibt eine doppelte
                 Sicherheitsabfrage; danach ist die Datenbank leer.</div>
@@ -1051,7 +1051,7 @@
         <div class="section-title" style="display:flex; align-items:center; gap:12px">Jobs
           <button class="btn small secondary" id="jobs-refresh" style="margin-left:auto" data-i18n="btn.refresh">↻ Aktualisieren</button>
         </div>
-        <div class="hint">Lang laufende Aktionen (Wetter, Neuberechnung, Embeddings, Ortsnamen, Importe)
+        <div class="hint" data-i18n="adm.jobs.hint">Lang laufende Aktionen (Wetter, Neuberechnung, Embeddings, Ortsnamen, Importe)
           sind als <b>Jobs mit Sperre</b> registriert: derselbe Typ kann nicht doppelt laufen — auch
           nicht aus zwei Browsern oder von zwei Nutzern gleichzeitig (verhindert doppelte
           API-Kosten und Duplikate).</div>
@@ -1061,7 +1061,7 @@
 
         <!-- A22 — Nachtplan: Läufe automatisch zur eingestellten Stunde -->
         <div class="section-title">Nachtplan</div>
-        <div class="hint">Angehakte Läufe starten automatisch einmal täglich zur eingestellten
+        <div class="hint" data-i18n="adm.sched.hint">Angehakte Läufe starten automatisch einmal täglich zur eingestellten
           Stunde (Serverzeit) — z. B. nachts, wenn niemand arbeitet. Läuft serverseitig;
           kein offener Browser nötig.</div>
         <div class="panel" id="sched-panel" style="display:flex; flex-direction:column; gap:8px"></div>
@@ -1072,7 +1072,7 @@
 
         <!-- P2.5 — Bulk-Bestätigen: erst Vorschau, dann bestätigen -->
         <div class="panel" id="bulk-panel" style="margin-bottom:16px">
-          <div class="hint" style="margin-top:0">Viele korrekte KI-Vorschläge auf einmal in die
+          <div class="hint" style="margin-top:0" data-i18n="adm.bulk.hint">Viele korrekte KI-Vorschläge auf einmal in die
             Lebensdatenbank übernehmen: filtern → <b>Vorschau</b> prüfen → bestätigen.</div>
           <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center">
             <select id="bulk-cat" class="mf-select">
@@ -1093,9 +1093,9 @@
             <label class="stat-label" style="display:flex; align-items:center; gap:6px">Confidence ≥
               <input id="bulk-conf" type="number" min="0" max="100" step="5" value="80"
                      style="width:64px; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:5px 8px; color:var(--text)"> %</label>
-            <label class="stat-label" style="display:flex; align-items:center; gap:6px">von
+            <label class="stat-label" style="display:flex; align-items:center; gap:6px"><span data-i18n="pr.from">von</span>
               <input id="bulk-from" type="date" style="background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:5px 8px; color:var(--text)"></label>
-            <label class="stat-label" style="display:flex; align-items:center; gap:6px">bis
+            <label class="stat-label" style="display:flex; align-items:center; gap:6px"><span data-i18n="pr.to">bis</span>
               <input id="bulk-to" type="date" style="background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:5px 8px; color:var(--text)"></label>
             <button class="btn small secondary" id="bulk-preview-btn" data-i18n="btn.preview">🔍 Vorschau</button>
             <button class="btn small" id="bulk-confirm-btn" style="display:none" data-i18n="btn.confirmall">✓ Alle bestätigen</button>
@@ -1106,7 +1106,7 @@
         <div id="mod-queue"></div>
 
         <div class="section-title" id="fuzzy-title" style="margin-top:24px" data-i18n="adm.fuzzy">⏳ Unscharfe Zeiten</div>
-        <div class="hint">Events mit grober Zeitangabe (Monat, Jahreszeit, Jahr, Jahrzehnt oder ganz ohne Datum).
+        <div class="hint" data-i18n="adm.fuzzy.hint">Events mit grober Zeitangabe (Monat, Jahreszeit, Jahr, Jahrzehnt oder ganz ohne Datum).
           Anklicken öffnet die Schnellbearbeitung — je konkreter die Daten, desto besser Timeline &amp; Karte.</div>
         <div id="fuzzy-list"></div>
         </div>
@@ -1117,7 +1117,7 @@
         <div class="panel" style="padding:0">
           <div class="action-row">
             <button class="btn secondary" id="btn-export" data-i18n="act.export">📦 Daten exportieren</button>
-            <div class="action-desc"><b>Backup als JSON-Datei.</b><br>
+            <div class="action-desc" data-i18n="act.export.desc"><b>Backup als JSON-Datei.</b><br>
               Lädt alle deine Daten (Roh-Eingang, Ereignisse, Objekte, Orte, Wetter) als eine
               JSON-Datei herunter. Embeddings sind enthalten. Regelmäßig machen — das ist dein Backup.<br>
               <label class="stat-label" style="display:inline-flex; align-items:center; gap:6px; margin-top:8px">
@@ -1130,7 +1130,7 @@
               <button class="btn secondary" id="btn-import" style="width:100%; text-align:left" data-i18n="act.import">📥 Daten importieren</button>
               <input type="file" id="import-file" accept=".json,application/json" style="display:none">
             </div>
-            <div class="action-desc"><b>Export-Datei zurückspielen.</b><br>
+            <div class="action-desc" data-i18n="act.import.desc"><b>Export-Datei zurückspielen.</b><br>
               Importiert eine Life-Dash-Export-Datei. Bereits vorhandene Einträge (gleiche ID) werden
               übersprungen — mehrfaches Importieren erzeugt keine Duplikate. Alles landet in deinem Konto.</div>
           </div>
@@ -1143,7 +1143,7 @@
               <button class="btn secondary" id="btn-timeline-import" style="width:100%; text-align:left" data-i18n="act.tlimport">🛰️ Google Timeline importieren</button>
               <input type="file" id="timeline-file" accept=".json,application/json" style="display:none">
             </div>
-            <div class="action-desc"><b>Orts-Historie &amp; Routen aus Google Maps.</b><br>
+            <div class="action-desc" data-i18n="act.tlimport.desc"><b>Orts-Historie &amp; Routen aus Google Maps.</b><br>
               Importiert den Timeline-Export vom Smartphone (Android: Einstellungen → Standort →
               Standortdienste → Zeitachse → „Zeitachsendaten exportieren"; auch alte Takeout-Exporte
               funktionieren). Besuche werden zu Events, Bewegungen zu Routen auf der Karte.
@@ -1169,7 +1169,7 @@
               </select>
               <button class="btn secondary" id="btn-resolve-run" style="text-align:left" data-i18n="act.namerun">📍 Lauf starten</button>
             </div>
-            <div class="action-desc"><b>Ein Lauf für alle Ortsnamen-Aufgaben</b> (Reverse-Geocoding
+            <div class="action-desc" data-i18n="act.namerun.desc"><b>Ein Lauf für alle Ortsnamen-Aufgaben</b> (Reverse-Geocoding
               via OpenStreetMap, gedrosselt; läuft als Hintergrund-Job in Etappen und ist jederzeit
               fortsetzbar; manuell umbenannte Einträge bleiben immer unangetastet).<br>
               <b>Fehlende Namen:</b> importierte Besuche heißen „Ort (53.49, 10.00)" oder tragen nur
@@ -1181,7 +1181,7 @@
           </div>
           <div class="action-row">
             <div style="flex-shrink:0; min-width:215px"><b style="font-size:13px" data-i18n="adm.format">📐 Anzeige-Format</b></div>
-            <div class="action-desc"><b>Bausteine für aufgelöste Adressen</b> — statt der langen
+            <div class="action-desc" data-i18n="adm.format.desc"><b>Bausteine für aufgelöste Adressen</b> — statt der langen
               Adresskette mit Verwaltungsregionen und Postleitzahl:<br>
               <span id="fmt-parts" style="display:inline-flex; gap:14px; flex-wrap:wrap; margin:8px 0">
                 <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="road" checked> <span data-i18n="pn.street">Straße</span></label>
@@ -1199,7 +1199,7 @@
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div style="flex-shrink:0; min-width:215px"><b style="font-size:13px">🧩 Was trackst du?</b></div>
-            <div class="action-desc"><b>Module für Kompendium, Statistik &amp; KI wählen.</b><br>
+            <div class="action-desc" data-i18n="adm.track.desc"><b>Module für Kompendium, Statistik &amp; KI wählen.</b><br>
               Abgewählte Module verschwinden aus Reitern, Filtern, Formularen und dem
               KI-Prompt — vorhandene Daten bleiben erhalten und tauchen nach dem
               Wieder-Anwählen sofort wieder auf.
@@ -1212,8 +1212,8 @@
 
         <div class="admin-tabpane admin-only" data-tabpane="nutzer" style="display:none">
           <div class="section-title" data-i18n="adm.users.title">Nutzer</div>
-          <div class="hint" style="margin-bottom:14px">
-            👥 Konten entstehen automatisch beim ersten Login<span id="users-provider"></span>.
+          <div class="hint" style="margin-bottom:14px" data-i18n="adm.users.hint">
+            <span data-i18n="adm.users.hint1">👥 Konten entstehen automatisch beim ersten Login</span><span id="users-provider"></span>.
             Hier lassen sich Rollen ändern und Nutzer <b>mitsamt all ihren Daten</b> löschen.
             Das eigene Konto ist geschützt — so bleibt immer ein Admin übrig.
           </div>
@@ -1223,8 +1223,8 @@
         </div>
 
         <div class="admin-tabpane admin-only" data-tabpane="db" style="display:none">
-          <div class="section-title">Datenbank — Rohansicht</div>
-          <div class="hint" style="margin-bottom:14px">
+          <div class="section-title" data-i18n="adm.db.title">Datenbank — Rohansicht</div>
+          <div class="hint" style="margin-bottom:14px" data-i18n="adm.db.hint">
             🗄️ Direkter Blick auf die Tabellen (Admin). Roh-Eingang = <code>fragments</code>,
             Lebensdatenbank = <code>events</code>/<code>entities</code>/<code>locations</code>, Anreicherungen = <code>media_refs</code>/<code>metrics</code>.
           </div>
@@ -1245,7 +1245,7 @@
             </select>
             <button class="btn small secondary" id="logs-refresh">↻ Aktualisieren</button>
           </div>
-          <div class="hint" style="margin-bottom:12px">Die letzten App-Log-Zeilen seit Prozessstart
+          <div class="hint" style="margin-bottom:12px" data-i18n="adm.logs.hint">Die letzten App-Log-Zeilen seit Prozessstart
             (max. 500, nur im Speicher — kein Datei-Zugriff). Vollständige Logs weiterhin über
             <code>docker logs</code>; Ausführlichkeit steuert <code>LOG_LEVEL</code> in der .env.</div>
           <pre id="logs-list" style="background:var(--bg-elev); border:1px solid var(--border); border-radius:10px; padding:12px; max-height:60vh; overflow:auto; font-size:12px; line-height:1.55; white-space:pre-wrap; margin:0"></pre>
@@ -1258,8 +1258,8 @@
 <!-- A15 — Onboarding: Tracking-Auswahl beim ersten Start -->
 <div class="modal-overlay" id="track-modal">
   <div class="modal-box">
-    <h3>🧩 Was möchtest du tracken?</h3>
-    <div class="hint" style="margin-top:4px">Wähle die Bereiche, die dich interessieren —
+    <h3 data-i18n="track.modal.title">🧩 Was möchtest du tracken?</h3>
+    <div class="hint" style="margin-top:4px" data-i18n="track.modal.hint">Wähle die Bereiche, die dich interessieren —
       sie bestimmen Kompendium, Statistik und was die KI erkennt. Jederzeit änderbar
       unter Verwaltung → Meine Daten.</div>
     <div id="track-options" style="columns:2; margin:14px 0"></div>
@@ -1272,20 +1272,20 @@
 <!-- F1 — Tagebuch: EIN formatierter Eintrag pro Tag (Markdown, KI-frei) -->
 <div class="modal-overlay" id="journal-modal">
   <div class="modal-box">
-    <h3>📖 Tagebuch-Eintrag</h3>
-    <div class="stat-label" style="margin:6px 0 12px; line-height:1.5">Ein Eintrag pro Tag — erscheint im
+    <h3 data-i18n="jr.title">📖 Tagebuch-Eintrag</h3>
+    <div class="stat-label" style="margin:6px 0 12px; line-height:1.5" data-i18n="jr.hint">Ein Eintrag pro Tag — erscheint im
       Zeitstrahl als Tageskopf über den Ereignissen des Tages. Formatierung mit Markdown:
       <code>**fett**</code>, <code>*kursiv*</code>, <code># Überschrift</code>, <code>- Liste</code>, <code>&gt; Zitat</code>.
       Die KI fasst den Text nie an.</div>
-    <div class="field-row"><div class="field-key">Tag</div>
+    <div class="field-row"><div class="field-key" data-i18n="field.day">Tag</div>
       <div class="field-val"><input id="jr-date" type="date" class="mf-select"></div></div>
     <textarea id="jr-text" class="input-area" rows="10" style="margin-top:12px; font-size:14px"
-      placeholder="Wie war der Tag? Schreib frei drauflos …"></textarea>
+      data-i18n-ph="jr.ph" placeholder="Wie war der Tag? Schreib frei drauflos …"></textarea>
     <div id="jr-preview-box" class="ev-note md" style="display:none; margin-top:12px"></div>
     <div class="btn-row" style="margin-top:14px">
-      <button class="btn" id="jr-save">💾 Speichern</button>
-      <button class="btn secondary" id="jr-preview">👁 Vorschau</button>
-      <button class="btn ghost" id="jr-cancel">Abbrechen</button>
+      <button class="btn" id="jr-save" data-i18n="btn.save">💾 Speichern</button>
+      <button class="btn secondary" id="jr-preview" data-i18n="jr.preview">👁 Vorschau</button>
+      <button class="btn ghost" id="jr-cancel" data-i18n="btn.cancel">Abbrechen</button>
     </div>
   </div>
 </div>
@@ -1293,36 +1293,36 @@
 <!-- F8: Druck-Auswahldialog — Zeitraum und Umfang wählen -->
 <div class="modal-overlay" id="print-modal">
   <div class="modal-box">
-    <h3>🖨️ Drucken</h3>
-    <div class="stat-label" style="margin:6px 0 12px; line-height:1.5">
+    <h3 data-i18n="pr.title">🖨️ Drucken</h3>
+    <div class="stat-label" style="margin:6px 0 12px; line-height:1.5" data-i18n="pr.hint">
       Wähle den Zeitraum — gedruckt wird eine eigene, helle Seite mit allen
       Ereignissen darin, chronologisch nach Tagen. Eingeklappte Gruppen und
       „weitere anzeigen" spielen dabei keine Rolle. Über den Druckdialog des
       Browsers lässt sich das Ergebnis auch als PDF sichern.
     </div>
     <div class="filter-chips" style="margin-bottom:12px">
-      <span class="filter-chip" data-print-preset="all">Alles</span>
-      <span class="filter-chip" data-print-preset="year">Dieses Jahr</span>
-      <span class="filter-chip" data-print-preset="12m">Letzte 12 Monate</span>
+      <span class="filter-chip" data-print-preset="all" data-i18n="pr.all">Alles</span>
+      <span class="filter-chip" data-print-preset="year" data-i18n="pr.year">Dieses Jahr</span>
+      <span class="filter-chip" data-print-preset="12m" data-i18n="pr.12m">Letzte 12 Monate</span>
     </div>
-    <div class="field-row"><div class="field-key">Von</div>
+    <div class="field-row"><div class="field-key" data-i18n="pr.from">Von</div>
       <div class="field-val"><input id="pr-from" type="date" class="mf-select"></div></div>
-    <div class="field-row"><div class="field-key">Bis</div>
+    <div class="field-row"><div class="field-key" data-i18n="pr.to">Bis</div>
       <div class="field-val"><input id="pr-to" type="date" class="mf-select"></div></div>
     <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px">
       <label class="stat-label" style="display:flex; align-items:center; gap:8px">
-        <input type="checkbox" id="pr-desc" checked> Beschreibungen mitdrucken</label>
+        <input type="checkbox" id="pr-desc" checked> <span data-i18n="pr.opt.desc">Beschreibungen mitdrucken</span></label>
       <label class="stat-label" style="display:flex; align-items:center; gap:8px">
-        <input type="checkbox" id="pr-notes" checked> Notizen und Tagebuch mitdrucken</label>
+        <input type="checkbox" id="pr-notes" checked> <span data-i18n="pr.opt.notes">Notizen und Tagebuch mitdrucken</span></label>
       <label class="stat-label" style="display:flex; align-items:center; gap:8px">
-        <input type="checkbox" id="pr-visits"> Importierte Standort-Besuche einschließen</label>
+        <input type="checkbox" id="pr-visits"> <span data-i18n="pr.opt.visits">Importierte Standort-Besuche einschließen</span></label>
       <label class="stat-label" style="display:flex; align-items:center; gap:8px">
-        <input type="checkbox" id="pr-unconfirmed"> Unbestätigte Vorschläge einschließen</label>
+        <input type="checkbox" id="pr-unconfirmed"> <span data-i18n="pr.opt.unconf">Unbestätigte Vorschläge einschließen</span></label>
     </div>
     <div id="pr-count" class="action-desc" style="margin-top:12px">—</div>
     <div class="btn-row" style="margin-top:14px">
-      <button class="btn" id="pr-go">🖨️ Drucken</button>
-      <button class="btn ghost" id="pr-cancel">Abbrechen</button>
+      <button class="btn" id="pr-go" data-i18n="pr.go">🖨️ Drucken</button>
+      <button class="btn ghost" id="pr-cancel" data-i18n="btn.cancel">Abbrechen</button>
     </div>
   </div>
 </div>
@@ -1718,6 +1718,83 @@ const I18N_EN = {
   'layer.in.text': "Immutable fragments (text, voice, import). An evidence archive — never overwritten, never deleted automatically.",
   'layer.out.text': "Timeline, map, statistics, search embeddings. Computed — safe to discard and rebuild at any time.",
 
+  // --- Verwaltung: Erklaertexte ---
+  'adm.runs.hint': "These runs happen <b>in the background on the server</b> — you can close the page. Progress, the stop button and the nightly schedule live in the <b>“Jobs”</b> tab; progress is kept when you stop, and a restart resumes where it left off.",
+  'act.recompute.desc': "<b>Repeat the AI extraction.</b><br>Discards all <i>unconfirmed</i> events and rebuilds them from the raw inbox — with the current AI model and prompt. Confirmed events and manually corrected fields are left untouched. Useful after model or prompt changes. Stops cleanly when the AI quota runs out (whatever was computed is kept).",
+  'act.weather.desc': "<b>Fill in missing weather (fact enrichment).</b><br>Fetches historical weather (via Open-Meteo) for events that have <i>none</i> yet — e.g. after new entries or imports. Older events with weather in the legacy format (temperature and condition only) get the missing <i>daily values</i> (min/max, sun, rain, snow, wind) added <b>on top</b>. Fetched once = kept forever: existing values are never overwritten or recalculated.",
+  'act.embed.desc': "<b>Rebuild the semantic search (derived data).</b><br>Discards the vectors of all events and recomputes them with the current embedding model. Required after every model change, otherwise the “meaning search” finds nothing or the wrong things. Stops without doing anything if no embedding model is configured.",
+  'act.wipe.desc': "<b style=\"color:var(--danger)\">Cannot be undone!</b><br>Deletes all life data — raw inbox, events &amp; items, places, weather &amp; embeddings. User accounts remain. There is a double confirmation; afterwards the database is empty.",
+  'adm.jobs.hint': "Long-running actions (weather, recompute, embeddings, place names, imports) are registered as <b>jobs with a lock</b>: the same type cannot run twice — not even from two browsers or by two users at once (this prevents duplicate API costs and duplicate data).",
+  'adm.bulk.hint': "Move many correct AI proposals into the life database at once: filter → check the <b>preview</b> → confirm.",
+  'layer.mid.text': "AI proposals (unconfirmed, disposable) become the fixed life database once you confirm them — including facts such as weather, photos and routes. Machines never change what you have confirmed.",
+
+  // --- Verwaltung: Daten, Ortsnamen, Dialoge ---
+  'adm.sched.hint': "Ticked runs start automatically once a day at the configured hour (server time) — e.g. at night when nobody is working. Runs server-side; no open browser needed.",
+  'act.export.desc': "<b>Backup as a JSON file.</b><br>Downloads all your data (raw inbox, events, items, places, weather) as a single JSON file. Embeddings are included. Do this regularly — this is your backup.",
+  'act.import.desc': "<b>Restore an export file.</b><br>Imports a Life-Dash export file. Entries that already exist (same ID) are skipped — importing repeatedly creates no duplicates. Everything lands in your account.",
+  'act.tlimport.desc': "<b>Location history &amp; routes from Google Maps.</b><br>Imports the timeline export from your phone (Android: Settings → Location → Location services → Timeline → “Export timeline data”; older Takeout exports work too). Visits become events, routes become tracks on the map. Importing repeatedly creates no duplicates.",
+  'act.namerun.desc': "<b>One run for every place-name task</b> (reverse geocoding via OpenStreetMap, rate limited; runs as a background job in stages and can be resumed at any time; manually renamed entries are always left alone).<br><b>Missing names:</b> imported visits are called “Place (53.49, 10.00)” or carry only a label such as “Home” — the run fetches real addresses, labels stay as a prefix (“Home — Example Street 1”).<br><b>Long addresses:</b> reformats existing names to the building blocks chosen below.<br><b>Foreign scripts:</b> re-resolves names in local scripts (e.g. Greek) with a language fallback to the Latin transliteration.",
+  'adm.format.desc': "<b>Building blocks for resolved addresses</b> — instead of the long address chain with administrative regions and postcode:",
+  'adm.track.desc': "<b>Choose modules for collection, statistics &amp; AI.</b><br>Deselected modules disappear from tabs, filters, forms and the AI prompt — existing data is kept and reappears immediately once you select them again.",
+  'adm.fuzzy.hint': "Events with a vague date (month, season, year, decade or no date at all). Clicking one opens the quick editor — the more precise the dates, the better the timeline and map.",
+  'track.modal.title': "🧩 What would you like to track?",
+  'jr.title': "📖 Journal entry",
+  'jr.hint': "One entry per day — appears in the timeline as a day header above that day’s events. Formatting with Markdown: <code>**bold**</code>, <code>*italic*</code>, <code># heading</code>, <code>- list</code>, <code>&gt; quote</code>. The AI never touches this text.",
+  'field.day': "Day",
+  'jr.preview': "👁 Preview",
+  'pr.title': "🖨️ Print",
+  'pr.hint': "Pick the date range — what gets printed is a dedicated light page with every event in it, grouped by day. Collapsed groups and “show more” play no role. Your browser’s print dialog can also save the result as a PDF.",
+  'pr.all': "Everything",
+  'pr.year': "This year",
+  'pr.12m': "Last 12 months",
+  'pr.from': "From",
+  'pr.to': "To",
+  'pr.opt.desc': "Include descriptions",
+  'pr.opt.notes': "Include notes and journal",
+  'pr.opt.visits': "Include imported location visits",
+  'pr.opt.unconf': "Include unconfirmed proposals",
+  'pr.go': "🖨️ Print",
+  'adm.users.hint1': "👥 Accounts are created automatically on first sign-in",
+
+  // --- Nachtrag: fehlende Uebersetzungen & letzte Reste ---
+  'banner.offline': "⚠ Backend not reachable. Start it with <code>uvicorn app.main:app</code> in the <code>backend/</code> folder and reload.",
+  'act.weather': "🌤️ Add weather",
+  'act.embed': "🧠 Build embeddings",
+  'act.import': "📥 Import data",
+  'act.tlimport': "🛰️ Import Google Timeline",
+  'btn.refresh': "↻ Refresh",
+  'module.animal': "Animals",
+  'module.country': "Countries",
+  'module.artist': "Artists",
+  'module.food': "Food",
+  'module.movie': "Movies",
+  'module.game': "Games",
+  'module.book': "Books",
+  'module.trip': "Trips",
+  'module.milestone': "Milestones",
+  'of': "of",
+
+  // --- Letzte Erklaertexte ---
+  'stats.hint': "💡 Statistics are <b>computed views</b> — rebuildable at any time. Every module (trips, animals …) brings its own widgets.",
+  'adm.users.hint': "👥 Accounts are created automatically on first sign-in. Here you can change roles and delete users <b>together with all their data</b>. Your own account is protected — so there is always at least one admin left.",
+  'adm.db.title': "Database — raw view",
+  'adm.db.hint': "🗄️ A direct look at the tables (admin). Raw inbox = <code>fragments</code>, life database = <code>events</code>/<code>entities</code>/<code>locations</code>, enrichments = <code>media_refs</code>/<code>metrics</code>.",
+  'adm.logs.hint': "The most recent app log lines since the process started (max. 500, in memory only — no file access). Full logs remain available via <code>docker logs</code>; the level is controlled by <code>LOG_LEVEL</code> in the .env.",
+  'track.modal.hint': "Pick the areas that interest you — they decide the collection, the statistics and what the AI recognises. Changeable at any time under Settings → My data.",
+
+  // --- Nachtrag: Kopfzeile & fehlende Attribute ---
+  'map.cluster.tip': "If the range holds at most this many points, you get individual markers plus a numbered route. Above that the map switches to cluster mode — nearby points are bundled depending on zoom (click/zoom splits the bubbles). The 10–300 range protects performance.",
+  'jr.ph': "How was your day? Just write freely …",
+  'adm.tracking.title': "Tracking",
+  'of.dash': "of –",
+  'by': "by",
+  'module.animal.tab': "🦅 Animals",
+  'module.country.tab': "🌍 Countries",
+  'module.artist.tab': "🎤 Artists",
+  'module.food.tab': "🍽️ Food",
+  'module.movie.tab': "🎬 Movies",
+  'module.game.tab': "🎮 Games",
+  'module.book.tab': "📖 Books",
 };
 
 function langSetting() {
@@ -1921,7 +1998,7 @@ function rebuildCompTabs() {
     return;
   }
   tabs.innerHTML = mods.map((m, i) =>
-    `<div class="zoom-btn ${i === 0 ? 'active' : ''}" data-type="${esc(m.key)}">${m.emoji || ''} ${esc(m.label)}</div>`).join('');
+    `<div class="zoom-btn ${i === 0 ? 'active' : ''}" data-type="${esc(m.key)}">${m.emoji || ''} ${esc(t('module.' + m.key, m.label))}</div>`).join('');
   tabs.querySelectorAll('.zoom-btn').forEach(tab => tab.addEventListener('click', () => {
     tabs.querySelectorAll('.zoom-btn').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
@@ -1944,7 +2021,7 @@ function trackChooserHtml(current) {
   return MODULES.map(m => `
     <label style="display:flex; gap:10px; align-items:center; padding:5px 0; cursor:pointer">
       <input type="checkbox" data-track="${esc(m.key)}" ${!current || current.includes(m.key) ? 'checked' : ''}>
-      <span>${m.emoji || '•'} ${esc(m.label)}</span>
+      <span>${m.emoji || '•'} ${esc(t('module.' + m.key, m.label))}</span>
     </label>`).join('');
 }
 async function saveTracked(keys) {
@@ -3677,7 +3754,8 @@ async function loadWorld() {
 
   const pct = data.countries_total ? Math.round(data.countries_visited / data.countries_total * 100) : 0;
   document.getElementById('world-countries').textContent = data.countries_visited;
-  document.getElementById('world-countries-sub').textContent = `von ${data.countries_total}`;
+  document.getElementById('world-countries-sub').textContent =
+    `${t('of', 'von')} ${data.countries_total}`;
   document.getElementById('world-continents').textContent = `${data.continents_visited}/7`;
   document.getElementById('world-share').textContent = pct + '%';
   const newest = data.recent[0];
@@ -3790,7 +3868,8 @@ async function loadAchievements() {
   } catch (e) { return; }
 
   document.getElementById('ach-earned').textContent = data.earned;
-  document.getElementById('ach-earned-sub').textContent = `von ${data.total}`;
+  document.getElementById('ach-earned-sub').textContent =
+    `${t('of', 'von')} ${data.total}`;
   document.getElementById('ach-points').textContent = data.points;
   document.getElementById('ach-platin').textContent =
     data.achievements.filter(a => a.tier === 'platin').length;
@@ -4130,7 +4209,7 @@ async function loadJobs() {
         <td><b>${t('job.' + j.type, JOB_LABELS[j.type] || esc(j.type))}</b></td>
         <td style="white-space:nowrap">${JOB_STATUS[j.status] || esc(j.status)}</td>
         <td class="stat-label">${j.done}${j.unit ? ' ' + esc(j.unit) : ''}${j.status === 'running' && j.remaining != null ? ` · noch ~${j.remaining}` : ''}</td>
-        <td class="stat-label" style="white-space:nowrap">${fmt(j.started_at)}${j.started_by ? `<br>von ${esc(j.started_by)}` : ''}</td>
+        <td class="stat-label" style="white-space:nowrap">${fmt(j.started_at)}${j.started_by ? `<br>${t('by', 'von')} ${esc(j.started_by)}` : ''}</td>
         <td class="stat-label">${esc(j.result || '')}</td>
         <td>${j.status === 'running' ? `<button class="btn small danger" data-job-stop="${esc(j.id)}">⏹ Stopp</button>` : ''}</td>
       </tr>`).join('') + '</tbody>';
@@ -4585,7 +4664,7 @@ document.getElementById('logout-link').addEventListener('click', async ev => {
     AUTH.user = await api("/api/auth/me");
   } catch (err) {
     if (AUTH.mode === 'oidc') { showLogin(); return; }
-    showBanner(`⚠ Backend nicht erreichbar. Starte es mit <code>uvicorn app.main:app</code> im Ordner <code>backend/</code> und lade neu.`);
+    showBanner(`${t('banner.offline', '⚠ Backend nicht erreichbar. Starte es mit <code>uvicorn app.main:app</code> im Ordner <code>backend/</code> und lade neu.')}`);
     return;
   }
 

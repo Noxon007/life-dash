@@ -1,52 +1,59 @@
 # Life-Dash
 
-Die durchsuchbare persönliche Lebensdatenbank — Erinnerungen, Orte, Reisen,
-Konzerte & mehr als responsive PWA mit KI-gestützter Erfassung und Suche.
+Your searchable personal life database — memories, places, trips, concerts and
+more, as a responsive PWA with AI-assisted capture and search.
 
-- **Konzept & Roadmap:** [docs/KONZEPT.md](docs/KONZEPT.md)
-- **Backend/Architektur:** [backend/README.md](backend/README.md)
+- **Concept & roadmap:** [docs/KONZEPT.md](docs/KONZEPT.md)
+- **Backend/architecture:** [backend/README.md](backend/README.md)
 - **Deployment:** [docs/DEPLOY.md](docs/DEPLOY.md)
-- **Alle Einstellungen:** [.env.example](.env.example)
-- **Änderungen pro Version:** [CHANGELOG.md](CHANGELOG.md)
+- **All settings:** [.env.example](.env.example)
+- **Changes per version:** [CHANGELOG.md](CHANGELOG.md)
 
-## Schnellstart
+## Quick start
 
 ```bash
-cp .env.example .env      # OIDC_*, SESSION_SECRET, POSTGRES_PASSWORD setzen
-docker compose up -d      # App + PostgreSQL; Image: ghcr.io/noxon007/life-dash
+cp .env.example .env      # set OIDC_*, SESSION_SECRET, POSTGRES_PASSWORD
+docker compose up -d      # app + PostgreSQL; image: ghcr.io/noxon007/life-dash
 ```
 
-Frontend/PWA: `http://<host>:8000/` · API-Docs: `/docs` · Health: `/health`
+Frontend/PWA: `http://<host>:8000/` · API docs: `/docs` · Health: `/health`
 
-Ohne KI-Schlüssel läuft die App im Modus `mock` (regelbasierte Erfassung) —
-zum Ausprobieren genügt das. Lokale Entwicklung ohne Docker: siehe
-[backend/README.md](backend/README.md) (`AUTH_MODE=dev`, uvicorn mit Reload).
+Without an AI key the app runs in `mock` mode (rule-based capture) — that is
+enough to try it out. Local development without Docker: see
+[backend/README.md](backend/README.md) (`AUTH_MODE=dev`, uvicorn with reload).
+
+The interface speaks **English and German**; a switch in the top bar changes
+the language at any time (it follows your browser on first visit).
 
 ## Stack
 
-FastAPI + SQLAlchemy (SQLite oder PostgreSQL) · Vanilla-JS-PWA (vom Backend
-ausgeliefert) · Releases als Docker-Image via GitHub Actions.
+FastAPI + SQLAlchemy (SQLite or PostgreSQL) · vanilla-JS PWA (served by the
+backend) · releases as a Docker image via GitHub Actions.
 
-Life-Dash bindet sich an keinen Anbieter: der Login läuft über **jeden
-standardkonformen OIDC-Provider** (Authentik, Keycloak, Pocket ID, Zitadel …),
-die KI über **jede OpenAI-kompatible API** (OpenAI, Gemini, lokal via Ollama
-oder LM Studio …) und die Ortsauflösung über **Nominatim oder einen
-kompatiblen Dienst**. Was du einsetzt, entscheidet allein deine `.env`.
+Life-Dash ties you to no vendor: sign-in works with **any standards-compliant
+OIDC provider** (Authentik, Keycloak, Pocket ID, Zitadel …), the AI with **any
+OpenAI-compatible API** (OpenAI, Gemini, locally via Ollama or LM Studio …) and
+place lookup with **Nominatim or a compatible service**. What you use is
+decided by your `.env` alone.
 
-## Versionierung & Releases
+## Versioning & releases
 
-[Semantic Versioning](https://semver.org/lang/de/) (`MAJOR.MINOR.PATCH`).
-Während der `0.x`-Phase: Features → `MINOR`, Fixes → `PATCH`. Ein Release ist
-ein Git-Tag `vX.Y.Z`; der Workflow baut daraus das Image mit den Tags
-`X.Y.Z` (exakt), `X.Y` (mitlaufend) und `latest`. Auf dem Server auf eine
-konkrete Version pinnen (`LIFEDASH_VERSION`), nicht `latest`. Änderungen werden
-in [CHANGELOG.md](CHANGELOG.md) gepflegt.
+[Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`). During the
+`0.x` phase: features → `MINOR`, fixes → `PATCH`. A release is a git tag
+`vX.Y.Z`; the workflow builds the image from it with the tags `X.Y.Z` (exact),
+`X.Y` (rolling) and `latest`. On a server, pin a concrete version
+(`LIFEDASH_VERSION`) rather than `latest`. Changes are tracked in
+[CHANGELOG.md](CHANGELOG.md).
 
-## Lizenz
+## Documentation language
 
-Life-Dash ist freie Software unter der
+Documentation is maintained in **English**. Discussion and input may of course
+happen in any language — translation happens when writing things down.
+
+## License
+
+Life-Dash is free software under the
 **[GNU Affero General Public License v3.0](LICENSE)** (AGPL-3.0-or-later).
-Du darfst Life-Dash nutzen, verändern und weiterverbreiten — auch als
-gehosteten Dienst —, solange Änderungen unter derselben Lizenz offengelegt
-werden (das Netzwerk-Copyleft der AGPL gilt ausdrücklich auch für
-SaaS-Betrieb). Details: [LICENSE](LICENSE).
+You may use, modify and redistribute Life-Dash — including as a hosted
+service — as long as changes are published under the same license (the AGPL's
+network copyleft explicitly covers SaaS operation). Details: [LICENSE](LICENSE).
