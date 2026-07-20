@@ -53,13 +53,18 @@ Import-Quellen (P2.1 Immich, P2.8 OwnTracks, P2.9 Automatisierung,
 P2.10 Trakt/Medienkonsum, P2.11 Dawarich/Reitti/GPX, P4.1 Health, P4.2 PSN)
 und P5.1/P5.2 (Offline-Capture, Whisper).
 
-**Releaseplan bis 1.0 steht in KONZEPT Kap. 14.3** — Reihenfolge: 0.21 A28+F14 ·
-0.22 F13 · 0.23 F11+F12 · **0.24 F15 (Fotos manuell)** · **0.25 P2.1 (Immich)** ·
-**0.26 A29 (ZIP-Backup mit Medien)** · 0.27 P3.1 · 0.28 Demo-Modus ·
-0.29 Härtung/Betrieb · 0.30 Projektoberfläche · 0.31 Freeze ·
-**1.0 = Veröffentlichung**. Nur noch die Import-Konnektoren nach 1.0.
-Kein Termindruck (Anmerkung 58) — nichts wird für ein Datum verschoben.
-Dort nachsehen statt Reihenfolge raten.
+**Releaseplan bis 1.0 steht in KONZEPT Kap. 14.3.** Fertig: 0.21 A28+F14 ·
+0.22 F13 · 0.23 F11+F12 · 0.24 F15 (Fotos) · 0.25 P2.1 (Immich, Stufe 1) ·
+0.26 A29 (ZIP-Backup). Offen: **0.27 Fixes (A31/A32/A30)** · 0.28 F16+A33+A34 ·
+**0.29 A35 (lokale Konten — Voraussetzung für Demo-Modus und R1)** ·
+0.30 P3.1 · 0.31 Demo-Modus · 0.32 Härtung · 0.33 Projektoberfläche ·
+0.34 Freeze · **1.0 = Veröffentlichung**. Import-Konnektoren erst danach.
+Kein Termindruck (Anmerkung 58). Dort nachsehen statt Reihenfolge raten.
+
+**Offener Messwert (Anmerkung 61):** `/api/events` liefert ALLES auf einmal —
+2,0 kB je Ereignis, bei 20.000 Ereignissen 38 MB, davon 74 % Metriken/Medien/
+Objekte. F12 hat das etwa verdoppelt. 0.27 bringt nur die Ladeanzeige (A30);
+die Ursache behebt A36, bewusst vertagt.
 
 **Medien-Invariante (Anmerkung 57, ab F15 bindend):** `provider='local'` sind
 hochgeladene Dateien = **Lebensdatenbank**, dürfen von Neuberechnungen NIE
