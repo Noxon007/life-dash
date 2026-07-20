@@ -615,7 +615,8 @@ Effort: S = hours · M = ~1 day · L = several days. No package blocks another e
 
 #### Group A — necessary & sensible for everyday use
 
-**✅ Group A is complete.** All packages are implemented; the detailed record
+**Group A was complete with v0.20.0; the feedback round of 2026-07-20 added
+A28.** All other packages are implemented; the detailed record
 of what each one changed lives in 14.1 and in [CHANGELOG.md](../CHANGELOG.md),
 so the table below keeps one line per package rather than repeating it.
 
@@ -647,6 +648,12 @@ so the table below keeps one line per package rather than repeating it.
 | **A26** | “My data” tab regrouped into clear blocks | v0.16.0 | — |
 | **A27** | Generality audit: `.env.example` as the complete setup reference, no vendor defaults hardwired, portable docs | v0.16.0/v0.19.0 | — |
 
+**Open in group A:**
+
+| No. | Package | Effort | Content | Benefit |
+|---|---|---|---|---|
+| **A28** | **One place-name run instead of a scope selection** *(note 50)* | S | A25 merged the three buttons into one with a dropdown, but the run still has to be started three times — once per scope. Decision: **drop the selection entirely.** One run covers everything: the candidates are the **deduplicated union** of the three sets (`unnamed` = coordinate names/bare labels, `verbose` = over-long Nominatim chains, `nonlatin` = foreign-script names), processed with `unnamed` first — freshly fetched names already arrive in the chosen format, so the reformatting pass never has to touch them again. The scope-specific “did this actually improve anything?” checks (`tracks.py`) have to be generalised into one condition. `scope` may stay in the API as an optional parameter, but the UI no longer offers it. | One button, one run — and each place is geocoded **at most once** instead of up to three times. A place can be in several sets (a Greek address is often over-long as well); at Nominatim's 1.2 s throttle and ~10,000 places that is a difference of hours. |
+
 #### Group B — new features (order: features first, new import sources LAST — decision 2026-07-19)
 
 | No. | Package | Effort | Content | Benefit |
@@ -661,6 +668,8 @@ so the table below keeps one line per package rather than repeating it.
 | **F8** | ⏸️ **Print view for selected days** *(note 38; first stage done v0.17.0, selection dialog done v0.19.0)* | M | Pick a range → a print-friendly page (light layout, no navigation): events chronologically with place, weather, notes, later photos; the browser print dialog (PDF). Implemented: a dialog with from/to plus presets, switches for descriptions/notes/imported visits/proposals and a live count; printing builds a dedicated `#print-area` instead of the on-screen view, so collapsed groups no longer matter. **Remainder blocked:** “printing with photos” requires P2.1 (Immich) and waits for that package. | Memories physically: print holiday days or share them as a PDF. |
 | **F9** | ✅ **Light mode** *(note 41; done v0.15.0)* | S–M | The app used to be dark only; the colours already live in CSS variables. New: a light theme plus a switch (auto following the system setting, manually overridable, stored per device). The map switches tile style with it. | Readability in daylight; the basis for the print view (F8). |
 | **F10** | ✅ **Bilingual: app de/en, docs in English** *(note 42, decided; done v0.20.0)* | M–L | The **app UI** has a German/English switch (a string catalog instead of hard-coded text — the actual work, since all text lives inline; AI prompts are unaffected). German stays the source of truth in the markup, the `I18N_EN` catalog holds English only, and a missing key falls back to German so no label can ever be empty. The language is stored per device and on the account, and drives `Accept-Language` for place-name lookups (this also completes A25). The **docs (README, CHANGELOG, KONZEPT) are switched to English**: a one-off translation, maintained in English from then on. Discussion and input may stay in any language — translation happens when writing. | Reachability for the international self-hosting community (AGPL + English docs = the GitHub standard). |
+| **F11** | **Get more out of the weather already stored** *(note 49)* | S–M | Since v0.14.0 every enriched event carries seven daily values (min/max temperature, sunshine hours, rain, snow, max wind, condition) — but only one statistics block reads them. This package is a **pure layer-4 derivation: no API call, no re-enrichment, nothing new stored.** (a) **Aggregations:** rain days per year, total sunshine hours, “warmest trip”, average temperature per country — the latter fits straight into the world tab (F5). (b) **Weather achievements** on the existing F6 infrastructure: “sun worshipper”, “bad-weather defier”, “frostbite” — one new metric function plus YAML thresholds, no new data. (c) **Patterns:** “you almost only run in sunshine”, “your June 2024 had 12 rainy days”. | The most valuable weather feature costs nothing: the data is already there and is currently used once. |
+| **F12** | **Additional weather values** *(note 49)* | S–M | Fetch fields Open-Meteo already offers but that are discarded today (`services/weather.py` requests seven): **`apparent_temperature_max/min`** (the “feels like” temperature — 5 °C with wind is a different memory than 5 °C without), **`precipitation_hours`** (how *long* it rained, not just how much — already noted as optional in F3), **`sunrise`/`sunset`/`daylight_duration`** (was it dark? interesting for trips to the far north), optionally `windgusts_10m_max` and `uv_index_max`. Added **additively** as new metrics via a re-enrichment run, exactly like the F3 daily values in v0.15.1 — existing values are never overwritten. **Deliberately not part of this:** hourly data for the weather at the event's exact time. That was in the F3 plan and was decided against in favour of pure daily values; reopening it needs a new decision. | Richer memories, and honest ones — “felt like −8 °C” says more about a day than the thermometer does. |
 | **P3.1** | **Declarative statistics widgets** | M | Render widgets generically from the module YAML (`count`, `count_distinct`, `timeseries`) instead of hard-coding them. Builds sensibly on A7. | New modules bring their statistics along automatically. |
 | **P5.1** | **Offline capture + share target** | M | PWA: buffer fragments offline and synchronise them; sharing from other apps → a fragment. | Capturing on the go without a network. |
 | **P5.2** | **Whisper voice input** | M | Server-side speech-to-text (instead of the browser API), also for voice memos as a file. | Better dictation quality, independent of the browser. |
@@ -756,6 +765,26 @@ so the table below keeps one line per package rather than repeating it.
 46. ✅ **Merge resolve place names / shorten addresses / transliterate foreign scripts:** server-side this was already one job with three scopes, and the UI follows; with F10 (de/en) “transliterate” had to become language-neutral → package **A25** (completed with F10 in v0.20.0).
 47. ✅ **Sort “my data” under settings better** → package **A26**.
 48. ✅ **Check generality:** UI texts, docs and defaults must not hardwire anything instance-specific (e.g. a provider name on the login screen) — other people should be able to deploy the project cleanly → package **A27**.
+
+**Feedback round 2026-07-20 — third round (49–50):**
+49. ✅ **What else can the weather data give us?** Split into two packages,
+    because one costs nothing and the other costs a run over all events:
+    **F11** squeezes more out of what is *already stored* (aggregations,
+    weather achievements on the F6 infrastructure, average temperature per
+    country in the world tab) — a pure layer-4 derivation without a single API
+    call. **F12** adds fields Open-Meteo already offers but that are currently
+    discarded (feels-like temperature, precipitation hours, sunrise/sunset),
+    added additively by re-enrichment. *Explicitly kept closed:* hourly data
+    for the weather at the event's exact time — that was part of the original
+    F3 plan and was decided against in favour of pure daily values.
+50. ✅ **Three geocoding runs → one:** clarification first — there are not
+    three jobs. Server-side it has been *one* job type (`resolve_names`) with
+    three scopes since A25; what remained was having to start it three times.
+    Decision: **drop the scope selection entirely** — one run covers the
+    deduplicated union of all three candidate sets → package **A28**. The
+    argument is not only convenience: a place can belong to several sets (a
+    Greek address is usually over-long too) and is therefore geocoded up to
+    three times today. At Nominatim's 1.2 s throttle that matters.
 
 **Still open / to be decided:**
 6. **Recomputation granularity & cost:** stays open — it depends on the final model (local = runtime, API = quota/cost). The quota protection (stopping while keeping what was already computed) covers the acute case.
