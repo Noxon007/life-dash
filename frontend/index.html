@@ -1292,7 +1292,7 @@
                      placeholder="https://immich.example.org"><br>
               <input type="password" id="im-key" class="mf-select" style="width:100%; max-width:520px"
                      data-i18n-ph="im.key.ph" placeholder="API-Schlüssel (Immich → Konto → API-Schlüssel)"><br>
-              <span class="hint" id="im-state" data-i18n="im.state.none">Noch kein Schlüssel hinterlegt.</span>
+              <span class="hint" id="im-state" style="display:block; margin-top:8px" data-i18n="im.state.none">Noch kein Schlüssel hinterlegt.</span>
               <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap">
                 <button class="btn small secondary" id="im-save" data-i18n="im.save">Speichern</button>
               </div>
@@ -1317,7 +1317,7 @@
                      placeholder="https://tiles.example.org/{z}/{x}/{y}.png"><br>
               <input type="text" id="tile-attr" class="mf-select" style="width:100%; max-width:520px"
                      data-i18n-ph="adm.basemap.attr.ph" placeholder="Attribution, z. B. © Mein Kartenanbieter"><br>
-              <span class="hint" data-i18n="adm.basemap.note">Die Attribution ist kein Schmuck: nahezu jede Kachelquelle
+              <span class="hint" style="display:block; margin-top:8px" data-i18n="adm.basemap.note">Die Attribution ist kein Schmuck: nahezu jede Kachelquelle
               verlangt sie in ihren Nutzungsbedingungen. Beide Angaben bleiben auf diesem Gerät.</span>
               <div style="margin-top:8px"><button class="btn small secondary" id="tile-save" data-i18n="adm.basemap.save">Speichern</button></div>
             </div>
@@ -3111,10 +3111,10 @@ function renderWeatherSummary(events, metricOf, placeOf) {
   // heißeste Tag — sonst gewinnt jede Reise, die zufällig einen Hitzetag hatte.
   const trips = {};
   withWeather.filter(e => e.category === 'trip').forEach(e => {
-    const t = metricOf(e, 'temperature_c');
-    if (t == null) return;
+    const temp = metricOf(e, 'temperature_c');
+    if (temp == null) return;
     const k = e.parent_event_id || e.id;
-    (trips[k] = trips[k] || { sum: 0, n: 0, e }).sum += t;
+    (trips[k] = trips[k] || { sum: 0, n: 0, e }).sum += temp;
     trips[k].n++;
   });
   const warmest = Object.values(trips)
@@ -4562,11 +4562,11 @@ document.getElementById('logs-refresh').addEventListener('click', loadLogs);
 
 // ---------- NUTZERVERWALTUNG (A6, nur Admin) ----------
 async function loadUsers() {
-  const t = document.getElementById('users-table');
+  const tbl = document.getElementById('users-table');
   let users;
   try { users = await api('/api/admin/users'); }
-  catch { t.innerHTML = ''; return; }
-  t.innerHTML = '<thead><tr><th>Nutzer</th><th>Rolle</th><th>Daten</th><th>Dabei seit</th><th></th></tr></thead><tbody>'
+  catch { tbl.innerHTML = ''; return; }
+  tbl.innerHTML = '<thead><tr><th>Nutzer</th><th>Rolle</th><th>Daten</th><th>Dabei seit</th><th></th></tr></thead><tbody>'
     + users.map(u => {
       const self = AUTH.user && u.id === AUTH.user.id;
       return `<tr data-uid="${esc(u.id)}">
@@ -4582,7 +4582,7 @@ async function loadUsers() {
       </tr>`;
     }).join('') + '</tbody>';
 
-  t.querySelectorAll('select[data-role]:not([disabled])').forEach(sel =>
+  tbl.querySelectorAll('select[data-role]:not([disabled])').forEach(sel =>
     sel.addEventListener('change', async () => {
       const uid = sel.closest('tr').dataset.uid;
       try {
@@ -4596,7 +4596,7 @@ async function loadUsers() {
         loadUsers(); // Anzeige zurücksetzen
       }
     }));
-  t.querySelectorAll('button[data-del]').forEach(btn =>
+  tbl.querySelectorAll('button[data-del]').forEach(btn =>
     btn.addEventListener('click', async () => {
       const row = btn.closest('tr');
       const u = users.find(x => x.id === row.dataset.uid);
@@ -4647,10 +4647,10 @@ async function loadDbTable(name) {
 }
 function renderDbTable() {
   const data = dbData;
-  const t = document.getElementById('db-table');
+  const tbl = document.getElementById('db-table');
   const cols = data.columns;
   const head = `<thead><tr><th style="width:82px">Aktion</th>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>`;
-  if (!data.rows.length) { t.innerHTML = head + `<tbody><tr><td colspan="${cols.length+1}">Tabelle „${esc(data.table)}" ist leer.</td></tr></tbody>`; return; }
+  if (!data.rows.length) { tbl.innerHTML = head + `<tbody><tr><td colspan="${cols.length+1}">Tabelle „${esc(data.table)}" ist leer.</td></tr></tbody>`; return; }
   const body = `<tbody>${data.rows.map(r => {
     const id = r.id;
     const cells = cols.map(c => {
@@ -4663,9 +4663,9 @@ function renderDbTable() {
         <button class="btn small ghost db-del" title="Löschen" style="padding:2px 6px">🗑️</button>
       </td>${cells}</tr>`;
   }).join('')}</tbody>`;
-  t.innerHTML = head + body;
+  tbl.innerHTML = head + body;
 
-  t.querySelectorAll('.db-del').forEach(btn => btn.addEventListener('click', async e => {
+  tbl.querySelectorAll('.db-del').forEach(btn => btn.addEventListener('click', async e => {
     const tr = e.target.closest('tr'), id = tr.dataset.id;
     if (!(await uiConfirm(`Die Zeile wird direkt aus der Datenbank entfernt.`,
       { title: `Zeile ${id} aus „${data.table}" löschen?`, okLabel: '🗑️ Löschen', danger: true }))) return;
@@ -4681,7 +4681,7 @@ function renderDbTable() {
     await loadDbTable(data.table);
     refreshAll();
   }));
-  t.querySelectorAll('.db-edit').forEach(btn => btn.addEventListener('click', e => startDbEdit(e.target.closest('tr'))));
+  tbl.querySelectorAll('.db-edit').forEach(btn => btn.addEventListener('click', e => startDbEdit(e.target.closest('tr'))));
 }
 function startDbEdit(tr) {
   const id = tr.dataset.id;
@@ -4791,14 +4791,14 @@ const JOB_STATUS = new Proxy(JOB_STATUS_DE, {
 });
 let jobsTimer = null;
 async function loadJobs() {
-  const t = document.getElementById('jobs-table');
-  if (!t) return;
+  const tbl = document.getElementById('jobs-table');
+  if (!tbl) return;
   let jobs;
-  try { jobs = await api('/api/jobs?limit=12'); } catch { t.innerHTML = ''; return; }
+  try { jobs = await api('/api/jobs?limit=12'); } catch { tbl.innerHTML = ''; return; }
   // Zeiten sind UTC gespeichert -> lokal anzeigen
   const fmt = iso => iso ? new Date(iso.endsWith('Z') ? iso : iso + 'Z')
     .toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '—';
-  t.innerHTML = !jobs.length
+  tbl.innerHTML = !jobs.length
     ? '<tbody><tr><td class="stat-label" style="padding:10px">Noch keine Jobs gelaufen.</td></tr></tbody>'
     : '<thead><tr><th>Job</th><th>Status</th><th>Fortschritt</th><th>Gestartet</th><th>Ergebnis</th><th></th></tr></thead><tbody>'
     + jobs.map(j => `<tr>
@@ -4809,7 +4809,7 @@ async function loadJobs() {
         <td class="stat-label">${esc(j.result || '')}</td>
         <td>${j.status === 'running' ? `<button class="btn small danger" data-job-stop="${esc(j.id)}">⏹ Stopp</button>` : ''}</td>
       </tr>`).join('') + '</tbody>';
-  t.querySelectorAll('[data-job-stop]').forEach(btn => btn.addEventListener('click', async () => {
+  tbl.querySelectorAll('[data-job-stop]').forEach(btn => btn.addEventListener('click', async () => {
     btn.disabled = true;
     try { await api(`/api/jobs/${btn.dataset.jobStop}/stop`, { method: 'POST' }); toast(t('toast.stopreq', 'Stopp angefordert — der Lauf endet nach dem aktuellen Batch.'), 'warn'); }
     catch (err) { toast(err.message, 'error'); }

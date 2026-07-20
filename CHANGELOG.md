@@ -15,6 +15,22 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.26.1] – 2026-07-20
+
+### Fixed
+- **The jobs table stayed empty as soon as any job existed** — so “link photos”
+  looked as if it had done nothing, when in truth the job had started, run and
+  finished. This affected **every** kind of background job (weather, place
+  names, embeddings, recomputation), not just the new Immich one, and had been
+  broken since 0.20.0 when the app became bilingual. Two other places had the
+  same defect: an error message after changing a user's role or deleting a
+  user, and the confirmation after deleting a row in the raw database view.
+  A check now guards against this class of mistake so it cannot come back
+  unnoticed.
+- **A hint box in the settings overlapped the fields next to it** — the note
+  about the stored Immich key, and the one about map attribution, were laid
+  out as inline text but styled as boxes, so they covered their neighbours.
+
 ## [0.26.0] – 2026-07-20
 
 ### Added
