@@ -10,6 +10,34 @@ jedem `MINOR` vorkommen.
 
 ## [Unreleased]
 
+- **Zweisprachigkeit, zweiter Teil:** Rund 70 längere Erklärtexte im Reiter
+  Verwaltung stehen noch auf Deutsch, auch wenn die App auf Englisch steht.
+  Ebenso offen: die Umstellung der Dokumentation (README, Deployment-Anleitung,
+  Konzept, Changelog) auf Englisch.
+
+## [0.20.0] – 2026-07-20
+
+### Hinzugefügt
+- **🇬🇧 Die App spricht Englisch:** Neuer Sprachumschalter oben rechts —
+  ein Klick wechselt zwischen Deutsch und Englisch, die Wahl gilt pro Gerät.
+  Beim allerersten Aufruf richtet sich die Sprache nach dem Browser.
+  Übersetzt sind Navigation, Zeitstrahl, Karte, Statistik, Welt, Erfolge,
+  Eingabe (KI und manuell), alle Dialoge, Meldungen und die Beschriftungen
+  der Verwaltungs-Reiter. Wo eine Übersetzung fehlt, erscheint weiterhin der
+  deutsche Text — es bleibt also nie ein Feld leer.
+- **Ortsnamen folgen der App-Sprache:** Bisher hat Life-Dash Adressen immer
+  auf Deutsch angefragt. Jetzt richtet sich die Auflösung nach deiner
+  Spracheinstellung: auf Englisch kommt „Corfu, Greece" statt „Korfu,
+  Griechenland", bei fremden Schriften entsprechend die englische Umschrift.
+  Die Einstellung wird im Konto gespeichert, damit auch der Ortsnamen-Lauf
+  im Hintergrund sie kennt.
+
+### Behoben
+- **Sprachwechsel blieb bei einem Fehler auf halber Strecke stehen:** Konnte
+  beim Umschalten ein Teil der Oberfläche nicht neu aufgebaut werden (etwa
+  weil das Backend gerade nicht antwortete), blieb der Rest in der alten
+  Sprache. Die Teile werden jetzt einzeln aufgebaut und stören sich nicht mehr.
+
 ## [0.19.0] – 2026-07-20
 
 ### Hinzugefügt

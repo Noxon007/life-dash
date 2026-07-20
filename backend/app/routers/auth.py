@@ -64,6 +64,9 @@ def _settings_view(user: User) -> dict:
     tracked = prefs.get("tracked_modules")
     return {
         "place_name_parts": geocode_svc.parts_for(user),
+        # F10: UI-Sprache — steuert auch, in welcher Sprache Ortsnamen
+        # aufgelöst werden (Accept-Language beim Geocoding)
+        "lang": geocode_svc.lang_for(user),
         "map_cluster_min": cluster_min_for(user),
         # A15: None/fehlend = noch nie gewählt -> Frontend zeigt Onboarding
         "tracked_modules": tracked if isinstance(tracked, list) else None,
@@ -95,6 +98,13 @@ def update_my_settings(
                 400, "place_name_parts: mindestens ein gültiger Baustein "
                      f"aus {list(geocode_svc.PLACE_NAME_PARTS)}")
         prefs["place_name_parts"] = geocode_svc.sanitize_parts(raw)
+    if "lang" in payload:
+        raw = payload["lang"]
+        if raw not in geocode_svc.ACCEPT_LANGUAGE_BY_LANG:
+            raise HTTPException(
+                400, "lang: unterstützt werden "
+                     f"{sorted(geocode_svc.ACCEPT_LANGUAGE_BY_LANG)}")
+        prefs["lang"] = raw
     if "map_cluster_min" in payload:
         try:
             wanted = int(payload["map_cluster_min"])

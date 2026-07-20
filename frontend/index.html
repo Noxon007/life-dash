@@ -556,15 +556,15 @@
     <div class="login-box">
       <div class="logo"><span class="dot"></span> Life-Dash</div>
       <!-- A27: kein hart verdrahteter Provider-Name — kommt aus der Config -->
-      <p>Deine durchsuchbare Lebensdatenbank.<br>Bitte melde dich an<span id="login-provider"></span>.</p>
-      <a class="btn" href="/api/auth/login" style="text-decoration:none; display:inline-block">🔐 Anmelden (SSO)</a>
+      <p><span data-i18n="login.claim">Deine durchsuchbare Lebensdatenbank.<br>Bitte melde dich an</span><span id="login-provider"></span>.</p>
+      <a class="btn" href="/api/auth/login" style="text-decoration:none; display:inline-block" data-i18n="login.btn">🔐 Anmelden (SSO)</a>
     </div>
   </div>
 
   <!-- LADE-OVERLAY (KI-Analyse etc.) -->
   <div class="loading-overlay" id="loading-overlay">
     <div class="spinner"></div>
-    <div class="loading-text" id="loading-text">🤖 KI analysiert…</div>
+    <div class="loading-text" id="loading-text" data-i18n="loading.ai">🤖 KI analysiert…</div>
     <div class="loading-bar" id="loading-bar"><div class="loading-bar-fill" id="loading-bar-fill"></div></div>
   </div>
 
@@ -574,12 +574,12 @@
   <!-- Bestätigungs-Dialog (A1) — Ersatz für confirm()/prompt() -->
   <div class="modal-overlay" id="confirm-modal" style="z-index:2600">
     <div class="modal-box" style="width:min(440px,100%)">
-      <h3 id="cf-title">Bestätigen</h3>
+      <h3 id="cf-title" data-i18n="dialog.confirm.title">Bestätigen</h3>
       <div id="cf-text" style="color:var(--text-dim); font-size:13px; line-height:1.6; white-space:pre-line; margin-top:8px"></div>
       <input id="cf-input" style="display:none; margin-top:14px; width:100%; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:8px 10px; color:var(--text); font-size:13px">
       <div class="btn-row" style="margin-top:20px">
         <button class="btn" id="cf-ok">OK</button>
-        <button class="btn secondary" id="cf-cancel">Abbrechen</button>
+        <button class="btn secondary" id="cf-cancel" data-i18n="btn.cancel">Abbrechen</button>
       </div>
     </div>
   </div>
@@ -587,58 +587,58 @@
   <!-- EVENT BEARBEITEN (Modal) -->
   <div class="modal-overlay" id="edit-modal">
     <div class="modal-box">
-      <h3>✏️ Eintrag bearbeiten</h3>
-      <div class="stat-label" style="margin-bottom:14px">Geänderte Felder werden vor KI-Neuberechnungen geschützt. Speichern bestätigt den Eintrag.</div>
+      <h3 data-i18n="edit.title">✏️ Eintrag bearbeiten</h3>
+      <div class="stat-label" style="margin-bottom:14px" data-i18n="edit.hint">Geänderte Felder werden vor KI-Neuberechnungen geschützt. Speichern bestätigt den Eintrag.</div>
       <!-- Bestätigungs-Provenienz (P2.7): wann/wodurch wurde das zur Wahrheit? -->
       <div class="chip badge-confirmed" id="ed-provenance" style="display:none; margin-bottom:14px"></div>
-      <div class="field-row"><div class="field-key">Titel</div>
+      <div class="field-row"><div class="field-key" data-i18n="field.title">Titel</div>
         <div class="field-val"><input id="ed-title" style="max-width:none"></div></div>
-      <div class="field-row"><div class="field-key">Beschreibung</div>
+      <div class="field-row"><div class="field-key" data-i18n="field.description">Beschreibung</div>
         <div class="field-val"><input id="ed-desc" style="max-width:none"></div></div>
-      <div class="field-row"><div class="field-key">Datum von</div>
-        <div class="field-val" style="display:flex; gap:6px"><input id="ed-date-start" type="date"><input id="ed-time-start" type="time" title="Uhrzeit (optional)"></div></div>
-      <div class="field-row"><div class="field-key">Datum bis</div>
-        <div class="field-val" style="display:flex; gap:6px"><input id="ed-date-end" type="date"><input id="ed-time-end" type="time" title="Uhrzeit (optional)"></div></div>
-      <div class="field-row"><div class="field-key">Präzision</div>
+      <div class="field-row"><div class="field-key" data-i18n="field.date.from">Datum von</div>
+        <div class="field-val" style="display:flex; gap:6px"><input id="ed-date-start" type="date"><input id="ed-time-start" type="time" data-i18n-title="field.time.tip" title="Uhrzeit (optional)"></div></div>
+      <div class="field-row"><div class="field-key" data-i18n="field.date.to">Datum bis</div>
+        <div class="field-val" style="display:flex; gap:6px"><input id="ed-date-end" type="date"><input id="ed-time-end" type="time" data-i18n-title="field.time.tip" title="Uhrzeit (optional)"></div></div>
+      <div class="field-row"><div class="field-key" data-i18n="field.precision">Präzision</div>
         <div class="field-val"><select id="ed-precision" class="mf-select">
-          <option value="exact">Tag + Uhrzeit</option>
-          <option value="day">Tag (genau)</option>
-          <option value="month">Monat</option>
-          <option value="season">Jahreszeit</option>
-          <option value="year">Jahr</option>
-          <option value="decade">Jahrzehnt</option>
+          <option value="exact" data-i18n="prec.exact">Tag + Uhrzeit</option>
+          <option value="day" data-i18n="prec.day">Tag (genau)</option>
+          <option value="month" data-i18n="prec.month">Monat</option>
+          <option value="season" data-i18n="prec.season">Jahreszeit</option>
+          <option value="year" data-i18n="prec.year">Jahr</option>
+          <option value="decade" data-i18n="prec.decade">Jahrzehnt</option>
         </select></div></div>
-      <div class="field-row"><div class="field-key">Kategorie</div>
+      <div class="field-row"><div class="field-key" data-i18n="field.category">Kategorie</div>
         <div class="field-val"><select id="ed-category" class="mf-select">
-          <option value="event">Ereignis</option>
-          <option value="trip">Reise</option>
-          <option value="sighting">Sichtung</option>
-          <option value="sport">Aktivität</option>
-          <option value="concert">Konzert</option>
-          <option value="meal">Mahlzeit</option>
-          <option value="milestone">Meilenstein</option>
-          <option value="journal">Tagebuch</option>
+          <option value="event" data-i18n="cat.event">Ereignis</option>
+          <option value="trip" data-i18n="cat.trip">Reise</option>
+          <option value="sighting" data-i18n="cat.sighting">Sichtung</option>
+          <option value="sport" data-i18n="cat.sport">Aktivität</option>
+          <option value="concert" data-i18n="cat.concert">Konzert</option>
+          <option value="meal" data-i18n="cat.meal">Mahlzeit</option>
+          <option value="milestone" data-i18n="cat.milestone">Meilenstein</option>
+          <option value="journal" data-i18n="cat.journal">Tagebuch</option>
         </select></div></div>
-      <div class="field-row"><div class="field-key">Ort / Adresse</div>
-        <div class="field-val"><input id="ed-location" placeholder="z. B. Reeperbahn 1, Hamburg — wird geocodiert" style="max-width:none"></div></div>
-      <div class="field-row"><div class="field-key">🏷️ Objekte</div>
+      <div class="field-row"><div class="field-key" data-i18n="field.place">Ort / Adresse</div>
+        <div class="field-val"><input id="ed-location" data-i18n-ph="edit.place.ph" placeholder="z. B. Reeperbahn 1, Hamburg — wird geocodiert" style="max-width:none"></div></div>
+      <div class="field-row"><div class="field-key" data-i18n="field.items">🏷️ Objekte</div>
         <div class="field-val" style="max-width:none">
           <div id="ed-entities" style="display:flex; flex-direction:column; gap:6px"></div>
-          <button class="btn small secondary" id="ed-ent-add" style="margin-top:6px">+ Objekt</button>
+          <button class="btn small secondary" id="ed-ent-add" style="margin-top:6px" data-i18n="btn.addobj">+ Objekt</button>
         </div></div>
-      <div class="field-row"><div class="field-key">💬 Kommentar</div>
-        <div class="field-val"><textarea id="ed-note" rows="6" placeholder="persönliche Notiz / Tagebuchtext — Markdown möglich (**fett**, # Überschrift, - Liste), bleibt von der KI unberührt" style="width:100%; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:6px 10px; color:var(--text); font-size:13px; font-family:inherit; resize:vertical"></textarea></div></div>
+      <div class="field-row"><div class="field-key" data-i18n="field.comment">💬 Kommentar</div>
+        <div class="field-val"><textarea id="ed-note" rows="6" data-i18n-ph="edit.note.ph" placeholder="persönliche Notiz / Tagebuchtext — Markdown möglich (**fett**, # Überschrift, - Liste), bleibt von der KI unberührt" style="width:100%; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:6px 10px; color:var(--text); font-size:13px; font-family:inherit; resize:vertical"></textarea></div></div>
       <!-- F7: Mehrtages-Event -> Tages-Unterereignisse anlegen -->
-      <div class="field-row" id="ed-days-row" style="display:none"><div class="field-key">📅 Tage</div>
+      <div class="field-row" id="ed-days-row" style="display:none"><div class="field-key" data-i18n="field.days">📅 Tage</div>
         <div class="field-val" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
           <span class="stat-label" id="ed-days-info"></span>
           <button class="btn small secondary" id="ed-days-btn"
-            title="Legt für jeden Tag der Spanne ein Tages-Ereignis an („… — Tag 3") — mit eigenem Wetter pro Tag; im Zeitstrahl eingeklappt unterm Haupt-Event">Tages-Einträge anlegen</button>
+            data-i18n-title="edit.days.tip" title="Legt für jeden Tag der Spanne ein Tages-Ereignis an („… — Tag 3") — mit eigenem Wetter pro Tag; im Zeitstrahl eingeklappt unterm Haupt-Event" data-i18n="edit.days.btn">Tages-Einträge anlegen</button>
         </div></div>
       <div class="btn-row" style="margin-top:18px">
-        <button class="btn" id="ed-save">💾 Speichern</button>
-        <button class="btn secondary" id="ed-cancel">Abbrechen</button>
-        <button class="btn ghost" id="ed-delete" style="margin-left:auto; color:var(--danger)">🗑️ Eintrag löschen</button>
+        <button class="btn" id="ed-save" data-i18n="btn.save">💾 Speichern</button>
+        <button class="btn secondary" id="ed-cancel" data-i18n="btn.cancel">Abbrechen</button>
+        <button class="btn ghost" id="ed-delete" style="margin-left:auto; color:var(--danger)" data-i18n="edit.delete">🗑️ Eintrag löschen</button>
       </div>
     </div>
   </div>
@@ -646,18 +646,18 @@
   <!-- SIDEBAR / BOTTOM-NAV -->
   <nav class="sidebar">
     <div class="logo"><span class="dot"></span> Life-Dash</div>
-    <div class="nav-item active" data-view="timeline"><span class="ico">📅</span> <span class="lbl">Zeitstrahl</span></div>
-    <div class="nav-item" data-view="map"><span class="ico">🗺️</span> <span class="lbl">Karte</span></div>
-    <div class="nav-item" data-view="input"><span class="ico">✍️</span> <span class="lbl">Eingabe</span></div>
-    <div class="nav-item" data-view="stats"><span class="ico">📊</span> <span class="lbl">Statistik</span></div>
-    <div class="nav-item" data-view="compendium"><span class="ico">📚</span> <span class="lbl">Kompendium</span></div>
-    <div class="nav-item" data-view="world"><span class="ico">🌍</span> <span class="lbl">Welt</span></div>
-    <div class="nav-item" data-view="achievements"><span class="ico">🏆</span> <span class="lbl">Erfolge</span></div>
-    <div class="nav-item" data-view="admin"><span class="ico">⚙️</span> <span class="lbl">Verwaltung</span> <span class="nav-badge" style="display:none">0</span></div>
+    <div class="nav-item active" data-view="timeline"><span class="ico">📅</span> <span class="lbl" data-i18n="nav.timeline">Zeitstrahl</span></div>
+    <div class="nav-item" data-view="map"><span class="ico">🗺️</span> <span class="lbl" data-i18n="nav.map">Karte</span></div>
+    <div class="nav-item" data-view="input"><span class="ico">✍️</span> <span class="lbl" data-i18n="nav.input">Eingabe</span></div>
+    <div class="nav-item" data-view="stats"><span class="ico">📊</span> <span class="lbl" data-i18n="nav.stats">Statistik</span></div>
+    <div class="nav-item" data-view="compendium"><span class="ico">📚</span> <span class="lbl" data-i18n="nav.compendium">Kompendium</span></div>
+    <div class="nav-item" data-view="world"><span class="ico">🌍</span> <span class="lbl" data-i18n="nav.world">Welt</span></div>
+    <div class="nav-item" data-view="achievements"><span class="ico">🏆</span> <span class="lbl" data-i18n="nav.achievements">Erfolge</span></div>
+    <div class="nav-item" data-view="admin"><span class="ico">⚙️</span> <span class="lbl" data-i18n="nav.admin">Verwaltung</span> <span class="nav-badge" style="display:none">0</span></div>
     <div class="sidebar-foot" id="sidebar-foot">
       <b>Life-Dash</b> <span id="foot-version"></span><br>
       <span id="foot-user">…</span><br>
-      <a href="#" id="logout-link" style="display:none">Abmelden</a>
+      <a href="#" id="logout-link" style="display:none" data-i18n="logout">Abmelden</a>
     </div>
   </nav>
 
@@ -668,8 +668,10 @@
         <h1 id="view-title">Zeitstrahl</h1>
         <div class="sub" id="view-sub">Dein Leben als Ereignisstrom</div>
       </div>
-      <input class="search" id="global-search" placeholder="🔍 Suche: „am Meer&quot;, „Frankreich&quot; …">
-      <button class="btn small secondary" id="theme-btn"
+      <input class="search" id="global-search" data-i18n-ph="search.placeholder"
+        placeholder="🔍 Suche: „am Meer&quot;, „Frankreich&quot; …">
+      <button class="btn small secondary" id="lang-btn" title="Switch to English">🇬🇧 EN</button>
+      <button class="btn small secondary" id="theme-btn" data-i18n-title="theme.tip"
         title="Erscheinungsbild: Auto folgt der Systemeinstellung; Klick wechselt Auto → Hell → Dunkel (pro Gerät gespeichert)">🌓 Auto</button>
     </div>
     <div class="content">
@@ -677,17 +679,17 @@
       <!-- ===== TIMELINE ===== -->
       <div class="view active" id="view-timeline">
         <div class="zoom-bar" id="tl-zoom">
-          <div class="zoom-btn" data-zoom="day">Tag</div>
-          <div class="zoom-btn" data-zoom="week">Woche</div>
-          <div class="zoom-btn" data-zoom="month">Monat</div>
-          <div class="zoom-btn active" data-zoom="year">Jahr</div>
-          <div class="zoom-btn" data-zoom="decade">Jahrzehnt</div>
+          <div class="zoom-btn" data-zoom="day" data-i18n="zoom.day">Tag</div>
+          <div class="zoom-btn" data-zoom="week" data-i18n="zoom.week">Woche</div>
+          <div class="zoom-btn" data-zoom="month" data-i18n="zoom.month">Monat</div>
+          <div class="zoom-btn active" data-zoom="year" data-i18n="zoom.year">Jahr</div>
+          <div class="zoom-btn" data-zoom="decade" data-i18n="zoom.decade">Jahrzehnt</div>
         </div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:-8px 0 20px">
           <div class="filter-chips" id="tl-filters" style="margin:0"></div>
-          <span class="filter-chip off" id="tl-visits-toggle" title="Importierte Timeline-Besuche (Google) im Zeitstrahl anzeigen — auf der Karte sind sie immer sichtbar">🛰️ Besuche</span>
-          <span class="filter-chip" id="tl-journal-btn" title="Tagebuch-Eintrag für einen Tag schreiben (Markdown) — erscheint als Tageskopf über den Ereignissen des Tages">📖 Tagebuch schreiben</span>
-          <span class="filter-chip" id="tl-print-btn" title="Zeitraum wählen und drucken oder als PDF sichern — gedruckt wird hell, ohne Navigation und mit allen Ereignissen des Zeitraums">🖨️ Drucken</span>
+          <span class="filter-chip off" id="tl-visits-toggle" data-i18n-title="tl.visits.tip" title="Importierte Timeline-Besuche (Google) im Zeitstrahl anzeigen — auf der Karte sind sie immer sichtbar" data-i18n="tl.visits">🛰️ Besuche</span>
+          <span class="filter-chip" id="tl-journal-btn" data-i18n-title="tl.journal.tip" title="Tagebuch-Eintrag für einen Tag schreiben (Markdown) — erscheint als Tageskopf über den Ereignissen des Tages" data-i18n="tl.journal">📖 Tagebuch schreiben</span>
+          <span class="filter-chip" id="tl-print-btn" data-i18n-title="tl.print.tip" title="Zeitraum wählen und drucken oder als PDF sichern — gedruckt wird hell, ohne Navigation und mit allen Ereignissen des Zeitraums" data-i18n="tl.print">🖨️ Drucken</span>
         </div>
         <div id="tl-search-note" class="hint" style="display:none"></div>
         <div class="timeline" id="timeline-list"></div>
@@ -697,32 +699,32 @@
       <div class="view" id="view-map">
         <div class="map-filters">
           <div class="filter-group">
-            <label>Ansicht</label>
+            <label data-i18n="map.view">Ansicht</label>
             <div class="filter-chips">
-              <span class="filter-chip active" data-mode="day">Tag</span>
-              <span class="filter-chip" data-mode="week">Woche</span>
-              <span class="filter-chip" data-mode="month">Monat</span>
-              <span class="filter-chip" data-mode="year">Jahr</span>
-              <span class="filter-chip" data-mode="decade">Jahrzehnt</span>
-              <span class="filter-chip" data-mode="all">Alles</span>
+              <span class="filter-chip active" data-mode="day" data-i18n="zoom.day">Tag</span>
+              <span class="filter-chip" data-mode="week" data-i18n="zoom.week">Woche</span>
+              <span class="filter-chip" data-mode="month" data-i18n="zoom.month">Monat</span>
+              <span class="filter-chip" data-mode="year" data-i18n="zoom.year">Jahr</span>
+              <span class="filter-chip" data-mode="decade" data-i18n="zoom.decade">Jahrzehnt</span>
+              <span class="filter-chip" data-mode="all" data-i18n="zoom.all">Alles</span>
             </div>
           </div>
           <div class="filter-group">
-            <label>Zeitraum</label>
+            <label data-i18n="map.range">Zeitraum</label>
             <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap">
-              <button class="btn small secondary" id="mp-prev">‹ zurück</button>
+              <button class="btn small secondary" id="mp-prev" data-i18n="map.prev">‹ zurück</button>
               <span class="time-range-label" id="mp-period-label" style="min-width:150px; text-align:center">–</span>
-              <button class="btn small secondary" id="mp-next">weiter ›</button>
-              <input type="date" id="mp-date" class="mf-select" title="Tag im Kalender wählen">
+              <button class="btn small secondary" id="mp-next" data-i18n="map.next">weiter ›</button>
+              <input type="date" id="mp-date" class="mf-select" data-i18n-title="map.pickday" title="Tag im Kalender wählen">
             </div>
           </div>
           <div class="filter-group">
-            <label>Darstellung</label>
+            <label data-i18n="map.display">Darstellung</label>
             <div class="filter-chips">
-              <span class="filter-chip active" id="mp-route-toggle">🧭 Route verbinden</span>
-              <span class="filter-chip active" id="mp-tracks-toggle">🛰️ Timeline-Routen</span>
-              <span class="filter-chip active" id="mp-group-toggle" title="Ab Monats-Ansicht: wiederholte Besuche desselben Orts zu einem Eintrag bündeln">🔁 Orte bündeln</span>
-              <span class="filter-chip" id="mp-fullscreen" title="Karte im Vollbild (Esc beendet)">⛶ Vollbild</span>
+              <span class="filter-chip active" id="mp-route-toggle" data-i18n="map.route">🧭 Route verbinden</span>
+              <span class="filter-chip active" id="mp-tracks-toggle" data-i18n="map.tracks">🛰️ Timeline-Routen</span>
+              <span class="filter-chip active" id="mp-group-toggle" data-i18n-title="map.group.tip" title="Ab Monats-Ansicht: wiederholte Besuche desselben Orts zu einem Eintrag bündeln" data-i18n="map.group">🔁 Orte bündeln</span>
+              <span class="filter-chip" id="mp-fullscreen" data-i18n-title="map.fs.tip" title="Karte im Vollbild (Esc beendet)" data-i18n="map.fs">⛶ Vollbild</span>
               <label class="stat-label" style="display:flex; align-items:center; gap:6px" title="Hat der Zeitraum höchstens so viele Punkte, gibt es Einzelmarker + nummerierte Route. Darüber schaltet die Karte in den Cluster-Modus — dort bündeln sich nahe Punkte je nach Zoom (Klick/Zoom teilt Bubbles auf). Rahmen 10–300 schützt die Performance.">
                 Cluster ab
                 <input id="mp-cluster-min" type="number" min="10" max="300" step="10" value="50"
@@ -745,65 +747,65 @@
       <!-- ===== STATS ===== -->
       <div class="view" id="view-stats">
         <div class="grid cols-4" style="margin-bottom:24px">
-          <div class="stat-card" data-go="timeline:all"><div class="stat-num" id="stat-events">–</div><div class="stat-label">Ereignisse gesamt</div><div class="stat-sub">Lebensdatenbank</div></div>
-          <div class="stat-card" data-go="comp:country" data-req-mod="country"><div class="stat-num" id="stat-countries">–</div><div class="stat-label">Länder besucht</div><div class="stat-sub">Kompendium</div></div>
-          <div class="stat-card" data-go="map"><div class="stat-num" id="stat-places">–</div><div class="stat-label">Orte besucht</div><div class="stat-sub">verortete Events</div></div>
-          <div class="stat-card" data-go="comp:animal" data-req-mod="animal"><div class="stat-num" id="stat-animals">–</div><div class="stat-label">Tierarten gesehen</div><div class="stat-sub">Kompendium</div></div>
-          <div class="stat-card" data-go="timeline:concert" data-req-mod="artist"><div class="stat-num" id="stat-concerts">–</div><div class="stat-label">Konzerte besucht</div><div class="stat-sub">Kategorie concert</div></div>
-          <div class="stat-card" data-go="comp:artist" data-req-mod="artist"><div class="stat-num" id="stat-artists">–</div><div class="stat-label">Künstler live</div><div class="stat-sub">Kompendium</div></div>
-          <div class="stat-card" data-go="timeline:milestone"><div class="stat-num" id="stat-age">–</div><div class="stat-label">Alter</div><div class="stat-sub" id="stat-age-sub">Geburt als Meilenstein eintragen</div></div>
-          <div class="stat-card" data-go="timeline:milestone"><div class="stat-num" id="stat-milestones">–</div><div class="stat-label">Meilensteine</div><div class="stat-sub">Hochzeit, Geburt, Umzug …</div></div>
-          <div class="stat-card" data-go="timeline:milestone"><div class="stat-num" id="stat-moves">–</div><div class="stat-label">Umzüge</div><div class="stat-sub">aus Meilensteinen</div></div>
-          <div class="stat-card" data-go="timeline:meal" data-req-mod="food"><div class="stat-num" id="stat-meals">–</div><div class="stat-label">Mahlzeiten</div><div class="stat-sub">Kategorie meal</div></div>
-          <div class="stat-card" data-go="admin"><div class="stat-num" id="stat-unconfirmed">–</div><div class="stat-label">Unbestätigt</div><div class="stat-sub">zu moderieren</div></div>
+          <div class="stat-card" data-go="timeline:all"><div class="stat-num" id="stat-events">–</div><div class="stat-label" data-i18n="stat.events">Ereignisse gesamt</div><div class="stat-sub" data-i18n="stat.sub.lifedb" data-i18n="layer.mid.title">Lebensdatenbank</div></div>
+          <div class="stat-card" data-go="comp:country" data-req-mod="country"><div class="stat-num" id="stat-countries">–</div><div class="stat-label" data-i18n="stat.countries">Länder besucht</div><div class="stat-sub" data-i18n="stat.sub.collection">Kompendium</div></div>
+          <div class="stat-card" data-go="map"><div class="stat-num" id="stat-places">–</div><div class="stat-label" data-i18n="stat.places">Orte besucht</div><div class="stat-sub" data-i18n="stat.sub.located">verortete Events</div></div>
+          <div class="stat-card" data-go="comp:animal" data-req-mod="animal"><div class="stat-num" id="stat-animals">–</div><div class="stat-label" data-i18n="stat.animals">Tierarten gesehen</div><div class="stat-sub" data-i18n="stat.sub.collection">Kompendium</div></div>
+          <div class="stat-card" data-go="timeline:concert" data-req-mod="artist"><div class="stat-num" id="stat-concerts">–</div><div class="stat-label" data-i18n="stat.concerts">Konzerte besucht</div><div class="stat-sub" data-i18n="stat.sub.catconcert">Kategorie concert</div></div>
+          <div class="stat-card" data-go="comp:artist" data-req-mod="artist"><div class="stat-num" id="stat-artists">–</div><div class="stat-label" data-i18n="stat.artists">Künstler live</div><div class="stat-sub" data-i18n="stat.sub.collection">Kompendium</div></div>
+          <div class="stat-card" data-go="timeline:milestone"><div class="stat-num" id="stat-age">–</div><div class="stat-label" data-i18n="stat.age">Alter</div><div class="stat-sub" id="stat-age-sub" data-i18n="stat.sub.age">Geburt als Meilenstein eintragen</div></div>
+          <div class="stat-card" data-go="timeline:milestone"><div class="stat-num" id="stat-milestones">–</div><div class="stat-label" data-i18n="stat.milestones">Meilensteine</div><div class="stat-sub" data-i18n="stat.sub.milestones">Hochzeit, Geburt, Umzug …</div></div>
+          <div class="stat-card" data-go="timeline:milestone"><div class="stat-num" id="stat-moves">–</div><div class="stat-label" data-i18n="stat.moves">Umzüge</div><div class="stat-sub" data-i18n="stat.sub.frommilestones">aus Meilensteinen</div></div>
+          <div class="stat-card" data-go="timeline:meal" data-req-mod="food"><div class="stat-num" id="stat-meals">–</div><div class="stat-label" data-i18n="stat.meals">Mahlzeiten</div><div class="stat-sub" data-i18n="stat.sub.catmeal">Kategorie meal</div></div>
+          <div class="stat-card" data-go="admin"><div class="stat-num" id="stat-unconfirmed">–</div><div class="stat-label" data-i18n="stat.unconfirmed">Unbestätigt</div><div class="stat-sub" data-i18n="stat.sub.tomoderate">zu moderieren</div></div>
         </div>
         <div class="grid cols-4" style="margin-bottom:24px">
           <div class="stat-card" data-event-slot="hot">
             <div class="stat-num" id="stat-hot">–</div>
-            <div class="stat-label">🔥 Heißester Tag</div>
-            <div class="stat-sub" id="stat-hot-sub">Wetter-Enrichment ausführen</div>
+            <div class="stat-label" data-i18n="stat.hot">🔥 Heißester Tag</div>
+            <div class="stat-sub" id="stat-hot-sub" data-i18n="stat.sub.weather">Wetter-Enrichment ausführen</div>
           </div>
           <div class="stat-card" data-event-slot="cold">
             <div class="stat-num" id="stat-cold">–</div>
-            <div class="stat-label">❄️ Kältester Tag</div>
-            <div class="stat-sub" id="stat-cold-sub">Wetter-Enrichment ausführen</div>
+            <div class="stat-label" data-i18n="stat.cold">❄️ Kältester Tag</div>
+            <div class="stat-sub" id="stat-cold-sub" data-i18n="stat.sub.weather">Wetter-Enrichment ausführen</div>
           </div>
           <div class="stat-card" data-event-slot="sunny">
             <div class="stat-num" id="stat-sunny">–</div>
-            <div class="stat-label">☀️ Sonnigster Tag</div>
+            <div class="stat-label" data-i18n="stat.sun">☀️ Sonnigster Tag</div>
             <div class="stat-sub" id="stat-sunny-sub">–</div>
           </div>
           <div class="stat-card" data-event-slot="rainy">
             <div class="stat-num" id="stat-rainy">–</div>
-            <div class="stat-label">🌧️ Nassester Tag</div>
+            <div class="stat-label" data-i18n="stat.rain">🌧️ Nassester Tag</div>
             <div class="stat-sub" id="stat-rainy-sub">–</div>
           </div>
           <div class="stat-card" data-event-slot="windy">
             <div class="stat-num" id="stat-windy">–</div>
-            <div class="stat-label">💨 Windigster Tag</div>
+            <div class="stat-label" data-i18n="stat.wind">💨 Windigster Tag</div>
             <div class="stat-sub" id="stat-windy-sub">–</div>
           </div>
           <div class="stat-card" data-event-slot="snowy">
             <div class="stat-num" id="stat-snowy">–</div>
-            <div class="stat-label">❄️ Schneereichster Tag</div>
+            <div class="stat-label" data-i18n="stat.snow">❄️ Schneereichster Tag</div>
             <div class="stat-sub" id="stat-snowy-sub">–</div>
           </div>
         </div>
         <div class="grid cols-2">
           <div class="panel">
-            <h3>Ereignisse pro Jahr</h3>
+            <h3 data-i18n="chart.peryear">Ereignisse pro Jahr</h3>
             <div id="chart-years"></div>
           </div>
           <div class="panel">
-            <h3>Kategorien-Verteilung</h3>
+            <h3 data-i18n="chart.categories">Kategorien-Verteilung</h3>
             <div id="chart-cats"></div>
           </div>
           <div class="panel">
-            <h3>Top-Orte</h3>
+            <h3 data-i18n="chart.topplaces">Top-Orte</h3>
             <div id="chart-places"></div>
           </div>
           <div class="panel" data-req-mod="animal">
-            <h3>Meistgesehene Tiere</h3>
+            <h3 data-i18n="chart.topanimals">Meistgesehene Tiere</h3>
             <div id="chart-animals"></div>
           </div>
         </div>
@@ -830,24 +832,24 @@
       <!-- ===== WELT (F5) ===== -->
       <div class="view" id="view-world">
         <div class="grid cols-4" style="margin-bottom:20px">
-          <div class="stat-card"><div class="stat-num" id="world-countries">–</div><div class="stat-label">Länder besucht</div><div class="stat-sub" id="world-countries-sub">von –</div></div>
-          <div class="stat-card"><div class="stat-num" id="world-continents">–</div><div class="stat-label">Kontinente</div><div class="stat-sub">von 7</div></div>
-          <div class="stat-card"><div class="stat-num" id="world-share">–</div><div class="stat-label">Welt entdeckt</div><div class="stat-sub">Anteil aller Länder</div></div>
-          <div class="stat-card"><div class="stat-num" id="world-newest">–</div><div class="stat-label">Zuletzt neu</div><div class="stat-sub" id="world-newest-sub">erstmals besucht</div></div>
+          <div class="stat-card"><div class="stat-num" id="world-countries">–</div><div class="stat-label" data-i18n="stat.countries">Länder besucht</div><div class="stat-sub" id="world-countries-sub">von –</div></div>
+          <div class="stat-card"><div class="stat-num" id="world-continents">–</div><div class="stat-label" data-i18n="world.continents">Kontinente</div><div class="stat-sub" data-i18n="world.of7">von 7</div></div>
+          <div class="stat-card"><div class="stat-num" id="world-share">–</div><div class="stat-label" data-i18n="world.share">Welt entdeckt</div><div class="stat-sub" data-i18n="world.share.sub">Anteil aller Länder</div></div>
+          <div class="stat-card"><div class="stat-num" id="world-newest">–</div><div class="stat-label" data-i18n="world.newest">Zuletzt neu</div><div class="stat-sub" id="world-newest-sub" data-i18n="world.newest.sub">erstmals besucht</div></div>
         </div>
 
         <div class="panel" style="margin-bottom:20px">
-          <h3>Deine Weltkarte</h3>
+          <h3 data-i18n="world.map">Deine Weltkarte</h3>
           <div id="world-map"></div>
           <div class="action-desc" style="margin-top:10px">
-            Eingefärbt sind Länder, die in deiner Lebensdatenbank vorkommen — je
-            kräftiger, desto mehr Ereignisse. Klick auf ein Land zeigt die Details.
+            <span data-i18n="world.map.hint">Eingefärbt sind Länder, die in deiner Lebensdatenbank vorkommen — je
+            kräftiger, desto mehr Ereignisse. Klick auf ein Land zeigt die Details.</span>
           </div>
           <div class="action-desc" id="world-hint" style="margin-top:8px; display:none"></div>
         </div>
 
         <div class="panel">
-          <h3>Checkliste</h3>
+          <h3 data-i18n="world.checklist">Checkliste</h3>
           <div id="world-checklist"></div>
         </div>
       </div>
@@ -855,10 +857,10 @@
       <!-- ===== ERFOLGE (F6) ===== -->
       <div class="view" id="view-achievements">
         <div class="grid cols-4" style="margin-bottom:20px">
-          <div class="stat-card"><div class="stat-num" id="ach-earned">–</div><div class="stat-label">Erfolge erreicht</div><div class="stat-sub" id="ach-earned-sub">von –</div></div>
-          <div class="stat-card"><div class="stat-num" id="ach-points">–</div><div class="stat-label">Punkte</div><div class="stat-sub">Bronze 1 · Silber 2 · Gold 3 · Platin 4</div></div>
-          <div class="stat-card"><div class="stat-num" id="ach-platin">–</div><div class="stat-label">Platin</div><div class="stat-sub">voll ausgereizt</div></div>
-          <div class="stat-card"><div class="stat-num" id="ach-close">–</div><div class="stat-label">Kurz davor</div><div class="stat-sub">über 75 % zur nächsten Stufe</div></div>
+          <div class="stat-card"><div class="stat-num" id="ach-earned">–</div><div class="stat-label" data-i18n="ach.earned">Erfolge erreicht</div><div class="stat-sub" id="ach-earned-sub">von –</div></div>
+          <div class="stat-card"><div class="stat-num" id="ach-points">–</div><div class="stat-label" data-i18n="ach.points">Punkte</div><div class="stat-sub" data-i18n="ach.points.sub">Bronze 1 · Silber 2 · Gold 3 · Platin 4</div></div>
+          <div class="stat-card"><div class="stat-num" id="ach-platin">–</div><div class="stat-label" data-i18n="ach.platinum">Platin</div><div class="stat-sub" data-i18n="ach.platinum.sub">voll ausgereizt</div></div>
+          <div class="stat-card"><div class="stat-num" id="ach-close">–</div><div class="stat-label" data-i18n="ach.close">Kurz davor</div><div class="stat-sub" data-i18n="ach.close.sub">über 75 % zur nächsten Stufe</div></div>
         </div>
         <div id="ach-list"></div>
       </div>
@@ -866,38 +868,38 @@
       <!-- ===== INPUT ===== -->
       <div class="view" id="view-input">
         <div class="zoom-bar">
-          <div class="zoom-btn active" id="input-mode-ai">🤖 KI-Analyse</div>
-          <div class="zoom-btn" id="input-mode-manual">📝 Manuell</div>
+          <div class="zoom-btn active" id="input-mode-ai" data-i18n="in.mode.ai">🤖 KI-Analyse</div>
+          <div class="zoom-btn" id="input-mode-manual" data-i18n="in.mode.manual">📝 Manuell</div>
         </div>
 
         <div id="input-ai-section">
         <div class="hint">
-          ✍️ Schreib einfach frei drauflos. Die KI erkennt Datum, Ort, Kategorie und Objekte. Dein Roh-Text wird <b>unverändert im Roh-Eingang</b> gespeichert.
+          <span data-i18n="in.ai.hint">✍️ Schreib einfach frei drauflos. Die KI erkennt Datum, Ort, Kategorie und Objekte. Dein Roh-Text wird <b>unverändert im Roh-Eingang</b> gespeichert.</span>
         </div>
-        <textarea class="input-area" id="input-text" placeholder="z. B. „12.07.2026 war in Detmold und habe einen Adler gesehen&quot;"></textarea>
+        <textarea class="input-area" id="input-text" data-i18n-ph="in.ai.ph" placeholder="z. B. „12.07.2026 war in Detmold und habe einen Adler gesehen&quot;"></textarea>
         <div class="examples">
-          <div class="example-chip">12.07.2026 war in Detmold und habe einen Adler gesehen</div>
-          <div class="example-chip">Sommer 2002 Urlaub in Frankreich</div>
-          <div class="example-chip">Gestern 8 km gelaufen bei Sonnenschein</div>
+          <div class="example-chip" data-i18n="in.ex1">12.07.2026 war in Detmold und habe einen Adler gesehen</div>
+          <div class="example-chip" data-i18n="in.ex2">Sommer 2002 Urlaub in Frankreich</div>
+          <div class="example-chip" data-i18n="in.ex3">Gestern 8 km gelaufen bei Sonnenschein</div>
         </div>
         <div class="btn-row">
-          <button class="btn" id="analyze-btn">🤖 KI analysieren</button>
-          <button class="btn secondary" id="voice-btn">🎙️ Sprachaufnahme</button>
-          <button class="btn secondary" id="geo-btn" title="Gerätestandort als Ortsvorschlag mitgeben — nur auf Knopfdruck, nie automatisch. Nennt der Text selbst einen Ort, hat der Text Vorrang.">📍 Standort verwenden</button>
+          <button class="btn" id="analyze-btn" data-i18n="in.analyze">🤖 KI analysieren</button>
+          <button class="btn secondary" id="voice-btn" data-i18n="in.voice">🎙️ Sprachaufnahme</button>
+          <button class="btn secondary" id="geo-btn" data-i18n-title="in.geo.tip" title="Gerätestandort als Ortsvorschlag mitgeben — nur auf Knopfdruck, nie automatisch. Nennt der Text selbst einen Ort, hat der Text Vorrang." data-i18n="in.geo">📍 Standort verwenden</button>
         </div>
         <div class="hint" id="geo-hint" style="display:none"></div>
 
         <div class="ai-preview" id="ai-preview">
           <div class="ai-head">
             <span class="pulse"></span>
-            <b>KI-Vorschau (Vorschlag)</b>
-            <span class="chip badge-unconfirmed" style="margin-left:auto">unbestätigt — bitte prüfen</span>
+            <b data-i18n="in.preview">KI-Vorschau (Vorschlag)</b>
+            <span class="chip badge-unconfirmed" style="margin-left:auto" data-i18n="in.unconfirmed">unbestätigt — bitte prüfen</span>
           </div>
           <div id="ai-fields"></div>
           <div class="btn-row" style="margin-top:18px">
-            <button class="btn" id="confirm-btn">✓ Bestätigen &amp; speichern</button>
-            <button class="btn secondary" id="edit-btn">✏️ Bearbeiten</button>
-            <button class="btn ghost" id="discard-btn">Verwerfen</button>
+            <button class="btn" id="confirm-btn" data-i18n="in.confirm">✓ Bestätigen &amp; speichern</button>
+            <button class="btn secondary" id="edit-btn" data-i18n="btn.edit">✏️ Bearbeiten</button>
+            <button class="btn ghost" id="discard-btn" data-i18n="btn.discard">Verwerfen</button>
           </div>
         </div>
         </div><!-- /input-ai-section -->
@@ -905,63 +907,62 @@
         <!-- Manuelle Eingabe: alle Felder selbst eintragen, keine KI -->
         <div id="input-manual-section" style="display:none">
           <div class="hint">
-            📝 Alles selbst eintragen — ohne KI. Der Eintrag wird sofort als <b>bestätigt</b> gespeichert
-            und ist vor KI-Neuberechnungen geschützt.
+            <span data-i18n="in.manual.hint">📝 Alles selbst eintragen — ohne KI. Der Eintrag wird sofort als <b>bestätigt</b> gespeichert und ist vor KI-Neuberechnungen geschützt.</span>
           </div>
           <div class="panel">
-            <div class="field-row"><div class="field-key">Titel *</div>
-              <div class="field-val"><input id="mf-title" placeholder="z. B. Hai beim Schnorcheln gesehen" style="max-width:none"></div></div>
-            <div class="field-row"><div class="field-key">Beschreibung</div>
-              <div class="field-val"><input id="mf-desc" placeholder="optional" style="max-width:none"></div></div>
-            <div class="field-row"><div class="field-key">Datum von</div>
+            <div class="field-row"><div class="field-key" data-i18n="field.title.req">Titel *</div>
+              <div class="field-val"><input id="mf-title" data-i18n-ph="in.title.ph" placeholder="z. B. Hai beim Schnorcheln gesehen" style="max-width:none"></div></div>
+            <div class="field-row"><div class="field-key" data-i18n="field.description">Beschreibung</div>
+              <div class="field-val"><input id="mf-desc" data-i18n-ph="ph.optional" placeholder="optional" style="max-width:none"></div></div>
+            <div class="field-row"><div class="field-key" data-i18n="field.date.from">Datum von</div>
               <div class="field-val"><input id="mf-date-start" type="date"></div></div>
-            <div class="field-row"><div class="field-key">Datum bis</div>
-              <div class="field-val"><input id="mf-date-end" type="date" title="leer = wie 'von'"></div></div>
-            <div class="field-row"><div class="field-key">Präzision</div>
+            <div class="field-row"><div class="field-key" data-i18n="field.date.to">Datum bis</div>
+              <div class="field-val"><input id="mf-date-end" type="date" data-i18n-title="in.dateto.tip" title="leer = wie 'von'"></div></div>
+            <div class="field-row"><div class="field-key" data-i18n="field.precision">Präzision</div>
               <div class="field-val"><select id="mf-precision" class="mf-select">
                 <option value="day" selected>Tag (genau)</option>
-                <option value="month">Monat</option>
-                <option value="season">Jahreszeit</option>
-                <option value="year">Jahr</option>
-                <option value="decade">Jahrzehnt</option>
+                <option value="month" data-i18n="prec.month">Monat</option>
+                <option value="season" data-i18n="prec.season">Jahreszeit</option>
+                <option value="year" data-i18n="prec.year">Jahr</option>
+                <option value="decade" data-i18n="prec.decade">Jahrzehnt</option>
               </select></div></div>
-            <div class="field-row"><div class="field-key">Kategorie</div>
+            <div class="field-row"><div class="field-key" data-i18n="field.category">Kategorie</div>
               <div class="field-val"><select id="mf-category" class="mf-select">
                 <option value="event" selected>Ereignis</option>
-                <option value="trip">Reise</option>
-                <option value="sighting">Sichtung</option>
-                <option value="sport">Aktivität</option>
-                <option value="concert">Konzert</option>
-                <option value="meal">Mahlzeit</option>
-                <option value="milestone">Meilenstein (Hochzeit, Geburt, Umzug …)</option>
-                <option value="journal">Tagebuch (ein Eintrag pro Tag)</option>
+                <option value="trip" data-i18n="cat.trip">Reise</option>
+                <option value="sighting" data-i18n="cat.sighting">Sichtung</option>
+                <option value="sport" data-i18n="cat.sport">Aktivität</option>
+                <option value="concert" data-i18n="cat.concert">Konzert</option>
+                <option value="meal" data-i18n="cat.meal">Mahlzeit</option>
+                <option value="milestone" data-i18n="cat.milestone.long">Meilenstein (Hochzeit, Geburt, Umzug …)</option>
+                <option value="journal" data-i18n="cat.journal.long">Tagebuch (ein Eintrag pro Tag)</option>
               </select></div></div>
-            <div class="field-row"><div class="field-key">Ort</div>
+            <div class="field-row"><div class="field-key" data-i18n="field.location">Ort</div>
               <div class="field-val" style="display:flex; gap:8px">
-                <input id="mf-location" placeholder="z. B. Bern, Schweiz — wird automatisch geocodiert" style="max-width:none; flex:1">
-                <button class="btn small secondary" id="mf-geo-btn" title="Gerätestandort als Adresse übernehmen (überschreibbar)">📍</button>
+                <input id="mf-location" data-i18n-ph="in.loc.ph" placeholder="z. B. Bern, Schweiz — wird automatisch geocodiert" style="max-width:none; flex:1">
+                <button class="btn small secondary" id="mf-geo-btn" data-i18n-title="in.geo2.tip" title="Gerätestandort als Adresse übernehmen (überschreibbar)">📍</button>
               </div></div>
-            <div class="field-row"><div class="field-key">Objekte</div>
+            <div class="field-row"><div class="field-key" data-i18n="field.objects">Objekte</div>
               <div class="field-val">
                 <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center">
                   <select id="mf-ent-type" class="mf-select" style="width:auto">
-                    <option value="animal">🐾 Tier</option>
-                    <option value="country">🌍 Land</option>
-                    <option value="artist">🎤 Künstler</option>
-                    <option value="food">🍽️ Gericht</option>
-                    <option value="movie">🎬 Film</option>
-                    <option value="game">🎮 Spiel</option>
-                    <option value="book">📖 Buch</option>
+                    <option value="animal" data-i18n="ent.animal">🐾 Tier</option>
+                    <option value="country" data-i18n="ent.country">🌍 Land</option>
+                    <option value="artist" data-i18n="ent.artist">🎤 Künstler</option>
+                    <option value="food" data-i18n="ent.food">🍽️ Gericht</option>
+                    <option value="movie" data-i18n="ent.movie">🎬 Film</option>
+                    <option value="game" data-i18n="ent.game">🎮 Spiel</option>
+                    <option value="book" data-i18n="ent.book">📖 Buch</option>
                   </select>
-                  <input id="mf-ent-name" placeholder="Name, z. B. Hai" style="width:160px">
-                  <button class="btn small secondary" id="mf-ent-add">+ hinzufügen</button>
+                  <input id="mf-ent-name" data-i18n-ph="in.ent.ph" placeholder="Name, z. B. Hai" style="width:160px">
+                  <button class="btn small secondary" id="mf-ent-add" data-i18n="btn.add">+ hinzufügen</button>
                 </div>
                 <div id="mf-ent-list" style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px"></div>
               </div></div>
           </div>
           <div class="btn-row">
-            <button class="btn" id="mf-save">💾 Speichern</button>
-            <button class="btn ghost" id="mf-clear">Felder leeren</button>
+            <button class="btn" id="mf-save" data-i18n="btn.save">💾 Speichern</button>
+            <button class="btn ghost" id="mf-clear" data-i18n="in.clear">Felder leeren</button>
           </div>
         </div>
       </div>
@@ -971,33 +972,33 @@
         <!-- A14 — Reiter statt Scroll-Seite: „Verwaltung" (alle Nutzer) vs.
              System-Themen (nur Admin, .admin-only wird für Nutzer versteckt) -->
         <div class="comp-tabs" id="admin-tabs" style="margin-bottom:18px">
-          <div class="zoom-btn active" data-atab="moderation">📋 Moderation</div>
-          <div class="zoom-btn" data-atab="daten">📦 Meine Daten</div>
-          <div class="zoom-btn" data-atab="jobs">⏱️ Jobs</div>
-          <div class="zoom-btn admin-only" data-atab="system">⚙️ System</div>
-          <div class="zoom-btn admin-only" data-atab="nutzer">👥 Nutzer</div>
-          <div class="zoom-btn admin-only" data-atab="db">🗄️ Datenbank</div>
-          <div class="zoom-btn admin-only" data-atab="logs">📜 Logs</div>
+          <div class="zoom-btn active" data-atab="moderation" data-i18n="adm.moderation">📋 Moderation</div>
+          <div class="zoom-btn" data-atab="daten" data-i18n="adm.data">📦 Meine Daten</div>
+          <div class="zoom-btn" data-atab="jobs" data-i18n="adm.jobs">⏱️ Jobs</div>
+          <div class="zoom-btn admin-only" data-atab="system" data-i18n="adm.system">⚙️ System</div>
+          <div class="zoom-btn admin-only" data-atab="nutzer" data-i18n="adm.users">👥 Nutzer</div>
+          <div class="zoom-btn admin-only" data-atab="db" data-i18n="adm.db">🗄️ Datenbank</div>
+          <div class="zoom-btn admin-only" data-atab="logs" data-i18n="adm.logs">📜 Logs</div>
         </div>
 
         <div class="admin-tabpane admin-only" data-tabpane="system" style="display:none">
         <div class="stages">
           <div class="stage">
-            <div class="stage-num">EINGANG</div>
-            <h4>Roh-Input</h4>
-            <p>Unveränderliche Fragmente (Text, Sprache, Import). Beweisarchiv — wird nie überschrieben oder automatisch gelöscht.</p>
+            <div class="stage-num" data-i18n="layer.in">EINGANG</div>
+            <h4 data-i18n="layer.in.title">Roh-Input</h4>
+            <p data-i18n="layer.in.text">Unveränderliche Fragmente (Text, Sprache, Import). Beweisarchiv — wird nie überschrieben oder automatisch gelöscht.</p>
           </div>
           <div class="stage-arrow">→</div>
           <div class="stage">
-            <div class="stage-num">VORSCHLAG → WAHRHEIT</div>
-            <h4>Lebensdatenbank</h4>
+            <div class="stage-num" data-i18n="layer.mid">VORSCHLAG → WAHRHEIT</div>
+            <h4 data-i18n="layer.mid.title">Lebensdatenbank</h4>
             <p>KI-Vorschläge (unbestätigt, wegwerfbar) werden durch dein Bestätigen zur fixen Lebensdatenbank — inkl. Fakten wie Wetter, Fotos, Routen. Maschinen ändern Bestätigtes nie.</p>
           </div>
           <div class="stage-arrow">→</div>
           <div class="stage">
-            <div class="stage-num">ABLEITUNGEN</div>
-            <h4>Ansichten &amp; Suche</h4>
-            <p>Timeline, Karte, Statistik, Such-Embeddings. Berechnet — jederzeit gefahrlos verwerfbar und neu erzeugbar.</p>
+            <div class="stage-num" data-i18n="layer.out">ABLEITUNGEN</div>
+            <h4 data-i18n="layer.out.title">Ansichten &amp; Suche</h4>
+            <p data-i18n="layer.out.text">Timeline, Karte, Statistik, Such-Embeddings. Berechnet — jederzeit gefahrlos verwerfbar und neu erzeugbar.</p>
           </div>
         </div>
 
@@ -1011,7 +1012,7 @@
             <b>„Jobs"</b>; Fortschritt bleibt beim Stoppen erhalten, ein Neustart setzt fort.</div>
           <div class="panel" style="padding:0">
             <div class="action-row">
-              <button class="btn secondary" id="btn-recompute-2">🔄 KI-Vorschläge neu berechnen</button>
+              <button class="btn secondary" id="btn-recompute-2" data-i18n="act.recompute">🔄 KI-Vorschläge neu berechnen</button>
               <div class="action-desc"><b>KI-Extraktion wiederholen.</b><br>
                 Verwirft alle <i>unbestätigten</i> Events und erzeugt sie neu aus dem Roh-Eingang —
                 mit dem aktuellen KI-Modell und Prompt. Bestätigte Events und manuell korrigierte Felder bleiben
@@ -1019,7 +1020,7 @@
                 KI-Kontingent sauber ab (bereits Berechnetes bleibt erhalten).</div>
             </div>
             <div class="action-row">
-              <button class="btn secondary" id="btn-enrich">🌤️ Wetter ergänzen</button>
+              <button class="btn secondary" id="btn-enrich" data-i18n="act.weather">🌤️ Wetter ergänzen</button>
               <div class="action-desc"><b>Fehlendes Wetter nachtragen (Fakten-Anreicherung).</b><br>
                 Holt historisches Wetter (via Open-Meteo) für Events, die noch <i>keins</i> haben —
                 z. B. nach neuen Einträgen oder Importen. Ältere Events mit Wetter im Alt-Format
@@ -1028,14 +1029,14 @@
                 dauerhaft: Vorhandene Werte werden nie überschrieben oder neu berechnet.</div>
             </div>
             <div class="action-row">
-              <button class="btn secondary" id="btn-embed">🧠 Embeddings berechnen</button>
+              <button class="btn secondary" id="btn-embed" data-i18n="act.embed">🧠 Embeddings berechnen</button>
               <div class="action-desc"><b>Semantische Suche neu aufbauen (Ableitung).</b><br>
                 Verwirft die Vektoren aller Events und berechnet sie mit dem aktuellen Embedding-Modell neu.
                 Nötig nach jedem Modellwechsel, sonst findet die „Bedeutungs-Suche" nichts oder Falsches.
                 Bricht ohne Fortschritt ab, wenn kein Embedding-Modell konfiguriert ist.</div>
             </div>
             <div class="action-row" style="border-top:1px solid var(--danger)">
-              <button class="btn danger" id="btn-wipe">🗑️ Alle Daten löschen</button>
+              <button class="btn danger" id="btn-wipe" data-i18n="act.wipe">🗑️ Alle Daten löschen</button>
               <div class="action-desc"><b style="color:var(--danger)">Unwiderruflich!</b><br>
                 Löscht sämtliche Lebensdaten — Roh-Eingang, Ereignisse &amp; Objekte,
                 Orte, Wetter &amp; Embeddings. Nutzer-Konten bleiben bestehen. Es gibt eine doppelte
@@ -1048,7 +1049,7 @@
         <!-- A11 — Jobs: laufende und letzte Lang-Läufer, mit Sperre pro Typ -->
         <div class="admin-tabpane" data-tabpane="jobs" style="display:none">
         <div class="section-title" style="display:flex; align-items:center; gap:12px">Jobs
-          <button class="btn small secondary" id="jobs-refresh" style="margin-left:auto">↻ Aktualisieren</button>
+          <button class="btn small secondary" id="jobs-refresh" style="margin-left:auto" data-i18n="btn.refresh">↻ Aktualisieren</button>
         </div>
         <div class="hint">Lang laufende Aktionen (Wetter, Neuberechnung, Embeddings, Ortsnamen, Importe)
           sind als <b>Jobs mit Sperre</b> registriert: derselbe Typ kann nicht doppelt laufen — auch
@@ -1067,7 +1068,7 @@
         </div>
 
         <div class="admin-tabpane" data-tabpane="moderation">
-        <div class="section-title" id="mod-queue-title">Moderations-Queue</div>
+        <div class="section-title" id="mod-queue-title" data-i18n="adm.modqueue">Moderations-Queue</div>
 
         <!-- P2.5 — Bulk-Bestätigen: erst Vorschau, dann bestätigen -->
         <div class="panel" id="bulk-panel" style="margin-bottom:16px">
@@ -1075,18 +1076,18 @@
             Lebensdatenbank übernehmen: filtern → <b>Vorschau</b> prüfen → bestätigen.</div>
           <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center">
             <select id="bulk-cat" class="mf-select">
-              <option value="">Alle Kategorien</option>
-              <option value="event">Ereignis</option>
-              <option value="trip">Reise</option>
-              <option value="sighting">Sichtung</option>
-              <option value="sport">Aktivität</option>
-              <option value="concert">Konzert</option>
-              <option value="meal">Mahlzeit</option>
-              <option value="milestone">Meilenstein</option>
+              <option value="" data-i18n="opt.allcats">Alle Kategorien</option>
+              <option value="event" data-i18n="cat.event">Ereignis</option>
+              <option value="trip" data-i18n="cat.trip">Reise</option>
+              <option value="sighting" data-i18n="cat.sighting">Sichtung</option>
+              <option value="sport" data-i18n="cat.sport">Aktivität</option>
+              <option value="concert" data-i18n="cat.concert">Konzert</option>
+              <option value="meal" data-i18n="cat.meal">Mahlzeit</option>
+              <option value="milestone" data-i18n="cat.milestone">Meilenstein</option>
             </select>
             <select id="bulk-source" class="mf-select">
-              <option value="">Alle Quellen</option>
-              <option value="ai">KI-Extraktion</option>
+              <option value="" data-i18n="opt.allsources">Alle Quellen</option>
+              <option value="ai" data-i18n="opt.src.ai">KI-Extraktion</option>
               <option value="api">API</option>
             </select>
             <label class="stat-label" style="display:flex; align-items:center; gap:6px">Confidence ≥
@@ -1096,15 +1097,15 @@
               <input id="bulk-from" type="date" style="background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:5px 8px; color:var(--text)"></label>
             <label class="stat-label" style="display:flex; align-items:center; gap:6px">bis
               <input id="bulk-to" type="date" style="background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:5px 8px; color:var(--text)"></label>
-            <button class="btn small secondary" id="bulk-preview-btn">🔍 Vorschau</button>
-            <button class="btn small" id="bulk-confirm-btn" style="display:none">✓ Alle bestätigen</button>
+            <button class="btn small secondary" id="bulk-preview-btn" data-i18n="btn.preview">🔍 Vorschau</button>
+            <button class="btn small" id="bulk-confirm-btn" style="display:none" data-i18n="btn.confirmall">✓ Alle bestätigen</button>
           </div>
           <div id="bulk-result" style="margin-top:10px; max-height:320px; overflow-y:auto"></div>
         </div>
 
         <div id="mod-queue"></div>
 
-        <div class="section-title" id="fuzzy-title" style="margin-top:24px">⏳ Unscharfe Zeiten</div>
+        <div class="section-title" id="fuzzy-title" style="margin-top:24px" data-i18n="adm.fuzzy">⏳ Unscharfe Zeiten</div>
         <div class="hint">Events mit grober Zeitangabe (Monat, Jahreszeit, Jahr, Jahrzehnt oder ganz ohne Datum).
           Anklicken öffnet die Schnellbearbeitung — je konkreter die Daten, desto besser Timeline &amp; Karte.</div>
         <div id="fuzzy-list"></div>
@@ -1112,10 +1113,10 @@
 
         <div class="admin-tabpane" data-tabpane="daten" style="display:none">
         <!-- A26: klare Blöcke — Sichern, Importe, Ortsnamen, Tracking -->
-        <div class="section-title">Sichern &amp; Zurückspielen</div>
+        <div class="section-title" data-i18n="adm.backup">Sichern &amp; Zurückspielen</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
-            <button class="btn secondary" id="btn-export">📦 Daten exportieren</button>
+            <button class="btn secondary" id="btn-export" data-i18n="act.export">📦 Daten exportieren</button>
             <div class="action-desc"><b>Backup als JSON-Datei.</b><br>
               Lädt alle deine Daten (Roh-Eingang, Ereignisse, Objekte, Orte, Wetter) als eine
               JSON-Datei herunter. Embeddings sind enthalten. Regelmäßig machen — das ist dein Backup.<br>
@@ -1126,7 +1127,7 @@
           </div>
           <div class="action-row">
             <div style="flex-shrink:0; min-width:215px">
-              <button class="btn secondary" id="btn-import" style="width:100%; text-align:left">📥 Daten importieren</button>
+              <button class="btn secondary" id="btn-import" style="width:100%; text-align:left" data-i18n="act.import">📥 Daten importieren</button>
               <input type="file" id="import-file" accept=".json,application/json" style="display:none">
             </div>
             <div class="action-desc"><b>Export-Datei zurückspielen.</b><br>
@@ -1135,11 +1136,11 @@
           </div>
         </div>
 
-        <div class="section-title">Importe</div>
+        <div class="section-title" data-i18n="adm.imports">Importe</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div style="flex-shrink:0; min-width:215px">
-              <button class="btn secondary" id="btn-timeline-import" style="width:100%; text-align:left">🛰️ Google Timeline importieren</button>
+              <button class="btn secondary" id="btn-timeline-import" style="width:100%; text-align:left" data-i18n="act.tlimport">🛰️ Google Timeline importieren</button>
               <input type="file" id="timeline-file" accept=".json,application/json" style="display:none">
             </div>
             <div class="action-desc"><b>Orts-Historie &amp; Routen aus Google Maps.</b><br>
@@ -1157,16 +1158,16 @@
         </div>
 
         <!-- A25: EIN Ortsnamen-Lauf (gleicher Server-Job, Scope per Auswahl) -->
-        <div class="section-title">Ortsnamen</div>
+        <div class="section-title" data-i18n="adm.placenames">Ortsnamen</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div style="flex-shrink:0; min-width:215px; display:flex; flex-direction:column; gap:8px">
               <select id="resolve-scope" class="mf-select">
-                <option value="unnamed">Fehlende Namen auflösen</option>
-                <option value="verbose">Lange Adressen kürzen</option>
-                <option value="nonlatin">Fremdschrift übersetzen</option>
+                <option value="unnamed" data-i18n="pn.missing">Fehlende Namen auflösen</option>
+                <option value="verbose" data-i18n="pn.long">Lange Adressen kürzen</option>
+                <option value="nonlatin" data-i18n="pn.script">Fremdschrift übersetzen</option>
               </select>
-              <button class="btn secondary" id="btn-resolve-run" style="text-align:left">📍 Lauf starten</button>
+              <button class="btn secondary" id="btn-resolve-run" style="text-align:left" data-i18n="act.namerun">📍 Lauf starten</button>
             </div>
             <div class="action-desc"><b>Ein Lauf für alle Ortsnamen-Aufgaben</b> (Reverse-Geocoding
               via OpenStreetMap, gedrosselt; läuft als Hintergrund-Job in Etappen und ist jederzeit
@@ -1179,14 +1180,14 @@
               zur lateinischen Umschrift neu auf.</div>
           </div>
           <div class="action-row">
-            <div style="flex-shrink:0; min-width:215px"><b style="font-size:13px">📐 Anzeige-Format</b></div>
+            <div style="flex-shrink:0; min-width:215px"><b style="font-size:13px" data-i18n="adm.format">📐 Anzeige-Format</b></div>
             <div class="action-desc"><b>Bausteine für aufgelöste Adressen</b> — statt der langen
               Adresskette mit Verwaltungsregionen und Postleitzahl:<br>
               <span id="fmt-parts" style="display:inline-flex; gap:14px; flex-wrap:wrap; margin:8px 0">
-                <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="road" checked> Straße</label>
-                <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="suburb" checked> Ortsteil</label>
-                <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="city" checked> Stadt</label>
-                <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="country" checked> Land</label>
+                <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="road" checked> <span data-i18n="pn.street">Straße</span></label>
+                <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="suburb" checked> <span data-i18n="pn.district">Ortsteil</span></label>
+                <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="city" checked> <span data-i18n="pn.city">Stadt</span></label>
+                <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="country" checked> <span data-i18n="pn.country">Land</span></label>
               </span><br>
               Benannte Orte (Restaurant, Museum …) behalten ihren Eigennamen immer vorn. Die Auswahl
               gilt sofort für alle neuen Auflösungen; Bestandsdaten bringt der Lauf
@@ -1194,7 +1195,7 @@
           </div>
         </div>
 
-        <div class="section-title">Tracking</div>
+        <div class="section-title" data-i18n="adm.tracking">Tracking</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div style="flex-shrink:0; min-width:215px"><b style="font-size:13px">🧩 Was trackst du?</b></div>
@@ -1210,7 +1211,7 @@
         </div>
 
         <div class="admin-tabpane admin-only" data-tabpane="nutzer" style="display:none">
-          <div class="section-title">Nutzer</div>
+          <div class="section-title" data-i18n="adm.users.title">Nutzer</div>
           <div class="hint" style="margin-bottom:14px">
             👥 Konten entstehen automatisch beim ersten Login<span id="users-provider"></span>.
             Hier lassen sich Rollen ändern und Nutzer <b>mitsamt all ihren Daten</b> löschen.
@@ -1442,6 +1443,296 @@ function uiDialog(text, opts = {}) {
 const uiConfirm = (text, opts = {}) => uiDialog(text, opts);
 const uiPrompt = (text, opts = {}) => uiDialog(text, { ...opts, input: true });
 
+// ---------- F10: Zweisprachigkeit (Deutsch/Englisch) — Kern ----------
+// Bauprinzip: Die deutschen Texte bleiben im Quelltext stehen und sind die
+// Wahrheit; der Katalog I18N_EN enthält NUR Englisch. Fehlt ein Schlüssel,
+// erscheint automatisch der deutsche Text — es kann also nie ein leeres Label
+// geben, auch wenn der Katalog einmal hinterherhinkt.
+//
+// Drei Wege, je nachdem wo der Text steht:
+//   HTML-Inhalt      <h3 data-i18n="edit.title">✏️ Eintrag bearbeiten</h3>
+//   Attribute        <span data-i18n-title="…" title="…">  ·  data-i18n-ph für placeholder
+//   JavaScript       t('toast.saved', 'Gespeichert')
+//
+// KI-Prompts bleiben davon unberührt (die leben im Backend).
+// Steht bewusst VOR dem Theme-Block: applyTheme() läuft schon beim Laden und
+// übersetzt sein Knopf-Label — LANG darf dann nicht mehr in der TDZ stehen.
+// Englischer Katalog — die EINZIGE Stelle für englische UI-Texte.
+// Glossar (KONZEPT): Lebensdatenbank = life database · Vorschlagsraum =
+// proposal space · Roh-Eingang = raw inbox · Vorschläge = proposals ·
+// Ereignis = event · Ort = place · Objekt/Entity = item · Kompendium = collection.
+const I18N_EN = {
+  // --- Chrome: Navigation, Topbar, Ansichts-Titel ---
+  'nav.timeline': 'Timeline', 'nav.map': 'Map', 'nav.input': 'Capture',
+  'nav.stats': 'Statistics', 'nav.compendium': 'Collection', 'nav.world': 'World',
+  'nav.achievements': 'Achievements', 'nav.admin': 'Settings',
+  'search.placeholder': '🔍 Search: “by the sea”, “France” …',
+  'theme.tip': 'Appearance: Auto follows your system setting; clicking cycles Auto → Light → Dark (saved per device)',
+  'theme.auto': '🌓 Auto', 'theme.light': '☀️ Light', 'theme.dark': '🌙 Dark',
+  'view.timeline.title': 'Timeline', 'view.timeline.sub': 'Your life as a stream of events',
+  'view.map.title': 'Map', 'view.map.sub': 'Places you have been',
+  'view.stats.title': 'Statistics', 'view.stats.sub': 'Your life in numbers',
+  'view.compendium.title': 'Collection', 'view.compendium.sub': 'Things you have gathered in your life',
+  'view.world.title': 'World', 'view.world.sub': 'Where you have been — countries and continents',
+  'view.achievements.title': 'Achievements', 'view.achievements.sub': 'What you have collected',
+  'view.input.title': 'Capture', 'view.input.sub': 'Enter a fragment — the AI structures it',
+  'view.admin.title': 'Settings', 'view.admin.sub': 'Moderate, maintain data, jobs — system topics for admins only',
+  // --- Dialoge & Bearbeiten-Formular ---
+  'dialog.confirm.title': "Confirm",
+  'btn.cancel': "Cancel",
+  'edit.title': "✏️ Edit entry",
+  'edit.hint': "Fields you change are protected from AI recalculation. Saving confirms the entry.",
+  'field.title': "Title",
+  'field.description': "Description",
+  'field.date.from': "Date from",
+  'field.date.to': "Date to",
+  'field.precision': "Precision",
+  'field.category': "Category",
+  'field.place': "Place / address",
+  'field.items': "🏷️ Items",
+  'field.comment': "💬 Comment",
+  'field.days': "📅 Days",
+  'prec.exact': "Day + time",
+  'prec.day': "Day (exact)",
+  'prec.month': "Month",
+  'prec.season': "Season",
+  'prec.year': "Year",
+  'prec.decade': "Decade",
+  'edit.place.ph': "e.g. 5th Avenue 1, New York — will be geocoded",
+  'edit.note.ph': "personal note / journal text — Markdown allowed (**bold**, # heading, - list), never touched by the AI",
+  'edit.days.tip': "Creates a day event for every day in the span (“… — day 3”) — each with its own weather; collapsed under the main event in the timeline",
+  'btn.save': "💾 Save",
+  'edit.delete': "🗑️ Delete entry",
+  'edit.days.btn': "Create day entries",
+
+  // --- Zeitstrahl & Karte ---
+  'zoom.day': "Day",
+  'zoom.week': "Week",
+  'zoom.month': "Month",
+  'zoom.year': "Year",
+  'zoom.decade': "Decade",
+  'zoom.all': "All",
+  'tl.visits.tip': "Show imported timeline visits (Google) in the timeline — on the map they are always visible",
+  'tl.journal.tip': "Write a journal entry for a day (Markdown) — appears as a day header above that day’s events",
+  'tl.print.tip': "Pick a date range and print or save as PDF — printed light, without navigation, with every event in the range",
+  'map.view': "View",
+  'map.range': "Range",
+  'map.display': "Display",
+  'map.prev': "‹ back",
+  'map.next': "next ›",
+  'map.pickday': "Pick a day from the calendar",
+  'map.route': "🧭 Connect route",
+  'map.tracks': "🛰️ Timeline tracks",
+  'map.group.tip': "From month view up: merge repeated visits to the same place into one entry",
+  'map.fs.tip': "Map in fullscreen (Esc exits)",
+  'tl.visits': "🛰️ Visits",
+  'tl.journal': "📖 Write journal",
+  'tl.print': "🖨️ Print",
+  'map.group': "🔁 Merge places",
+  'map.fs': "⛶ Fullscreen",
+
+  // --- Statistik, Welt & Erfolge ---
+  'stat.events': "Events total",
+  'stat.countries': "Countries visited",
+  'stat.places': "Places visited",
+  'stat.animals': "Animal species seen",
+  'stat.concerts': "Concerts attended",
+  'stat.artists': "Artists seen live",
+  'stat.age': "Age",
+  'stat.milestones': "Milestones",
+  'stat.moves': "Moves",
+  'stat.meals': "Meals",
+  'stat.unconfirmed': "Unconfirmed",
+  'stat.sub.lifedb': "life database",
+  'stat.sub.collection': "collection",
+  'stat.sub.located': "events with a place",
+  'stat.sub.catconcert': "category concert",
+  'stat.sub.milestones': "wedding, birth, moving …",
+  'stat.sub.frommilestones': "from milestones",
+  'stat.sub.catmeal': "category meal",
+  'stat.sub.tomoderate': "to moderate",
+  'stat.sub.age': "add your birth as a milestone",
+  'stat.hot': "🔥 Hottest day",
+  'stat.cold': "❄️ Coldest day",
+  'stat.sun': "☀️ Sunniest day",
+  'stat.rain': "🌧️ Wettest day",
+  'stat.wind': "💨 Windiest day",
+  'stat.snow': "❄️ Snowiest day",
+  'stat.sub.weather': "run weather enrichment",
+  'chart.peryear': "Events per year",
+  'chart.categories': "Category distribution",
+  'chart.topplaces': "Top places",
+  'chart.topanimals': "Most-seen animals",
+  'world.continents': "Continents",
+  'world.share': "World explored",
+  'world.newest': "Newest",
+  'world.share.sub': "share of all countries",
+  'world.newest.sub': "first visited",
+  'world.map': "Your world map",
+  'world.checklist': "Checklist",
+  'world.map.hint': "Countries that appear in your life database are shaded — the stronger the shade, the more events. Click a country for details.",
+  'ach.earned': "Achievements earned",
+  'ach.points': "Points",
+  'ach.platinum': "Platinum",
+  'ach.close': "Almost there",
+  'ach.points.sub': "Bronze 1 · Silver 2 · Gold 3 · Platinum 4",
+  'ach.platinum.sub': "maxed out",
+  'ach.close.sub': "over 75 % toward the next tier",
+  'world.of7': "of 7",
+
+  // --- Eingabe & Verwaltung ---
+  'in.mode.ai': "🤖 AI analysis",
+  'in.mode.manual': "📝 Manual",
+  'in.ai.hint': "✍️ Just write freely. The AI recognises date, place, category and items. Your raw text is stored <b>unchanged in the raw inbox</b>.",
+  'in.ai.ph': "e.g. “12/07/2026 was in Detmold and saw an eagle”",
+  'in.ex1': "12/07/2026 was in Detmold and saw an eagle",
+  'in.ex2': "Summer 2002 holiday in France",
+  'in.ex3': "Ran 8 km yesterday in the sunshine",
+  'in.analyze': "🤖 Analyse with AI",
+  'in.voice': "🎙️ Voice input",
+  'in.geo.tip': "Attach your device location as a place suggestion — only on request, never automatically. If the text names a place itself, the text wins.",
+  'in.preview': "AI preview (proposal)",
+  'in.unconfirmed': "unconfirmed — please review",
+  'in.confirm': "✓ Confirm &amp; save",
+  'btn.edit': "✏️ Edit",
+  'btn.discard': "Discard",
+  'in.manual.hint': "📝 Enter everything yourself — no AI. The entry is saved as <b>confirmed</b> right away and is protected from AI recalculation.",
+  'field.title.req': "Title *",
+  'in.title.ph': "e.g. saw a shark while snorkelling",
+  'ph.optional': "optional",
+  'in.dateto.tip': "empty = same as “from”",
+  'cat.milestone.long': "Milestone (wedding, birth, moving …)",
+  'cat.journal.long': "Journal (one entry per day)",
+  'field.location': "Place",
+  'in.loc.ph': "e.g. Bern, Switzerland — geocoded automatically",
+  'in.geo2.tip': "Use your device location as the address (you can overwrite it)",
+  'field.objects': "Items",
+  'in.ent.ph': "name, e.g. shark",
+  'btn.add': "+ add",
+  'ent.animal': "🐾 Animal",
+  'ent.country': "🌍 Country",
+  'ent.artist': "🎤 Artist",
+  'ent.food': "🍽️ Dish",
+  'ent.movie': "🎬 Movie",
+  'ent.game': "🎮 Game",
+  'ent.book': "📖 Book",
+  'adm.moderation': "📋 Moderation",
+  'adm.data': "📦 My data",
+  'adm.jobs': "⏱️ Jobs",
+  'adm.system': "⚙️ System",
+  'adm.users': "👥 Users",
+  'adm.db': "🗄️ Database",
+  'adm.logs': "📜 Logs",
+  'layer.in': "INBOX",
+  'layer.in.title': "Raw input",
+  'layer.mid': "PROPOSAL → TRUTH",
+  'layer.mid.title': "Life database",
+  'layer.out': "DERIVED",
+  'layer.out.title': "Views &amp; search",
+  'in.geo': "📍 Use my location",
+
+  // --- Verwaltung ---
+  'adm.backup': "Backup &amp; restore",
+  'adm.imports': "Imports",
+  'adm.placenames': "Place names",
+  'adm.tracking': "Tracking",
+  'adm.users.title': "Users",
+  'adm.modqueue': "Moderation queue",
+  'act.recompute': "🔄 Recompute AI proposals",
+  'act.export': "📦 Export data",
+  'act.wipe': "🗑️ Delete all data",
+  'adm.fuzzy': "⏳ Vague dates",
+  'btn.preview': "🔍 Preview",
+  'btn.confirmall': "✓ Confirm all",
+  'act.namerun': "📍 Start run",
+  'adm.format': "📐 Display format",
+  'opt.allcats': "All categories",
+  'opt.allsources': "All sources",
+  'opt.src.ai': "AI extraction",
+  'pn.missing': "Resolve missing names",
+  'pn.long': "Shorten long addresses",
+  'pn.script': "Transliterate foreign scripts",
+  'pn.street': "Street",
+  'pn.district': "District",
+  'pn.city': "City",
+  'pn.country': "Country",
+
+  // --- JavaScript: Meldungen & dynamische Labels ---
+  'job.recompute': "🔄 Recompute AI proposals",
+  'job.weather': "🌤️ Add weather",
+  'job.embeddings': "🧠 Embeddings",
+  'job.resolve_names': "📍 Resolve/format place names",
+  'job.timeline_import': "🛰️ Timeline import",
+  'job.data_import': "📥 Data import",
+  'nodate': "no date",
+  'track.walk': "🚶 Walking",
+  'track.run': "🏃 Running",
+  'track.cycle': "🚴 Cycling",
+  'track.drive': "🚗 Driving",
+  'track.transit': "🚆 Transit",
+  'track.unknown': "🛰️ Track",
+  'cat.trip': "Trip",
+  'cat.sighting': "Sighting",
+  'cat.sport': "Activity",
+  'cat.concert': "Concert",
+  'cat.meal': "Meal",
+  'cat.milestone': "Milestone",
+  'cat.journal': "Journal",
+  'cat.event': "Event",
+  'cat.home': "Home",
+  'cat.media': "Media",
+  'cat.country': "Country",
+  'jobstatus.running': "⏳ running",
+  'jobstatus.done': "✅ done",
+  'jobstatus.stopped': "⏹ stopped",
+  'jobstatus.error': "⚠️ error",
+
+  // --- JavaScript: Toast-Meldungen ---
+  'toast.pickday': "Please pick a day.",
+  'toast.writefirst': "Please write something first.",
+  'toast.journalsaved': "✓ Journal entry saved.",
+  'toast.needtitle': "Please enter at least a title.",
+  'toast.rowdeleted': "✓ Row deleted.",
+  'toast.saved': "✓ Saved.",
+  'toast.schedsaved': "✓ Nightly schedule saved.",
+  'toast.tracksaved': "✓ Tracking choice saved.",
+  'toast.nofullscreen': "This browser does not support fullscreen.",
+  'toast.badexport': "Not a Life-Dash export (format field missing or wrong).",
+  'toast.stopreq': "Stop requested — the run ends after the current batch.",
+  'toast.savefail': "Saving failed: ",
+  'toast.savefail2': "Error while saving: ",
+  'toast.error': "Error: ",
+  'toast.rolefail': "Changing the role failed: ",
+  'toast.delfail': "Deleting failed: ",
+  'toast.exportfail': "Export failed: ",
+  'toast.importfail': "Import failed: ",
+  'toast.tlimportfail': "Timeline import failed: ",
+
+  // --- Login, Formular-Optionen & Schichten-Text ---
+  'login.claim': "Your searchable life database.<br>Please sign in",
+  'login.btn': "🔐 Sign in (SSO)",
+  'loading.ai': "🤖 AI is analysing…",
+  'logout': "Sign out",
+  'field.time.tip': "Time (optional)",
+  'btn.addobj': "+ Item",
+  'layer.in.text': "Immutable fragments (text, voice, import). An evidence archive — never overwritten, never deleted automatically.",
+  'layer.out.text': "Timeline, map, statistics, search embeddings. Computed — safe to discard and rebuild at any time.",
+
+};
+
+function langSetting() {
+  const stored = localStorage.getItem('lifedash_lang');
+  if (stored === 'de' || stored === 'en') return stored;
+  return (navigator.language || 'de').toLowerCase().startsWith('de') ? 'de' : 'en';   // Erstbesuch
+}
+let LANG = langSetting();
+
+/** Übersetzt einen Text. `de` ist der deutsche Originaltext und zugleich der
+ *  Rückfallwert, falls der Katalog den Schlüssel (noch) nicht kennt. */
+function t(key, de) {
+  return LANG === 'en' && I18N_EN[key] !== undefined ? I18N_EN[key] : de;
+}
+
 // ---------- F9: Heller Modus ----------
 // Einstellung pro Gerät (localStorage): 'auto' folgt der Systemeinstellung,
 // 'light'/'dark' übersteuern manuell. Ein früher Head-Script setzt data-theme
@@ -1465,7 +1756,9 @@ function applyTheme() {
   document.documentElement.dataset.theme = eff;
   document.querySelector('meta[name="theme-color"]')
     .setAttribute('content', eff === 'light' ? '#eef1f6' : '#0f1420');
-  document.getElementById('theme-btn').textContent = THEME_LABELS[themeSetting()];
+  const mode = themeSetting();
+  document.getElementById('theme-btn').textContent =
+    t(`theme.${mode}`, THEME_LABELS[mode]);
   if (mainTiles) mainTiles.setUrl(tileUrl());
   if (compTiles) compTiles.setUrl(tileUrl());
   if (worldTiles) worldTiles.setUrl(tileUrl());
@@ -1482,12 +1775,101 @@ matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
 });
 applyTheme();
 
+// ---------- F10: Zweisprachigkeit — Anwenden & Umschalter ----------
+/** Setzt die Sprache auf alle statischen Texte an und zeichnet die dynamisch
+ *  gerenderten Ansichten neu.
+ *  `initial` = Aufruf beim Laden: dann NUR die statischen Texte anfassen. Das
+ *  Neuzeichnen greift auf später deklarierte Bindungen (`titles`, `tl`) zu und
+ *  liefe sonst in deren temporale Todeszone. */
+function applyLang(initial = false) {
+  document.documentElement.lang = LANG;
+  const swap = (attr, apply) => {
+    document.querySelectorAll(`[${attr}]`).forEach(el => {
+      const key = el.getAttribute(attr);
+      // Das deutsche Original einmalig sichern, bevor es überschrieben wird
+      if (el.dataset.i18nDe === undefined) el.dataset.i18nDe = apply.read(el);
+      apply.write(el, LANG === 'en' && I18N_EN[key] !== undefined
+        ? I18N_EN[key] : el.dataset.i18nDe);
+    });
+  };
+  swap('data-i18n', {
+    read: el => el.innerHTML,
+    // Der Katalog ist statischer, selbst geschriebener Text — keine Nutzerdaten
+    write: (el, v) => { el.innerHTML = v; },
+  });
+  swap('data-i18n-title', {
+    read: el => el.getAttribute('title') || '',
+    write: (el, v) => el.setAttribute('title', v),
+  });
+  swap('data-i18n-ph', {
+    read: el => el.getAttribute('placeholder') || '',
+    write: (el, v) => el.setAttribute('placeholder', v),
+  });
+
+  document.getElementById('lang-btn').textContent = LANG === 'de' ? '🇬🇧 EN' : '🇩🇪 DE';
+  document.getElementById('lang-btn').title = LANG === 'de'
+    ? 'Switch to English' : 'Auf Deutsch umschalten';
+  applyTheme();          // Knopf-Beschriftung des Themes hängt an der Sprache
+  if (!initial) redrawForLang();
+}
+
+/** Nach dem Sprachwechsel: alles neu zeichnen, was im JS zusammengebaut wird.
+ *  Jeder Schritt läuft gekapselt: Scheitert einer (z. B. weil das Backend
+ *  gerade nicht erreichbar ist), sollen die übrigen trotzdem umschalten —
+ *  sonst bliebe nach einem Fehler die halbe Oberfläche in der alten Sprache. */
+function redrawForLang() {
+  const step = fn => { try { fn(); } catch (err) { console.warn('Sprachwechsel:', err); } };
+  const active = document.querySelector('.view.active');
+  const view = active ? active.id.replace('view-', '') : null;
+
+  // Zuerst die Kopfzeile — sie ist immer sichtbar und hängt an nichts anderem
+  step(() => {
+    if (view && titles[view]) {
+      document.getElementById('view-title').textContent =
+        t(`view.${view}.title`, titles[view][0]);
+      document.getElementById('view-sub').textContent =
+        t(`view.${view}.sub`, titles[view][1]);
+    }
+  });
+  // Kategorie-Chips, Kompendium-Reiter und Selects tragen übersetzte Namen
+  step(applyModules);
+  step(() => { if (tl.events.length) renderTimeline(); });
+  step(() => {
+    if (view === 'stats') loadStats();
+    else if (view === 'world') loadWorld();
+    else if (view === 'achievements') loadAchievements();
+    else if (view === 'admin') loadAdminTab(adminTab);
+    else if (view === 'compendium') {
+      const tab = document.querySelector('#comp-tabs .zoom-btn.active');
+      if (tab) loadCompendium(tab.dataset.type);
+    }
+  });
+}
+
+document.getElementById('lang-btn').addEventListener('click', () => {
+  LANG = LANG === 'de' ? 'en' : 'de';
+  localStorage.setItem('lifedash_lang', LANG);
+  applyLang();
+  // A25/F10: Die Sprache wandert auch ins Konto — der Ortsnamen-Lauf läuft
+  // serverseitig und fragt Nominatim damit in der richtigen Sprache
+  // (Accept-Language). Scheitert das, bleibt die UI trotzdem umgeschaltet.
+  api('/api/auth/me/settings', {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lang: LANG }),
+  }).catch(() => {});
+});
+applyLang(true);   // Erstlauf: statische Texte in der gewählten Sprache
+
 // ---------- Kategorien ----------
 // Basis-Werte für Kategorien OHNE Modul (event, sport, home, media) — alles
 // Modulare (A7) kommt zur Laufzeit aus /api/modules und überlagert diese Maps.
 const catLabels = { trip:"Reise", sighting:"Sichtung", sport:"Aktivität", concert:"Konzert", meal:"Mahlzeit", milestone:"Meilenstein", journal:"Tagebuch", event:"Ereignis", home:"Wohnort", media:"Medien", country:"Land" };
 const catColors = { trip:'#5b8cff', sighting:'#35c4a7', sport:'#ff8f5c', concert:'#ff5c9e', meal:'#ffd166', milestone:'#e85dff', journal:'#d9a441', media:'#f5a623', home:'#b07bff', event:'#f5a623' };
 const KNOWN_CATS = ['trip','sighting','sport','concert','meal','milestone','journal','home','media'];
+// F10: Kategorie-Name in der aktiven Sprache. Die deutschen Namen kommen aus
+// der Map oben bzw. aus dem Modul-YAML — Englisch aus dem Katalog (cat.*).
+// Ein unbekannter Modul-Key fällt auf den vom Backend gelieferten Namen zurück.
+function catLabel(c) { return t('cat.' + c, catLabels[c] || c); }
 // Kategorien für Filter-Chips (Timeline + Karte); wird nach dem Modul-Load
 // neu berechnet (A15: nur getrackte Module)
 const FILTER_CATS_BASE = ['trip','sighting','sport','concert','meal','milestone','journal','event'];
@@ -1547,12 +1929,12 @@ function rebuildCompTabs() {
   }));
 }
 function rebuildCategorySelects() {
-  const opt = c => `<option value="${c}">${esc(catLabels[c] || c)}</option>`;
+  const opt = c => `<option value="${c}">${esc(catLabel(c))}</option>`;
   const cats = ['event', ...FILTER_CATS.filter(c => c !== 'event')];
   const mf = document.getElementById('mf-category');
   if (mf) { const v = mf.value; mf.innerHTML = cats.map(opt).join(''); mf.value = cats.includes(v) ? v : 'event'; }
   const bulk = document.getElementById('bulk-cat');
-  if (bulk) bulk.innerHTML = '<option value="">Alle Kategorien</option>' + cats.map(opt).join('');
+  if (bulk) bulk.innerHTML = '<option value="" data-i18n="opt.allcats">Alle Kategorien</option>' + cats.map(opt).join('');
   // Bearbeiten-Dialog: ALLE bekannten Kategorien (Bestandsdaten bleiben wählbar)
   const ed = document.getElementById('ed-category');
   if (ed) ed.innerHTML = ['event', ...KNOWN_CATS.filter(c => c !== 'event')].map(opt).join('');
@@ -1580,7 +1962,7 @@ function buildCatFilter(containerId, activeSet, onChange) {
   const el = document.getElementById(containerId);
   el.innerHTML = FILTER_CATS.map(c => `
     <span class="filter-chip ${activeSet.has(c) ? 'active' : 'off'}" data-cat="${c}">
-      <span class="fdot" style="background:${catColor(c)}"></span>${catLabels[c]}
+      <span class="fdot" style="background:${catColor(c)}"></span>${catLabel(c)}
     </span>`).join('');
   el.querySelectorAll('.filter-chip').forEach(chip => chip.addEventListener('click', () => {
     const c = chip.dataset.cat;
@@ -1853,7 +2235,7 @@ function eventCard(e) {
       <div class="ev-desc">${esc(e.description || '')}</div>
       ${e.note ? `<div class="ev-note md">${mdRender(e.note)}</div>` : ''}
       <div class="ev-meta">
-        <span class="chip">${catLabels[e.category] || e.category}</span>
+        <span class="chip">${catLabel(e.category)}</span>
         ${e.parent_event_id ? '<span class="chip">📅 Tages-Eintrag</span>' : ''}
         ${kids && kids.length ? `<span class="chip" data-expand-children="${esc(e.id)}" title="Tages-Einträge ein-/ausklappen">📅 ${kids.length} Tages-Einträge ▾</span>` : ''}
         ${eventChips(e).map(t => `<span class="chip">${esc(t)}</span>`).join('')}
@@ -2008,7 +2390,7 @@ function prBuildPage(events) {
     }
 
     rest.forEach(e => {
-      const meta = [catLabels[e.category] || e.category];
+      const meta = [catLabel(e.category)];
       if (e.location && e.location.name) meta.push('📍 ' + e.location.name);
       eventChips(e).forEach(c => meta.push(c));
       if (e.confirmed !== 'confirmed') meta.push('unbestätigter Vorschlag');
@@ -2082,8 +2464,8 @@ document.getElementById('journal-modal').addEventListener('click', ev => {
 document.getElementById('jr-save').addEventListener('click', async ev => {
   const date = document.getElementById('jr-date').value;
   const text = document.getElementById('jr-text').value.trim();
-  if (!date) { toast('Bitte einen Tag wählen.', 'warn'); return; }
-  if (!text) { toast('Bitte erst etwas schreiben.', 'warn'); return; }
+  if (!date) { toast(t('toast.pickday', 'Bitte einen Tag wählen.'), 'warn'); return; }
+  if (!text) { toast(t('toast.writefirst', 'Bitte erst etwas schreiben.'), 'warn'); return; }
   const btn = ev.target;
   btn.disabled = true; btn.textContent = '… speichere';
   try {
@@ -2107,10 +2489,10 @@ document.getElementById('jr-save').addEventListener('click', async ev => {
       });
     }
     closeJournal();
-    toast('✓ Tagebuch gespeichert.');
+    toast(t('toast.journalsaved', '✓ Tagebuch gespeichert.'));
     await refreshAll();
   } catch (err) {
-    toast('Speichern fehlgeschlagen: ' + err.message, 'error');
+    toast(t('toast.savefail', 'Speichern fehlgeschlagen: ') + err.message, 'error');
   } finally {
     btn.disabled = false; btn.textContent = '💾 Speichern';
   }
@@ -2350,7 +2732,7 @@ async function loadStats() {
   const perCat = {};
   events.forEach(e => { perCat[e.category] = (perCat[e.category]||0) + 1; });
   const catData = Object.entries(perCat).sort((a,b) => b[1]-a[1])
-    .map(([c,v]) => [catLabels[c] || c, v, FILTER_CATS.includes(c) ? c : 'event']);
+    .map(([c,v]) => [catLabel(c), v, FILTER_CATS.includes(c) ? c : 'event']);
   renderBars('chart-cats', catData.length ? catData : [["—",0]], cat => tlFilterOnly(cat));
 
   // Top-Orte (max. 8)
@@ -2404,7 +2786,7 @@ async function loadFuzzyDates() {
   }
   el.innerHTML = fuzzy.map(e => {
     EVENT_CACHE[e.id] = e;
-    const prec = e.date_start ? (PRECISION_LABELS[e.date_precision] || e.date_precision) : 'ohne Datum';
+    const prec = e.date_start ? t('prec.' + e.date_precision, PRECISION_LABELS[e.date_precision] || e.date_precision) : t('nodate', 'ohne Datum');
     return `<div class="mod-item" data-fuzzy-id="${esc(e.id)}" style="cursor:pointer">
       <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
         <span class="chip badge-unconfirmed">⏳ ${esc(prec)}</span>
@@ -2433,10 +2815,10 @@ async function loadModQueue() {
       <div class="stage-num">STUFE 1 · Roh-Input</div>
       <div class="mod-raw">„${esc(e.description || e.title)}"</div>
       <div class="arrow">↓ KI-Interpretation ↓</div>
-      <div class="field-row"><div class="field-key">Titel</div><div class="field-val">${esc(e.title)}</div></div>
+      <div class="field-row"><div class="field-key" data-i18n="field.title">Titel</div><div class="field-val">${esc(e.title)}</div></div>
       <div class="field-row"><div class="field-key">Zeit</div><div class="field-val">${fmtDate(e)} (${e.date_precision})</div></div>
-      <div class="field-row"><div class="field-key">Ort</div><div class="field-val">${e.location ? esc(e.location.name) : '–'}</div></div>
-      <div class="field-row"><div class="field-key">Kategorie</div><div class="field-val">${catLabels[e.category] || e.category}</div></div>
+      <div class="field-row"><div class="field-key" data-i18n="field.location">Ort</div><div class="field-val">${e.location ? esc(e.location.name) : '–'}</div></div>
+      <div class="field-row"><div class="field-key" data-i18n="field.category">Kategorie</div><div class="field-val">${catLabel(e.category)}</div></div>
       <div class="field-row"><div class="field-key">Confidence</div><div class="field-val">${Math.round(e.confidence*100)}%</div></div>
       <div class="btn-row">
         <button class="btn small" data-act="confirm">✓ Bestätigen</button>
@@ -2517,7 +2899,7 @@ async function bulkConfirmRun() {
     toast(`✓ ${r.confirmed} Event(s) bestätigt.`);
     await refreshAll();
   } catch (err) {
-    toast('Fehler: ' + err.message, 'error');
+    toast(t('toast.error', 'Fehler: ') + err.message, 'error');
   } finally {
     btn.disabled = false;
   }
@@ -2614,7 +2996,7 @@ function renderPreview(events) {
     ["Beschreibung", "description", e.description || ''],
     ["Zeitpunkt", null, `${fmtDate(e)} (${e.date_precision})`],
     ["Ort", null, e.location ? e.location.name : '–'],
-    ["Kategorie", null, catLabels[e.category] || e.category],
+    [t('field.category', 'Kategorie'), null, catLabel(e.category)],
     ["Erkannte Objekte", null, (e.entities || []).map(x => x.name).join(', ') || '–'],
   ];
   const cls = c >= 80 ? 'badge-confirmed' : 'badge-unconfirmed';
@@ -2813,7 +3195,7 @@ document.getElementById('ed-save').addEventListener('click', async () => {
     closeEventEdit();
     await refreshAll();
   } catch (err) {
-    toast('Fehler beim Speichern: ' + err.message, 'error');
+    toast(t('toast.savefail2', 'Fehler beim Speichern: ') + err.message, 'error');
   } finally {
     btn.disabled = false; btn.textContent = '💾 Speichern';
   }
@@ -2876,7 +3258,7 @@ function clearManualForm() {
 document.getElementById('mf-clear').addEventListener('click', clearManualForm);
 document.getElementById('mf-save').addEventListener('click', async () => {
   const title = document.getElementById('mf-title').value.trim();
-  if (!title) { toast('Bitte mindestens einen Titel eintragen.', 'warn'); return; }
+  if (!title) { toast(t('toast.needtitle', 'Bitte mindestens einen Titel eintragen.'), 'warn'); return; }
   const ds = document.getElementById('mf-date-start').value;
   const de = document.getElementById('mf-date-end').value || ds;
   const btn = document.getElementById('mf-save');
@@ -2900,7 +3282,7 @@ document.getElementById('mf-save').addEventListener('click', async () => {
     await refreshAll();
     gotoView('timeline');
   } catch (err) {
-    if (!String(err.message).startsWith('401')) toast('Fehler beim Speichern: ' + err.message, 'error');
+    if (!String(err.message).startsWith('401')) toast(t('toast.savefail2', 'Fehler beim Speichern: ') + err.message, 'error');
   } finally {
     btn.disabled = false; btn.textContent = '💾 Speichern';
   }
@@ -3021,6 +3403,10 @@ async function openMapView() {
 const trackCache = new Map();
 const TRACK_COLORS = { walk:'#34d399', run:'#f87171', cycle:'#fbbf24', drive:'#60a5fa', transit:'#a78bfa', unknown:'#9ca3af' };
 const TRACK_LABELS = { walk:'🚶 Zu Fuß', run:'🏃 Laufen', cycle:'🚴 Fahrrad', drive:'🚗 Auto', transit:'🚆 Transit', unknown:'🛰️ Route' };
+// F10: Bewegungsart in der aktiven Sprache (unbekannte Art -> „Route")
+function trackLabel(kind) {
+  return t('track.' + (kind || 'unknown'), TRACK_LABELS[kind] || TRACK_LABELS.unknown);
+}
 // Perioden-Key -> [start, ende) als lokale ISO-Strings (Server filtert auf Überlappung)
 function keyRange(key) {
   const pad = n => String(n).padStart(2, '0');
@@ -3062,7 +3448,7 @@ async function drawTracks(key) {
     const km = t.distance_m ? `${(t.distance_m/1000).toFixed(1)} km · ` : '';
     L.polyline(t.points, { color: TRACK_COLORS[t.activity_type] || TRACK_COLORS.unknown, weight: 3, opacity: .75 })
       .addTo(mapTracks)
-      .bindPopup(`<b>${TRACK_LABELS[t.activity_type] || TRACK_LABELS.unknown}</b><br>`
+      .bindPopup(`<b>${trackLabel(t.activity_type)}</b><br>`
         + `${km}${t.date_start.slice(0,10)} ${t.date_start.slice(11,16)}–${t.date_end.slice(11,16)}`);
   });
 }
@@ -3223,7 +3609,7 @@ document.getElementById('mp-fullscreen').addEventListener('click', () => {
   const el = document.getElementById('map');
   if (document.fullscreenElement) document.exitFullscreen();
   else if (el.requestFullscreen) el.requestFullscreen();
-  else toast('Vollbild wird von diesem Browser nicht unterstützt.', 'warn');
+  else toast(t('toast.nofullscreen', 'Vollbild wird von diesem Browser nicht unterstützt.'), 'warn');
 });
 document.addEventListener('fullscreenchange', () => {
   if (mapObj) setTimeout(() => mapObj.invalidateSize(), 80);
@@ -3240,7 +3626,7 @@ document.getElementById('mp-cluster-min').addEventListener('change', async ev =>
       body: JSON.stringify({ map_cluster_min: v }),
     });
   } catch (err) {
-    toast('Speichern fehlgeschlagen: ' + err.message, 'error');
+    toast(t('toast.savefail', 'Speichern fehlgeschlagen: ') + err.message, 'error');
   }
 });
 document.querySelectorAll('[data-mode]').forEach(chip => {
@@ -3451,8 +3837,8 @@ function gotoView(v) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === v));
   document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
   document.getElementById('view-'+v).classList.add('active');
-  document.getElementById('view-title').textContent = titles[v][0];
-  document.getElementById('view-sub').textContent = titles[v][1];
+  document.getElementById('view-title').textContent = t(`view.${v}.title`, titles[v][0]);
+  document.getElementById('view-sub').textContent = t(`view.${v}.sub`, titles[v][1]);
   if (v === 'map') setTimeout(openMapView, 40);
   if (v === 'stats') loadStats();
   if (v === 'compendium') { const t = document.querySelector('#comp-tabs .zoom-btn.active'); if (t) loadCompendium(t.dataset.type); }
@@ -3532,7 +3918,7 @@ async function loadUsers() {
         });
         toast(`✓ Rolle geändert: ${r.role === 'admin' ? 'Admin' : 'Nutzer'}.`);
       } catch (err) {
-        toast('Rolle ändern fehlgeschlagen: ' + err.message, 'error');
+        toast(t('toast.rolefail', 'Rolle ändern fehlgeschlagen: ') + err.message, 'error');
         loadUsers(); // Anzeige zurücksetzen
       }
     }));
@@ -3550,7 +3936,7 @@ async function loadUsers() {
         toast(`✓ Nutzer „${who}" gelöscht (${r.total} Datenzeilen).`);
         loadUsers();
       } catch (err) {
-        toast('Löschen fehlgeschlagen: ' + err.message, 'error');
+        toast(t('toast.delfail', 'Löschen fehlgeschlagen: ') + err.message, 'error');
       }
     }));
 }
@@ -3613,7 +3999,7 @@ function renderDbTable() {
       const r = await api(`/api/admin/tables/${data.table}/${encodeURIComponent(id)}`, { method: 'DELETE' });
       // A4: Aufräum-Folgen anzeigen (mitgelöschte Verknüpfungen etc.)
       const fx = (r && r.side_effects && r.side_effects.length) ? '\n' + r.side_effects.join('\n') : '';
-      toast('✓ Zeile gelöscht.' + fx, 'ok', fx ? 8000 : 5000);
+      toast(t('toast.rowdeleted', '✓ Zeile gelöscht.') + fx, 'ok', fx ? 8000 : 5000);
     } catch (err) {
       toast(err.message, 'error', 9000);  // z. B. Leitplanke: Fragmente/Nutzer gesperrt
       return;
@@ -3647,7 +4033,7 @@ function startDbEdit(tr) {
       });
       // A4: Folge-Neuberechnungen anzeigen (Embedding zurückgesetzt, Wetter neu …)
       const fx = (r.side_effects && r.side_effects.length) ? '\n' + r.side_effects.join('\n') : '';
-      toast('✓ Gespeichert.' + fx, 'ok', fx ? 8000 : 5000);
+      toast(t('toast.saved', '✓ Gespeichert.') + fx, 'ok', fx ? 8000 : 5000);
     } catch (err) {
       toast(err.message, 'error', 9000);  // z. B. Enum-/JSON-/Zeit-Validierung
       return;
@@ -3723,7 +4109,11 @@ document.querySelectorAll('.example-chip').forEach(c =>
 const JOB_LABELS = { recompute: '🔄 KI-Vorschläge neu berechnen', weather: '🌤️ Wetter ergänzen',
                      embeddings: '🧠 Embeddings', resolve_names: '📍 Ortsnamen auflösen/formatieren',
                      timeline_import: '🛰️ Timeline-Import', data_import: '📥 Daten-Import' };
-const JOB_STATUS = { running: '⏳ läuft', done: '✅ fertig', stopped: '⏹ gestoppt', error: '⚠️ Fehler' };
+const JOB_STATUS_DE = { running: '⏳ läuft', done: '✅ fertig', stopped: '⏹ gestoppt', error: '⚠️ Fehler' };
+// F10: Status in der aktiven Sprache
+const JOB_STATUS = new Proxy(JOB_STATUS_DE, {
+  get: (o, k) => typeof k === 'string' && o[k] ? t('jobstatus.' + k, o[k]) : o[k],
+});
 let jobsTimer = null;
 async function loadJobs() {
   const t = document.getElementById('jobs-table');
@@ -3737,7 +4127,7 @@ async function loadJobs() {
     ? '<tbody><tr><td class="stat-label" style="padding:10px">Noch keine Jobs gelaufen.</td></tr></tbody>'
     : '<thead><tr><th>Job</th><th>Status</th><th>Fortschritt</th><th>Gestartet</th><th>Ergebnis</th><th></th></tr></thead><tbody>'
     + jobs.map(j => `<tr>
-        <td><b>${JOB_LABELS[j.type] || esc(j.type)}</b></td>
+        <td><b>${t('job.' + j.type, JOB_LABELS[j.type] || esc(j.type))}</b></td>
         <td style="white-space:nowrap">${JOB_STATUS[j.status] || esc(j.status)}</td>
         <td class="stat-label">${j.done}${j.unit ? ' ' + esc(j.unit) : ''}${j.status === 'running' && j.remaining != null ? ` · noch ~${j.remaining}` : ''}</td>
         <td class="stat-label" style="white-space:nowrap">${fmt(j.started_at)}${j.started_by ? `<br>von ${esc(j.started_by)}` : ''}</td>
@@ -3746,7 +4136,7 @@ async function loadJobs() {
       </tr>`).join('') + '</tbody>';
   t.querySelectorAll('[data-job-stop]').forEach(btn => btn.addEventListener('click', async () => {
     btn.disabled = true;
-    try { await api(`/api/jobs/${btn.dataset.jobStop}/stop`, { method: 'POST' }); toast('Stopp angefordert — der Lauf endet nach dem aktuellen Batch.', 'warn'); }
+    try { await api(`/api/jobs/${btn.dataset.jobStop}/stop`, { method: 'POST' }); toast(t('toast.stopreq', 'Stopp angefordert — der Lauf endet nach dem aktuellen Batch.'), 'warn'); }
     catch (err) { toast(err.message, 'error'); }
     loadJobs();
   }));
@@ -3768,7 +4158,7 @@ function renderSchedule() {
     const cfg = sched[tp] || {};
     return `<label class="stat-label" style="display:flex; align-items:center; gap:10px">
       <input type="checkbox" data-sched="${tp}" ${cfg.enabled ? 'checked' : ''}>
-      <span style="min-width:230px">${JOB_LABELS[tp] || tp}</span>
+      <span style="min-width:230px">${t('job.' + tp, JOB_LABELS[tp] || tp)}</span>
       um <input type="number" min="0" max="23" value="${cfg.hour ?? 3}" data-sched-hour="${tp}"
         style="width:56px; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:4px 6px; color:var(--text)"> Uhr
     </label>`;
@@ -3787,8 +4177,8 @@ function renderSchedule() {
         body: JSON.stringify({ job_schedule: out }),
       });
       SETTINGS.job_schedule = s.job_schedule;
-      toast('✓ Nachtplan gespeichert.');
-    } catch (err) { toast('Speichern fehlgeschlagen: ' + err.message, 'error'); }
+      toast(t('toast.schedsaved', '✓ Nachtplan gespeichert.'));
+    } catch (err) { toast(t('toast.savefail', 'Speichern fehlgeschlagen: ') + err.message, 'error'); }
   }));
 }
 // Helfer für Nicht-Batch-Läufe (Importe): Job starten/abschließen
@@ -3822,7 +4212,7 @@ async function runAdmin(btn, fn, doneMsg) {
     toast(doneMsg(res));
     await Promise.all([loadTimeline(), loadModQueue(), loadDbTables()]);
   } catch (err) {
-    toast('Fehler: ' + err.message, 'error');
+    toast(t('toast.error', 'Fehler: ') + err.message, 'error');
   } finally {
     btn.disabled = false; btn.textContent = label;
   }
@@ -3875,7 +4265,7 @@ async function runBatchedAdmin(btn, { reset, step, unit, doneMsg, jobType }) {
     if (isAdmin()) loadDbTables();
   } catch (err) {
     endState = 'error'; endResult = err.message.slice(0, 250);
-    toast('Fehler: ' + err.message, 'error');
+    toast(t('toast.error', 'Fehler: ') + err.message, 'error');
   } finally {
     jobFinish(job, endState, endResult);
     delete runningOps[btn.id];
@@ -3929,7 +4319,7 @@ document.getElementById('btn-export').addEventListener('click', async ev => {
     const size = blob.size > 1048576 ? `${(blob.size/1048576).toFixed(1)} MB` : `${Math.ceil(blob.size/1024)} kB`;
     toast(`✓ Export erstellt (${size}):\n${parts.join(', ') || 'keine Daten'}\n→ ${a.download}`, 'ok', 9000);
   } catch (err) {
-    toast('Export fehlgeschlagen: ' + err.message, 'error', 8000);
+    toast(t('toast.exportfail', 'Export fehlgeschlagen: ') + err.message, 'error', 8000);
   } finally {
     btn.disabled = false; btn.textContent = '📦 Daten exportieren';
   }
@@ -3943,7 +4333,7 @@ document.getElementById('import-file').addEventListener('change', async ev => {
   btn.disabled = true; btn.textContent = '… importiere';
   try {
     const payload = JSON.parse(await file.text());
-    if (payload.format !== 'lifedash-export') { toast('Kein Life-Dash-Export (format-Feld fehlt/falsch).', 'error'); return; }
+    if (payload.format !== 'lifedash-export') { toast(t('toast.badexport', 'Kein Life-Dash-Export (format-Feld fehlt/falsch).'), 'error'); return; }
     // Etappen-Import (A2): Tabellen in FK-Reihenfolge, je max. IMPORT_CHUNK
     // Zeilen pro Request. Gefahrlos, weil der Import idempotent ist
     // (vorhandene IDs werden übersprungen) — und der Balken zeigt Fortschritt.
@@ -3985,7 +4375,7 @@ document.getElementById('import-file').addEventListener('change', async ev => {
     toast(`✓ Import fertig: ${imported} Zeilen neu, ${skipped} bereits vorhanden.`);
     await refreshAll();
   } catch (err) {
-    toast('Import fehlgeschlagen: ' + err.message, 'error', 8000);
+    toast(t('toast.importfail', 'Import fehlgeschlagen: ') + err.message, 'error', 8000);
   } finally {
     btn.disabled = false; btn.textContent = '📥 Daten importieren';
     showLoading(false);
@@ -4082,7 +4472,7 @@ document.getElementById('timeline-file').addEventListener('change', async ev => 
     trackCache.clear();
     await refreshAll();
   } catch (err) {
-    toast('Timeline-Import fehlgeschlagen: ' + err.message, 'error', 8000);
+    toast(t('toast.tlimportfail', 'Timeline-Import fehlgeschlagen: ') + err.message, 'error', 8000);
   } finally {
     btn.disabled = false; btn.textContent = '🛰️ Google Timeline importieren';
     showLoading(false);
@@ -4108,8 +4498,8 @@ async function loadPlaceFormat() {
       Array.isArray(s.tracked_modules) ? s.tracked_modules : MODULES.map(m => m.key));
     box.querySelectorAll('[data-track]').forEach(cb => cb.addEventListener('change', async () => {
       const keys = [...box.querySelectorAll('[data-track]:checked')].map(c => c.dataset.track);
-      try { await saveTracked(keys); toast('✓ Tracking-Auswahl gespeichert.'); }
-      catch (err) { toast('Speichern fehlgeschlagen: ' + err.message, 'error'); loadPlaceFormat(); }
+      try { await saveTracked(keys); toast(t('toast.tracksaved', '✓ Tracking-Auswahl gespeichert.')); }
+      catch (err) { toast(t('toast.savefail', 'Speichern fehlgeschlagen: ') + err.message, 'error'); loadPlaceFormat(); }
     }));
   } catch (_) { /* Standard-Häkchen bleiben */ }
 }
@@ -4121,7 +4511,7 @@ document.getElementById('track-save').addEventListener('click', async () => {
     await saveTracked(keys);
     toast('✓ Los geht\'s — die Auswahl ist jederzeit unter Verwaltung änderbar.');
   } catch (err) {
-    toast('Speichern fehlgeschlagen: ' + err.message, 'error');
+    toast(t('toast.savefail', 'Speichern fehlgeschlagen: ') + err.message, 'error');
   }
   document.getElementById('track-modal').classList.remove('show');
 });
@@ -4140,7 +4530,7 @@ document.querySelectorAll('#fmt-parts [data-part]').forEach(cb =>
       });
       toast('✓ Ortsnamen-Format gespeichert — gilt für alle neuen Auflösungen.');
     } catch (err) {
-      toast('Speichern fehlgeschlagen: ' + err.message, 'error');
+      toast(t('toast.savefail', 'Speichern fehlgeschlagen: ') + err.message, 'error');
       loadPlaceFormat();
     }
   }));

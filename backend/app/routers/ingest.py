@@ -51,7 +51,7 @@ def reverse_location(
 
     from app.services import geocode as geocode_svc
 
-    hit = geocode_svc.reverse_geocode(lat, lng)
+    hit = geocode_svc.reverse_geocode(lat, lng, geocode_svc.lang_for(user))
     if not hit:
         raise HTTPException(404, "Keine Adresse zu diesem Standort gefunden")
     return {"name": geocode_svc.short_name(hit, geocode_svc.parts_for(user))}

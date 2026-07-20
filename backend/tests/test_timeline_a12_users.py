@@ -39,7 +39,7 @@ def fake_reverse(monkeypatch):
     monkeypatch.setattr(tracks_router, "NOMINATIM_DELAY_S", 0)
     monkeypatch.setattr(
         tracks_router.geocode_svc, "reverse_geocode",
-        lambda lat, lng: {
+        lambda lat, lng, lang=None: {
             "name": ("Musterstraße, Mantouki, Detmold, Kreis Lippe, "
                      "Nordrhein-Westfalen, 32756, Deutschland"),
             "type": "house",

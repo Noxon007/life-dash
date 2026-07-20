@@ -23,7 +23,8 @@ from app.ai.base import ExtractedEvent, ProviderUnavailable
 
 log = logging.getLogger("lifedash.ingestion")
 from app.config import settings
-from app.services.geocode import geocode, parts_for, reverse_geocode, short_name
+from app.services.geocode import (geocode, lang_for, parts_for,
+                                  reverse_geocode, short_name)
 from app.models import (
     ConfirmState,
     DatePrecision,
@@ -236,9 +237,9 @@ def _location_from_capture(db: Session, fragment: Fragment) -> Location | None:
     lat, lng = fragment.capture_lat, fragment.capture_lng
     name, ltype, country = f"Ort ({lat:.4f}, {lng:.4f})", None, None
     if settings.geocoding_enabled:
-        hit = reverse_geocode(lat, lng)
+        user = db.get(User, fragment.user_id) if fragment.user_id else None
+        hit = reverse_geocode(lat, lng, lang_for(user))
         if hit:
-            user = db.get(User, fragment.user_id) if fragment.user_id else None
             name = short_name(hit, parts_for(user)) or name
             ltype = hit.get("type")
             country = (hit.get("address") or {}).get("country")
@@ -275,14 +276,16 @@ def _resolve_location(db: Session, ex: ExtractedEvent, user_id: str | None) -> L
 
     lat, lng, ltype, name = ex.location_lat, ex.location_lng, None, ex.location_name
     geo = None
-    # Präzise Adresse per Geocoding auflösen (bis Straße/Hausnummer)
+    # Präzise Adresse per Geocoding auflösen (bis Straße/Hausnummer).
+    # Der Nutzer wird VOR dem Aufruf geladen: seine UI-Sprache bestimmt, in
+    # welcher Sprache Nominatim antwortet (F10), seine Bausteine den Namen.
+    user = db.get(User, user_id) if user_id else None
     if settings.geocoding_enabled:
-        geo = geocode(ex.location_name)
+        geo = geocode(ex.location_name, lang_for(user))
         if geo:
             lat, lng, ltype = geo["lat"], geo["lng"], geo.get("type")
             # Kompakter Anzeige-Name aus den gewählten Bausteinen statt der
             # vollen Nominatim-Adresse mit Verwaltungskette
-            user = db.get(User, user_id) if user_id else None
             name = short_name(geo, parts_for(user)) or geo["name"]
 
     country = (geo.get("address") or {}).get("country") if geo else None

@@ -41,9 +41,18 @@ Entscheidungen/Anmerkungen in Kap. 15. Erst dort gezielt nachlesen statt Code ra
   etc. aus Config); `.env.example` ist die Setup-Referenz
 
 ## Stand
-Umgesetzt bis **v0.19.0** (2026-07-20). Gruppe A ist komplett; von Gruppe B
-offen: **F10** (de/en + englische Doku — als Nächstes, eigenes Release 0.20.0)
-und **P3.1** (deklarative Statistik-Widgets). F8 ist bis auf „Druck mit Fotos"
-fertig, das auf P2.1 wartet. Danach nur noch die großen Pakete: Import-Quellen
-(P2.1 Immich, P2.8 OwnTracks, P2.9 Automatisierung, P4.1 Health, P4.2 PSN) und
-P5.1/P5.2 (Offline-Capture, Whisper). Details/Begründungen: KONZEPT Kap. 14.2+15.
+Umgesetzt bis **v0.20.0** (2026-07-20). Gruppe A komplett. Von Gruppe B offen:
+**F10-Rest** (~70 Verwaltungs-Fließtexte + Doku-Übersetzung auf Englisch — der
+App-Mechanismus steht seit 0.20.0), **P3.1** (deklarative Statistik-Widgets),
+F8-Rest („Druck mit Fotos", wartet auf P2.1). Danach nur noch die großen
+Pakete: Import-Quellen (P2.1 Immich, P2.8 OwnTracks, P2.9 Automatisierung,
+P4.1 Health, P4.2 PSN) und P5.1/P5.2 (Offline-Capture, Whisper).
+
+## Frontend-Übersetzung (F10)
+Deutsch steht im Quelltext und ist die Wahrheit; `I18N_EN` in `index.html`
+enthält NUR Englisch. Fehlt ein Schlüssel, erscheint Deutsch — nie ein leeres
+Label. Drei Wege: `data-i18n` (HTML-Inhalt), `data-i18n-title`/`data-i18n-ph`
+(Attribute), `t('key', 'Deutscher Text')` (JS). Neue UI-Texte immer so anlegen.
+**Achtung TDZ:** `LANG`/`I18N_EN` stehen bewusst VOR dem Theme-Block, weil
+`applyTheme()` schon beim Laden `t()` ruft. Prüfen mit jsdom statt nur Syntax:
+ein Syntaxcheck übersieht genau diese Fehlerklasse.

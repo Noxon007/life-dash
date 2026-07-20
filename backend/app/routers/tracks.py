@@ -295,7 +295,8 @@ def _semantic_label(name: str | None) -> str | None:
 
 
 def _apply_resolved_name(db: Session, loc: Location, user_id: str,
-                         parts: list[str] | None = None) -> bool:
+                         parts: list[str] | None = None,
+                         lang: str | None = None) -> bool:
     """Reverse-geocodet eine Location und zieht die Titel der verknüpften
     Besuchs-Events („Besuch: …") nach — deckt Koordinaten-Namen („Ort (lat,
     lng)"), semantische Labels („Zuhause", A12) und Fremdschrift-Namen (A10)
@@ -307,7 +308,7 @@ def _apply_resolved_name(db: Session, loc: Location, user_id: str,
     Lebenslauf) bleiben getrennte Orte. Manuell umbenannte Events (title in
     field_overrides) bleiben unangetastet."""
     label = _semantic_label(loc.name)
-    hit = geocode_svc.reverse_geocode(loc.lat, loc.lng)
+    hit = geocode_svc.reverse_geocode(loc.lat, loc.lng, lang)
     if not hit:
         return False
     short = geocode_svc.short_name(hit, parts)
@@ -525,10 +526,11 @@ def import_timeline(
         # findet die Titel-Nachführung in _apply_resolved_name sie nicht
         db.flush()
         parts = geocode_svc.parts_for(user)
+        lang = geocode_svc.lang_for(user)   # F10: Ortsnamen in der UI-Sprache
         for i, loc in enumerate(unnamed_new):
             if i:
                 time.sleep(_geo_delay())
-            if _apply_resolved_name(db, loc, user.id, parts):
+            if _apply_resolved_name(db, loc, user.id, parts, lang):
                 names_resolved += 1
 
     db.commit()
@@ -577,6 +579,7 @@ def resolve_place_names(
     """
     limit = max(1, min(limit, 100))
     parts = geocode_svc.parts_for(user)
+    lang = geocode_svc.lang_for(user)   # F10: Ortsnamen in der UI-Sprache
 
     def _candidates() -> list[Location]:
         if scope == "nonlatin":
@@ -594,7 +597,7 @@ def resolve_place_names(
     for i, loc in enumerate(locs):
         if i:
             time.sleep(_geo_delay())
-        ok = _apply_resolved_name(db, loc, user.id, parts)
+        ok = _apply_resolved_name(db, loc, user.id, parts, lang)
         if ok:
             db.commit()
         # Bleibt der Name trotz Auflösung fremdschriftlich (OSM kennt keinen

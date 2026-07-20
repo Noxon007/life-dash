@@ -227,7 +227,8 @@ def test_reimport_erzeugt_keine_duplikate_und_aendert_bestaetigtes_nicht(db, use
 # --------------------------------------------------------------------------- #
 def test_ortsnamen_aufloesung_respektiert_manuell_umbenannte_titel(db, user, monkeypatch):
     monkeypatch.setattr("app.services.geocode.reverse_geocode",
-                        lambda lat, lng: {"name": "Hermannsdenkmal, Detmold", "type": "poi"})
+                        lambda lat, lng, lang=None: {"name": "Hermannsdenkmal, Detmold",
+                                                    "type": "poi"})
     loc = Location(user_id=user.id, name="Ort (51.9375, 8.8797)",
                    lat=51.9375, lng=8.8797)
     auto = Event(user_id=user.id, title="Besuch: Ort (51.9375, 8.8797)",

@@ -3,11 +3,14 @@
 Löst Ortsnamen/Adressen -> Koordinaten + genaue Adresse auf. Damit sind
 präzise Angaben bis Straße/Hausnummer möglich, wenn der Text sie enthält.
 
-Sprache (A10): Angefragt wird mit `Accept-Language: de,en` — fehlt ein
-deutscher OSM-Name, liefert Nominatim die englische/lateinische Umschrift
-statt der Lokalschrift (z. B. Griechisch). Zusätzlich wird über
-`namedetails` der beste lateinische Name (`name:de` -> `name:en`) bevorzugt,
-falls der Hauptname trotzdem in Fremdschrift kommt.
+Sprache (A10, sprachneutral seit F10): Angefragt wird mit einer
+`Accept-Language`-Kette, die der UI-Sprache des Nutzers folgt — bei Deutsch
+`de,en`, bei Englisch `en,de`. Fehlt ein Name in der Wunschsprache, liefert
+Nominatim die andere bzw. die lateinische Umschrift statt der Lokalschrift
+(z. B. Griechisch). Zusätzlich wird über `namedetails` der beste lateinische
+Name bevorzugt, falls der Hauptname trotzdem in Fremdschrift kommt.
+Früher war „de,en" fest verdrahtet — damit hätte eine englische Oberfläche
+deutsche Ortsnamen bekommen.
 
 Standard: öffentlicher Nominatim-Endpoint. Ein selbst gehosteter oder
 kommerzieller Nominatim-kompatibler Dienst (gleiche API) läuft genauso —
@@ -28,7 +31,28 @@ from app.config import settings
 log = logging.getLogger("lifedash.geocode")
 
 USER_AGENT = "life-dash/0.1 (self-hosted life database)"
-ACCEPT_LANGUAGE = "de,en"  # Fallback-Kette: Deutsch -> englische Umschrift
+# Fallback-Ketten je UI-Sprache: Wunschsprache zuerst, die andere als Rückfall
+ACCEPT_LANGUAGE_BY_LANG = {"de": "de,en", "en": "en,de"}
+DEFAULT_LANG = "de"
+
+
+def accept_language(lang: str | None = None) -> str:
+    """Accept-Language-Kette für die gewünschte UI-Sprache."""
+    return ACCEPT_LANGUAGE_BY_LANG.get(lang or DEFAULT_LANG,
+                                       ACCEPT_LANGUAGE_BY_LANG[DEFAULT_LANG])
+
+
+def lang_for(user) -> str:
+    """UI-Sprache des Nutzers (F10) — Grundlage für Ortsnamen und Namenswahl."""
+    lang = ((getattr(user, "settings", None) or {}).get("lang")) if user else None
+    return lang if lang in ACCEPT_LANGUAGE_BY_LANG else DEFAULT_LANG
+
+
+def _name_keys(lang: str | None = None) -> tuple[str, ...]:
+    """Reihenfolge der namedetails-Schlüssel für die gewünschte Sprache."""
+    primary = lang if lang in ACCEPT_LANGUAGE_BY_LANG else DEFAULT_LANG
+    other = "en" if primary == "de" else "de"
+    return (f"name:{primary}", f"name:{other}", "name")
 
 
 def _base() -> str:
@@ -43,13 +67,14 @@ def _with_key(params: dict) -> dict:
     return params
 
 
-def _fetch_json(url: str, what: str):
+def _fetch_json(url: str, what: str, lang: str | None = None):
     """GET + JSON mit 429-Behandlung (0.15.2): Drosselt der Dienst, wird
     Retry-After respektiert (Deckel 30 s) und EINMAL erneut versucht —
     statt im Sekundentakt gegen die Sperre weiterzufeuern."""
     for attempt in (1, 2):
         req = urllib.request.Request(
-            url, headers={"User-Agent": USER_AGENT, "Accept-Language": ACCEPT_LANGUAGE})
+            url, headers={"User-Agent": USER_AGENT,
+                          "Accept-Language": accept_language(lang)})
         try:
             with urllib.request.urlopen(req, timeout=8) as resp:
                 return json.loads(resp.read().decode("utf-8"))
@@ -107,11 +132,12 @@ def parts_for(user) -> list[str]:
     return sanitize_parts(prefs.get("place_name_parts"))
 
 
-def _poi_name(namedetails: dict | None) -> str | None:
-    """Eigenname des Treffers (name:de -> name:en -> name) — z. B. ein
-    POI-Name („Adlerwarte Berlebeck"), der in keinem Adress-Baustein steckt."""
+def _poi_name(namedetails: dict | None, lang: str | None = None) -> str | None:
+    """Eigenname des Treffers in der UI-Sprache (z. B. „Adlerwarte Berlebeck"),
+    der in keinem Adress-Baustein steckt. Reihenfolge: Wunschsprache -> andere
+    Sprache -> sprachloser Name."""
     nd = namedetails or {}
-    for key in ("name:de", "name:en", "name"):
+    for key in _name_keys(lang):
         if nd.get(key):
             return str(nd[key])
     return None
@@ -146,21 +172,23 @@ def short_name(hit: dict | None, parts: list[str] | None = None) -> str:
     return ", ".join(s.strip() for s in name.split(",")[:2])
 
 
-def _prefer_latin(display_name: str, namedetails: dict | None) -> str:
+def _prefer_latin(display_name: str, namedetails: dict | None,
+                  lang: str | None = None) -> str:
     """Ersetzt einen fremdschriftlichen Hauptnamen (erstes Adress-Segment)
-    durch `name:de`/`name:en` aus den namedetails, falls vorhanden."""
+    durch den Namen in der UI-Sprache aus den namedetails, falls vorhanden."""
     if not namedetails or not display_name:
         return display_name
     first, sep, rest = display_name.partition(",")
     if not NON_LATIN_RE.search(first):
         return display_name
-    best = namedetails.get("name:de") or namedetails.get("name:en")
+    best = next((namedetails[k] for k in _name_keys(lang)[:2]
+                 if namedetails.get(k)), None)
     if not best or NON_LATIN_RE.search(best):
         return display_name
     return f"{best}{sep}{rest}"
 
 
-def geocode(query: str) -> dict | None:
+def geocode(query: str, lang: str | None = None) -> dict | None:
     """Gibt {name, lat, lng, type} für den besten Treffer zurück oder None."""
     if not query or not query.strip():
         return None
@@ -168,7 +196,8 @@ def geocode(query: str) -> dict | None:
         {"q": query.strip(), "format": "json", "limit": 1,
          "addressdetails": 1, "namedetails": 1}
     ))
-    data = _fetch_json(f"{_base()}/search?{params}", f"Nominatim-Suche ({query!r})")
+    data = _fetch_json(f"{_base()}/search?{params}",
+                       f"Nominatim-Suche ({query!r})", lang)
     if data is None:
         return None
     if not data:
@@ -177,19 +206,20 @@ def geocode(query: str) -> dict | None:
     hit = data[0]
     try:
         return {
-            "name": _prefer_latin(hit.get("display_name", query), hit.get("namedetails")),
+            "name": _prefer_latin(hit.get("display_name", query),
+                                  hit.get("namedetails"), lang),
             "lat": float(hit["lat"]),
             "lng": float(hit["lon"]),
             "type": hit.get("type"),
             # strukturierte Felder für den kompakten Anzeige-Namen (short_name)
             "address": hit.get("address") or {},
-            "poi": _poi_name(hit.get("namedetails")),
+            "poi": _poi_name(hit.get("namedetails"), lang),
         }
     except (KeyError, ValueError, TypeError):
         return None
 
 
-def reverse_geocode(lat: float, lng: float) -> dict | None:
+def reverse_geocode(lat: float, lng: float, lang: str | None = None) -> dict | None:
     """Koordinate -> Adresse ({name, type}) — für importierte Timeline-Besuche,
     deren Geräte-Export keine Ortsnamen enthält. zoom=17 ≈ Gebäude/Straße.
 
@@ -203,13 +233,13 @@ def reverse_geocode(lat: float, lng: float) -> dict | None:
          "addressdetails": 1, "namedetails": 1}
     ))
     data = _fetch_json(f"{_base()}/reverse?{params}",
-                       f"Reverse-Geocoding ({lat}, {lng})")
+                       f"Reverse-Geocoding ({lat}, {lng})", lang)
     if not data or not isinstance(data, dict):
         return None
     name = data.get("display_name")
     if not name:
         return None
-    return {"name": _prefer_latin(name, data.get("namedetails")),
+    return {"name": _prefer_latin(name, data.get("namedetails"), lang),
             "type": data.get("type"),
             "address": data.get("address") or {},
-            "poi": _poi_name(data.get("namedetails"))}
+            "poi": _poi_name(data.get("namedetails"), lang)}
