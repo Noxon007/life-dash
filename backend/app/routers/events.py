@@ -6,15 +6,18 @@ from datetime import datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import (ConfirmState, DatePrecision, Event, EventEntityLink,
-                        Metric, Source, User)
+                        Location, Metric, Source, User)
 from app.routers._serialize import event_to_read
-from app.schemas import EventManualCreate, EventRead, OnThisDayGroup
+from app.schemas import (EventGeo, EventManualCreate, EventRead, EventsIndex,
+                         LocationGeo, OnThisDayGroup, YearCount)
 from app.services.ingestion import create_manual_event
+from app.services.stats_overview import find_birth
 
 router = APIRouter(prefix="/api/events", tags=["Events"])
 
@@ -119,21 +122,49 @@ def create_day_children(
     return [event_to_read(c) for c in created]
 
 
+# A37: Datierungen, die der Nutzer selbst als „unscharf" sieht. Die Liste
+# „Unscharfe Zeiten" filterte das bisher im Browser über ALLE Ereignisse.
+_VAGUE_PRECISIONS = (DatePrecision.month, DatePrecision.season,
+                     DatePrecision.year, DatePrecision.decade)
+
+
 @router.get("", response_model=list[EventRead])
 def list_events(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-    category: str | None = Query(None, description="Nach Kategorie filtern"),
-    confirmed_only: bool = Query(False, description="Nur bestätigte Events"),
-    q: str | None = Query(None, description="Volltextsuche in Titel/Beschreibung"),
-    slim: bool = Query(False, description="A36: schlanke Liste ohne Metrik-Zeilen "
-                       "(Wetter kompakt) — für Zeitstrahl/Karte/Heute"),
+    # Annotated statt Query-als-Default (wie bei on_this_day): so bleiben es
+    # echte Python-Defaults, die auch beim direkten Aufruf gelten. Mit
+    # `= Query(None)` bekäme ein Direktaufruf das Query-Objekt selbst als Wert
+    # in den Filter — die Abfrage bricht dann erst in der DB-Schicht.
+    category: Annotated[str | None, Query(description="Nach Kategorie filtern")] = None,
+    confirmed_only: Annotated[bool, Query(description="Nur bestätigte Events")] = False,
+    q: Annotated[str | None, Query(description="Volltextsuche in Titel/Beschreibung")] = None,
+    slim: Annotated[bool, Query(description="A36: schlanke Liste ohne Metrik-Zeilen "
+                                "(Wetter kompakt) — für Zeitstrahl/Karte/Heute")] = False,
+    # A37 — serverseitiges Zeitfenster
+    date_from: Annotated[datetime | None, Query(
+        alias="from", description="A37: nur Ereignisse ab diesem Zeitpunkt")] = None,
+    date_to: Annotated[datetime | None, Query(
+        alias="to", description="A37: nur Ereignisse bis zu diesem Zeitpunkt")] = None,
+    limit: Annotated[int | None, Query(
+        ge=1, le=5000, description="A37: Seitengröße (ohne Angabe: alles)")] = None,
+    offset: Annotated[int, Query(ge=0, description="A37: Seitenversatz")] = 0,
+    parent: Annotated[str | None, Query(
+        description="A37/F7: nur die Tages-Kinder dieses Ereignisses")] = None,
+    vague: Annotated[bool, Query(
+        description="A37: nur undatierte und unscharf datierte Ereignisse")] = False,
 ) -> list[EventRead]:
     """Liste der eigenen Events, optional gefiltert (für Timeline & Karte).
 
     slim (A36): ohne die Roh-Metriken (67 % der Nutzlast) — das Wetter kommt
     kompakt im Feld `weather`. Der Zeitstrahl braucht die Rohzeilen nicht; das
-    macht das erste Laden (v. a. mobil, Anmerkung 61) deutlich kleiner."""
+    macht das erste Laden (v. a. mobil, Anmerkung 61) deutlich kleiner.
+
+    A37: `from`/`to` schneiden ein Zeitfenster heraus, `limit`/`offset` blättern
+    darin. Ohne beides verhält sich der Endpunkt wie bisher (alles auf einmal) —
+    Export, Tests und Altpfade bleiben damit gültig. Undatierte Ereignisse haben
+    in einem Zeitfenster keinen Platz und fallen bei gesetztem `from`/`to` weg;
+    erreichbar bleiben sie über `vague=1`."""
     # A36-Performance: im slim-Modus die Metriken NICHT eager laden — 16 Zeilen
     # je Ereignis als ORM-Objekte waren der Flaschenhals (bei 12.000 Ereignissen
     # ~3 s). Stattdessen unten das Wetter in EINER schlanken Abfrage holen.
@@ -148,23 +179,71 @@ def list_events(
     if q:
         like = f"%{q}%"
         query = query.filter(Event.title.ilike(like) | Event.description.ilike(like))
+    if date_from is not None:
+        query = query.filter(Event.date_start.isnot(None), Event.date_start >= date_from)
+    if date_to is not None:
+        query = query.filter(Event.date_start.isnot(None), Event.date_start <= date_to)
+    if parent is not None:
+        query = query.filter(Event.parent_event_id == parent)
+    if vague:
+        query = query.filter(Event.date_start.is_(None)
+                             | Event.date_precision.in_(_VAGUE_PRECISIONS))
 
-    events = query.order_by(Event.date_start.desc().nullslast()).all()
+    # A37: Die Sortierung MUSS eindeutig sein, sonst blättert man an
+    # Datums-Gleichständen an Einträgen vorbei oder sieht sie doppelt — bei
+    # Timeline-Importen haben dutzende Besuche denselben Zeitstempel.
+    query = query.order_by(Event.date_start.desc().nullslast(), Event.id.desc())
+    if offset:
+        query = query.offset(offset)
+    if limit is not None:
+        query = query.limit(limit)
+    events = query.all()
     if not slim:
         return [event_to_read(e) for e in events]
 
-    # Kompaktes Wetter für alle Ereignisse in einer einzigen Tupel-Abfrage
-    # (kein ORM-Objekt je Metrik). weather_rev ist ein interner Marker.
+    kids = _child_counts(db, events)
+    return [event_to_read(e, slim=True, weather=w, child_count=kids.get(e.id))
+            for e, w in zip(events, _weather_for(db, events))]
+
+
+def _child_counts(db: Session, events: list[Event]) -> dict[str, int]:
+    """F7: Zahl der Tages-Kinder je Ereignis der Seite — eine Abfrage.
+
+    Der Chip „📅 N Tages-Einträge" zählte bisher in der geladenen Liste. Mit
+    dem Zeitfenster kann ein Kind auf einer anderen Seite liegen; der Chip
+    hätte zu wenig gezeigt, ohne dass es jemandem auffällt."""
+    if not events:
+        return {}
+    ids = [e.id for e in events]
+    out: dict[str, int] = {}
+    for i in range(0, len(ids), 500):
+        rows = (db.query(Event.parent_event_id, func.count(Event.id))
+                .filter(Event.parent_event_id.in_(ids[i:i + 500]))
+                .group_by(Event.parent_event_id).all())
+        out.update({pid: n for pid, n in rows})
+    return out
+
+
+def _weather_for(db: Session, events: list[Event]) -> list[dict | None]:
+    """Kompaktes Wetter je Ereignis in EINER Tupel-Abfrage (kein ORM je Metrik).
+
+    A36 holte das Wetter für alle Ereignisse des Nutzers auf einmal — bei einer
+    Seite von 300 Einträgen wären das weiterhin 190.000 Zeilen. A37 fragt nur
+    die Ereignisse der Seite ab. `weather_rev` ist ein interner Marker."""
+    if not events:
+        return []
+    ids = [e.id for e in events]
     wx: dict[str, dict] = {}
-    rows = (db.query(Metric.event_id, Metric.key, Metric.value, Metric.value_text)
-            .join(Event, Event.id == Metric.event_id)
-            .filter(Event.user_id == user.id,
-                    Metric.source == Source.weather,
-                    Metric.key != "weather_rev")
-            .all())
-    for eid, key, value, value_text in rows:
-        wx.setdefault(eid, {})[key] = value_text if value_text is not None else value
-    return [event_to_read(e, slim=True, weather=wx.get(e.id)) for e in events]
+    # In Blöcken, damit die IN-Liste keine Parameter-Grenze reißt (SQLite: 999)
+    for i in range(0, len(ids), 500):
+        rows = (db.query(Metric.event_id, Metric.key, Metric.value, Metric.value_text)
+                .filter(Metric.event_id.in_(ids[i:i + 500]),
+                        Metric.source == Source.weather,
+                        Metric.key != "weather_rev")
+                .all())
+        for eid, key, value, value_text in rows:
+            wx.setdefault(eid, {})[key] = value_text if value_text is not None else value
+    return [wx.get(e.id) for e in events]
 
 
 # --------------------------------------------------------------------------- #
@@ -249,12 +328,95 @@ def on_this_day(
     return groups
 
 
-@router.get("/map", response_model=list[EventRead])
+@router.get("/index", response_model=EventsIndex)
+def events_index(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> EventsIndex:
+    """A37: Die Verteilung der eigenen Ereignisse über die Jahre — als Zahlen.
+
+    Der Zeitstrahl blättert (limit/offset), braucht aber trotzdem zu wissen,
+    wie weit seine Geschichte reicht und wie viel in welchem Jahr liegt. Das
+    hier kostet drei Aggregat-Abfragen statt einer vollen Liste; der Heute-
+    Reiter holt seine drei Kacheln aus derselben Antwort."""
+    year = func.extract("year", Event.date_start)
+    rows = (db.query(year.label("y"), func.count(Event.id))
+            .filter(Event.user_id == user.id, Event.date_start.isnot(None))
+            .group_by("y").order_by("y").all())
+    years = [YearCount(year=int(y), count=n) for y, n in rows]
+    dated = sum(y.count for y in years)
+    total = (db.query(func.count(Event.id))
+             .filter(Event.user_id == user.id).scalar() or 0)
+    unconfirmed = (db.query(func.count(Event.id))
+                   .filter(Event.user_id == user.id,
+                           Event.confirmed != ConfirmState.confirmed).scalar() or 0)
+    return EventsIndex(
+        total=total, dated=dated, undated=total - dated, unconfirmed=unconfirmed,
+        year_min=years[0].year if years else None,
+        year_max=years[-1].year if years else None,
+        years=years,
+        # F17 fährt hier mit: das Geburtsdatum kommt aus einem Meilenstein, der
+        # in aller Regel außerhalb der geladenen Seiten liegt. Der Zeitstrahl
+        # holt den Index ohnehin — so bleibt es bei einer Anfrage.
+        birth=find_birth(db, user.id),
+    )
+
+
+@router.get("/map", response_model=list[EventGeo])
 def list_map_events(
-    db: Session = Depends(get_db), user: User = Depends(get_current_user)
-) -> list[EventRead]:
-    """Nur verortete eigene Events (mit Koordinaten) — für die Karte."""
-    events = (db.query(Event).options(*_EAGER)
-              .filter(Event.user_id == user.id).join(Event.location).all())
-    result = [event_to_read(e) for e in events if e.location and e.location.lat is not None]
-    return result
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    date_from: Annotated[datetime | None, Query(alias="from")] = None,
+    date_to: Annotated[datetime | None, Query(alias="to")] = None,
+    weather: Annotated[bool, Query(
+        description="Wetter mitschicken — nur für den angezeigten Zeitraum")] = False,
+) -> list[EventGeo]:
+    """Nur verortete eigene Events (mit Koordinaten) — für die Karte.
+
+    A37: Antwortet in der schlanken Geo-Form (siehe `EventGeo`) statt mit
+    vollen Ereignissen — und erst dann, wenn ihr Reiter geöffnet wird; bis A36
+    hing sie am selben Aufruf wie der Zeitstrahl und verlängerte den Start.
+
+    `weather` ist bewusst abschaltbar und standardmäßig AUS: gemessen bei
+    12.000 Punkten macht es aus 205 Byte je Punkt 799 — es ist der größte
+    Einzelposten der Antwort. Die Karte holt deshalb erst alle Punkte ohne
+    Wetter (Zeitraum-Regler, Bündelung, Marker) und danach das Wetter nur für
+    den angezeigten Zeitraum, wo Popup und Stopp-Liste es wirklich zeigen."""
+    query = (db.query(Event).options(selectinload(Event.location))
+             .filter(Event.user_id == user.id, Event.location_id.isnot(None))
+             .join(Event.location).filter(Location.lat.isnot(None),
+                                          Event.date_start.isnot(None)))
+    if date_from is not None:
+        query = query.filter(Event.date_start >= date_from)
+    if date_to is not None:
+        query = query.filter(Event.date_start <= date_to)
+    events = query.order_by(Event.date_start.asc(), Event.id.asc()).all()
+    wx = _weather_for(db, events) if weather else [None] * len(events)
+    return [
+        EventGeo(
+            id=e.id, title=e.title, category=e.category, date_start=e.date_start,
+            date_precision=e.date_precision, source=e.source,
+            location=LocationGeo.model_validate(e.location), weather=w,
+        )
+        for e, w in zip(events, wx)
+    ]
+
+
+@router.get("/{event_id}", response_model=EventRead)
+def get_event(
+    event_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> EventRead:
+    """A37: Ein einzelnes Ereignis, vollständig.
+
+    Solange das Frontend alles im Speicher hatte, brauchte es das nie. Mit dem
+    Zeitfenster kann ein Ereignis außerhalb der geladenen Seiten liegen — eine
+    Statistik-Kachel oder ein Suchtreffer verweist darauf — und dann muss es
+    einzeln nachladbar sein. Muss ZULETZT stehen: `/{event_id}` würde sonst
+    auch `/map` und `/index` schlucken."""
+    event = (db.query(Event).options(*_EAGER)
+             .filter(Event.id == event_id, Event.user_id == user.id).first())
+    if not event:
+        raise HTTPException(404, "Event nicht gefunden")
+    return event_to_read(event)

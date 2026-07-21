@@ -22,7 +22,8 @@ def _weather_compact(event: Event) -> dict | None:
 
 
 def event_to_read(event: Event, *, slim: bool = False,
-                  weather: dict | None = None) -> EventRead:
+                  weather: dict | None = None,
+                  child_count: int | None = None) -> EventRead:
     """Baut ein EventRead inkl. verknüpfter Entities und Metriken.
 
     slim (A36): Die Metrik-Zeilen entfallen; stattdessen trägt `weather` die
@@ -75,4 +76,6 @@ def event_to_read(event: Event, *, slim: bool = False,
         # vorberechnetes Wetter bevorzugen; sonst (Einzelaufruf) aus den
         # geladenen Metriken bauen
         weather=(weather if weather is not None else _weather_compact(event)) if slim else None,
+        # A37/F7: vom Aufrufer je Seite gezählt (None = nicht ermittelt)
+        child_count=child_count,
     )

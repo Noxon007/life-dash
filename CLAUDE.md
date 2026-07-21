@@ -72,15 +72,20 @@ aus e.weather ODER e.metrics — geprüft von tools/check-weather-line.js.
 aus dem Meilenstein „Geburt" (Anmerkung 72), „~" bei vager Datierung. BIRTH_DATE
 wird in renderTimelineList aus tl.events ermittelt.
 
-**A37 ist als Nächstes dran (0.32.0, Anmerkung 81):** serverseitiges Zeitfenster
-für `/api/events` (from/to/limit/offset + Jahres-Index), eigener schlanker
-Geo-Endpunkt für die Karte. **Der eigentliche Aufwand ist die Statistik:**
-`loadStats()` reduziert heute im Browser über die VOLLE Liste (Orte, Kategorien,
-Meilensteine, Umzüge, Konzerte, Unbestätigte) — unter einem Fenster werden diese
-Kacheln still falsch, sie müssen als SQL-Aggregate in den Server. Ebenso:
-unscharfe Zeiten, Tagebuch-Tagesabfrage, Druckbereich. Falle: F17 braucht den
-Meilenstein „Geburt", der außerhalb jedes Fensters außer dem ersten liegt.
-**A38 (Mobil-Layout)** liegt im selben Release, Audit-Liste in Anmerkung 82.
+**A37 fertig (v0.32.0, Anmerkung 81/85):** Der Zeitstrahl lädt Seiten
+(`/api/events?limit&offset`, `TL_PAGE=300`, Nachladen beim Scrollen in
+`.content`). **Grundregel ab jetzt: Wer eine Zahl über den GESAMTEN Bestand
+braucht, holt sie vom Server** — `/api/events/index` (Gesamt, Unbestätigte,
+Jahre, Spanne, Geburts-Meilenstein für F17) und `/api/stats/overview`
+(alle Statistik-Kacheln und -Diagramme, `services/stats_overview.py`).
+Ein Client-Reduce über `tl.events` zählt nur noch das geladene Fenster.
+`tools/check-a37-window.js` prüft genau das (Verkehr + Kacheln). Karte:
+eigener Endpunkt `/api/events/map` (ohne Wetter; das kommt je Zeitraum nach —
+gemessen 799 vs. 356 Byte je Punkt). Einzelabruf `GET /api/events/{id}` für
+Ereignisse außerhalb des Fensters. Gemessen bei 12k über HTTP: Start
+12,7 MB/1,49 s → 0,31 MB/0,08 s, Statistik 26 MB/5,5 s → 2 kB/0,39 s.
+**Offen bleibt A38 (Mobil-Layout)** im selben Release, Audit-Liste in
+Anmerkung 82.
 
 **Kein Ticket-System (Anmerkung 83):** Beobachtungen aus der Nutzung werden als
 nummerierte Anmerkung in KONZEPT Kap. 15 festgehalten, Pakete in 14.2/14.3 —

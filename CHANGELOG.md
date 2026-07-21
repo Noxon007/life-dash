@@ -15,6 +15,43 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.32.0] – 2026-07-21
+
+### Changed
+- **The app no longer loads your whole life to show you the top of it.** Until
+  now every view started by fetching every entry you have ever recorded. The
+  timeline now asks for one page and loads more as you scroll, and each of the
+  other views asks for exactly what it shows. Measured over HTTP on a database
+  of 12,000 entries: the opening request went from **12.7 MB and 1.5 seconds to
+  0.3 MB and 0.08 seconds**. Whether your database holds twelve thousand entries
+  or two hundred thousand no longer decides how long the app takes to open — on
+  a phone or a small home server most of all.
+- **The statistics are calculated where the data is.** Every number on the
+  statistics tab — places, categories, milestones, moves, weather records,
+  charts — used to be computed in your browser from that same complete list.
+  They are now computed by the server and arrive as about two kilobytes instead
+  of 26 megabytes, which also made that tab roughly fifteen times faster to
+  open. **The numbers themselves are unchanged**, and the tests compare them
+  against the previous rules, including the rule that weather belongs to a
+  calendar day rather than to each entry of that day.
+- **The map fetches its own points** instead of borrowing the timeline's, and
+  only when you open it. Weather is fetched for the period you are looking at,
+  because carrying it for every point on the map would have quadrupled the
+  download for something only visible in the popup you click.
+- The “today” tiles, the vague-dates list, the journal, and the print dialog
+  now ask for the entries they need rather than sifting the complete list.
+
+### Fixed
+- Clicking a weather record on the statistics tab opens the entry again. It
+  silently did nothing whenever that entry was not in memory — which, with the
+  new paging, would have been most of the time.
+
+### Notes for upgraders
+- No migration and no configuration change. The database is untouched.
+- The list endpoint keeps its old behaviour when asked without a page or a
+  time range, so exports, backups and any scripts against `/api/events` keep
+  working exactly as before.
+
 ## [0.31.2] – 2026-07-21
 
 ### Changed

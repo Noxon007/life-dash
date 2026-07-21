@@ -2077,7 +2077,18 @@ const I18N_EN = {
   'wx.trip': "🏖️ Warmest trip",
   'wx.trip.sub': "no trip with weather yet",
   'wx.feels': "feels like",
+  'wx.none': "no weather data — Admin → “Add weather”",
+  'wx.noplace': "no place",
+  'wx.newdata': "comes with new weather enrichment (from v0.14)",
   'chart.raindays': "Rainy days per year",
+  // A37 — Zeitfenster: Nachladen, Ende der Geschichte, Einzelabruf
+  'tl.more': "▼ Load older entries",
+  'tl.loading': "Loading …",
+  'tl.end': "That is the beginning of your story.",
+  'tl.search.fallback': "Search limited (server search unavailable) — showing plain text matches.",
+  'stat.born': "born",
+  'stat.born.hint': "add your birth as a milestone",
+  'ev.notfound': "Entry could not be loaded.",
   'world.avgtemp': "Avg. temperature",
   'bm.auto': "🌓 Matching the theme",
   'bm.osm': "🗺️ OpenStreetMap",
@@ -2746,7 +2757,10 @@ function eventChips(e) {
 
 // ---------- TIMELINE ----------
 const MONTHS_LONG = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
-const tl = { zoom: 'year', query: '', events: [], catFilter: new Set(FILTER_CATS), showVisits: false };
+// A37: `events` ist ab jetzt das GELADENE Stück, nicht die ganze Geschichte —
+// offset/done/loading führen das Blättern.
+const tl = { zoom: 'year', query: '', events: [], catFilter: new Set(FILTER_CATS),
+             showVisits: false, offset: 0, done: false, loading: false, autoPages: 0 };
 
 function isoWeek(d) {
   const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -2774,39 +2788,89 @@ function tlGroup(e) {
 // Gemeinsamer Events-Abruf: Timeline, Karte, Statistik und Unscharfe-Zeiten
 // teilen sich EINE Antwort (bei 10k+ Events sonst 4x mehrere MB).
 // refreshAll() invalidiert den Cache nach jeder Änderung.
-// A36: Zwei Abrufe mit eigenem Cache. fetchEvents() ist SCHLANK (ohne die
-// Roh-Metriken, 67 % der Nutzlast) — das ist der Startpfad (Zeitstrahl, Heute,
-// Karte) und macht das erste Laden mobil verkraftbar. Nur die Statistik holt
-// über fetchEventsFull() die vollen Metriken, und zwar erst beim Öffnen.
-let _eventsPromise = null, _eventsFullPromise = null;
-function fetchEvents(force = false) {
-  if (force || !_eventsPromise) _eventsPromise = api('/api/events?slim=1');
-  return _eventsPromise;
+// A36: Die Liste ist schlank (ohne die Roh-Metriken, 67 % der Nutzlast).
+// A37: Und sie kommt in SEITEN. Bis v0.31 lud der Zeitstrahl jeden Eintrag in
+// einer Antwort — gemessen bei 12.000 Einträgen 13,3 MB und 1,4 s allein im
+// Server, und das bei jedem Start. Jetzt: die erste Seite sofort, der Rest
+// beim Scrollen; ob 12.000 oder 200.000 Einträge da liegen, ist damit egal.
+//
+// Die Kehrseite ist der eigentliche Inhalt des Pakets: Was „alles" wissen
+// muss, darf es nicht mehr aus dieser Liste zählen. Der Jahres-Index und
+// /api/stats/overview liefern solche Zahlen aus dem Server — ein Client mit
+// Fenster zählte sonst still das Fenster statt das Leben.
+const TL_PAGE = 300;
+let _indexPromise = null;
+function fetchIndex(force = false) {
+  if (force || !_indexPromise) _indexPromise = api('/api/events/index');
+  return _indexPromise;
 }
-function fetchEventsFull(force = false) {
-  if (force || !_eventsFullPromise) _eventsFullPromise = api('/api/events');
-  return _eventsFullPromise;
+// Gezielte Ereignis-Abfrage: jeder Aufrufer sagt, was er braucht (Zeitraum,
+// Seite, Kategorie, `vague`, `parent`) — statt alles zu holen und zu filtern.
+function fetchEvents(params = {}) {
+  const q = new URLSearchParams({ slim: '1', ...params });
+  return api(`/api/events?${q}`);
 }
-async function loadTimeline() {
-  // Suche nutzt den hybriden Such-Endpoint (Volltext + semantisch)
-  if (tl.query) {
-    try {
-      tl.events = await api(`/api/search?q=${encodeURIComponent(tl.query)}`);
-    } catch (err) {
-      // Anm. 33: Scheitert die Server-Suche (z. B. Embedding-Dienst), gab es
-      // vorher STILL keine Filterung. Jetzt: einfache lokale Textsuche als
-      // Fallback + sichtbarer Hinweis.
-      const q = tl.query.toLowerCase();
-      tl.events = (await fetchEvents()).filter(e =>
-        `${e.title} ${e.description || ''} ${e.location ? e.location.name : ''}`
-          .toLowerCase().includes(q));
-      toast('Suche eingeschränkt (Server-Suche nicht erreichbar) — zeige einfache Texttreffer.', 'warn', 6000);
+
+async function loadTimeline(more = false) {
+  if (tl.loading) return;
+  tl.loading = true;
+  try {
+    if (!more) { tl.events = []; tl.offset = 0; tl.done = false; }
+    // F17: Das Geburtsdatum steckt in einem Meilenstein, der fast immer
+    // außerhalb der geladenen Seiten liegt — es kommt aus dem Index.
+    fetchIndex().then(idx => {
+      BIRTH_DATE = idx.birth ? new Date(idx.birth.date_start) : null;
+    }).catch(() => {});
+    if (tl.query) {
+      // Suche nutzt den hybriden Such-Endpoint (Volltext + semantisch);
+      // Treffermengen sind klein, hier wird nicht geblättert.
+      try {
+        tl.events = await api(`/api/search?q=${encodeURIComponent(tl.query)}`);
+      } catch (err) {
+        // Anm. 33: Scheitert die Server-Suche (z. B. Embedding-Dienst), gab es
+        // vorher STILL keine Filterung. Der Rückfall ist jetzt die einfache
+        // Textsuche DESSELBEN Endpunkts — nicht mehr ein Filter über die volle
+        // Liste im Browser, die es nicht mehr gibt.
+        tl.events = await fetchEvents({ q: tl.query, limit: TL_PAGE });
+        toast(t('tl.search.fallback', 'Suche eingeschränkt (Server-Suche nicht erreichbar) — zeige einfache Texttreffer.'), 'warn', 6000);
+      }
+      tl.done = true;
+    } else {
+      const page = await fetchEvents({ limit: TL_PAGE, offset: tl.offset });
+      tl.events = more ? tl.events.concat(page) : page;
+      tl.offset += page.length;
+      tl.done = page.length < TL_PAGE;
     }
-  } else {
-    tl.events = await fetchEvents();
+  } finally {
+    tl.loading = false;
   }
   renderTimeline();
+  // Ein enger Kategorie-Filter kann eine ganze Seite wegfiltern — dann stünde
+  // „keine Ereignisse" da, obwohl es Treffer gibt, nur weiter hinten. Also
+  // weiterblättern, bis etwas Sichtbares zusammenkommt — aber gedeckelt:
+  // Trifft ein Filter gar nichts, soll die App nicht stillschweigend die
+  // ganze Datenbank in Einzelseiten nachholen. Dann bleibt der Fuß-Knopf.
+  const auto = more ? tl.autoPages + 1 : 1;
+  tl.autoPages = auto;
+  if (!tl.done && !tl.query && tlVisibleCount() < 12 && auto < 6) loadTimeline(true);
 }
+
+// Wie viele Karten stehen nach den Filtern tatsächlich auf dem Schirm?
+function tlVisibleCount() {
+  return tl.events.filter(e => passesFilter(e, tl.catFilter)
+    && (tl.zoom === 'day' || !e.parent_event_id)
+    && (tl.showVisits || e.source !== 'google_timeline')).length;
+}
+
+// A37: Nachladen beim Scrollen. Der Zeitstrahl scrollt in `.content`; 600 px
+// vor dem Ende kommt die nächste Seite, damit das Nachladen im Lesefluss
+// verschwindet, statt am Ende zu stocken.
+document.querySelector('.content').addEventListener('scroll', ev => {
+  const box = ev.target;
+  if (!document.getElementById('view-timeline').classList.contains('active')) return;
+  if (tl.loading || tl.done || tl.query) return;
+  if (box.scrollTop + box.clientHeight >= box.scrollHeight - 600) loadTimeline(true);
+});
 function renderTimeline() {
   const note = document.getElementById('tl-search-note');
   if (tl.query) {
@@ -2863,21 +2927,22 @@ async function renderOnThisDay() {
     </div>`;
 }
 
-// F16: Kennzahlen des Heute-Reiters — aus den ohnehin geladenen Ereignissen,
-// also ohne zusätzliche Anfrage.
+// F16: Kennzahlen des Heute-Reiters.
+// A37: Drei Zahlen über den GESAMTEN Bestand — genau die Sorte, die ein
+// Zeitfenster still verfälscht hätte. Sie kommen deshalb aus dem Jahres-Index
+// (drei Aggregat-Abfragen), nicht mehr aus einer geladenen Liste.
 async function loadToday() {
   renderOnThisDay();
   try {
-    const events = await fetchEvents();
-    const years = events.filter(e => e.date_start).map(e => e.date_start.slice(0, 4)).sort();
-    document.getElementById('today-events').textContent = events.length.toLocaleString('de-DE');
+    const idx = await fetchIndex();
+    document.getElementById('today-events').textContent = idx.total.toLocaleString('de-DE');
     document.getElementById('today-unconfirmed').textContent =
-      events.filter(e => e.confirmed !== 'confirmed').length.toLocaleString('de-DE');
-    document.getElementById('today-span').textContent = years.length
-      ? `${years[0]} – ${years[years.length - 1]}` : '–';
+      idx.unconfirmed.toLocaleString('de-DE');
+    document.getElementById('today-span').textContent =
+      idx.year_min ? `${idx.year_min} – ${idx.year_max}` : '–';
     // A35/Anmerkung 73: Startformular nur bei komplett leerer Lebensdatenbank
     // und solange es nicht übersprungen wurde.
-    const empty = events.length === 0 && localStorage.getItem('seed-done') !== '1';
+    const empty = idx.total === 0 && localStorage.getItem('seed-done') !== '1';
     document.getElementById('seed-form').style.display = empty ? '' : 'none';
   } catch (_) { /* Kacheln bleiben auf „–" */ }
 }
@@ -2911,7 +2976,7 @@ document.getElementById('seed-save').addEventListener('click', async () => {
       made++;
     }
     dismissSeed();
-    fetchEvents(true);   // Cache leeren, damit die neuen Einträge überall auftauchen
+    invalidateEvents();  // damit die neuen Einträge überall auftauchen
     toast(t('seed.done', '✓ {n} Eintrag/Einträge angelegt.').replace('{n}', made));
     await loadToday();
   } catch (err) { toast(err.message, 'error'); btn.disabled = false; }
@@ -2922,7 +2987,6 @@ const TL_GROUP_CAP = 25;
 function renderTimelineList() {
   const el = document.getElementById('timeline-list');
   el.style.display = '';
-  computeBirthDate(tl.events);   // F17: Geburtsdatum für die Alters-Chips
   let filtered = tl.events.filter(e => passesFilter(e, tl.catFilter));
   // F7: Tages-Unterereignisse sammeln und (außer im Tages-Zoom) unterm
   // Eltern-Event einklappen — der Chip „📅 N Tages-Einträge" klappt sie auf.
@@ -2943,7 +3007,9 @@ function renderTimelineList() {
   toggle.style.display = visits ? '' : 'none';
   toggle.textContent = `🛰️ ${visits} Besuche`;
   if (!filtered.length) {
-    el.innerHTML = '<div class="hint">Keine Events. Leg unter „Eingabe" eins an — oder Suche/Filter zurücksetzen.</div>';
+    el.innerHTML = tl.done || tl.query
+      ? '<div class="hint">Keine Events. Leg unter „Eingabe" eins an — oder Suche/Filter zurücksetzen.</div>'
+      : `<div class="hint">${t('tl.loading', 'Lade …')}</div>`;
     return;
   }
   const groups = {};
@@ -2981,6 +3047,23 @@ function renderTimelineList() {
       const g = ordered[+btn.dataset.tlMore];
       btn.outerHTML = g.items.slice(TL_GROUP_CAP).map(renderItem).join('');
     }));
+  el.insertAdjacentHTML('beforeend', tlFooter());
+  const more = document.getElementById('tl-load-more');
+  if (more) more.addEventListener('click', () => loadTimeline(true));
+}
+
+// A37: Fuß des Zeitstrahls — zeigt, dass die Geschichte weitergeht. Das
+// Nachladen passiert beim Scrollen von selbst; der Knopf ist für alle Fälle
+// da, in denen kein Scroll-Ereignis kommt (kurze Liste, Tastatur, Mobil-
+// Impulsscrollen). Ohne diesen Hinweis sähe ein Fenster wie ein Ende aus.
+function tlFooter() {
+  if (tl.query) return '';
+  if (tl.done) {
+    return `<div class="hint" style="text-align:center">${
+      t('tl.end', 'Das ist der Anfang deiner Geschichte.')}</div>`;
+  }
+  return `<div class="hint" id="tl-load-more" style="text-align:center; cursor:pointer">${
+    tl.loading ? t('tl.loading', 'Lade …') : t('tl.more', '▼ Ältere Einträge laden')}</div>`;
 }
 // Besuchs-Verdichtung (A5): gleiche Besuchs-Titel (google_timeline) einer
 // Zeitgruppe zusammenfassen; andere Events bleiben einzeln in ihrer Position.
@@ -3037,16 +3120,12 @@ function eventPhotos(e) {
 const EVENT_CACHE = {};   // id -> Event (für den Bearbeiten-Dialog)
 const TL_CHILDREN = new Map();  // F7: parent_event_id -> Tages-Kinder (sortiert)
 // F17: Geburtsdatum = frühester Meilenstein mit „Geburt/geboren/birth" (eine
-// Wahrheit, kein Profilfeld — Anmerkung 72). Einmal je Zeitstrahl-Aufbau
-// ermittelt und gepuffert, damit nicht jede Karte die Liste durchsucht.
+// Wahrheit, kein Profilfeld — Anmerkung 72).
+// A37: Ermittelt jetzt der Server und liefert es im Jahres-Index mit. Vorher
+// suchte das Frontend in der geladenen Liste — mit dem Zeitfenster liegt die
+// Geburt außerhalb jeder Seite außer der letzten, und die Alters-Chips wären
+// reihenweise still verschwunden.
 let BIRTH_DATE = null;
-function computeBirthDate(events) {
-  const births = (events || [])
-    .filter(e => e.category === 'milestone' && e.date_start
-      && /geburt|geboren|\bbirth\b/i.test(`${e.title} ${e.description || ''}`))
-    .sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
-  BIRTH_DATE = births.length ? new Date(births[0].date_start) : null;
-}
 // F17: Alter beim Ereignis als Ableitung — volle Jahre zwischen Geburt und
 // Ereignis. Nur wenn eine Geburt bekannt ist und das Ereignis danach liegt;
 // bei vager Datierung mit „~", damit die Zahl nicht mehr behauptet als die
@@ -3068,7 +3147,12 @@ function eventCard(e) {
   const conf = e.confirmed === 'confirmed';
   // Aufklapp-Chip nur, wenn die Kinder eingeklappt sind (im Tages-Zoom
   // stehen sie ohnehin einzeln im Zeitstrahl)
-  const kids = tl.zoom !== 'day' ? TL_CHILDREN.get(e.id) : null;
+  // A37: Gezählt wird im Server (child_count) — die Kinder können auf einer
+  // Seite liegen, die noch gar nicht geladen ist. Nur wo es kein child_count
+  // gibt (Suche, „An diesem Tag"), zählt weiter die geladene Liste.
+  const kids = tl.zoom !== 'day'
+    ? (e.child_count != null ? e.child_count : (TL_CHILDREN.get(e.id) || []).length)
+    : 0;
   return `
     <div class="event-card ${catClass(e.category)}" data-id="${esc(e.id)}" title="Klicken zum Bearbeiten">
       <div class="ev-head">
@@ -3081,7 +3165,7 @@ function eventCard(e) {
       <div class="ev-meta">
         <span class="chip">${catLabel(e.category)}</span>
         ${e.parent_event_id ? '<span class="chip">📅 Tages-Eintrag</span>' : ''}
-        ${kids && kids.length ? `<span class="chip" data-expand-children="${esc(e.id)}" title="Tages-Einträge ein-/ausklappen">📅 ${kids.length} Tages-Einträge ▾</span>` : ''}
+        ${kids ? `<span class="chip" data-expand-children="${esc(e.id)}" title="Tages-Einträge ein-/ausklappen">📅 ${kids} Tages-Einträge ▾</span>` : ''}
         ${ageChip(e)}
         ${eventChips(e).map(t => `<span class="chip">${esc(t)}</span>`).join('')}
         <span class="chip ${conf ? 'badge-confirmed' : 'badge-unconfirmed'}">
@@ -3127,9 +3211,11 @@ document.querySelectorAll('#tl-zoom [data-zoom]').forEach(btn => {
 // Text liegt im note-Feld und wird damit nie von der KI angefasst.
 let jrExisting = null;   // Journal-Event des gewählten Tages (falls vorhanden)
 async function jrLoad(dateStr) {
-  const events = await fetchEvents().catch(() => []);
-  jrExisting = events.find(e => e.category === 'journal' && e.date_start
-    && e.date_start.slice(0, 10) === dateStr) || null;
+  // A37: gezielt nach dem EINEN Tag fragen, statt alles zu holen und zu suchen
+  const events = await fetchEvents({
+    category: 'journal', from: `${dateStr}T00:00:00`, to: `${dateStr}T23:59:59`,
+  }).catch(() => []);
+  jrExisting = events[0] || null;
   document.getElementById('jr-text').value = jrExisting ? (jrExisting.note || '') : '';
   jrPreview(false);
 }
@@ -3158,18 +3244,22 @@ function prDateInput(id) {
   return v ? new Date(v + 'T00:00:00') : null;
 }
 
-function prSelected(events) {
+// A37: Der Druck hatte immer schon einen Zeitraum — er filterte ihn nur aus
+// der vollen Liste heraus. Jetzt fragt er ihn ab; die beiden Optionen
+// (Besuche, Unbestätigte) bleiben ein Filter, weil sie keine Zeitfrage sind.
+async function prSelected() {
   const from = prDateInput('pr-from');
   const to = prDateInput('pr-to');
   if (to) to.setHours(23, 59, 59, 999);
   const withVisits = document.getElementById('pr-visits').checked;
   const withUnconfirmed = document.getElementById('pr-unconfirmed').checked;
 
+  const params = {};
+  if (from) params.from = from.toISOString().slice(0, 19);
+  if (to) params.to = to.toISOString().slice(0, 19);
+  const events = await fetchEvents(params).catch(() => []);
   return events.filter(e => {
     if (!e.date_start) return false;
-    const d = new Date(e.date_start);
-    if (from && d < from) return false;
-    if (to && d > to) return false;
     if (!withVisits && e.source === 'google_timeline') return false;
     if (!withUnconfirmed && e.confirmed !== 'confirmed') return false;
     return true;
@@ -3179,7 +3269,7 @@ function prSelected(events) {
 async function prRefreshCount() {
   const box = document.getElementById('pr-count');
   try {
-    const n = prSelected(await fetchEvents()).length;
+    const n = (await prSelected()).length;
     box.textContent = n
       ? `${n} Ereignis${n === 1 ? '' : 'se'} im gewählten Zeitraum.`
       : 'Keine Ereignisse im gewählten Zeitraum — Zeitraum oder Optionen anpassen.';
@@ -3266,13 +3356,20 @@ function prBuildPage(events) {
   document.getElementById('print-area').innerHTML = html;
 }
 
+// A37: Die volle Spanne kommt aus dem Jahres-Index statt aus der ganzen
+// Liste — Jahresgrenzen genügen für eine Vorbelegung und schließen sicher
+// alles ein.
+async function prFullSpan() {
+  const idx = await fetchIndex().catch(() => null);
+  return idx && idx.year_min
+    ? [`${idx.year_min}-01-01`, `${idx.year_max}-12-31`] : ['', ''];
+}
+
 document.getElementById('tl-print-btn').addEventListener('click', async () => {
-  const events = await fetchEvents().catch(() => []);
-  const dated = events.filter(e => e.date_start).map(e => e.date_start.slice(0, 10)).sort();
-  // Vorbelegung: die volle Spanne der vorhandenen Daten
-  if (!document.getElementById('pr-from').value && dated.length) {
-    document.getElementById('pr-from').value = dated[0];
-    document.getElementById('pr-to').value = dated[dated.length - 1];
+  if (!document.getElementById('pr-from').value) {
+    const [from, to] = await prFullSpan();
+    document.getElementById('pr-from').value = from;
+    document.getElementById('pr-to').value = to;
   }
   document.getElementById('print-modal').classList.add('show');
   prRefreshCount();
@@ -3291,11 +3388,9 @@ document.querySelectorAll('#print-modal [data-print-preset]').forEach(chip => {
       document.getElementById('pr-from').value = iso(back);
       document.getElementById('pr-to').value = iso(today);
     } else {
-      const events = await fetchEvents().catch(() => []);
-      const dated = events.filter(e => e.date_start)
-        .map(e => e.date_start.slice(0, 10)).sort();
-      document.getElementById('pr-from').value = dated[0] || '';
-      document.getElementById('pr-to').value = dated[dated.length - 1] || '';
+      const [from, to] = await prFullSpan();
+      document.getElementById('pr-from').value = from;
+      document.getElementById('pr-to').value = to;
     }
     prRefreshCount();
   });
@@ -3309,8 +3404,7 @@ document.getElementById('pr-cancel').addEventListener('click',
   () => document.getElementById('print-modal').classList.remove('show'));
 
 document.getElementById('pr-go').addEventListener('click', async () => {
-  const events = prSelected(await fetchEvents().catch(() => []));
-  prBuildPage(events);
+  prBuildPage(await prSelected());
   document.getElementById('print-modal').classList.remove('show');
   // Kurz warten, damit das Layout des frisch gebauten Bereichs steht
   setTimeout(() => window.print(), 60);
@@ -3501,49 +3595,19 @@ document.querySelectorAll('#view-stats .stat-card[data-event-slot]').forEach(car
 // --------------------------------------------------------------------------- //
 // F11 — Wetterbilanz
 // --------------------------------------------------------------------------- //
-// Reine Ableitung aus dem, was ohnehin an den Events hängt: kein API-Aufruf,
-// nichts Gespeichertes. Der Block bleibt versteckt, solange nichts Wetter
-// trägt — eine Bilanz aus null Tagen wäre nur eine Reihe Striche.
-function renderWeatherSummary(events, metricOf, placeOf) {
+// A37: Die Regeln sind dieselben geblieben — sie stehen nur nicht mehr hier,
+// sondern in `services/stats_overview.py`. Der Browser bekam dafür bis v0.31
+// jeden Eintrag mit allen Metriken geschickt (bei 12.000 Einträgen 26 MB), nur
+// um daraus vier Kacheln zu rechnen. Was hier bleibt, ist das Zeichnen.
+// A31/Anmerkung 64 gilt unverändert: gezählt wird der KALENDERTAG, nicht der
+// Eintrag — sonst hätte ein importierter Tag mit dreißig Besuchen dreißig
+// Regentage ergeben.
+function renderWeatherSummary(ov) {
   const box = document.getElementById('weather-summary');
   const panel = document.getElementById('panel-rain-years');
   if (!box) return;
-  const withWeather = events.filter(e => metricOf(e, 'temperature_c', 'temp_max_c') != null);
-  if (!withWeather.length) { box.style.display = 'none'; panel.style.display = 'none'; return; }
-
-  // A31: Wetter gehört einem TAG, nicht einem Eintrag. Nach einem
-  // Timeline-Import hat ein Tag dutzende Besuche, die alle denselben
-  // Wetterdatensatz tragen — über Einträge gerechnet kämen mehr als 365
-  // Regentage im Jahr heraus und die Sonnenstunden wären vervielfacht.
-  // Regel: EIN Datensatz je Kalendertag, genommen vom frühesten Eintrag des
-  // Tages, der Wetter trägt. Eine Regel, in einem Satz erklärbar — und für
-  // den Normalfall (ein Ort pro Tag) exakt richtig.
-  const byDay = new Map();
-  [...withWeather]
-    .sort((a, b) => (a.date_start || '').localeCompare(b.date_start || ''))
-    .forEach(e => {
-      const day = (e.date_start || '').slice(0, 10);
-      if (!day || byDay.has(day)) return;
-      byDay.set(day, e);
-    });
-  const days = [...byDay.values()];
-
-  const sum = key => days.reduce((a, e) => a + (metricOf(e, key) || 0), 0);
-  const rainDays = days.filter(e => (metricOf(e, 'rain_mm') || 0) >= 1).length;
-  const sunHours = Math.round(sum('sunshine_h'));
-  // Wärmste Reise: Mittel über die TAGE einer Reise (nicht über ihre
-  // Einträge) — sonst zählt ein Reisetag mit zwanzig Besuchen zwanzigfach.
-  const trips = {};
-  days.filter(e => e.category === 'trip').forEach(e => {
-    const temp = metricOf(e, 'temperature_c');
-    if (temp == null) return;
-    const k = e.parent_event_id || e.id;
-    (trips[k] = trips[k] || { sum: 0, n: 0, e }).sum += temp;
-    trips[k].n++;
-  });
-  const warmest = Object.values(trips)
-    .map(x => ({ avg: x.sum / x.n, e: x.e }))
-    .sort((a, b) => b.avg - a.avg)[0];
+  const wx = ov.weather || {};
+  if (!wx.days) { box.style.display = 'none'; panel.style.display = 'none'; return; }
 
   const tile = (num, label, sub) => `
     <div class="stat-card">
@@ -3551,30 +3615,21 @@ function renderWeatherSummary(events, metricOf, placeOf) {
       <div class="stat-label">${label}</div>
       <div class="stat-sub">${sub}</div>
     </div>`;
-  const share = Math.round(rainDays / days.length * 100);
+  const warm = wx.warmest_trip;
   document.getElementById('weather-tiles').innerHTML = [
-    tile(days.length, t('wx.days', '📆 Tage mit Wetter'),
+    tile(wx.days, t('wx.days', '📆 Tage mit Wetter'),
          t('wx.days.sub', 'Kalendertage mit Wetterdaten')),
-    tile(sunHours ? `${sunHours} h` : '–', t('wx.sun', '☀️ Sonnenstunden'),
+    tile(wx.sun_hours ? `${wx.sun_hours} h` : '–', t('wx.sun', '☀️ Sonnenstunden'),
          t('wx.sun.sub', 'über alle Tage zusammen')),
-    tile(rainDays, t('wx.rain', '🌧️ Regentage'),
-         `${share}% ${t('wx.rain.sub', 'deiner erfassten Tage')}`),
-    tile(warmest ? `${warmest.avg.toFixed(1)} °C` : '–', t('wx.trip', '🏖️ Wärmste Reise'),
-         warmest ? esc(warmest.e.title) : t('wx.trip.sub', 'noch keine Reise mit Wetter')),
+    tile(wx.rain_days, t('wx.rain', '🌧️ Regentage'),
+         `${wx.rain_share}% ${t('wx.rain.sub', 'deiner erfassten Tage')}`),
+    tile(warm ? `${warm.avg.toFixed(1)} °C` : '–', t('wx.trip', '🏖️ Wärmste Reise'),
+         warm ? esc(warm.title) : t('wx.trip.sub', 'noch keine Reise mit Wetter')),
   ].join('');
   box.style.display = '';
 
-  // Regentage pro Jahr — über TAGE, nicht über Einträge (A31): sonst zeigte
-  // ein Jahr mit vielen importierten Besuchen über 600 „Regentage".
-  const perYear = {};
-  days.forEach(e => {
-    const y = eventYear(e);
-    if (!y) return;
-    perYear[y] = perYear[y] || 0;
-    if ((metricOf(e, 'rain_mm') || 0) >= 1) perYear[y]++;
-  });
-  const data = Object.entries(perYear).sort((a, b) => a[0] - b[0]);
-  if (rainDays && data.length) {
+  const data = wx.rain_days_per_year || [];
+  if (wx.rain_days && data.length) {
     renderBars('chart-raindays', data);
     panel.style.display = '';
   } else panel.style.display = 'none';
@@ -3613,125 +3668,80 @@ async function renderModuleWidgets() {
   box.style.display = '';
 }
 
+// A37: Eine Anfrage statt der ganzen Lebensdatenbank. Bis v0.31 holte diese
+// Funktion ALLE Ereignisse mit ihren Roh-Metriken (gemessen: 26 MB und 5,5 s
+// bei 12.000 Einträgen) und reduzierte im Browser darüber. Jetzt rechnet der
+// Server (/api/stats/overview, rund 2 kB) — nicht aus Sparsamkeit, sondern
+// weil ein Client, der nur noch ein Zeitfenster kennt, sonst das Fenster
+// gezählt hätte statt das Leben. Die Regeln selbst sind unverändert.
 async function loadStats() {
-  const [events, animals, countries, artists] = await Promise.all([
-    fetchEventsFull(),      // A36: Statistik braucht die Roh-Metriken (Wetter-Extreme)
+  const [ov, animals, countries, artists] = await Promise.all([
+    api("/api/stats/overview"),
     api("/api/compendium/animal").catch(() => []),
     api("/api/compendium/country").catch(() => []),
     api("/api/compendium/artist").catch(() => []),
   ]);
-  const unconfirmed = events.filter(e => e.confirmed !== 'confirmed').length;
-  // Orte: unterschiedliche Ortsnamen (nur erster Namensteil, sonst zählt
-  // jede Nominatim-Langadresse einzeln)
-  const placeOf = e => e.location && e.location.name ? e.location.name.split(',')[0].trim() : null;
-  const places = new Set(events.map(placeOf).filter(Boolean));
+  const num = (id, value) => { document.getElementById(id).textContent = value; };
+  const c = ov.counts;
 
-  document.getElementById('stat-events').textContent = events.length;
-  document.getElementById('stat-countries').textContent = countries.length;
-  document.getElementById('stat-places').textContent = places.size;
-  document.getElementById('stat-animals').textContent = animals.length;
-  document.getElementById('stat-concerts').textContent = events.filter(e => e.category === 'concert').length;
-  document.getElementById('stat-artists').textContent = artists.length;
-  document.getElementById('stat-unconfirmed').textContent = unconfirmed;
+  num('stat-events', c.events);
+  num('stat-countries', countries.length);
+  num('stat-places', c.places);
+  num('stat-animals', animals.length);
+  num('stat-concerts', c.concerts);
+  num('stat-artists', artists.length);
+  num('stat-unconfirmed', c.unconfirmed);
+  num('stat-milestones', c.milestones);
+  num('stat-moves', c.moves);
+  num('stat-meals', c.meals);
 
-  // Meilensteine, Umzüge, Mahlzeiten
-  const milestones = events.filter(e => e.category === 'milestone');
-  document.getElementById('stat-milestones').textContent = milestones.length;
-  const textOf = e => `${e.title} ${e.description || ''}`.toLowerCase();
-  document.getElementById('stat-moves').textContent =
-    milestones.filter(e => /umzug|umgezogen|eingezogen/.test(textOf(e))).length;
-  document.getElementById('stat-meals').textContent = events.filter(e => e.category === 'meal').length;
+  // Alter: aus dem Meilenstein „Geburt" (Anmerkung 72 — eine Wahrheit,
+  // kein Profilfeld). Der Server hat ihn gefunden, auch wenn er außerhalb
+  // jedes geladenen Fensters liegt.
+  num('stat-age', ov.age != null ? ov.age : '–');
+  num('stat-age-sub', ov.birth
+    ? `${t('stat.born', 'geboren')} ${fmtDate(ov.birth)}`
+    : t('stat.born.hint', 'Geburt als Meilenstein eintragen'));
 
-  // Alter: frühester Meilenstein mit "Geburt/geboren" gilt als eigene Geburt
-  const births = milestones
-    .filter(e => e.date_start && /geburt|geboren/.test(textOf(e)))
-    .sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
-  if (births.length) {
-    const b = new Date(births[0].date_start), now = new Date();
-    let age = now.getFullYear() - b.getFullYear();
-    if (now < new Date(now.getFullYear(), b.getMonth(), b.getDate())) age--;
-    document.getElementById('stat-age').textContent = age;
-    document.getElementById('stat-age-sub').textContent = `geboren ${fmtDate(births[0])}`;
-  } else {
-    document.getElementById('stat-age').textContent = '–';
-    document.getElementById('stat-age-sub').textContent = 'Geburt als Meilenstein eintragen';
-  }
-
-  // Wetter-Extreme — aus den Wetter-Metriken. F3: Hitze/Kälte nutzen die
-  // echten Tages-Max/Min (Bestandsdaten ohne Min/Max: Tagesmittel als Rückfall)
-  const metricOf = (e, ...keys) => {
-    for (const k of keys) {
-      const m = (e.metrics || []).find(mm => mm.key === k);
-      if (m && m.value != null) return m.value;
-    }
-    return null;
-  };
-  let hot = null, cold = null;
-  events.forEach(e => {
-    const hi = metricOf(e, 'temp_max_c', 'temperature_c');
-    if (hi != null && (!hot || hi > hot.t)) hot = { t: hi, e };
-    const lo = metricOf(e, 'temp_min_c', 'temperature_c');
-    if (lo != null && (!cold || lo < cold.t)) cold = { t: lo, e };
-  });
-  // Größter Wert einer Metrik über alle Events (nur > 0 zählt)
-  const metricMax = key => {
-    let best = null;
-    events.forEach(e => {
-      const v = metricOf(e, key);
-      if (v != null && v > 0 && (!best || v > best.t)) best = { t: v, e };
-    });
-    return best;
-  };
-  const tempCard = (id, x, unit = ' °C', empty = 'keine Wetterdaten — Verwaltung → „Wetter ergänzen"') => {
-    document.getElementById(id).textContent = x ? `${x.t}${unit}` : '–';
-    document.getElementById(id + '-sub').textContent = x
-      ? `${fmtDate(x.e)} · ${placeOf(x.e) || 'ohne Ort'} — ${x.e.title}`
-      : empty;
-    // Klick auf die Kachel öffnet das Event (Schnellbearbeitung)
+  // Wetter-Extreme. Der Server liefert je Kachel Wert, Datum, Ort und Titel;
+  // ein Klick öffnet den Eintrag und lädt ihn dafür bei Bedarf einzeln nach.
+  const tempCard = (id, x, unit = ' °C',
+                    empty = t('wx.none', 'keine Wetterdaten — Verwaltung → „Wetter ergänzen"')) => {
+    num(id, x ? `${x.value}${unit}` : '–');
+    num(id + '-sub', x
+      ? `${fmtDate(x)} · ${x.place || t('wx.noplace', 'ohne Ort')} — ${x.title}`
+      : empty);
     const card = document.getElementById(id).closest('.stat-card');
-    if (card) card.dataset.eventId = x ? x.e.id : '';
-    if (x) EVENT_CACHE[x.e.id] = x.e;
+    if (card) card.dataset.eventId = x ? x.id : '';
   };
-  tempCard('stat-hot', hot);
-  tempCard('stat-cold', cold);
-  const newDataHint = 'kommt mit neuen Wetter-Anreicherungen (ab v0.14)';
-  tempCard('stat-sunny', metricMax('sunshine_h'), ' h', newDataHint);
-  tempCard('stat-rainy', metricMax('rain_mm'), ' mm', newDataHint);
-  tempCard('stat-windy', metricMax('wind_max_kmh'), ' km/h', newDataHint);
-  tempCard('stat-snowy', metricMax('snow_cm'), ' cm', newDataHint);
-  renderWeatherSummary(events, metricOf, placeOf);
+  const ex = ov.extremes || {};
+  tempCard('stat-hot', ex.hot);
+  tempCard('stat-cold', ex.cold);
+  const newDataHint = t('wx.newdata', 'kommt mit neuen Wetter-Anreicherungen (ab v0.14)');
+  tempCard('stat-sunny', ex.sunny, ' h', newDataHint);
+  tempCard('stat-rainy', ex.rainy, ' mm', newDataHint);
+  tempCard('stat-windy', ex.windy, ' km/h', newDataHint);
+  tempCard('stat-snowy', ex.snowy, ' cm', newDataHint);
+  renderWeatherSummary(ov);
   renderModuleWidgets();
 
-  const perYear = {};
-  events.forEach(e => { const y = eventYear(e); if (y) perYear[y] = (perYear[y]||0) + 1; });
-  const yearData = Object.entries(perYear).sort((a,b) => a[0]-b[0]);
-  renderBars('chart-years', yearData.length ? yearData : [["—",0]]);
+  renderBars('chart-years', ov.per_year.length ? ov.per_year : [["—", 0]]);
 
-  const perCat = {};
-  events.forEach(e => { perCat[e.category] = (perCat[e.category]||0) + 1; });
-  const catData = Object.entries(perCat).sort((a,b) => b[1]-a[1])
-    .map(([c,v]) => [catLabel(c), v, FILTER_CATS.includes(c) ? c : 'event']);
-  renderBars('chart-cats', catData.length ? catData : [["—",0]], cat => tlFilterOnly(cat));
+  const catData = ov.per_category
+    .map(([cat, n]) => [catLabel(cat), n, FILTER_CATS.includes(cat) ? cat : 'event']);
+  renderBars('chart-cats', catData.length ? catData : [["—", 0]], cat => tlFilterOnly(cat));
 
-  // Top-Orte (max. 8)
-  const perPlace = {};
-  events.forEach(e => { const p = placeOf(e); if (p) perPlace[p] = (perPlace[p]||0) + 1; });
-  const placeData = Object.entries(perPlace).sort((a,b) => b[1]-a[1]).slice(0, 8);
-  renderBars('chart-places', placeData.length ? placeData : [["—",0]]);
+  renderBars('chart-places', ov.top_places.length ? ov.top_places : [["—", 0]]);
 
-  // Meistgesehene Tiere: animal-Entities über alle Events gezählt (max. 8);
-  // Klick springt zur Kompendium-Detailseite (Entity-ID aus dem Kompendium)
-  const animalByName = {};
-  animals.forEach(a => { animalByName[a.name] = a.id; });
-  const perAnimal = {};
-  events.forEach(e => (e.entities || []).forEach(en => {
-    if (en.type === 'animal') perAnimal[en.name] = (perAnimal[en.name]||0) + 1;
-  }));
-  const animalData = Object.entries(perAnimal).sort((a,b) => b[1]-a[1]).slice(0, 8)
-    .map(([n,v]) => [`${compEmoji('animal', n)} ${n}`, v, animalByName[n] ? `${animalByName[n]}|${n}` : null]);
-  renderBars('chart-animals', animalData.length ? animalData : [["—",0]],
+  // Meistgesehene Tiere — die Entity-ID kommt mit, der Klick springt ins
+  // Kompendium (vorher musste dafür die Kompendium-Liste danebengelegt werden)
+  const animalData = ov.top_animals
+    .map(([name, n, entityId]) => [`${compEmoji('animal', name)} ${name}`, n,
+                                   entityId ? `${entityId}|${name}` : null]);
+  renderBars('chart-animals', animalData.length ? animalData : [["—", 0]],
     key => { const [id, ...n] = key.split('|'); jumpToEntity('animal', id, n.join('|')); });
 }
+
 function renderBars(id, data, onClick) {
   const max = Math.max(1, ...data.map(d => d[1]));
   const el = document.getElementById(id);
@@ -3751,11 +3761,12 @@ const PRECISION_LABELS = { month: 'Monat', season: 'Jahreszeit', year: 'Jahr', d
 async function loadFuzzyDates() {
   const el = document.getElementById('fuzzy-list');
   if (!el) return;
-  let events = [];
-  try { events = await fetchEvents(); } catch { return; }
-  const fuzzy = events
-    .filter(e => !e.date_start || PRECISION_LABELS[e.date_precision])
-    .sort((a, b) => (a.date_start || '9999') < (b.date_start || '9999') ? -1 : 1);
+  // A37: Der Server kennt die Regel („undatiert oder gröber als tagesgenau")
+  // und liefert nur diese Einträge — vorher wurde dafür die volle Liste
+  // geholt und im Browser gefiltert.
+  let fuzzy = [];
+  try { fuzzy = await fetchEvents({ vague: 1 }); } catch { return; }
+  fuzzy.sort((a, b) => (a.date_start || '9999') < (b.date_start || '9999') ? -1 : 1);
   document.getElementById('fuzzy-title').textContent =
     `⏳ Unscharfe Zeiten — ${fuzzy.length} Event${fuzzy.length === 1 ? '' : 's'}`;
   if (!fuzzy.length) {
@@ -4185,9 +4196,15 @@ document.getElementById('ed-media-file').addEventListener('change', ev => {
 document.getElementById('ed-drop').addEventListener('drop', ev =>
   uploadEventMedia([...(ev.dataTransfer.files || [])].filter(f => f.type.startsWith('image/'))));
 
-function openEventEdit(id) {
-  const e = EVENT_CACHE[id];
-  if (!e) return;
+async function openEventEdit(id) {
+  // A37: Mit dem Zeitfenster kann das Ereignis außerhalb der geladenen Seiten
+  // liegen — eine Statistik-Kachel oder ein Suchtreffer verweist darauf. Vorher
+  // tat der Klick dann einfach nichts; jetzt wird es einzeln nachgeladen.
+  let e = EVENT_CACHE[id];
+  if (!e) {
+    try { e = EVENT_CACHE[id] = await api(`/api/events/${id}`); }
+    catch (_) { toast(t('ev.notfound', 'Eintrag konnte nicht geladen werden.'), 'error'); return; }
+  }
   editingEvent = e;
   renderEventMedia(id);
   document.getElementById('ed-title').value = e.title || '';
@@ -4264,9 +4281,17 @@ document.querySelector('.content').addEventListener('click', ev => {
     const card = tog.closest('.event-card');
     const next = card.nextElementSibling;
     if (next && next.classList.contains('tl-children')) { next.remove(); return; }
-    const kids = TL_CHILDREN.get(tog.dataset.expandChildren) || [];
-    card.insertAdjacentHTML('afterend', `<div class="tl-children">${
+    // A37: Erst die geladenen Kinder — und wenn sie nicht (vollständig) auf
+    // einer geladenen Seite stehen, gezielt nachfragen.
+    const id = tog.dataset.expandChildren;
+    const local = TL_CHILDREN.get(id) || [];
+    const render = kids => card.insertAdjacentHTML('afterend', `<div class="tl-children">${
       kids.map(k => k.category === 'journal' ? journalCard(k) : eventCard(k)).join('')}</div>`);
+    const expected = +(tog.textContent.match(/\d+/) || [0])[0];
+    if (local.length >= expected) render(local);
+    else fetchEvents({ parent: id })
+      .then(kids => render(kids.sort((a, b) => (a.date_start || '') < (b.date_start || '') ? -1 : 1)))
+      .catch(() => render(local));
     return;
   }
   // F15: Klick auf ein Foto öffnet den Betrachter, NICHT den Bearbeiten-Dialog
@@ -4501,8 +4526,32 @@ function mpJumpToDate(dateStr) {
   mp.index = idx;
   renderPeriod();
 }
+// A37: Das Wetter je Zeitraum, nachgeladen. Gemessen macht es aus 205 Byte je
+// Kartenpunkt 799 — über eine ganze Lebensdatenbank wäre es der größte Posten
+// der Antwort, dabei zeigt es nur, was gerade auf dem Schirm ist (Popup und
+// Stopp-Liste). Also: Punkte einmal, Wetter je angezeigtem Zeitraum.
+const MP_WX = new Map();   // Zeitraum-Schlüssel -> geladen
+async function mpEnsureWeather(key, items) {
+  if (!items.length || MP_WX.has(key)) return false;
+  MP_WX.set(key, true);
+  const dates = items.map(e => e.date_start).sort();
+  try {
+    const wx = await api(`/api/events/map?${new URLSearchParams({
+      from: dates[0].slice(0, 19), to: dates[dates.length - 1].slice(0, 19),
+      weather: '1' })}`);
+    const byId = new Map(wx.map(e => [e.id, e.weather]));
+    let hit = false;
+    mp.located.forEach(e => {
+      if (byId.has(e.id) && byId.get(e.id)) { e.weather = byId.get(e.id); hit = true; }
+    });
+    return hit;
+  } catch (_) { return false; }   // ohne Wetter bleibt die Karte vollständig
+}
+
 async function openMapView() {
-  mp.located = (await fetchEvents()).filter(e => e.location && e.location.lat != null && e.date_start);
+  // A37: eigener schlanker Endpunkt statt der Zeitstrahl-Liste — und erst
+  // jetzt, beim Öffnen des Reiters, statt beim Start der App.
+  mp.located = await api('/api/events/map').catch(() => []);
   if (!mapObj) {
     mapObj = L.map('map').setView([50, 6], 4);
     addTiles(mapObj, 19);                   // F13: wählbare Hintergrundkarte
@@ -4597,6 +4646,9 @@ function renderPeriod() {
   drawTracks(key); // async — zeichnet die Timeline-Routen, sobald geladen
   const all = mpFiltered().filter(e => periodKey(e) === key)
     .sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
+  // A37: Wetter für genau diesen Zeitraum nachladen und neu zeichnen, sobald
+  // es da ist. Die Karte steht sofort; das Wetter kommt in die Popups nach.
+  mpEnsureWeather(key, all).then(got => { if (got) renderPeriod(); });
   // A5 (Besuchs-Verdichtung): Ab Monats-Ansicht wiederholte Besuche desselben
   // Orts bündeln — ein Marker + eine Listenzeile je Ort („59× Zuhause — …")
   // statt langer Kartenlisten. In Tag/Woche bleibt die nummerierte Route.
@@ -5230,9 +5282,15 @@ function mdRender(text) {
   return out.join('');
 }
 function isAdmin() { return AUTH.user && AUTH.user.role === 'admin'; }
+// A37: Es gibt keinen Cache über „alle Ereignisse" mehr, den man leeren
+// müsste — jede Ansicht fragt, was sie zeigt. Zwischengespeichert bleibt nur
+// der Jahres-Index (Kacheln, Geburtsdatum) und das Kartenwetter je Zeitraum.
+function invalidateEvents() {
+  _indexPromise = null;
+  MP_WX.clear();
+}
 async function refreshAll() {
-  fetchEvents(true);       // schlanken Cache invalidieren (Zeitstrahl etc.)
-  fetchEventsFull(true);   // A36: auch den vollen Cache (Statistik) frisch holen
+  invalidateEvents();
   await Promise.all([loadTimeline(), loadModQueue(), loadFuzzyDates()]);
 }
 

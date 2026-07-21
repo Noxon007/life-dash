@@ -125,6 +125,58 @@ class EventRead(BaseModel):
     # A36: kompaktes Wetter in der schlanken Liste (statt der Metrik-Zeilen);
     # in der vollen Liste None, dort liest das Frontend die Metriken.
     weather: dict | None = None
+    # A37/F7: Wie viele Tages-Kinder hängen an diesem Eintrag? Der Zeitstrahl
+    # zählte sie bisher in der geladenen Liste — mit dem Zeitfenster kann ein
+    # Kind auf einer anderen Seite liegen, und der Chip zählte still zu wenig.
+    child_count: int | None = None
+
+
+# --------------------------------------------------------------------------- #
+# A37 — schlanke Ansichten fürs serverseitige Zeitfenster
+# --------------------------------------------------------------------------- #
+class LocationGeo(BaseModel):
+    """Nur, was ein Kartenpunkt braucht."""
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    name: str
+    lat: float
+    lng: float | None = None
+
+
+class EventGeo(BaseModel):
+    """A37: Ereignis als Kartenpunkt — ohne Beschreibung, Notiz, Entities und
+    Medien. Rund 380 statt 660 Byte je Eintrag; das Wetter bleibt drin, weil
+    Marker-Popup und Stopp-Liste es zeigen."""
+    id: str
+    title: str
+    category: str
+    date_start: datetime
+    date_precision: DatePrecision
+    source: Source
+    location: LocationGeo
+    weather: dict | None = None
+
+
+class YearCount(BaseModel):
+    year: int
+    count: int
+
+
+class EventsIndex(BaseModel):
+    """A37: Wie viele Ereignisse liegen wo — ohne ein einziges davon zu laden.
+
+    Trägt die Jahresüberschriften und die Scroll-Länge des Zeitstrahls sowie
+    die Kacheln des Heute-Reiters (Gesamtzahl, Unbestätigte, Zeitspanne)."""
+    total: int
+    dated: int
+    undated: int
+    unconfirmed: int
+    year_min: int | None = None
+    year_max: int | None = None
+    years: list[YearCount] = []
+    # F17: der Meilenstein „Geburt" — Grundlage der Alters-Chips, und praktisch
+    # immer außerhalb des geladenen Fensters
+    birth: dict | None = None
 
 
 class FragmentRead(BaseModel):
