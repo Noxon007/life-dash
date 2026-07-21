@@ -118,8 +118,14 @@ def list_events(
     category: str | None = Query(None, description="Nach Kategorie filtern"),
     confirmed_only: bool = Query(False, description="Nur bestätigte Events"),
     q: str | None = Query(None, description="Volltextsuche in Titel/Beschreibung"),
+    slim: bool = Query(False, description="A36: schlanke Liste ohne Metrik-Zeilen "
+                       "(Wetter kompakt) — für Zeitstrahl/Karte/Heute"),
 ) -> list[EventRead]:
-    """Liste der eigenen Events, optional gefiltert (für Timeline & Karte)."""
+    """Liste der eigenen Events, optional gefiltert (für Timeline & Karte).
+
+    slim (A36): ohne die Roh-Metriken (67 % der Nutzlast) — das Wetter kommt
+    kompakt im Feld `weather`. Der Zeitstrahl braucht die Rohzeilen nicht; das
+    macht das erste Laden (v. a. mobil, Anmerkung 61) deutlich kleiner."""
     query = db.query(Event).options(*_EAGER).filter(Event.user_id == user.id)
     if category:
         query = query.filter(Event.category == category)
@@ -132,7 +138,7 @@ def list_events(
         query = query.filter(Event.title.ilike(like) | Event.description.ilike(like))
 
     events = query.order_by(Event.date_start.desc().nullslast()).all()
-    return [event_to_read(e) for e in events]
+    return [event_to_read(e, slim=slim) for e in events]
 
 
 # --------------------------------------------------------------------------- #

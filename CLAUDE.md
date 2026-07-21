@@ -56,19 +56,19 @@ und P5.1/P5.2 (Offline-Capture, Whisper).
 **Releaseplan bis 1.0 steht in KONZEPT Kap. 14.3.** Fertig: 0.21 A28+F14 ·
 0.22 F13 · 0.23 F11+F12 · 0.24 F15 (Fotos) · 0.25 P2.1 (Immich, Stufe 1) ·
 0.26 A29 (ZIP-Backup). Offen: **0.27 Fixes (A31/A32/A30)** · 0.28 F16+A33+A34 ·
-0.29 A35 (lokale Konten) · 0.30 P3.1 (deklarative Statistik) ·
-**0.31 Demo-Modus** · 0.32 Härtung · 0.33 Projektoberfläche · 0.34 Freeze · **1.0 = Veröffentlichung**. Import-Konnektoren erst danach.
+0.29 A35 (lokale Konten) · 0.30 P3.1 · 0.31 A36+F17 (schlanke Liste, Alter) ·
+**0.32 Demo-Modus** · 0.33 Härtung · 0.34 Projektoberfläche · 0.35 Freeze · **1.0 = Veröffentlichung**. Import-Konnektoren erst danach.
 Kein Termindruck (Anmerkung 58). Dort nachsehen statt Reihenfolge raten.
 
-**F17 (Altersanzeige, offen, Anmerkung 72):** Geburtsdatum ist ein
-Meilenstein-Ereignis „Geburt" (kein Profilfeld — eine Wahrheit); Alter je
-Ereignis = Ableitung, dezent auf der Karte. Startformular dazu hängt an A35
-(0.29, Anmerkung 73). F17 selbst noch nicht terminiert.
+**A36 fertig (v0.31.0):** `/api/events?slim=1` lässt die Roh-Metriken weg
+(67 % der Nutzlast) und ersetzt sie durch ein kompaktes `weather`-Objekt;
+Zeitstrahl/Heute/Karte nutzen slim, nur die Statistik holt die volle Liste
+(fetchEventsFull) beim Öffnen. −60 % (19→8 MB bei 12k). weatherSummary liest
+aus e.weather ODER e.metrics — geprüft von tools/check-weather-line.js.
 
-**Offener Messwert (Anmerkung 61):** `/api/events` liefert ALLES auf einmal —
-2,0 kB je Ereignis, bei 20.000 Ereignissen 38 MB, davon 74 % Metriken/Medien/
-Objekte. F12 hat das etwa verdoppelt. 0.27 bringt nur die Ladeanzeige (A30);
-die Ursache behebt A36, bewusst vertagt.
+**F17 fertig (v0.31.0):** Alter je Ereignis als Chip auf der Karte, Ableitung
+aus dem Meilenstein „Geburt" (Anmerkung 72), „~" bei vager Datierung. BIRTH_DATE
+wird in renderTimelineList aus tl.events ermittelt.
 
 **Medien-Invariante (Anmerkung 57, ab F15 bindend):** `provider='local'` sind
 hochgeladene Dateien = **Lebensdatenbank**, dürfen von Neuberechnungen NIE

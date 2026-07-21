@@ -2100,6 +2100,8 @@ const I18N_EN = {
   'wipemine.ask': "All your entries, items, places, routes, photos and raw records will be permanently deleted. Type LOESCHEN to confirm.",
   'wipemine.done': "✓ {rows} rows and {files} image files deleted.",
   'btn.delete': "Delete",
+  'age.at': "at",
+  'age.tip': "Your age at this point",
   'widgets.title': "📊 From your modules",
   'seed.title': "👋 Your first entries",
   'seed.desc': "A few details and the life database is no longer empty. All optional and changeable at any time.",
@@ -2689,35 +2691,43 @@ function fmtDate(e) {
 // ---------- Chips für ein Event ----------
 // F3: Alle Wetter-Metriken werden zu EINER kompakten Zeile gebündelt
 // („12–17 °C · Nieselregen · ☀️ 3,2 h · 🌧️ 5,1 mm") statt vieler Roh-Chips.
+// A36: das Wetter eines Ereignisses als flaches {schlüssel: wert} — egal ob
+// aus der schlanken Liste (e.weather, schon kompakt) oder der vollen Liste
+// (e.metrics, Rohzeilen). Zahlen bleiben Zahlen, Texte (Bedingung, Uhrzeiten)
+// bleiben Texte — genau wie das Backend es kompaktiert.
+function wxOf(e) {
+  if (e.weather) return e.weather;
+  const flat = {};
+  (e.metrics || []).forEach(m => {
+    if (m.source === 'weather') flat[m.key] = m.value_text != null ? m.value_text : m.value;
+  });
+  return flat;
+}
 function weatherSummary(e) {
-  const get = k => (e.metrics || []).find(m => m.key === k);
-  const min = get('temp_min_c'), max = get('temp_max_c'), mean = get('temperature_c');
+  const wx = wxOf(e);
+  const num = k => (typeof wx[k] === 'number' ? wx[k] : null);
   const parts = [];
-  if (min && max) parts.push(`${min.value}–${max.value} °C`);
-  else if (mean) parts.push(`${mean.value} °C`);
-  const cond = get('weather');
-  if (cond && cond.value_text) parts.push(cond.value_text);
-  const sun = get('sunshine_h');
-  if (sun && sun.value > 0) parts.push(`☀️ ${sun.value} h`);
-  const rain = get('rain_mm');
-  if (rain && rain.value > 0) parts.push(`🌧️ ${rain.value} mm`);
-  const snow = get('snow_cm');
-  if (snow && snow.value > 0) parts.push(`❄️ ${snow.value} cm`);
-  const wind = get('wind_max_kmh');
-  if (wind && wind.value >= 30) parts.push(`💨 ${wind.value} km/h`);  // nur wenn nennenswert
-  // F12: gefühlte Temperatur nur zeigen, wenn sie spürbar abweicht — sonst
-  // wiederholt die Zeile bloß dieselbe Zahl. Ab 3 °C Unterschied wird's eine
-  // eigene Erinnerung („gefühlt −8 °C").
-  const appMin = get('apparent_temp_min_c'), appMax = get('apparent_temp_max_c');
-  if (appMin && min && Math.abs(appMin.value - min.value) >= 3)
-    parts.push(`${t('wx.feels', 'gefühlt')} ${Math.round(appMin.value)}–${Math.round((appMax || appMin).value)} °C`);
-  const rainH = get('rain_h');
-  if (rainH && rainH.value > 0) parts.push(`⏱️ ${rainH.value} h`);
-  const gust = get('gust_max_kmh');
-  if (gust && gust.value >= 60) parts.push(`🌪️ ${gust.value} km/h`);
-  const rise = get('sunrise'), set_ = get('sunset');
-  if (rise && set_ && rise.value_text && set_.value_text)
-    parts.push(`🌅 ${rise.value_text}–${set_.value_text}`);
+  const min = num('temp_min_c'), max = num('temp_max_c'), mean = num('temperature_c');
+  if (min != null && max != null) parts.push(`${min}–${max} °C`);
+  else if (mean != null) parts.push(`${mean} °C`);
+  if (wx.weather) parts.push(wx.weather);
+  const sun = num('sunshine_h');
+  if (sun > 0) parts.push(`☀️ ${sun} h`);
+  const rain = num('rain_mm');
+  if (rain > 0) parts.push(`🌧️ ${rain} mm`);
+  const snow = num('snow_cm');
+  if (snow > 0) parts.push(`❄️ ${snow} cm`);
+  const wind = num('wind_max_kmh');
+  if (wind >= 30) parts.push(`💨 ${wind} km/h`);  // nur wenn nennenswert
+  // F12: gefühlte Temperatur nur zeigen, wenn sie spürbar abweicht (≥ 3 °C).
+  const appMin = num('apparent_temp_min_c'), appMax = num('apparent_temp_max_c');
+  if (appMin != null && min != null && Math.abs(appMin - min) >= 3)
+    parts.push(`${t('wx.feels', 'gefühlt')} ${Math.round(appMin)}–${Math.round(appMax != null ? appMax : appMin)} °C`);
+  const rainH = num('rain_h');
+  if (rainH > 0) parts.push(`⏱️ ${rainH} h`);
+  const gust = num('gust_max_kmh');
+  if (gust >= 60) parts.push(`🌪️ ${gust} km/h`);
+  if (wx.sunrise && wx.sunset) parts.push(`🌅 ${wx.sunrise}–${wx.sunset}`);
   return parts.length ? parts.join(' · ') : null;
 }
 function eventChips(e) {
@@ -2764,10 +2774,18 @@ function tlGroup(e) {
 // Gemeinsamer Events-Abruf: Timeline, Karte, Statistik und Unscharfe-Zeiten
 // teilen sich EINE Antwort (bei 10k+ Events sonst 4x mehrere MB).
 // refreshAll() invalidiert den Cache nach jeder Änderung.
-let _eventsPromise = null;
+// A36: Zwei Abrufe mit eigenem Cache. fetchEvents() ist SCHLANK (ohne die
+// Roh-Metriken, 67 % der Nutzlast) — das ist der Startpfad (Zeitstrahl, Heute,
+// Karte) und macht das erste Laden mobil verkraftbar. Nur die Statistik holt
+// über fetchEventsFull() die vollen Metriken, und zwar erst beim Öffnen.
+let _eventsPromise = null, _eventsFullPromise = null;
 function fetchEvents(force = false) {
-  if (force || !_eventsPromise) _eventsPromise = api('/api/events');
+  if (force || !_eventsPromise) _eventsPromise = api('/api/events?slim=1');
   return _eventsPromise;
+}
+function fetchEventsFull(force = false) {
+  if (force || !_eventsFullPromise) _eventsFullPromise = api('/api/events');
+  return _eventsFullPromise;
 }
 async function loadTimeline() {
   // Suche nutzt den hybriden Such-Endpoint (Volltext + semantisch)
@@ -2904,6 +2922,7 @@ const TL_GROUP_CAP = 25;
 function renderTimelineList() {
   const el = document.getElementById('timeline-list');
   el.style.display = '';
+  computeBirthDate(tl.events);   // F17: Geburtsdatum für die Alters-Chips
   let filtered = tl.events.filter(e => passesFilter(e, tl.catFilter));
   // F7: Tages-Unterereignisse sammeln und (außer im Tages-Zoom) unterm
   // Eltern-Event einklappen — der Chip „📅 N Tages-Einträge" klappt sie auf.
@@ -3017,6 +3036,33 @@ function eventPhotos(e) {
 }
 const EVENT_CACHE = {};   // id -> Event (für den Bearbeiten-Dialog)
 const TL_CHILDREN = new Map();  // F7: parent_event_id -> Tages-Kinder (sortiert)
+// F17: Geburtsdatum = frühester Meilenstein mit „Geburt/geboren/birth" (eine
+// Wahrheit, kein Profilfeld — Anmerkung 72). Einmal je Zeitstrahl-Aufbau
+// ermittelt und gepuffert, damit nicht jede Karte die Liste durchsucht.
+let BIRTH_DATE = null;
+function computeBirthDate(events) {
+  const births = (events || [])
+    .filter(e => e.category === 'milestone' && e.date_start
+      && /geburt|geboren|\bbirth\b/i.test(`${e.title} ${e.description || ''}`))
+    .sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
+  BIRTH_DATE = births.length ? new Date(births[0].date_start) : null;
+}
+// F17: Alter beim Ereignis als Ableitung — volle Jahre zwischen Geburt und
+// Ereignis. Nur wenn eine Geburt bekannt ist und das Ereignis danach liegt;
+// bei vager Datierung mit „~", damit die Zahl nicht mehr behauptet als die
+// Daten hergeben (Kap. 3.1). Kein Alter am Geburts-Ereignis selbst.
+function ageChip(e) {
+  if (!BIRTH_DATE || !e.date_start) return '';
+  if (/geburt|geboren|\bbirth\b/i.test(`${e.title} ${e.description || ''}`)
+      && e.category === 'milestone') return '';
+  const when = new Date(e.date_start);
+  let age = when.getFullYear() - BIRTH_DATE.getFullYear();
+  if (when < new Date(when.getFullYear(), BIRTH_DATE.getMonth(), BIRTH_DATE.getDate())) age--;
+  if (age < 0 || age > 130) return '';
+  const vague = e.date_precision && !['exact', 'day'].includes(e.date_precision);
+  return `<span class="chip" title="${t('age.tip', 'Dein Alter zu diesem Zeitpunkt')}">🎂 ${
+    t('age.at', 'mit')} ${vague ? '~' : ''}${age}</span>`;
+}
 function eventCard(e) {
   EVENT_CACHE[e.id] = e;
   const conf = e.confirmed === 'confirmed';
@@ -3036,6 +3082,7 @@ function eventCard(e) {
         <span class="chip">${catLabel(e.category)}</span>
         ${e.parent_event_id ? '<span class="chip">📅 Tages-Eintrag</span>' : ''}
         ${kids && kids.length ? `<span class="chip" data-expand-children="${esc(e.id)}" title="Tages-Einträge ein-/ausklappen">📅 ${kids.length} Tages-Einträge ▾</span>` : ''}
+        ${ageChip(e)}
         ${eventChips(e).map(t => `<span class="chip">${esc(t)}</span>`).join('')}
         <span class="chip ${conf ? 'badge-confirmed' : 'badge-unconfirmed'}">
           ${conf ? '✓ bestätigt' : `⚠ unbestätigt · ${Math.round(e.confidence*100)}%`}
@@ -3568,7 +3615,7 @@ async function renderModuleWidgets() {
 
 async function loadStats() {
   const [events, animals, countries, artists] = await Promise.all([
-    fetchEvents(),
+    fetchEventsFull(),      // A36: Statistik braucht die Roh-Metriken (Wetter-Extreme)
     api("/api/compendium/animal").catch(() => []),
     api("/api/compendium/country").catch(() => []),
     api("/api/compendium/artist").catch(() => []),
@@ -5184,7 +5231,8 @@ function mdRender(text) {
 }
 function isAdmin() { return AUTH.user && AUTH.user.role === 'admin'; }
 async function refreshAll() {
-  fetchEvents(true); // Cache invalidieren — alle Ansichten teilen sich den neuen Abruf
+  fetchEvents(true);       // schlanken Cache invalidieren (Zeitstrahl etc.)
+  fetchEventsFull(true);   // A36: auch den vollen Cache (Statistik) frisch holen
   await Promise.all([loadTimeline(), loadModQueue(), loadFuzzyDates()]);
 }
 

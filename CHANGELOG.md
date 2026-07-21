@@ -15,6 +15,27 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.31.0] – 2026-07-21
+
+### Added
+- **🎂 Your age on every entry.** Each entry now shows, discreetly, how old you
+  were at the time — read from your “Birth” milestone (the one the first-run
+  form creates). No separate profile field, so there is a single source of
+  truth; entries with a vague date show “~” so the number never claims more
+  than the data holds, and nothing appears before your birth or if no birth is
+  recorded.
+
+### Changed
+- **The app opens much faster, especially on a phone.** The timeline used to
+  download every entry with all its weather readings in one go — about
+  two-thirds of that was raw weather rows the list never shows individually.
+  It now fetches a slim version (the weather folded into one compact value per
+  entry), which cuts the initial download by roughly 60 % (measured: ~19 MB
+  down to ~8 MB at 12,000 entries). The timeline looks exactly the same; only
+  the statistics view, which needs the raw figures, still loads the full set —
+  and only when you open it. This is the fix behind the earlier “Failed to
+  fetch” on mobile.
+
 ## [0.30.1] – 2026-07-20
 
 ### Fixed

@@ -1,17 +1,38 @@
 """Hilfsfunktionen zum Serialisieren von ORM-Objekten in Schemas."""
 from __future__ import annotations
 
-from app.models import Event
+from app.models import Event, Source
 from app.schemas import (EntityRead, EventRead, LocationRead, MediaRead,
                          MetricRead)
 
 
-def event_to_read(event: Event) -> EventRead:
-    """Baut ein EventRead inkl. verknüpfter Entities und Metriken."""
+def _weather_compact(event: Event) -> dict | None:
+    """A36: Die 16 Wetter-Metriken eines Ereignisses als EIN flaches Objekt.
+
+    In der schlanken Liste ersetzt das die Metrik-Zeilen — sie sind 67 % der
+    Nutzlast (bei 12.000 Ereignissen der Unterschied zwischen 24 und 7 MB), und
+    der Zeitstrahl braucht davon nur die Werte, nicht Herkunft/Einheit/ID je
+    Zeile. `weather_rev` (interner Marker) fällt weg."""
+    flat: dict = {}
+    for m in event.metrics:
+        if m.source != Source.weather or m.key == "weather_rev":
+            continue
+        flat[m.key] = m.value_text if m.value_text is not None else m.value
+    return flat or None
+
+
+def event_to_read(event: Event, *, slim: bool = False) -> EventRead:
+    """Baut ein EventRead inkl. verknüpfter Entities und Metriken.
+
+    slim (A36): Die Metrik-Zeilen entfallen; stattdessen trägt `weather` die
+    Wetterwerte kompakt. Alles andere (Entities, Medien, Ort) bleibt, damit die
+    Karten unverändert rendern. Für den Zeitstrahl/Heute/Karte — die
+    Statistik lädt weiter die volle Liste, weil sie die Roh-Metriken braucht.
+    """
     entities = [
         EntityRead.model_validate(link.entity) for link in event.entity_links
     ]
-    metrics = [MetricRead.model_validate(m) for m in event.metrics]
+    metrics = [] if slim else [MetricRead.model_validate(m) for m in event.metrics]
     # F15: Bilder in fester Reihenfolge — die Galerie soll nicht bei jedem
     # Laden anders aussehen.
     media = [
@@ -45,4 +66,5 @@ def event_to_read(event: Event) -> EventRead:
         entities=entities,
         metrics=metrics,
         media=media,
+        weather=_weather_compact(event) if slim else None,
     )

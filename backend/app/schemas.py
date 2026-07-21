@@ -122,6 +122,9 @@ class EventRead(BaseModel):
     entities: list[EntityRead] = []
     metrics: list[MetricRead] = []
     media: list["MediaRead"] = []   # F15: angehängte Bilder
+    # A36: kompaktes Wetter in der schlanken Liste (statt der Metrik-Zeilen);
+    # in der vollen Liste None, dort liest das Frontend die Metriken.
+    weather: dict | None = None
 
 
 class FragmentRead(BaseModel):
