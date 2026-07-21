@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import (ConfirmState, DatePrecision, Event, EventEntityLink,
-                        Source, User)
+                        Metric, Source, User)
 from app.routers._serialize import event_to_read
 from app.schemas import EventManualCreate, EventRead, OnThisDayGroup
 from app.services.ingestion import create_manual_event
@@ -24,6 +24,14 @@ _EAGER = (
     selectinload(Event.entity_links).selectinload(EventEntityLink.entity),
     selectinload(Event.metrics),
     selectinload(Event.location),
+    selectinload(Event.media),
+)
+# A36: slim lädt die Metriken NICHT (Wetter kommt separat als Tupel-Abfrage);
+# Medien bleiben eager, damit die Fotostreifen ohne N+1 rendern.
+_EAGER_SLIM = (
+    selectinload(Event.entity_links).selectinload(EventEntityLink.entity),
+    selectinload(Event.location),
+    selectinload(Event.media),
 )
 
 
@@ -126,7 +134,11 @@ def list_events(
     slim (A36): ohne die Roh-Metriken (67 % der Nutzlast) — das Wetter kommt
     kompakt im Feld `weather`. Der Zeitstrahl braucht die Rohzeilen nicht; das
     macht das erste Laden (v. a. mobil, Anmerkung 61) deutlich kleiner."""
-    query = db.query(Event).options(*_EAGER).filter(Event.user_id == user.id)
+    # A36-Performance: im slim-Modus die Metriken NICHT eager laden — 16 Zeilen
+    # je Ereignis als ORM-Objekte waren der Flaschenhals (bei 12.000 Ereignissen
+    # ~3 s). Stattdessen unten das Wetter in EINER schlanken Abfrage holen.
+    eager = _EAGER_SLIM if slim else _EAGER
+    query = db.query(Event).options(*eager).filter(Event.user_id == user.id)
     if category:
         query = query.filter(Event.category == category)
     if confirmed_only:
@@ -138,7 +150,21 @@ def list_events(
         query = query.filter(Event.title.ilike(like) | Event.description.ilike(like))
 
     events = query.order_by(Event.date_start.desc().nullslast()).all()
-    return [event_to_read(e, slim=slim) for e in events]
+    if not slim:
+        return [event_to_read(e) for e in events]
+
+    # Kompaktes Wetter für alle Ereignisse in einer einzigen Tupel-Abfrage
+    # (kein ORM-Objekt je Metrik). weather_rev ist ein interner Marker.
+    wx: dict[str, dict] = {}
+    rows = (db.query(Metric.event_id, Metric.key, Metric.value, Metric.value_text)
+            .join(Event, Event.id == Metric.event_id)
+            .filter(Event.user_id == user.id,
+                    Metric.source == Source.weather,
+                    Metric.key != "weather_rev")
+            .all())
+    for eid, key, value, value_text in rows:
+        wx.setdefault(eid, {})[key] = value_text if value_text is not None else value
+    return [event_to_read(e, slim=True, weather=wx.get(e.id)) for e in events]
 
 
 # --------------------------------------------------------------------------- #

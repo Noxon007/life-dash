@@ -71,7 +71,33 @@ def ensure_schema(engine: Engine) -> list[str]:
         ensure_weather_unique_index(engine)
     if "locations" in existing_tables:
         cleanup_searched_address_labels(engine)
+    ensure_indexes(engine, existing_tables)
     return applied
+
+
+# Fremdschlüssel-Indizes, die in frühen Versionen fehlten. Ohne sie lädt das
+# Zeitstrahl-Eager-Loading (metrics/entities/media je Ereignis) mit vollen
+# Tabellen-Scans — auf einem Raspberry Pi mit zehntausenden Ereignissen die
+# eigentliche Bremse beim ersten Laden. `create_all` legt sie nur bei NEUEN
+# Datenbanken an; hier kommen sie in bestehende nachträglich hinein.
+_INDEXES: dict[str, list[tuple[str, str]]] = {
+    "metrics": [("ix_metrics_event_id", "event_id")],
+    "event_entity_links": [("ix_eel_event_id", "event_id"),
+                           ("ix_eel_entity_id", "entity_id")],
+    "media_refs": [("ix_media_event_id", "event_id"),
+                   ("ix_media_user_id", "user_id")],
+    "events": [("ix_events_date_start", "date_start")],
+}
+
+
+def ensure_indexes(engine: Engine, existing_tables: set[str]) -> None:
+    for table, indexes in _INDEXES.items():
+        if table not in existing_tables:
+            continue
+        with engine.begin() as conn:
+            for name, column in indexes:
+                conn.execute(text(
+                    f'CREATE INDEX IF NOT EXISTS "{name}" ON "{table}" ("{column}")'))
 
 
 def cleanup_searched_address_labels(engine: Engine) -> None:

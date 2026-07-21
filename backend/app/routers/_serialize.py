@@ -21,14 +21,20 @@ def _weather_compact(event: Event) -> dict | None:
     return flat or None
 
 
-def event_to_read(event: Event, *, slim: bool = False) -> EventRead:
+def event_to_read(event: Event, *, slim: bool = False,
+                  weather: dict | None = None) -> EventRead:
     """Baut ein EventRead inkl. verknüpfter Entities und Metriken.
 
     slim (A36): Die Metrik-Zeilen entfallen; stattdessen trägt `weather` die
     Wetterwerte kompakt. Alles andere (Entities, Medien, Ort) bleibt, damit die
-    Karten unverändert rendern. Für den Zeitstrahl/Heute/Karte — die
-    Statistik lädt weiter die volle Liste, weil sie die Roh-Metriken braucht.
-    """
+    Karten unverändert rendern.
+
+    `weather` (A36-Performance): das kompakte Wetter, vom Aufrufer vorberechnet.
+    Der Zeitstrahl-Endpunkt lädt die Metriken GAR NICHT (das Laden von 16 Zeilen
+    je Ereignis als ORM-Objekte war der eigentliche Flaschenhals — bei 12.000
+    Ereignissen 3 s), sondern holt das Wetter in EINER schlanken Abfrage und
+    reicht es hier durch. Wird nichts übergeben, fällt slim auf die geladenen
+    Metriken zurück (Einzelaufruf/Test)."""
     entities = [
         EntityRead.model_validate(link.entity) for link in event.entity_links
     ]
@@ -66,5 +72,7 @@ def event_to_read(event: Event, *, slim: bool = False) -> EventRead:
         entities=entities,
         metrics=metrics,
         media=media,
-        weather=_weather_compact(event) if slim else None,
+        # vorberechnetes Wetter bevorzugen; sonst (Einzelaufruf) aus den
+        # geladenen Metriken bauen
+        weather=(weather if weather is not None else _weather_compact(event)) if slim else None,
     )

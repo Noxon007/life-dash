@@ -15,6 +15,27 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.31.2] – 2026-07-21
+
+### Changed
+- **The first load is dramatically faster on a large database.** 0.31.0 shrank
+  what was *sent*; this shrinks what the server has to *do*. Building the
+  timeline used to load all sixteen weather readings of every entry as full
+  database objects just to fold them into one value — measured on a fast
+  machine, that alone was about 3 seconds at 12,000 entries. The timeline query
+  now skips those rows entirely and fetches the weather in one lightweight pass,
+  cutting the response from roughly 6 seconds to about 1.2 on that machine — and
+  proportionally more on a Raspberry Pi. Several long-missing database indexes
+  were added at the same time (they are created automatically on start).
+
+### Notes for self-hosters
+- If the first load is still slow for you, the remaining cost is simply having
+  to send every entry at once. A faster machine (or moving the database from an
+  SD card / SQLite to PostgreSQL) helps directly, because the work is now
+  CPU- and disk-bound rather than wasted effort. Loading only the visible time
+  range — so the size of your history stops mattering — is the planned next
+  step if this is not enough.
+
 ## [0.31.1] – 2026-07-21
 
 ### Fixed

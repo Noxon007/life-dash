@@ -157,7 +157,9 @@ class Event(Base):
     title: Mapped[str] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    date_start: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # index: der Zeitstrahl sortiert und filtert nach date_start (Performance
+    # bei zehntausenden Ereignissen — sonst sortiert die DB ohne Index)
+    date_start: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     date_end: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     date_precision: Mapped[DatePrecision] = mapped_column(
         Enum(DatePrecision), default=DatePrecision.day
@@ -251,8 +253,8 @@ class EventEntityLink(Base):
     __tablename__ = "event_entity_links"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
-    event_id: Mapped[str] = mapped_column(ForeignKey("events.id"))
-    entity_id: Mapped[str] = mapped_column(ForeignKey("entities.id"))
+    event_id: Mapped[str] = mapped_column(ForeignKey("events.id"), index=True)
+    entity_id: Mapped[str] = mapped_column(ForeignKey("entities.id"), index=True)
     role: Mapped[str] = mapped_column(String(32), default="subject")  # subject|location|mentioned
 
     event: Mapped[Event] = relationship(back_populates="entity_links")
@@ -283,8 +285,8 @@ class MediaRef(Base):
     # Anmerkung 57: fehlte bisher, obwohl Kap. 6.1 es zusagt. Solange Medien
     # nur über ihr Event erreichbar waren, war das folgenlos — mit eigenen
     # Uploads wäre es der Weg zu fremden Bildern.
-    user_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
-    event_id: Mapped[str] = mapped_column(ForeignKey("events.id"))
+    user_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    event_id: Mapped[str] = mapped_column(ForeignKey("events.id"), index=True)
     provider: Mapped[str] = mapped_column(String(32), default="immich")
     external_id: Mapped[str] = mapped_column(String(255))
     captured_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -372,7 +374,7 @@ class Metric(Base):
     __tablename__ = "metrics"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
-    event_id: Mapped[str] = mapped_column(ForeignKey("events.id"))
+    event_id: Mapped[str] = mapped_column(ForeignKey("events.id"), index=True)
     key: Mapped[str] = mapped_column(String(64))  # steps|distance_km|temperature_c|...
     value: Mapped[float | None] = mapped_column(Float, nullable=True)
     value_text: Mapped[str | None] = mapped_column(String(255), nullable=True)
