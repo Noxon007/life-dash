@@ -55,9 +55,11 @@ und P5.1/P5.2 (Offline-Capture, Whisper).
 
 **Releaseplan bis 1.0 steht in KONZEPT Kap. 14.3.** Fertig: 0.21 A28+F14 ·
 0.22 F13 · 0.23 F11+F12 · 0.24 F15 (Fotos) · 0.25 P2.1 (Immich, Stufe 1) ·
-0.26 A29 (ZIP-Backup). Offen: **0.27 Fixes (A31/A32/A30)** · 0.28 F16+A33+A34 ·
-0.29 A35 (lokale Konten) · 0.30 P3.1 · 0.31 A36+F17 (schlanke Liste, Alter) ·
-**0.32 Demo-Modus** · 0.33 Härtung · 0.34 Projektoberfläche · 0.35 Freeze · **1.0 = Veröffentlichung**. Import-Konnektoren erst danach.
+0.26 A29 (ZIP-Backup) · 0.27 Fixes (A31/A32/A30) · 0.28 F16+A33+A34 ·
+0.29 A35 (lokale Konten) · 0.30 P3.1 · 0.31 A36+F17 (schlanke Liste, Alter).
+Offen: **0.32 A37+A38 (serverseitiges Zeitfenster + Mobil-Layout)** ·
+0.33 Demo-Modus · 0.34 Härtung · 0.35 Projektoberfläche · 0.36 Freeze ·
+**1.0 = Veröffentlichung**. Import-Konnektoren erst danach.
 Kein Termindruck (Anmerkung 58). Dort nachsehen statt Reihenfolge raten.
 
 **A36 fertig (v0.31.0):** `/api/events?slim=1` lässt die Roh-Metriken weg
@@ -69,6 +71,21 @@ aus e.weather ODER e.metrics — geprüft von tools/check-weather-line.js.
 **F17 fertig (v0.31.0):** Alter je Ereignis als Chip auf der Karte, Ableitung
 aus dem Meilenstein „Geburt" (Anmerkung 72), „~" bei vager Datierung. BIRTH_DATE
 wird in renderTimelineList aus tl.events ermittelt.
+
+**A37 ist als Nächstes dran (0.32.0, Anmerkung 81):** serverseitiges Zeitfenster
+für `/api/events` (from/to/limit/offset + Jahres-Index), eigener schlanker
+Geo-Endpunkt für die Karte. **Der eigentliche Aufwand ist die Statistik:**
+`loadStats()` reduziert heute im Browser über die VOLLE Liste (Orte, Kategorien,
+Meilensteine, Umzüge, Konzerte, Unbestätigte) — unter einem Fenster werden diese
+Kacheln still falsch, sie müssen als SQL-Aggregate in den Server. Ebenso:
+unscharfe Zeiten, Tagebuch-Tagesabfrage, Druckbereich. Falle: F17 braucht den
+Meilenstein „Geburt", der außerhalb jedes Fensters außer dem ersten liegt.
+**A38 (Mobil-Layout)** liegt im selben Release, Audit-Liste in Anmerkung 82.
+
+**Kein Ticket-System (Anmerkung 83):** Beobachtungen aus der Nutzung werden als
+nummerierte Anmerkung in KONZEPT Kap. 15 festgehalten, Pakete in 14.2/14.3 —
+nicht in Linear, Jira o. ä. Eine Wahrheit, und zwar die, die beim Arbeiten
+gelesen wird.
 
 **Medien-Invariante (Anmerkung 57, ab F15 bindend):** `provider='local'` sind
 hochgeladene Dateien = **Lebensdatenbank**, dürfen von Neuberechnungen NIE
