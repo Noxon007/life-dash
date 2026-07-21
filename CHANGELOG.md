@@ -45,6 +45,11 @@ any `MINOR`.
 - Clicking a weather record on the statistics tab opens the entry again. It
   silently did nothing whenever that entry was not in memory — which, with the
   new paging, would have been most of the time.
+- Narrowing the timeline to a single category now looks past the entries
+  already on screen. It would otherwise have said “no entries” for anything
+  rare — concerts, milestones — while they sat a page further back.
+- The print range no longer shifts by your time zone. Asking for “1–30 June”
+  quietly included the evening of 31 May and cut the last hours of 30 June.
 
 ### Notes for upgraders
 - No migration and no configuration change. The database is untouched.

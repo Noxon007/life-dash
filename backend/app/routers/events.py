@@ -201,35 +201,45 @@ def list_events(
     if not slim:
         return [event_to_read(e) for e in events]
 
-    kids = _child_counts(db, events)
+    kids = _child_counts(db, user.id, events)
     return [event_to_read(e, slim=True, weather=w, child_count=kids.get(e.id))
-            for e, w in zip(events, _weather_for(db, events))]
+            for e, w in zip(events, _weather_for(db, user.id, events))]
 
 
-def _child_counts(db: Session, events: list[Event]) -> dict[str, int]:
+def _child_counts(db: Session, user_id: str, events: list[Event]) -> dict[str, int]:
     """F7: Zahl der Tages-Kinder je Ereignis der Seite — eine Abfrage.
 
     Der Chip „📅 N Tages-Einträge" zählte bisher in der geladenen Liste. Mit
     dem Zeitfenster kann ein Kind auf einer anderen Seite liegen; der Chip
-    hätte zu wenig gezeigt, ohne dass es jemandem auffällt."""
+    hätte zu wenig gezeigt, ohne dass es jemandem auffällt.
+
+    `user_id` steht hier, obwohl die IDs schon aus den eigenen Ereignissen
+    stammen: „jede Abfrage ist auf den Nutzer eingeschränkt" (A12) ist eine
+    Regel ohne Ausnahmen — sonst muss man bei jeder Änderung neu begründen,
+    warum diese eine Stelle sicher ist."""
     if not events:
         return {}
     ids = [e.id for e in events]
     out: dict[str, int] = {}
     for i in range(0, len(ids), 500):
         rows = (db.query(Event.parent_event_id, func.count(Event.id))
-                .filter(Event.parent_event_id.in_(ids[i:i + 500]))
+                .filter(Event.user_id == user_id,
+                        Event.parent_event_id.in_(ids[i:i + 500]))
                 .group_by(Event.parent_event_id).all())
         out.update({pid: n for pid, n in rows})
     return out
 
 
-def _weather_for(db: Session, events: list[Event]) -> list[dict | None]:
+def _weather_for(db: Session, user_id: str, events: list[Event]) -> list[dict | None]:
     """Kompaktes Wetter je Ereignis in EINER Tupel-Abfrage (kein ORM je Metrik).
 
     A36 holte das Wetter für alle Ereignisse des Nutzers auf einmal — bei einer
     Seite von 300 Einträgen wären das weiterhin 190.000 Zeilen. A37 fragt nur
-    die Ereignisse der Seite ab. `weather_rev` ist ein interner Marker."""
+    die Ereignisse der Seite ab. `weather_rev` ist ein interner Marker.
+
+    Der Join auf `Event` bleibt trotz der ID-Einschränkung stehen: A12 verlangt
+    die Nutzer-Einschränkung in JEDER Abfrage, ohne Ausnahme (siehe
+    `_child_counts`)."""
     if not events:
         return []
     ids = [e.id for e in events]
@@ -237,7 +247,9 @@ def _weather_for(db: Session, events: list[Event]) -> list[dict | None]:
     # In Blöcken, damit die IN-Liste keine Parameter-Grenze reißt (SQLite: 999)
     for i in range(0, len(ids), 500):
         rows = (db.query(Metric.event_id, Metric.key, Metric.value, Metric.value_text)
-                .filter(Metric.event_id.in_(ids[i:i + 500]),
+                .join(Event, Event.id == Metric.event_id)
+                .filter(Event.user_id == user_id,
+                        Metric.event_id.in_(ids[i:i + 500]),
                         Metric.source == Source.weather,
                         Metric.key != "weather_rev")
                 .all())
@@ -391,7 +403,7 @@ def list_map_events(
     if date_to is not None:
         query = query.filter(Event.date_start <= date_to)
     events = query.order_by(Event.date_start.asc(), Event.id.asc()).all()
-    wx = _weather_for(db, events) if weather else [None] * len(events)
+    wx = _weather_for(db, user.id, events) if weather else [None] * len(events)
     return [
         EventGeo(
             id=e.id, title=e.title, category=e.category, date_start=e.date_start,

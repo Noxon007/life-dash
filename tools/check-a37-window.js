@@ -7,6 +7,10 @@
 //
 // Deshalb wird hier der VERKEHR geprüft: Welche Anfragen stellt die App, und
 // beantwortet sie ihre Gesamt-Kacheln aus dem Index statt aus einer Liste?
+// Feste Zeitzone, VOR dem ersten Date-Zugriff: auf einer UTC-Maschine (CI,
+// Container) wäre die Zeitzonen-Prüfung unten sonst wirkungslos — sie würde
+// auch dann bestehen, wenn wieder nach UTC umgerechnet wird.
+process.env.TZ = 'Europe/Berlin';
 const fs = require('fs'); const { JSDOM } = require('jsdom');
 const html = fs.readFileSync(process.argv[2] || 'frontend/index.html', 'utf8');
 
@@ -77,6 +81,19 @@ setTimeout(async () => {
   const list = d.getElementById('timeline-list').textContent;
   ok('Alters-Chips überleben das Zeitfenster (Geburt kommt aus dem Index)',
      /🎂/.test(list) && /34/.test(list));
+
+  // 5. Der Druckbereich muss ORTSZEIT senden. `toISOString()` rechnet nach UTC
+  //    um — beim Bau von A37 genau einmal passiert: aus „1.–30. Juni" wurde
+  //    serverseitig „31.05. 22:00 – 30.06. 21:59", also zwei Stunden vom
+  //    Vortag zu viel und zwei Stunden des Endtages zu wenig. Auf einem
+  //    Ausdruck fällt so etwas niemandem auf.
+  d.getElementById('pr-from').value = '2024-06-01';
+  d.getElementById('pr-to').value = '2024-06-30';
+  calls.length = 0;
+  await w.prSelected();
+  const url = decodeURIComponent(eventCalls()[0] || '');
+  ok('Druckbereich sendet den gewählten Tag, nicht den UTC-verschobenen',
+     /from=2024-06-01T00:00:00/.test(url) && /to=2024-06-30T23:59:59/.test(url));
 
   console.log(fail ? `\n${fail} FEHLER` : '\nA37: alle Prüfungen bestanden');
   process.exit(fail ? 1 : 0);

@@ -344,3 +344,19 @@ def test_index_carries_the_birth_for_the_age_chips(db, user):
 
     idx = events_index(db=db, user=user)
     assert idx.birth["date_start"] == datetime(1990, 4, 12)
+
+
+def test_static_routes_win_over_the_single_event_route():
+    """`/api/events/{event_id}` steht am Ende der Datei — mit Absicht.
+
+    Stünde es weiter oben, würde es `/api/events/index`, `/api/events/map` und
+    `/api/events/on-this-day` verschlucken: FastAPI nimmt die erste passende
+    Route, und `{event_id}` passt auf jedes einzelne Segment. Der Fehler wäre
+    ein 404 auf Endpunkte, die es gibt — und niemand würde ihn beim Lesen des
+    Codes sehen."""
+    from app.routers.events import router
+
+    paths = [r.path for r in router.routes if "GET" in (r.methods or ())]
+    single = paths.index("/api/events/{event_id}")
+    for static in ("/api/events/index", "/api/events/map", "/api/events/on-this-day"):
+        assert paths.index(static) < single, f"{static} steht hinter /{{event_id}}"

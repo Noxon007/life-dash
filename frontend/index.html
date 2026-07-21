@@ -1636,9 +1636,10 @@ let AUTH = { mode: "dev", user: null };
 // Aufrufstellen. Erst nach einer kurzen Verzögerung sichtbar: sonst blitzt der
 // Balken bei jedem schnellen Aufruf und beim 4-Sekunden-Takt der Job-Liste.
 //
-// WICHTIG: Das macht nichts schneller (KONZEPT Anmerkung 61). Bei zehntausenden
-// Ereignissen bleibt die Wartezeit — sie sieht nur nicht mehr nach Absturz aus.
-// Die Ursache behebt A36 (schlanke Ereignisliste).
+// WICHTIG: Das macht nichts schneller (KONZEPT Anmerkung 61) — es macht das
+// Warten nur sichtbar, statt es wie einen Absturz aussehen zu lassen. Die
+// Ursache haben A36 (schlanke Liste) und A37 (Zeitfenster) beseitigt; der
+// Balken bleibt für alles, was weiterhin dauert (Import, Anreicherung, Jobs).
 let NET_ACTIVE = 0, NET_TIMER = null;
 const NET_DELAY = 250;
 function netStart() {
@@ -2085,6 +2086,7 @@ const I18N_EN = {
   'tl.more': "▼ Load older entries",
   'tl.loading': "Loading …",
   'tl.end': "That is the beginning of your story.",
+  'tl.nothing.yet': "Nothing matching in the entries loaded so far — look further back?",
   'tl.search.fallback': "Search limited (server search unavailable) — showing plain text matches.",
   'stat.born': "born",
   'stat.born.hint': "add your birth as a milestone",
@@ -2590,7 +2592,7 @@ function applyModules() {
     .concat([...trackedCats].filter(c => !FILTER_CATS_BASE.includes(c)));
   tl.catFilter = new Set(FILTER_CATS);
   mp.catFilter = new Set(FILTER_CATS);
-  buildCatFilter('tl-filters', tl.catFilter, () => renderTimeline());
+  buildCatFilter('tl-filters', tl.catFilter, () => tlRefilter());
   buildCatFilter('mp-filters', mp.catFilter, () => {
     const keep = mp.periods.length ? mp.periods[mp.index] : null;
     rebuildPeriods(keep);
@@ -2643,7 +2645,7 @@ async function saveTracked(keys) {
   });
   TRACKED = new Set(s.tracked_modules || []);
   applyModules();
-  renderTimeline();
+  tlRefilter();   // A37: geänderte Modulauswahl kann eine Seite leerfiltern
 }
 
 // Wiederverwendbare Kategorie-Filter-Chips. onChange(activeSet) wird bei jedem Klick gerufen.
@@ -2844,15 +2846,9 @@ async function loadTimeline(more = false) {
   } finally {
     tl.loading = false;
   }
+  if (!more) tl.autoPages = 0;
   renderTimeline();
-  // Ein enger Kategorie-Filter kann eine ganze Seite wegfiltern — dann stünde
-  // „keine Ereignisse" da, obwohl es Treffer gibt, nur weiter hinten. Also
-  // weiterblättern, bis etwas Sichtbares zusammenkommt — aber gedeckelt:
-  // Trifft ein Filter gar nichts, soll die App nicht stillschweigend die
-  // ganze Datenbank in Einzelseiten nachholen. Dann bleibt der Fuß-Knopf.
-  const auto = more ? tl.autoPages + 1 : 1;
-  tl.autoPages = auto;
-  if (!tl.done && !tl.query && tlVisibleCount() < 12 && auto < 6) loadTimeline(true);
+  tlEnsureVisible();
 }
 
 // Wie viele Karten stehen nach den Filtern tatsächlich auf dem Schirm?
@@ -2860,6 +2856,28 @@ function tlVisibleCount() {
   return tl.events.filter(e => passesFilter(e, tl.catFilter)
     && (tl.zoom === 'day' || !e.parent_event_id)
     && (tl.showVisits || e.source !== 'google_timeline')).length;
+}
+
+// A37: Ein enger Filter kann eine ganze Seite wegfiltern — „Konzerte" trifft
+// in den letzten 300 Einträgen vielleicht keinen einzigen. Ohne das hier
+// stünde „Keine Events" da, obwohl es welche gibt, nur weiter hinten: die
+// stille Sorte Falschaussage, gegen die dieses Paket gebaut ist.
+// Gedeckelt, damit ein Filter, der gar nichts trifft, nicht die ganze
+// Datenbank in Einzelseiten nachholt — dann bleibt der Knopf im Fuß.
+const TL_AUTO_PAGES = 5;
+function tlEnsureVisible() {
+  if (tl.loading || tl.done || tl.query) return;
+  if (tlVisibleCount() >= 12 || tl.autoPages >= TL_AUTO_PAGES) return;
+  tl.autoPages++;
+  loadTimeline(true);
+}
+
+// Jede Filter- oder Zoom-Änderung zeichnet nicht nur neu, sondern prüft auch,
+// ob dafür überhaupt genug geladen ist (siehe tlEnsureVisible).
+function tlRefilter() {
+  tl.autoPages = 0;
+  renderTimeline();
+  tlEnsureVisible();
 }
 
 // A37: Nachladen beim Scrollen. Der Zeitstrahl scrollt in `.content`; 600 px
@@ -3007,9 +3025,13 @@ function renderTimelineList() {
   toggle.style.display = visits ? '' : 'none';
   toggle.textContent = `🛰️ ${visits} Besuche`;
   if (!filtered.length) {
-    el.innerHTML = tl.done || tl.query
+    // A37: Leer heißt nur dann „nichts da", wenn auch nichts mehr kommt.
+    // Sonst: Fuß mit Nachlade-Knopf, damit der Filter keine Sackgasse ist.
+    el.innerHTML = (tl.done || tl.query
       ? '<div class="hint">Keine Events. Leg unter „Eingabe" eins an — oder Suche/Filter zurücksetzen.</div>'
-      : `<div class="hint">${t('tl.loading', 'Lade …')}</div>`;
+      : `<div class="hint">${t('tl.nothing.yet', 'In den geladenen Einträgen ist dazu nichts — weiter zurück suchen?')}</div>`)
+      + tlFooter();
+    tlBindFooter(el);
     return;
   }
   const groups = {};
@@ -3048,7 +3070,10 @@ function renderTimelineList() {
       btn.outerHTML = g.items.slice(TL_GROUP_CAP).map(renderItem).join('');
     }));
   el.insertAdjacentHTML('beforeend', tlFooter());
-  const more = document.getElementById('tl-load-more');
+  tlBindFooter(el);
+}
+function tlBindFooter(el) {
+  const more = el.querySelector('#tl-load-more');
   if (more) more.addEventListener('click', () => loadTimeline(true));
 }
 
@@ -3195,14 +3220,14 @@ document.getElementById('tl-visits-toggle').addEventListener('click', function (
   tl.showVisits = !tl.showVisits;
   this.classList.toggle('active', tl.showVisits);
   this.classList.toggle('off', !tl.showVisits);
-  renderTimeline();
+  tlRefilter();   // A37: ohne Besuche kann eine ganze Seite wegfallen
 });
 document.querySelectorAll('#tl-zoom [data-zoom]').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('#tl-zoom [data-zoom]').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     tl.zoom = btn.dataset.zoom;
-    renderTimeline();
+    tlRefilter();
   });
 });
 
@@ -3239,6 +3264,16 @@ document.getElementById('tl-journal-btn').addEventListener('click', () => openJo
 // Statt die Bildschirmansicht zu drucken, wird #print-area frisch aufgebaut:
 // so landet der ganze gewählte Zeitraum auf dem Papier, unabhängig davon, was
 // im Zeitstrahl gerade eingeklappt oder noch nicht nachgeladen ist.
+// A37: Zeitpunkte für den Server als ORTSZEIT formatieren. `toISOString()`
+// rechnet nach UTC um — in Deutschland wären das im Sommer zwei Stunden, und
+// ein Druckbereich „1.–30. Juni" hätte still den Abend des 31. Mai mitgenommen
+// und die letzten zwei Stunden des 30. Juni verloren. Die Datenbank speichert
+// naive Ortszeit, also muss auch die Grenze Ortszeit sein.
+function isoLocal(d) {
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+       + `T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
 function prDateInput(id) {
   const v = document.getElementById(id).value;
   return v ? new Date(v + 'T00:00:00') : null;
@@ -3255,8 +3290,8 @@ async function prSelected() {
   const withUnconfirmed = document.getElementById('pr-unconfirmed').checked;
 
   const params = {};
-  if (from) params.from = from.toISOString().slice(0, 19);
-  if (to) params.to = to.toISOString().slice(0, 19);
+  if (from) params.from = isoLocal(from);
+  if (to) params.to = isoLocal(to);
   const events = await fetchEvents(params).catch(() => []);
   return events.filter(e => {
     if (!e.date_start) return false;
@@ -3378,7 +3413,9 @@ document.getElementById('tl-print-btn').addEventListener('click', async () => {
 document.querySelectorAll('#print-modal [data-print-preset]').forEach(chip => {
   chip.addEventListener('click', async () => {
     const today = new Date();
-    const iso = d => d.toISOString().slice(0, 10);
+    // Ortszeit, nicht UTC: `toISOString()` hätte in den Nachtstunden den
+    // Vortag eingetragen (dieselbe Falle wie oben in prSelected).
+    const iso = d => isoLocal(d).slice(0, 10);
     if (chip.dataset.printPreset === 'year') {
       document.getElementById('pr-from').value = `${today.getFullYear()}-01-01`;
       document.getElementById('pr-to').value = `${today.getFullYear()}-12-31`;
@@ -3556,9 +3593,10 @@ async function openEntityDetail(type, entityId, name) {
 function tlFilterOnly(cat) {
   tl.catFilter.clear();
   (cat === 'all' ? FILTER_CATS : [cat]).forEach(c => tl.catFilter.add(c));
-  buildCatFilter('tl-filters', tl.catFilter, () => renderTimeline());
+  buildCatFilter('tl-filters', tl.catFilter, () => tlRefilter());
   gotoView('timeline');
-  renderTimeline();
+  tlRefilter();   // A37: eine einzelne Kategorie trifft in der geladenen
+                  // Seite womöglich gar nichts — dann weiterblättern
 }
 // Kompendium mit bestimmtem Tab öffnen
 function openCompendiumType(type) {
@@ -4758,7 +4796,7 @@ document.getElementById('mp-next').addEventListener('click', () => mpGo(1));
 document.getElementById('mp-date').addEventListener('change', ev => mpJumpToDate(ev.target.value));
 
 // Kategorie-Filter-Chips (Timeline + Karte)
-buildCatFilter('tl-filters', tl.catFilter, () => renderTimeline());
+buildCatFilter('tl-filters', tl.catFilter, () => tlRefilter());
 buildCatFilter('mp-filters', mp.catFilter, () => {
   const keep = mp.periods.length ? mp.periods[mp.index] : null;
   rebuildPeriods(keep);
@@ -6014,10 +6052,12 @@ document.getElementById('logout-link').addEventListener('click', async ev => {
     await loadModQueue();
   } catch (err) {
     // „Failed to fetch" heißt NICHT, dass das Backend kaputt ist — /health kam
-    // ja durch. Es ist ein Netz-/Zeitüberschreitungsfehler, typisch im mobilen
-    // Netz bei großer Datenmenge (die Ereignisliste lädt heute alles auf
-    // einmal — Anmerkung 61/A36). Ehrliche Meldung + Erneut-Knopf statt
-    // irreführendem „Backend-Fehler".
+    // ja durch. Es ist ein Netz-/Zeitüberschreitungsfehler; der Anlass war
+    // mobil eine zu große erste Antwort (Anmerkung 61/77). Seit A37 lädt der
+    // Start nur noch eine Seite, die Ursache ist also weg — die ehrliche
+    // Meldung mit Erneut-Knopf bleibt trotzdem: ein schlechtes Netz gibt es
+    // weiterhin, und „Backend-Fehler" wäre dann immer noch die falsche
+    // Diagnose.
     const offline = /failed to fetch|networkerror|load failed/i.test(err.message || '');
     if (offline) {
       showBanner(t('banner.timeout',
