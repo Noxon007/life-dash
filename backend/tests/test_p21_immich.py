@@ -319,6 +319,45 @@ def test_immich_job_terminates_on_photoless_events(db, immich_user, fake_search)
     assert db.query(MediaRef).count() == 0   # nichts verknüpft (kein Foto)
 
 
+def test_same_photo_is_linked_only_once_across_events(db, immich_user, fake_search):
+    """Regression (Nutzer-Bericht): Timeline-Import mit vielen Besuchen am
+    selben Tag. Ein GPS-loses Foto wurde an JEDEN Besuch des Tages gehängt.
+    Jetzt: genau einmal, am ersten passenden Ereignis."""
+    from app.models import Job
+    from app.routers.jobs import _run_immich
+
+    # Fünf Besuche am selben Tag, je eigener Ort — wie ein Städtetag
+    for i in range(5):
+        _event(db, immich_user, when=datetime(2024, 5, 1, 9 + i, 0),
+               loc=_loc(db, immich_user, f"Ort {i}", 51.0 + i * 0.01, 8.0))
+    fake_search["assets"] = [_asset("ein-foto", "2024-05-01T12:00:00")]  # ohne GPS
+
+    job = Job(user_id=immich_user.id, type="immich", status="running")
+    db.add(job)
+    db.commit()
+    _run_immich(db, job)
+
+    refs = db.query(MediaRef).filter(MediaRef.external_id == "ein-foto").all()
+    assert len(refs) == 1        # NICHT fünfmal
+
+
+def test_rerun_does_not_duplicate_existing_links(db, immich_user, fake_search):
+    """Ein zweiter Lauf verknüpft ein bereits hängendes Foto nicht erneut."""
+    from app.models import Job
+    from app.routers.jobs import _run_immich
+
+    _event(db, immich_user, when=datetime(2024, 5, 1, 12, 0))
+    fake_search["assets"] = [_asset("foto", "2024-05-01T12:00:00")]
+
+    for _ in range(2):
+        job = Job(user_id=immich_user.id, type="immich", status="running")
+        db.add(job)
+        db.commit()
+        _run_immich(db, job)
+
+    assert db.query(MediaRef).filter(MediaRef.external_id == "foto").count() == 1
+
+
 def test_immich_job_reports_missing_config(db, user):
     """Ohne eingerichtetes Immich stoppt der Job MIT Meldung — nicht stumm."""
     from app.models import Job

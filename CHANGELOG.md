@@ -15,6 +15,26 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.31.1] – 2026-07-21
+
+### Fixed
+- **The same photo was being linked to many entries on the same day.** With a
+  Google-timeline import there are often a dozen visits on one day, all sharing
+  the same day-long window. A photo without GPS was attached to *every* one of
+  them, and a photo with GPS to every visit within 25 km — so one picture could
+  appear dozens of times and the linked-photo count ran far ahead of the number
+  of actual photos. Now **each photo is linked once**, to the first matching
+  entry, and a re-run never duplicates what is already there.
+  - If you already ran the linking and see the same photos repeated, use
+    **Settings → Immich → “Discard links”** and run **“Link photos”** once more.
+    The connections are derived data, so discarding and rebuilding them is safe
+    — your pictures in Immich are untouched.
+
+### Notes
+- This also keeps the photo volume — and therefore the size of the initial
+  load addressed in 0.31.0 — under control, since one picture no longer
+  multiplies across a day's entries.
+
 ## [0.31.0] – 2026-07-21
 
 ### Added

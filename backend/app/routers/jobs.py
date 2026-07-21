@@ -335,7 +335,8 @@ def _run_immich(db: Session, job: Job) -> tuple[str, str]:
     from sqlalchemy.exc import IntegrityError
 
     from app.services import immich as immich_api
-    from app.services.immich_link import candidates, link_event
+    from app.services.immich_link import (candidates, link_event,
+                                          linked_asset_ids)
 
     user = db.get(User, job.user_id)
     cfg = immich_api.config_for(user)
@@ -348,15 +349,19 @@ def _run_immich(db: Session, job: Job) -> tuple[str, str]:
     total = len(pending)
     job.unit = "Ereignisse geprüft"
     db.commit()
-    log.info("Immich-Lauf: %d Ereignisse zu prüfen (user=%s)",
-             total, user.email or user.id)
+    # Entduplizierung über den ganzen Lauf: jedes Foto genau einmal, am ersten
+    # passenden Ereignis. Vorbelegt mit dem, was schon hängt — so verdoppelt
+    # auch ein erneuter Lauf nichts.
+    seen = linked_asset_ids(db, user.id)
+    log.info("Immich-Lauf: %d Ereignisse zu prüfen, %d Fotos bereits verknüpft "
+             "(user=%s)", total, len(seen), user.email or user.id)
     if not total:
         return "done", "Keine neuen Ereignisse zum Verknüpfen — alles aktuell."
 
     linked = ticked = 0
     for i, event in enumerate(pending, 1):
         try:
-            linked += link_event(db, user, event, url, key)
+            linked += link_event(db, user, event, url, key, seen=seen)
             db.commit()
         except IntegrityError:
             db.rollback()      # paralleler Lauf war schneller — kein Schaden

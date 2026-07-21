@@ -49,18 +49,35 @@ def candidates(db: Session, user_id: str) -> list[Event]:
             and not any(m.provider == PROVIDER for m in e.media)]
 
 
-def link_event(db: Session, user, event: Event, url: str, key: str) -> int:
+def linked_asset_ids(db: Session, user_id: str) -> set[str]:
+    """Alle Immich-Asset-IDs, die diesem Nutzer schon irgendwo hängen.
+
+    Grundlage der Entduplizierung: Ein Foto gehört zu EINEM Moment, nicht zu
+    jedem Timeline-Besuch desselben Tages. An einem Städtetag liegen dutzende
+    Besuche im selben Tagesfenster und (bei GPS-Fotos) im selben 25-km-Umkreis;
+    ohne diese Menge landete dasselbe Bild an ihnen allen (und GPS-lose Fotos
+    an wirklich jedem Ereignis des Tages)."""
+    rows = (db.query(MediaRef.external_id)
+            .filter(MediaRef.user_id == user_id, MediaRef.provider == PROVIDER)
+            .all())
+    return {r[0] for r in rows}
+
+
+def link_event(db: Session, user, event: Event, url: str, key: str,
+               seen: set[str] | None = None) -> int:
     """Sucht Fotos für EIN Ereignis und verknüpft sie. Ohne Commit.
 
-    Idempotent über `external_id` (die Immich-Asset-ID): ein zweiter Lauf
-    erzeugt keine Dubletten, auch wenn dasselbe Foto zu zwei Ereignissen
-    desselben Tages passt.
+    `seen`: Asset-IDs, die diesem Nutzer schon (an DIESEM oder einem anderen
+    Ereignis) hängen. Wird über den ganzen Lauf mitgeführt, damit jedes Foto
+    genau einmal verknüpft wird — beim ersten passenden Ereignis. Wer den Satz
+    nicht übergibt (Einzelaufruf/Test), bekommt wenigstens die Entduplizierung
+    innerhalb des Ereignisses.
     """
     window = api.window_for(event)
     if window is None:
         return 0
     assets = api.search_assets(url, key, *window)
-    known = {m.external_id for m in event.media}
+    known = {m.external_id for m in event.media} if seen is None else seen
     added = 0
     for asset in assets:
         if added >= MAX_PER_EVENT:
@@ -75,7 +92,7 @@ def link_event(db: Session, user, event: Event, url: str, key: str) -> int:
             height=(asset.get("exifInfo") or {}).get("exifImageHeight"),
             sort_order=1000 + added,   # hinter den selbst hochgeladenen Bildern
         ))
-        known.add(asset["id"])
+        known.add(asset["id"])   # sofort merken -> kein zweites Ereignis bekommt es
         added += 1
     return added
 
