@@ -15,6 +15,28 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.30.1] – 2026-07-20
+
+### Fixed
+- **The Immich linking job could run forever without doing anything.** Entries
+  for which Immich has no matching photo stayed on the to-do list, so the job
+  kept re-checking the same first batch over and over — no progress, no end, no
+  error message. It now walks through every entry exactly once and finishes.
+- **The Immich job now shows a progress bar and writes to the log** as it goes
+  (how many entries checked, how many photos linked), instead of being a black
+  box. Loading the candidate list is also much faster on a large database — it
+  no longer makes two extra queries per entry.
+
+### Changed
+- **A slow load on a mobile network no longer says “Backend error”.** When the
+  first big data request times out — most likely on a phone with a large
+  database — the message now says so honestly and offers a “try again” link,
+  rather than blaming the backend, which is actually fine. (The underlying
+  cause, sending the whole event list at once, is a known item still to be
+  addressed.)
+- Weather auto-enrichment failures are no longer completely silent — they leave
+  a debug-level trace, so “why does this entry have no weather?” is answerable.
+
 ## [0.30.0] – 2026-07-20
 
 ### Added

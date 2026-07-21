@@ -34,7 +34,13 @@ def candidates(db: Session, user_id: str) -> list[Event]:
     Woche Urlaub die ersten zwölf Bilder am Reise-Eintrag und nichts an den
     einzelnen Tagen — die Beschwerde, die zu dieser Regel führte.
     """
+    from sqlalchemy.orm import selectinload
+
+    # Kinder und Medien mitladen (selectinload), sonst löst der Filter unten
+    # pro Ereignis zwei Lazy-Queries aus — bei zehntausenden Ereignissen wird
+    # der Kandidaten-Aufbau sonst zur eigentlichen Bremse (N+1).
     rows = (db.query(Event)
+            .options(selectinload(Event.children), selectinload(Event.media))
             .filter(Event.user_id == user_id, Event.date_start.isnot(None))
             .all())
     return [e for e in rows

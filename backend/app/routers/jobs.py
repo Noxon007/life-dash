@@ -323,28 +323,58 @@ def _run_resolve_names(db: Session, job: Job) -> tuple[str, str]:
 
 
 def _run_immich(db: Session, job: Job) -> tuple[str, str]:
-    """P2.1: Fotos aus Immich verknüpfen, stapelweise."""
+    """P2.1: Fotos aus Immich verknüpfen.
+
+    Die Kandidaten werden EINMAL am Anfang ermittelt und dann jedes Ereignis
+    genau einmal geprüft. Der alte Lauf rief `link_batch` in einer Schleife und
+    erwartete, dass die Kandidatenmenge schrumpft — sie tut es aber nur für
+    Ereignisse, an denen tatsächlich ein Foto landet. Ereignisse OHNE passende
+    Fotos blieben Kandidaten, der Stapel nahm immer wieder dieselben ersten 25:
+    eine Endlosschleife ohne Fortschritt und ohne Fehlermeldung.
+    """
+    from sqlalchemy.exc import IntegrityError
+
     from app.services import immich as immich_api
-    from app.services.immich_link import link_batch
+    from app.services.immich_link import candidates, link_event
 
     user = db.get(User, job.user_id)
-    while True:
+    cfg = immich_api.config_for(user)
+    if cfg is None:
+        return "stopped", ("Immich ist für dieses Konto nicht eingerichtet "
+                           "(Verwaltung → Meine Daten → Immich).")
+    url, key = cfg
+
+    pending = candidates(db, user.id)
+    total = len(pending)
+    job.unit = "Ereignisse geprüft"
+    db.commit()
+    log.info("Immich-Lauf: %d Ereignisse zu prüfen (user=%s)",
+             total, user.email or user.id)
+    if not total:
+        return "done", "Keine neuen Ereignisse zum Verknüpfen — alles aktuell."
+
+    linked = ticked = 0
+    for i, event in enumerate(pending, 1):
         try:
-            processed, linked, remaining = link_batch(db, user, limit=25)
+            linked += link_event(db, user, event, url, key)
+            db.commit()
+        except IntegrityError:
+            db.rollback()      # paralleler Lauf war schneller — kein Schaden
         except immich_api.ImmichError as exc:
-            # Fremder Dienst weg: sauber stoppen mit der echten Ursache,
-            # statt es hundertfach zu wiederholen.
-            return "stopped", str(exc)
-        cont = _tick(db, job.id, linked, remaining)
-        if remaining <= 0:
-            return "done", f"{db.get(Job, job.id).done} Fotos verknüpft"
-        if not cont:
-            return "stopped", "gestoppt"
-        # processed == 0 bei remaining > 0 kann nicht vorkommen (der Stapel
-        # nimmt immer vom Anfang) — die Prüfung schützt trotzdem vor einer
-        # Endlosschleife, falls sich die Kandidatenlogik einmal ändert.
-        if processed == 0:
-            return "stopped", f"{remaining} Ereignisse übrig, kein Fortschritt"
+            db.rollback()
+            log.warning("Immich-Lauf gestoppt bei %d/%d: %s", i, total, exc)
+            return "stopped", f"{linked} Fotos verknüpft, dann Abbruch: {exc}"
+        # Alle 10 Ereignisse Fortschritt schreiben (Balken) und ins Log —
+        # ohne Spur ist ein langsamer Lauf von einem hängenden nicht zu
+        # unterscheiden. done = geprüfte Ereignisse, remaining = die restlichen.
+        if i % 10 == 0 or i == total:
+            log.info("Immich-Lauf: %d/%d geprüft, %d Fotos verknüpft",
+                     i, total, linked)
+            if not _tick(db, job.id, i - ticked, total - i):
+                return "stopped", f"{linked} Fotos verknüpft (gestoppt bei {i}/{total})."
+            ticked = i
+
+    return "done", f"{linked} Fotos an {total} geprüften Ereignissen verknüpft."
 
 
 _RUNNERS = {

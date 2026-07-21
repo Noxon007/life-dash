@@ -296,6 +296,42 @@ def test_transient_errors_are_retried(monkeypatch):
     assert calls["n"] == 2      # erst 502, dann Erfolg
 
 
+def test_immich_job_terminates_on_photoless_events(db, immich_user, fake_search):
+    """Regression: Ereignisse ohne passende Fotos bleiben Kandidaten. Der alte
+    Runner nahm im Kreis dieselben ersten 25 — Endlosschleife ohne Fortschritt
+    und ohne Fehlermeldung. Der neue prüft jedes Ereignis genau einmal."""
+    from app.models import Job
+    from app.routers.jobs import _run_immich
+
+    # Fünf datierte Ereignisse, für die Immich NICHTS liefert
+    for i in range(5):
+        _event(db, immich_user, when=datetime(2024, 3, i + 1, 12, 0))
+    fake_search["assets"] = []
+
+    job = Job(user_id=immich_user.id, type="immich", status="running")
+    db.add(job)
+    db.commit()
+
+    status, msg = _run_immich(db, job)      # muss zurückkehren, nicht hängen
+
+    assert status == "done"
+    assert "5" in msg                        # 5 Ereignisse geprüft
+    assert db.query(MediaRef).count() == 0   # nichts verknüpft (kein Foto)
+
+
+def test_immich_job_reports_missing_config(db, user):
+    """Ohne eingerichtetes Immich stoppt der Job MIT Meldung — nicht stumm."""
+    from app.models import Job
+    from app.routers.jobs import _run_immich
+
+    job = Job(user_id=user.id, type="immich", status="running")
+    db.add(job)
+    db.commit()
+    status, msg = _run_immich(db, job)
+    assert status == "stopped"
+    assert "eingerichtet" in msg
+
+
 def test_persistent_errors_still_fail(monkeypatch):
     import urllib.error
 

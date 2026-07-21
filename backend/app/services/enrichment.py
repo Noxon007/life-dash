@@ -5,6 +5,7 @@ ohne Stufe 2 zu verändern.
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 from sqlalchemy.exc import IntegrityError
@@ -12,6 +13,8 @@ from sqlalchemy.orm import Session
 
 from app.models import Event, Metric, Source
 from app.services.weather import fetch_weather
+
+log = logging.getLogger("lifedash.enrichment")
 
 
 # Welche Wetter-Generation trägt ein Event? Hochzählen, wenn neue Felder
@@ -141,7 +144,12 @@ def auto_enrich_events(db: Session, events: list[Event]) -> int:
         try:
             if _needs_weather(event) and _add_weather(db, event):
                 enriched += 1
-        except Exception:  # noqa: BLE001 — Anreicherung ist nie kritisch
+        except Exception as exc:  # noqa: BLE001 — Anreicherung ist nie kritisch
+            # Nicht mehr stumm: ohne Spur bleibt „warum hat mein Eintrag kein
+            # Wetter?" unbeantwortbar (Punkt 5). DEBUG, damit es das Log bei
+            # zeitweiligen Open-Meteo-Aussetzern nicht flutet.
+            log.debug("Auto-Anreicherung übersprungen (%s): %s",
+                      getattr(event, "id", "?"), exc)
             continue
     return enriched
 

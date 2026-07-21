@@ -2261,6 +2261,8 @@ const I18N_EN = {
 
   // --- Nachtrag: fehlende Uebersetzungen & letzte Reste ---
   'banner.offline': "⚠ Backend not reachable. Start it with <code>uvicorn app.main:app</code> in the <code>backend/</code> folder and reload.",
+  'banner.timeout': "⚠ The data did not arrive in time (network, or a large amount of data). <a href=\"#\" onclick=\"location.reload();return false\" style=\"color:var(--accent)\">Try again</a>",
+  'banner.loaderr': "Error while loading",
   'act.weather': "🌤️ Add weather",
   'act.embed': "🧠 Build embeddings",
   'act.import': "📥 Import data",
@@ -5905,7 +5907,19 @@ document.getElementById('logout-link').addEventListener('click', async ev => {
     await loadToday();      // F16: Startansicht ist „Heute"
     await loadModQueue();
   } catch (err) {
-    showBanner(`⚠ Backend-Fehler: ${esc(err.message)}`);
+    // „Failed to fetch" heißt NICHT, dass das Backend kaputt ist — /health kam
+    // ja durch. Es ist ein Netz-/Zeitüberschreitungsfehler, typisch im mobilen
+    // Netz bei großer Datenmenge (die Ereignisliste lädt heute alles auf
+    // einmal — Anmerkung 61/A36). Ehrliche Meldung + Erneut-Knopf statt
+    // irreführendem „Backend-Fehler".
+    const offline = /failed to fetch|networkerror|load failed/i.test(err.message || '');
+    if (offline) {
+      showBanner(t('banner.timeout',
+        '⚠ Die Daten kamen nicht rechtzeitig an (Netz oder große Datenmenge). '
+        + '<a href="#" onclick="location.reload();return false" style="color:var(--accent)">Erneut versuchen</a>'));
+    } else {
+      showBanner(`⚠ ${t('banner.loaderr', 'Fehler beim Laden')}: ${esc(err.message)}`);
+    }
   }
 })();
 </script>
