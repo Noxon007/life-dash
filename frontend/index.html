@@ -356,6 +356,7 @@
   /* Am Schreibtisch gibt es den Klapp-Knopf nicht — dort ist Platz für beides. */
   #mp-filter-toggle { display: none; }
   /* A38: war ein Inline-Stil und damit im Mobilblock nicht aufhebbar. */
+  .mp-range-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .time-range-label { min-width: 150px; text-align: center; }
   .db-table input { width: 100%; min-width: 120px; }
   .job-name { min-width: 230px; }
@@ -705,7 +706,16 @@
     .action-row .btn { min-height: 44px; }
     /* Dieselbe Klasse Fehler an drei weiteren Stellen — erst das Prüfskript
        hat sie gefunden, die Audit-Liste kannte nur die Einstellungsspalten. */
-    .time-range-label { min-width: 0; flex: 1; }
+    /* Der Zeitraum passt nicht zwischen „zurück“ und „weiter“ — auf 360 px
+       bleiben dafür keine 100 px. Also eigene Zeile darüber, die Knöpfe
+       teilen sich die Breite darunter (und werden dabei gross genug). */
+    .mp-range-row { gap: 8px; }
+    .time-range-label {
+      order: -1; flex: 1 0 100%; min-width: 0;
+      font-size: 14px; font-weight: 600; padding-bottom: 2px;
+    }
+    .mp-range-row .btn { flex: 1; min-height: 44px; }
+    .mp-range-row #mp-date { flex: 1 0 100%; }
     .db-table input { min-width: 0; }
     .job-name { min-width: 0; }
 
@@ -1008,7 +1018,7 @@
           </div>
           <div class="filter-group">
             <label data-i18n="map.range">Zeitraum</label>
-            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap">
+            <div class="mp-range-row">
               <button class="btn small secondary" id="mp-prev" data-i18n="map.prev">‹ zurück</button>
               <span class="time-range-label" id="mp-period-label">–</span>
               <button class="btn small secondary" id="mp-next" data-i18n="map.next">weiter ›</button>
