@@ -63,6 +63,17 @@ any `MINOR`.
 - The print range no longer shifts by your time zone. Asking for “1–30 June”
   quietly included the evening of 31 May and cut the last hours of 30 June.
 
+### Infrastructure
+- **A development image is now published from every push to the main branch**
+  (`ghcr.io/…/life-dash:main`), so trying out a change no longer requires
+  inventing a version number. Releases are unchanged: a `vX.Y.Z` tag still
+  builds `X.Y.Z`, `X.Y` and `latest`. `GET /health` now also reports which
+  commit an image was built from — with a development track, the version
+  number alone no longer answers “what is running here?”.
+- `docker-compose.yml` no longer defaults to a version from thirteen releases
+  ago when no `.env` is present; it falls back to `latest`. Pinning a version
+  in `.env` remains the recommendation for anything holding real data.
+
 ### Notes for upgraders
 - No migration and no configuration change. The database is untouched.
 - The list endpoint keeps its old behaviour when asked without a page or a

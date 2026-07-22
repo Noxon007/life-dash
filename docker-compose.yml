@@ -21,7 +21,16 @@
 # Alle Einstellungen: .env.example · Anleitung: docs/DEPLOY.md
 services:
   app:
-    image: ghcr.io/noxon007/life-dash:${LIFEDASH_VERSION:-0.19.0}
+    # Welches Image läuft, entscheidet LIFEDASH_VERSION in der .env:
+    #   0.32.0  eine feste Version  — empfohlen für den Dauerbetrieb
+    #   latest  die jeweils neueste Veröffentlichung
+    #   main    der aktuelle Entwicklungsstand (zum Ausprobieren, Anm. 86)
+    # Die Vorgabe ist `latest` und nicht eine feste Nummer: eine Nummer hier
+    # veraltet mit jedem Release still (sie stand auf 0.19.0, während die App
+    # bei 0.32.0 war). Wer Aktualisierungen kontrollieren will — bei einer
+    # Datenbank über das eigene Leben ist das die vernünftige Haltung —
+    # trägt die Version in die .env ein und hebt sie bewusst an.
+    image: ghcr.io/noxon007/life-dash:${LIFEDASH_VERSION:-latest}
     build: .  # greift nur bei `docker compose build` im Quell-Checkout
     restart: unless-stopped
     ports:

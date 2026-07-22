@@ -21,21 +21,66 @@ GitHub, push the code and a SemVer tag:
 ```bash
 git remote add origin https://github.com/<your-account>/life-dash.git
 git push -u origin main
-git push origin v0.20.0
+git push origin v0.32.0
 ```
 
 Pushing the tag starts the **Docker Release** action: it builds the multi-arch
 image (`linux/amd64` + `linux/arm64`) and pushes it as
-`ghcr.io/<your-account>/life-dash:0.20.0`, `:0.20` and `:latest`. Status under
+`ghcr.io/<your-account>/life-dash:0.32.0`, `:0.32` and `:latest`. Status under
 *Repo → Actions*. After the first run, check that the package is public
 (*Profile → Packages → life-dash → Package settings → Visibility*) — then your
 server pulls it without a registry login. Point the `image:` path in
 `docker-compose.yml` at your account.
 
+### Two tracks: testing and publishing
+
+Getting code onto your server and *declaring a version* are separate things,
+and it is worth keeping them separate — otherwise every experiment costs a
+version number (which is exactly what happened here: 41 versions in six days,
+of which only nine were ever tagged).
+
+| | what you do | what you get |
+|---|---|---|
+| **Try a change** | push to `main` | image `:main`, rebuilt automatically |
+| **Publish** | update CHANGELOG + `app/version.py`, `git tag v0.32.0`, push the tag | `:0.32.0`, `:0.32`, `:latest` |
+
+**Testing a change** — no version, no tag, no changelog entry:
+
+```bash
+git push                      # the workflow builds :main (a few minutes)
+# on the server:
+LIFEDASH_VERSION=main         # in .env
+docker compose pull && docker compose up -d
+```
+
+`:main` is a development build. Point it at a copy of your data, or accept
+that you are running unreleased code — it has no upgrade guarantees.
+Doc-only changes (`*.md`, `docs/`) do not trigger a build.
+
+Two more ways to test that need no registry at all:
+
+```bash
+docker compose build && docker compose up -d      # build on the server itself
+```
+
+…or run the backend directly from a checkout (see *Development* in
+[backend/README.md](../backend/README.md)) — fastest for a quick look.
+
+**Which build am I running?** `GET /health` answers it:
+
+```json
+{ "status": "ok", "version": "0.32.0", "build": { "ref": "main", "sha": "8411eb4" } }
+```
+
+`version` is what the code *claims* to be — the number in `app/version.py`.
+`build` is where the image actually came from, and appears only for images
+built by CI. On a `:main` image the two disagree on purpose: the version is
+the last one published, the build is what you are testing.
+
 **Publishing a new version** (versioning scheme: [CHANGELOG.md](../CHANGELOG.md)):
-commit, update the CHANGELOG, `git tag v0.20.1` (fix) or `v0.21.0` (feature),
-push the tag. On the server, raise `LIFEDASH_VERSION` in `.env` and run
-`docker compose pull && docker compose up -d`.
+commit, update the CHANGELOG and `app/version.py`, `git tag v0.32.1` (fix) or
+`v0.33.0` (feature), push the tag. On the server, raise `LIFEDASH_VERSION` in
+`.env` and run `docker compose pull && docker compose up -d`.
 
 ## 2. Sign-in: local accounts or OIDC
 
@@ -102,7 +147,7 @@ cp .env.example .env
 Fill in `.env` — the minimum:
 
 ```ini
-LIFEDASH_VERSION=0.20.0
+LIFEDASH_VERSION=0.32.0
 PUBLIC_BASE_URL=https://life.example.com
 OIDC_ISSUER=https://id.example.com
 OIDC_CLIENT_ID=<client ID from your OIDC provider>

@@ -17,9 +17,19 @@ COPY backend/app ./app
 COPY backend/modules ./modules
 COPY frontend ./frontend
 
+# Herkunft des Images. Bewusst NACH den COPY-Schritten: diese Werte ändern
+# sich bei jedem Commit und würden weiter oben den Ebenen-Cache zerstören.
+# Die Versionsnummer steht weiterhin allein in app/version.py (A3) — das hier
+# beantwortet eine andere Frage: „welcher Bau bin ich?". Nötig, seit es
+# :main-Images gibt, die zwischen zwei Versionen liegen.
+ARG BUILD_REF=""
+ARG BUILD_SHA=""
+
 ENV MODULES_DIR=/app/modules \
     FRONTEND_DIR=/app/frontend \
-    DATABASE_URL=sqlite:////data/lifedash.db
+    DATABASE_URL=sqlite:////data/lifedash.db \
+    BUILD_REF=${BUILD_REF} \
+    BUILD_SHA=${BUILD_SHA}
 
 VOLUME /data
 EXPOSE 8000

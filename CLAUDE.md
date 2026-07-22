@@ -31,6 +31,10 @@ Entscheidungen/Anmerkungen in Kap. 15. Erst dort gezielt nachlesen statt Code ra
 
 ## Arbeitsregeln (vom User festgelegt)
 - **NIE pushen oder taggen** — Commits ja; Push/Tag macht der User selbst
+- **Zwei Gleise (Anmerkung 86):** Push auf `main` → Image `:main` (Testen, ohne
+  Version). SemVer-Tag → `:X.Y.Z`/`:latest` (Veröffentlichung). Eine neue
+  Version also nur, wenn ein NUTZER einen Unterschied merkt — mehrere Pakete
+  dürfen sich eine teilen. Nicht mehr je Arbeitspaket eine Nummer vergeben.
 - Jede Version: `backend/app/version.py` + `CHANGELOG.md` (verständliche Produktsprache,
   **keine Paketkürzel** wie „A25") + KONZEPT-Tabelle abhaken (✅ + „fertig vX.Y.Z")
 - Commit-Stil: deutsch, `feat(bereich): X.Y.Z — Beschreibung` (Historie ansehen)

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -129,13 +130,22 @@ app.include_router(admin.router)
 
 @app.get("/health", tags=["System"])
 def health() -> dict:
-    return {
+    out = {
         "status": "ok",
         "version": APP_VERSION,
         "ai_provider": settings.ai_provider,
         "auth_mode": settings.auth_mode,
         "database": settings.database_url.split("://")[0],
     }
+    # Anmerkung 86: Seit es Test-Images (:main) zwischen zwei Versionen gibt,
+    # beantwortet die Versionsnummer nicht mehr die Frage „welcher Stand läuft
+    # hier eigentlich?". `build` tut es — aber nur, wenn das Image aus dem
+    # CI kommt; lokal gebaut oder direkt gestartet bleibt das Feld weg,
+    # statt eine Herkunft zu behaupten, die es nicht gibt.
+    ref, sha = os.getenv("BUILD_REF", ""), os.getenv("BUILD_SHA", "")
+    if ref or sha:
+        out["build"] = {"ref": ref or None, "sha": sha[:7] or None}
+    return out
 
 
 # Frontend (responsive PWA) — zuletzt gemountet, damit /api/* & /docs gewinnen

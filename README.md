@@ -50,11 +50,19 @@ decided by your `.env` alone.
 ## Versioning & releases
 
 [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`). During the
-`0.x` phase: features → `MINOR`, fixes → `PATCH`. A release is a git tag
-`vX.Y.Z`; the workflow builds the image from it with the tags `X.Y.Z` (exact),
-`X.Y` (rolling) and `latest`. On a server, pin a concrete version
-(`LIFEDASH_VERSION`) rather than `latest`. Changes are tracked in
+`0.x` phase: features → `MINOR`, fixes → `PATCH`. Changes are tracked in
 [CHANGELOG.md](CHANGELOG.md).
+
+Building and releasing are separate on purpose:
+
+- **`:main`** — built from every push to the main branch. The current
+  development state, for trying things out. No guarantees.
+- **`vX.Y.Z`** — a git tag, and only that, is a release. It builds the image
+  tags `X.Y.Z` (exact), `X.Y` (rolling within the minor) and `latest`.
+
+On a server, pin a concrete version (`LIFEDASH_VERSION`) rather than `latest`,
+and never run `:main` against data you care about. `GET /health` reports both
+the declared version and the commit the image was built from.
 
 ## Documentation language
 
