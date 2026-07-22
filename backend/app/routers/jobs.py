@@ -327,21 +327,31 @@ def _run_recompute(db: Session, job: Job) -> tuple[str, str]:
 
 
 def _run_resolve_names(db: Session, job: Job) -> tuple[str, str]:
-    from app.routers.tracks import resolve_place_names
+    from app.routers.tracks import resolve_names_batch
 
     user = db.get(User, job.user_id)
     # A28: ohne scope läuft der Job über alle Mängel auf einmal. Alte
     # Job-Einträge, die noch einen Scope tragen, laufen unverändert weiter.
     scope = (job.params or {}).get("scope")
     what = f" ({scope})" if scope else ""
+    # Anmerkung 96: Jeder Ort wird in EINEM Lauf höchstens einmal versucht —
+    # dieselbe Kur, die Anmerkung 77 dem Immich-Lauf verordnet hat. Ohne diese
+    # Menge sammeln sich die unauflösbaren Orte vorne in der Warteschlange, bis
+    # ein ganzer Batch aus ihnen besteht; dann meldet der Lauf „nicht auflösbar"
+    # und hört auf, obwohl hunderte auflösbare Orte dahinter warten.
+    tried: set[str] = set()
     while True:
-        r = resolve_place_names(limit=25, scope=scope, db=db, user=user)
+        r = resolve_names_batch(db, user, limit=25, scope=scope, skip=tried)
         cont = _tick(db, job.id, r.resolved, r.remaining)
         if r.remaining <= 0:
-            return "done", f"{db.get(Job, job.id).done} Ortsnamen bearbeitet{what}"
+            done = db.get(Job, job.id).done
+            note = f", {len(tried)} nicht auflösbar" if tried else ""
+            return "done", f"{done} Ortsnamen bearbeitet{what}{note}"
         if not cont:
             return "stopped", "gestoppt"
         if r.resolved == 0:
+            # Jetzt heißt das wirklich, was es sagt: der Batch bestand aus
+            # Orten, die noch nie versucht wurden, und keiner ging.
             return "stopped", f"{r.remaining} nicht auflösbar{what}"
 
 

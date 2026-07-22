@@ -41,12 +41,19 @@ any `MINOR`.
     08:14–19:30” — which opens to the individual visits on click. Entries you
     created yourself are never merged, even two on the same day in the same
     city: they were entered separately, so they are meant separately.
+  - **The cities can be opened.** “Cities visited” and every bar of the
+    most-visited chart lead into the timeline, limited to that city — and the
+    collection gained a **Cities** tab beside countries, listing every city
+    with how many entries it holds and the years you were there. While the
+    limit is active a chip names the city and switches it off again, so a
+    shortened timeline always says why it is short. Places deliberately get no
+    tab of their own: there are hundreds of them and more with every import,
+    and a list you can never finish is what the map is for.
 
 ### Changed
 - Place data returned by the API now includes `city`; `GET /api/events` gained
-  `condense` and `city` parameters.
-
-### Changed
+  `condense` and `city` parameters, and `GET /api/cities` lists the visited
+  cities.
 - **Long-running jobs now say what they are doing while they do it.** Only the
   Immich run reported progress; resolving place names, adding weather, imports
   and exports wrote one line when they started and one when they finished, and
@@ -66,6 +73,20 @@ any `MINOR`.
     everything else out of the buffer within minutes.
 
 ### Fixed
+- **Resolving place names could stop while there was still work to do.** A
+  place the geocoder cannot identify stayed in the queue and was asked again in
+  every batch. On its own that only cost a request per round — but the failures
+  gather at the front of the queue, and as soon as a whole batch consisted of
+  them the run reported “not resolvable” and finished, leaving hundreds of
+  places that would have resolved untouched. Each place is now tried at most
+  once per run, and the closing line says how many could not be identified.
+  Starting the run again retries them: a place unknown today may be known next
+  month.
+- **The weather run spent most of its time looking for work.** Before every
+  batch of 25 entries it loaded the entire event table into memory to decide
+  which entries still needed weather. On a database with thousands of entries
+  that search cost more than the weather lookups themselves. The database now
+  does the selecting.
 - **The running version is readable on a phone again.** It lives in the sidebar
   footer, which the phone layout hides — so “which build am I looking at?” had
   no answer on the device where it is asked most. Version, account and sign-out

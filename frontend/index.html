@@ -1012,6 +1012,14 @@
         </div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:-8px 0 20px">
           <div class="filter-chips" id="tl-filters" style="margin:0"></div>
+          <!-- A41: Der Stadtfilter ist kein Dauerschalter, sondern ein Zustand,
+               in den man aus Statistik oder Kompendium hineinspringt. Er ist
+               deshalb nur sichtbar, wenn er gesetzt ist — aber dann sichtbar
+               UND abwerfbar, denn ein Zeitstrahl, der ohne Grund fast leer
+               aussieht, ist genau die stille Falschaussage aus Anmerkung 92. -->
+          <span class="filter-chip active" id="tl-city-chip" style="display:none"
+                data-i18n-title="tl.city.tip"
+                title="Zeitstrahl auf diese Stadt eingeschränkt — klicken, um wieder alles zu zeigen"></span>
           <span class="filter-chip off" id="tl-visits-toggle" data-i18n-title="tl.visits.tip" title="Importierte Timeline-Besuche (Google) im Zeitstrahl anzeigen — auf der Karte sind sie immer sichtbar" data-i18n="tl.visits">🛰️ Besuche</span>
           <span class="filter-chip" id="tl-journal-btn" data-i18n-title="tl.journal.tip" title="Tagebuch-Eintrag für einen Tag schreiben (Markdown) — erscheint als Tageskopf über den Ereignissen des Tages" data-i18n="tl.journal">📖 Tagebuch schreiben</span>
           <span class="filter-chip" id="tl-print-btn" data-i18n-title="tl.print.tip" title="Zeitraum wählen und drucken oder als PDF sichern — gedruckt wird hell, ohne Navigation und mit allen Ereignissen des Zeitraums" data-i18n="tl.print">🖨️ Drucken</span>
@@ -1083,7 +1091,9 @@
           <div class="stat-card" data-go="timeline:all"><div class="stat-num" id="stat-events">–</div><div class="stat-label" data-i18n="stat.events">Ereignisse gesamt</div><div class="stat-sub" data-i18n="stat.sub.lifedb" data-i18n="layer.mid.title">Lebensdatenbank</div></div>
           <div class="stat-card" data-go="comp:country" data-req-mod="country"><div class="stat-num" id="stat-countries">–</div><div class="stat-label" data-i18n="stat.countries">Länder besucht</div><div class="stat-sub" data-i18n="stat.sub.collection">Kompendium</div></div>
           <div class="stat-card" data-go="map"><div class="stat-num" id="stat-places">–</div><div class="stat-label" data-i18n="stat.places">Orte besucht</div><div class="stat-sub" data-i18n="stat.sub.located">verortete Events</div></div>
-          <div class="stat-card" data-go="map"><div class="stat-num" id="stat-cities">–</div><div class="stat-label" data-i18n="stat.cities">Städte besucht</div><div class="stat-sub" data-i18n="stat.sub.cities">aus der Ortsauflösung</div></div>
+          <!-- A41: führte bis 0.34 auf die ungefilterte Karte — eine Zahl, die
+               man nicht aufmachen kann, ist eine Sackgasse (Anmerkung 94). -->
+          <div class="stat-card" data-go="comp:city"><div class="stat-num" id="stat-cities">–</div><div class="stat-label" data-i18n="stat.cities">Städte besucht</div><div class="stat-sub" data-i18n="stat.sub.collection">Kompendium</div></div>
           <div class="stat-card" data-go="comp:animal" data-req-mod="animal"><div class="stat-num" id="stat-animals">–</div><div class="stat-label" data-i18n="stat.animals">Tierarten gesehen</div><div class="stat-sub" data-i18n="stat.sub.collection">Kompendium</div></div>
           <div class="stat-card" data-go="timeline:concert" data-req-mod="artist"><div class="stat-num" id="stat-concerts">–</div><div class="stat-label" data-i18n="stat.concerts">Konzerte besucht</div><div class="stat-sub" data-i18n="stat.sub.catconcert">Kategorie concert</div></div>
           <div class="stat-card" data-go="comp:artist" data-req-mod="artist"><div class="stat-num" id="stat-artists">–</div><div class="stat-label" data-i18n="stat.artists">Künstler live</div><div class="stat-sub" data-i18n="stat.sub.collection">Kompendium</div></div>
@@ -1189,6 +1199,9 @@
           <div class="zoom-btn" data-type="movie" data-i18n="module.movie.tab">🎬 Filme</div>
           <div class="zoom-btn" data-type="game" data-i18n="module.game.tab">🎮 Spiele</div>
           <div class="zoom-btn" data-type="book" data-i18n="module.book.tab">📖 Bücher</div>
+          <!-- A41: Städte stehen hier, Orte nicht (Anmerkung 95) — ein
+               Kompendium setzt eine Menge mit Horizont voraus. -->
+          <div class="zoom-btn" data-type="city" data-i18n="module.city.tab">🏙️ Städte</div>
         </div>
         <div class="grid cols-4" id="compendium-grid"></div>
         <div id="compendium-detail" style="display:none"></div>
@@ -2102,6 +2115,10 @@ const I18N_EN = {
   'zoom.decade': "Decade",
   'zoom.all': "All",
   'tl.visits.tip': "Show imported timeline visits (Google) in the timeline — on the map they are always visible",
+  // A41 — Stadtfilter
+  'tl.city.tip': "Timeline limited to this city — click to show everything again",
+  'comp.cities.empty': "No cities yet — they are filled in by the place-name run (“Resolve place names” in the settings).",
+  'comp.cities.entries': "entries",
   'tl.journal.tip': "Write a journal entry for a day (Markdown) — appears as a day header above that day’s events",
   'tl.print.tip': "Pick a date range and print or save as PDF — printed light, without navigation, with every event in the range",
   'map.view': "View",
@@ -2544,6 +2561,7 @@ const I18N_EN = {
   'module.movie.tab': "🎬 Movies",
   'module.game.tab': "🎮 Games",
   'module.book.tab': "📖 Books",
+  'module.city.tab': "🏙️ Cities",   // A41
 };
 
 function langSetting() {
@@ -2995,7 +3013,8 @@ const MONTHS_LONG = ["Januar","Februar","März","April","Mai","Juni","Juli","Aug
 // A37: `events` ist ab jetzt das GELADENE Stück, nicht die ganze Geschichte —
 // offset/done/loading führen das Blättern.
 const tl = { zoom: 'year', query: '', events: [], catFilter: new Set(FILTER_CATS),
-             showVisits: false, offset: 0, done: false, loading: false, autoPages: 0 };
+             showVisits: false, offset: 0, done: false, loading: false, autoPages: 0,
+             city: null };   // A41: Stadtfilter, serverseitig (siehe loadTimeline)
 
 function isoWeek(d) {
   const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -3126,9 +3145,19 @@ async function loadTimeline(more = false) {
       // Import bringt sonst dutzende Zeilen, die alle dasselbe sagen. Der
       // Server verdichtet VOR dem Blättern, sonst zerschnitte die Seitengrenze
       // eine Gruppe und beide Hälften zeigten zu kleine Zahlen.
+      // A41: Ist eine Stadt gewählt, filtert der Server danach — nach A37 gilt
+      // das für jede Auswahl über den GESAMTEN Bestand, ein Filter über die
+      // geladene Seite würde nur das Fenster durchsuchen. Zwei Dinge muss der
+      // Stadtfilter dabei mitziehen, sonst führt er in die Irre: die Besuche
+      // sind eingeblendet (die meisten Einträge einer Stadt SIND importierte
+      // Besuche — sonst stünde man vor einer leeren Liste), und verdichtet wird
+      // nicht (wer nach einer Stadt fragt, will die Einträge sehen, nicht eine
+      // Sammelkarte je Tag).
+      const cityMode = !!tl.city;
       const page = await fetchEvents({ limit: TL_PAGE, offset: tl.offset,
-                                       visits: tl.showVisits ? 1 : 0,
-                                       ...(tl.showVisits ? { condense: 1 } : {}) });
+                                       visits: (cityMode || tl.showVisits) ? 1 : 0,
+                                       ...(cityMode ? { city: tl.city }
+                                           : tl.showVisits ? { condense: 1 } : {}) });
       tl.events = more ? tl.events.concat(page) : page;
       tl.offset += page.length;
       tl.done = page.length < TL_PAGE;
@@ -3142,11 +3171,17 @@ async function loadTimeline(more = false) {
   tlEnsureVisible();
 }
 
+// A41: EINE Antwort auf „werden importierte Besuche gezeigt?" — der Schalter
+// sagt es, und ein gesetzter Stadtfilter sagt es auch. Stünde die Bedingung
+// weiter an zwei Stellen einzeln, zeigte der Server die Besuche einer Stadt und
+// der Browser filterte sie gleich wieder weg: eine leere Liste ohne Grund.
+function tlShowsVisits() { return tl.showVisits || !!tl.city; }
+
 // Wie viele Karten stehen nach den Filtern tatsächlich auf dem Schirm?
 function tlVisibleCount() {
   return tl.events.filter(e => passesFilter(e, tl.catFilter)
     && (tl.zoom === 'day' || !e.parent_event_id)
-    && (tl.showVisits || e.source !== 'google_timeline')).length;
+    && (tlShowsVisits() || e.source !== 'google_timeline')).length;
 }
 
 // A37: Ein enger Filter kann eine ganze Seite wegfiltern — „Konzerte" trifft
@@ -3313,7 +3348,8 @@ function renderTimelineList() {
   // A37: Ausgeblendet wird im Server; das hier fängt nur noch die Fälle ohne
   // Server-Filter ab (Suchtreffer). Die Zahl auf dem Schalter kommt aus dem
   // Index — in der geladenen Liste wäre sie eine beliebige Teilmenge.
-  if (!tl.showVisits) filtered = filtered.filter(e => e.source !== 'google_timeline');
+  if (!tlShowsVisits()) filtered = filtered.filter(e => e.source !== 'google_timeline');
+  renderCityChip();
   const toggle = document.getElementById('tl-visits-toggle');
   toggle.style.display = TL_VISIT_COUNT ? '' : 'none';
   toggle.textContent = `🛰️ ${TL_VISIT_COUNT.toLocaleString('de-DE')} ${t('tl.visits.n', 'Besuche')}`;
@@ -3842,7 +3878,41 @@ function compEmoji(type, name) {
   const map = COMP_EMOJI[type] || {};
   return map[(name || '').toLowerCase()] || map._default || "📦";
 }
+// A41: Städte sind keine Entity, sondern `Location.city` (A39) — sie kommen
+// aus einer Aggregation, nicht aus der Entity-Tabelle, und eine Stadt hat
+// keine Detailseite: der Klick führt in den gefilterten Zeitstrahl, wo die
+// Besuche tatsächlich stehen. Eine zweite Wahrheit für dieselbe Stadt
+// (Entity-Zeilen neben dem Feld) wäre teurer und ginge beim nächsten
+// Ortsnamen-Lauf auseinander.
+async function loadCities() {
+  const grid = document.getElementById('compendium-grid');
+  const detail = document.getElementById('compendium-detail');
+  detail.style.display = 'none';
+  grid.style.display = '';
+  let items = [];
+  try { items = await api('/api/cities'); } catch { items = []; }
+  if (!items.length) {
+    grid.innerHTML = `<div class="hint">${t('comp.cities.empty',
+      'Noch keine Städte — sie entstehen im Ortsnamen-Lauf („Ortsnamen auflösen" in den Einstellungen).')}</div>`;
+    return;
+  }
+  const yr = s => s ? String(s).slice(0, 4) : '?';
+  grid.innerHTML = items.map(c => {
+    const span = yr(c.first_visit) === yr(c.last_visit)
+      ? yr(c.first_visit) : `${yr(c.first_visit)}–${yr(c.last_visit)}`;
+    return `
+    <div class="comp-card" data-city="${esc(c.name)}">
+      <div class="comp-emoji">🏙️</div>
+      <div class="comp-name">${esc(c.name)}</div>
+      <div class="comp-count">${c.event_count} ${t('comp.cities.entries', 'Einträge')}${
+        c.first_visit ? ` · ${span}` : ''}${c.country ? ` · ${esc(c.country)}` : ''}</div>
+    </div>`;
+  }).join('');
+  grid.querySelectorAll('.comp-card').forEach(card =>
+    card.addEventListener('click', () => tlFilterCity(card.dataset.city)));
+}
 async function loadCompendium(type) {
+  if (type === 'city') return loadCities();
   const grid = document.getElementById('compendium-grid');
   const detail = document.getElementById('compendium-detail');
   detail.style.display = 'none';
@@ -3935,6 +4005,28 @@ function tlFilterOnly(cat) {
   tlRefilter();   // A37: eine einzelne Kategorie trifft in der geladenen
                   // Seite womöglich gar nichts — dann weiterblättern
 }
+// A41: Zeitstrahl auf eine Stadt einschränken — der Zielort für die
+// Statistik-Kachel, die Städte-Balken und das Städte-Kompendium. `null` hebt
+// die Einschränkung auf. Weil serverseitig gefiltert wird (A37), muss die
+// Seitenzählung von vorn beginnen: die geladenen Seiten gehören zur alten
+// Abfrage.
+function tlFilterCity(city) {
+  tl.city = city || null;
+  tl.offset = 0; tl.done = false; tl.events = []; tl.autoPages = 0;
+  gotoView('timeline');
+  loadTimeline();
+}
+// Der Chip existiert nur, solange gefiltert wird — und er trägt die
+// Abschaltung selbst, damit niemand vor einem verkürzten Zeitstrahl steht,
+// ohne den Grund zu sehen (Anmerkung 92: kein stiller Zustand).
+function renderCityChip() {
+  const chip = document.getElementById('tl-city-chip');
+  if (!chip) return;
+  chip.style.display = tl.city ? '' : 'none';
+  if (tl.city) chip.textContent = `🏙️ ${tl.city} ✕`;
+}
+document.getElementById('tl-city-chip').addEventListener('click', () => tlFilterCity(null));
+
 // Kompendium mit bestimmtem Tab öffnen
 function openCompendiumType(type) {
   document.querySelectorAll('#comp-tabs .zoom-btn').forEach(t =>
@@ -4114,7 +4206,13 @@ async function loadStats() {
   const cities = ov.top_cities || [];
   const cityPanel = document.getElementById('panel-cities');
   if (cityPanel) cityPanel.style.display = cities.length ? '' : 'none';
-  if (cities.length) renderBars('chart-cities', cities);
+  // A41: Die Balken sahen bis 0.34 anklickbar aus und waren es nicht —
+  // `renderBars` verdrahtet nur, was einen Schlüssel UND einen Handler hat.
+  // Der Schlüssel ist hier der Stadtname selbst; er ist zugleich der Wert,
+  // mit dem der Server filtert.
+  if (cities.length)
+    renderBars('chart-cities', cities.map(([name, n]) => [name, n, name]),
+               name => tlFilterCity(name));
 
   // Meistgesehene Tiere — die Entity-ID kommt mit, der Klick springt ins
   // Kompendium (vorher musste dafür die Kompendium-Liste danebengelegt werden)

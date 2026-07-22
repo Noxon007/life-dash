@@ -7,10 +7,10 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.models import Entity, Event, EventEntityLink, User
+from app.models import Entity, Event, EventEntityLink, Location, User
 from app.modules.registry import registry
 from app.routers._serialize import event_to_read
-from app.schemas import EntityRead, EventRead, ModuleRead
+from app.schemas import CityRead, EntityRead, EventRead, ModuleRead
 
 router = APIRouter(prefix="/api", tags=["Module & Kompendium"])
 
@@ -54,6 +54,45 @@ def compendium(
         item.event_count = count
         out.append(item)
     return out
+
+
+@router.get("/cities", response_model=list[CityRead])
+def cities(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[CityRead]:
+    """A41: Die besuchten Städte als Kompendium-Tab.
+
+    Städte sind KEINE `Entity` — sie stehen als `Location.city` (A39) und
+    werden hier aggregiert statt gespiegelt. Eine zweite Wahrheit für dieselbe
+    Tatsache wäre teurer als diese Abfrage: die Stadt kommt aus dem
+    Ortsnamen-Lauf und ändert sich, wenn er sie korrigiert.
+
+    Warum es Städte gibt und Orte nicht (Anmerkung 95): ein Kompendium
+    beantwortet „welche habe ich?" und setzt damit eine Menge mit Horizont
+    voraus. Ein Leben hat vielleicht 100–300 Städte; Orte sind ein
+    Koordinaten-Index, der mit jedem Import um hunderte wächst — dafür ist die
+    Karte da.
+
+    Der Leerstring bedeutet „nachgesehen, keine Stadt" (A39) und ist keine
+    Stadt — er fällt hier genauso weg wie NULL.
+    """
+    rows = (db.query(Location.city,
+                     func.min(Location.country),
+                     func.count(Event.id),
+                     func.count(func.distinct(Location.id)),
+                     func.min(Event.date_start),
+                     func.max(Event.date_start))
+            .join(Event, Event.location_id == Location.id)
+            .filter(Location.user_id == user.id,
+                    Event.user_id == user.id,
+                    Location.city.isnot(None), Location.city != "")
+            .group_by(Location.city)
+            .order_by(Location.city)
+            .all())
+    return [CityRead(name=name, country=country, event_count=events,
+                     place_count=places, first_visit=first, last_visit=last)
+            for name, country, events, places, first, last in rows]
 
 
 @router.post("/entities/{entity_id}/describe", response_model=EntityRead)

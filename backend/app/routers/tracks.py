@@ -636,7 +636,37 @@ def resolve_place_names(
     Frontend ruft so lange nach, bis nichts mehr offen ist. Fortschritt wird
     pro Ort committet.
     """
+    return resolve_names_batch(db, user, limit=limit, scope=scope)
+
+
+def resolve_names_batch(
+    db: Session,
+    user: User,
+    *,
+    limit: int = 25,
+    scope: str | None = None,
+    skip: set[str] | None = None,
+) -> PlaceNameResolveResult:
+    """Der Rumpf von `resolve_place_names` — als Funktion, damit der Job-Runner
+    `skip` mitgeben kann (Anmerkung 96).
+
+    `skip` sind die Orte, die dieser LAUF schon erfolglos versucht hat. Ohne das
+    fragt jeder Batch sie erneut: `_candidates()` wird jede Runde frisch
+    gerechnet und enthält sie weiter, `sort` ist stabil, also behalten sie ihren
+    Rang und rutschen nach vorn, sobald die auflösbaren Orte vor ihnen abgebaut
+    sind. Der Abzug in `remaining` ist rein kosmetisch und ändert daran nichts.
+    Die teure Folge ist nicht die verlorene Sekunde je Runde, sondern das Ende:
+    haben sich `limit` unauflösbare Orte vorne gesammelt, ist ein Batch komplett
+    Fehlschlag, der Runner sieht `resolved == 0` und meldet „nicht auflösbar" —
+    während hunderte auflösbare Orte dahinter unberührt bleiben.
+
+    Bewusst NUR für die Dauer eines Laufs und nicht gespeichert: dass OSM einen
+    Ort heute nicht kennt, ist keine Eigenschaft des Ortes (anders als
+    `Location.city`, Anmerkung 88), sondern das Ergebnis eines Versuchs. Ein
+    neuer Lauf ist die Art, wie der Nutzer „nochmal probieren" sagt.
+    """
     limit = max(1, min(limit, 100))
+    skip = skip if skip is not None else set()
     parts = geocode_svc.parts_for(user)
     lang = geocode_svc.lang_for(user)   # F10: Ortsnamen in der UI-Sprache
 
@@ -653,7 +683,7 @@ def resolve_place_names(
                     .all())
         return _resolve_candidates(db, user.id, parts)
 
-    all_candidates = _candidates()
+    all_candidates = [l for l in _candidates() if l.id not in skip]
     locs = all_candidates[:limit]
     log.info("Ortsnamen-Batch (%s): %d von %d Orten, ~%d s bei %.1f s Wartezeit",
              scope or "alle", len(locs), len(all_candidates), len(locs) * _geo_delay(),
@@ -693,11 +723,15 @@ def resolve_place_names(
             resolved += 1
         else:
             failed += 1
-    # Fehlschläge nicht als "offen" zählen, sonst dreht das Frontend
-    # Endlosrunden über dieselben, unauflösbaren Orte.
-    remaining = max(0, len(_candidates()) - failed)
-    log.info("Ortsnamen-Auflösung (%s): %d aufgelöst, %d fehlgeschlagen, %d offen",
-             scope or "alle", resolved, failed, remaining)
+            skip.add(loc.id)   # Anm. 96: in diesem Lauf nicht noch einmal
+    # Was noch offen ist, ist was noch nicht versucht wurde. Bis 0.34 stand
+    # hier `len(_candidates()) - failed`: die Fehlschläge blieben Kandidaten und
+    # wurden nur von der GEMELDETEN Zahl abgezogen — die Zahl stimmte, die
+    # Warteschlange nicht.
+    remaining = len([l for l in _candidates() if l.id not in skip])
+    log.info("Ortsnamen-Auflösung (%s): %d aufgelöst, %d fehlgeschlagen "
+             "(%d in diesem Lauf), %d offen",
+             scope or "alle", resolved, failed, len(skip), remaining)
     return PlaceNameResolveResult(resolved=resolved, failed=failed, remaining=remaining)
 
 

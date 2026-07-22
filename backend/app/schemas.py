@@ -81,6 +81,18 @@ class EntityRead(BaseModel):
     event_count: int = 0  # Anzahl verknüpfter Events (Kompendium-Kacheln)
 
 
+class CityRead(BaseModel):
+    """A41: eine besuchte Stadt fürs Kompendium — aggregiert aus
+    `Location.city` (A39), nicht als eigene Zeile gespeichert. `name` ist
+    zugleich der Filterwert für `/api/events?city=…`."""
+    name: str
+    country: str | None = None
+    event_count: int = 0
+    place_count: int = 0     # wie viele Orte in dieser Stadt
+    first_visit: datetime | None = None
+    last_visit: datetime | None = None
+
+
 class LocationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str

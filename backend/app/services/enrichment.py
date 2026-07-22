@@ -7,12 +7,13 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from datetime import time as time_
 
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 
-from app.models import Event, Metric, Source
+from app.models import Event, Location, Metric, Source
 from app.services.weather import fetch_weather
 
 log = logging.getLogger("lifedash.enrichment")
@@ -63,14 +64,33 @@ def _needs_weather(event: Event) -> bool:
 
 
 def _weather_candidates(db: Session) -> list[Event]:
-    """Verortete, datierte, nicht-zukünftige Events ohne Wetter-Metrik."""
+    """Verortete, datierte, nicht-zukünftige Events ohne Wetter-Metrik.
+
+    Diese Suche läuft VOR JEDEM Batch. Sie holte bis 0.34 den GANZEN Bestand
+    (`query(Event).all()`) und filterte in Python — samt Lazy-Load von
+    `location` und `metrics` je Event. Bei 12 000 Ereignissen war das Suchen
+    teurer als das Anreichern (Anmerkung 97). Jetzt entscheidet SQL alles, was
+    SQL entscheiden kann; in Python bleibt nur die Revisionsfrage, die aus den
+    Metriken kommt (Anmerkung 85: dieselbe Annahme „der Bestand passt in den
+    Speicher", die A37 im Frontend beseitigt hat).
+    """
     t0 = time.monotonic()
-    rows = db.query(Event).all()
+    # `date_start` ist naiv gespeichert (DateTime ohne Zeitzone) — der Vergleich
+    # muss es auch sein, sonst vergleicht SQLite Zeichenketten mit und ohne
+    # Offset. Grenze ist Mitternacht NACH heute, weil `_needs_weather`
+    # tagesgenau urteilt („Zukunft hat noch kein Wetter").
+    tomorrow = datetime.combine(datetime.now(timezone.utc).date(), time_.min) \
+        + timedelta(days=1)
+    rows = (db.query(Event)
+            .join(Location, Event.location_id == Location.id)
+            .filter(Location.lat.isnot(None),
+                    Event.date_start.isnot(None),
+                    Event.date_start < tomorrow)
+            .options(selectinload(Event.metrics),
+                     joinedload(Event.location))
+            .all())
     hits = [e for e in rows if _needs_weather(e)]
-    # Diese Suche läuft VOR JEDEM Batch über den ganzen Bestand. Bei kleinen
-    # Datenmengen ist das egal, bei 12 000 Ereignissen ist es der teuerste Teil
-    # des Laufs — sichtbar gemacht statt vermutet (Anmerkung 85: messen).
-    log.debug("Wetter-Kandidaten: %d von %d Ereignissen (%.1f s)",
+    log.debug("Wetter-Kandidaten: %d von %d vorgefilterten Ereignissen (%.1f s)",
               len(hits), len(rows), time.monotonic() - t0)
     return hits
 
