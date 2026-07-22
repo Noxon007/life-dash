@@ -45,26 +45,34 @@ Entscheidungen/Anmerkungen in Kap. 15. Erst dort gezielt nachlesen statt Code ra
   etc. aus Config); `.env.example` ist die Setup-Referenz
 
 ## Stand
-Umgesetzt bis **v0.20.0** (2026-07-20). **F10 komplett** (App zweisprachig +
-Doku auf Englisch). Offen und klein: **A28** (ein Ortsnamen-Lauf statt
-Scope-Auswahl), **F11** (mehr aus vorhandenen Wetterdaten — reine Ableitung,
-kein API-Aufruf), **F12** (zusätzliche Wetterfelder via Re-Enrichment),
-**F13** (wählbare Hintergrundkarten + eigene Tile-URL), **F14** („An diesem
-Tag"), **P3.1** (deklarative Statistik-Widgets), F8-Rest („Druck mit Fotos",
-wartet auf P2.1). Groß: **R1** (Veröffentlichungsreife — Demo-Modus,
-Screenshots, Härtung, getesteter Upgrade-Pfad; Gate vor jeder Werbung),
-Import-Quellen (P2.1 Immich, P2.8 OwnTracks, P2.9 Automatisierung,
-P2.10 Trakt/Medienkonsum, P2.11 Dawarich/Reitti/GPX, P4.1 Health, P4.2 PSN)
-und P5.1/P5.2 (Offline-Capture, Whisper).
+Umgesetzt bis **v0.34.0** (2026-07-22). Gruppe A ist bis **A41** fertig,
+Gruppe B bis **F18**. Offen ist damit nur noch: **A42** (Städte-Detailseite),
+**F19** (Abzeichen ohne Ende), **P5.1** (Offline-Erfassung), **F1-Rest**
+(KI-Tageszusammenfassung), **P2.1 Stufe 2** (Immich als Ereignisquelle),
+dann **Demo-Modus** und **R1** (Veröffentlichungsreife). Hinter 1.0 bleiben
+nur noch neue Import-Konnektoren (P2.8 OwnTracks, P2.9 Automatisierung,
+P2.10 Trakt, P2.11 Dawarich/GPX, P4.1 Health, P4.2 PSN) plus **P5.2**
+(Whisper — einzige Ausnahme, schwere neue Laufzeit-Abhängigkeit).
 
 **Releaseplan bis 1.0 steht in KONZEPT Kap. 14.3.** Fertig: 0.21 A28+F14 ·
 0.22 F13 · 0.23 F11+F12 · 0.24 F15 (Fotos) · 0.25 P2.1 (Immich, Stufe 1) ·
 0.26 A29 (ZIP-Backup) · 0.27 Fixes (A31/A32/A30) · 0.28 F16+A33+A34 ·
 0.29 A35 (lokale Konten) · 0.30 P3.1 · 0.31 A36+F17 (schlanke Liste, Alter) ·
-0.32 A37 (serverseitiges Zeitfenster) · 0.33 A38 (Mobil-Layout) + dev-Kennung.
-Offen: **0.34 A39+F18 (Städte + Fotos am Tag)** · **0.35 Demo-Modus** ·
-**1.0 = Veröffentlichung**. Import-Konnektoren erst danach.
-Kein Termindruck (Anmerkung 58). Dort nachsehen statt Reihenfolge raten.
+0.32 A37 (serverseitiges Zeitfenster) · 0.33 A38+A40 (Mobil-Layout,
+Kartenschalter) + dev-Kennung · 0.34 A39+F18+A41 (Städte, Tages-Fotos).
+Offen: **0.35 F19+A42 (Sammlung)** · **0.36 P5.1+F1-Rest (Erfassen)** ·
+**0.37 P2.1 Stufe 2 (Immich als Quelle)** · **0.38 Demo-Modus** ·
+**1.0 = Veröffentlichung**. Kein Termindruck (Anmerkung 58).
+Dort nachsehen statt Reihenfolge raten.
+
+**Was hinter 1.0 wartet, entscheidet die ART (Anmerkung 101, 2026-07-22):**
+neue Import-Konnektoren warten, alles andere nicht — vorher galt „nicht
+dringend", was P5.1, F1-Rest und P2.1 Stufe 2 grundlos nach hinten schob.
+Begründung: 1.0 ist per Ausschluss definiert als „vollständiges Werkzeug zum
+Erfassen und Erkunden von Hand", und ein Konnektor erweitert die *Zufuhr*,
+nicht das Konzept. Ein Paket, das Erfassen oder Erkunden verbessert, ist
+deshalb gar kein 1.x-Kandidat. Preis: drei Releases mehr vor dem Demo-Modus,
+bewusst in Kauf genommen; Rückzugsreihenfolge steht in 14.3.
 
 **Achtung Tags (Anmerkung 91):** `v0.32.0` wurde gesetzt, als A38 noch
 fehlte — deshalb ist A38 zu 0.33.0 geworden und der Rest um eins gerutscht.
@@ -113,19 +121,26 @@ bekommen: Bestandszeilen haben dort NULL, weil die Spalte per ADD COLUMN kam.
 **Wer Medien sucht, sucht sie über `user_id`, nicht über Events** — sonst
 fehlen Tages-Fotos beim Löschen, Aufräumen und im Export.
 
-**0.35 = Demo-Modus (vormals 0.33) — Anmerkungen 87/88 dokumentieren 0.34.** Beides sind
-Schema-Änderungen — und genau deshalb VOR dem Demo-Modus, ab dem Datensatz
-und Upgrade-Pfad das Modell stillhalten. **A39:** `Location.city` als echtes
-Feld (heute steckt die Stadt nur als Textbaustein im zusammengesetzten Namen,
-`addressdetails` werden nicht gespeichert → Rückfüllung läuft im vorhandenen
-Ortsnamen-Lauf A28 mit); darauf Zeitstrahl-Verdichtung gleicher Städte
-(serverseitig, wegen A37-Paginierung) und „besuchte Städte" als Statistik.
-Karte bleibt unberührt — Bewegungen sind `Track`, nicht Event. **F18:**
-`MediaRef.event_id` wird nullable, Fotos hängen wahlweise am Datum
-(`captured_at` gibt es schon), Tageskopf rendert sie. **Verworfen wurde ein
-automatisches Tages-Objekt je Tag** (Anmerkung 87): das hieße `parent_event_id`
-auf Bestätigtem setzen und Tausende leere Container, die jede Aggregation
-wieder ausfiltern müsste. Der Container ist das Datum, kein Objekt.
+**Als Nächstes: 0.35 = F19 + A42 (Sammlung).** **A42** (Anmerkung 102): Städte
+haben seit A41 einen Tab, aber keine **Seite** — der Klick verlässt die
+Sammlung (`tlFilterCity`), während jeder andere Typ `openEntityDetail` öffnet
+(Wikipedia-Text, Karte, Ereignisse). Ursache ist die richtige Entscheidung
+darunter: Städte sind bewusst **keine `Entity`** (Anm. 95), und der ganze
+Detail-Pfad hängt an einer Entity-ID. Also eigener Ereignis-Endpunkt je Stadt
+plus **`city_info`-Cache** (Ableitung, wegwerfbar — aber eine Schema-Ergänzung,
+und die ist VOR dem Demo-Datensatz billig). Zwei Fallen: **Namensgleichheit**
+(Springfield, Frankfurt) → Land muss in die Wikidata-Suche, sonst beschreibt
+die App selbstbewusst die falsche Stadt; und `services/wikipedia.py` fragt fest
+`de.wikipedia.org` — seit F10 deutscher Text unter englischer Oberfläche, gilt
+auch für Tiere und Länder und wird hier für alle mitrepariert. **F19**
+(Anm. 99): Platin hört auf, Endstation zu sein — darüber zählt das Abzeichen
+gegen eine erzeugte nächste Marke weiter; zu billige Schwellen einmalig hoch.
+
+**Verworfen: ein automatisches Tages-Objekt je Tag** (Anmerkung 87) — das hieße
+`parent_event_id` auf Bestätigtem setzen und Tausende leere Container, die jede
+Aggregation wieder ausfiltern müsste. Der Container ist das Datum, kein Objekt.
+Allgemein: erst prüfen, ob die Zeitachse den Container schon liefert, bevor
+eine Zeile entsteht, die für immer gepflegt, gezählt und ausgefiltert wird.
 
 **A36 fertig (v0.31.0):** `/api/events?slim=1` lässt die Roh-Metriken weg
 (67 % der Nutzlast) und ersetzt sie durch ein kompaktes `weather`-Objekt;
