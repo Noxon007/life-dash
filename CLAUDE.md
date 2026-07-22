@@ -45,9 +45,9 @@ Entscheidungen/Anmerkungen in Kap. 15. Erst dort gezielt nachlesen statt Code ra
   etc. aus Config); `.env.example` ist die Setup-Referenz
 
 ## Stand
-Umgesetzt bis **v0.37.0** (2026-07-22). **Gruppe A ist komplett** (A1–A42),
+Umgesetzt bis **v0.38.0** (2026-07-22). **Gruppe A ist komplett** (A1–A42),
 Gruppe B bis **F19**; **P5.1, F1 und P2.1 (beide Stufen) sind fertig**. Offen
-ist damit nur noch: **Demo-Modus (0.38)** und **R1** (1.0, drei Etappen auf
+ist damit nur noch: **Demo-Modus (0.39)** und **R1** (1.0, drei Etappen auf
 `main`).
 Hinter 1.0 bleiben
 nur noch neue Import-Konnektoren (P2.8 OwnTracks, P2.9 Automatisierung,
@@ -60,8 +60,9 @@ P2.10 Trakt, P2.11 Dawarich/GPX, P4.1 Health, P4.2 PSN) plus **P5.2**
 0.29 A35 (lokale Konten) · 0.30 P3.1 · 0.31 A36+F17 (schlanke Liste, Alter) ·
 0.32 A37 (serverseitiges Zeitfenster) · 0.33 A38+A40 (Mobil-Layout,
 Kartenschalter) + dev-Kennung · 0.34 A39+F18+A41 (Städte, Tages-Fotos) · 0.35 F19+A42 (Sammlung) ·
-0.36 P5.1+F1-Rest (Erfassen) · 0.37 P2.1 Stufe 2 (Immich als Quelle).
-Offen: **0.38 Demo-Modus** ·
+0.36 P5.1+F1-Rest (Erfassen) · 0.37 P2.1 Stufe 2 (Immich als Quelle) ·
+0.38 Feedback-Runde (Anm. 110).
+Offen: **0.39 Demo-Modus** ·
 **1.0 = Veröffentlichung**. Kein Termindruck (Anmerkung 58).
 Dort nachsehen statt Reihenfolge raten.
 
@@ -140,6 +141,29 @@ Kontinente, „nächste Marke: 10" wäre ein Rechenfehler mit Anspruch (Anm. 104
 Schwelle** (Anm. 103): die Wettermetriken zählten Einträge, wo überall „Tage"
 stand — A31/Anm. 64 hatte in dieser Datei überlebt. Frage bei jeder
 Invarianten-Reparatur: *wo gilt derselbe Satz noch?*
+
+**Feedback-Runde 0.38.0 (Anmerkung 110) — zwei teure Befunde, beide Stille.**
+**(a)** Der Bild-Endpunkt hielt seine DB-Verbindung, während er bei Immich auf
+das Foto wartete (15 s Zeitlimit). Hinter HTTP/2 feuert der Browser dutzende
+Bildabrufe parallel → Pool leer → **jede** Anfrage scheitert, auch die des
+Zeitstrahls, der deshalb „endlos lädt". **Regel: ein Proxy-Endpunkt ist kein
+Datenbank-Endpunkt** — Verbindung VOR dem Netzaufruf zurückgeben, danach nur
+noch Werte anfassen (jeder ORM-Zugriff nach `close()` holt sie sich wieder).
+**(b)** Die Karte zeichnete ohne Bündelung `all.slice(0, 300)` — die ersten
+300 CHRONOLOGISCH — und schwieg darüber; der Hinweis stand nur in der Liste
+daneben. **A40 einen Schritt weiter: auch eine ANSICHT, die nicht alles zeigen
+kann, muss das sagen — und zwar dort, wo hingeschaut wird.**
+Dazu: `Location.address` bewahrt jetzt die Roh-Bausteine (Umformatieren ohne
+Netz statt 1,2 s je Ort), eigene Kachel für unscharfe Daten, Schalter für
+importierte Besuche in „An diesem Tag" (der Parameter existierte seit F16, die
+Oberfläche hat ihn nie gesetzt — **ein Standard, den man nicht ändern kann, ist
+keiner**), Fotoleisten folgen der Zoomstufe (Woche gebündelt, ab Monat 12 von N
+und die Beschriftung sagt es). Wächter: `check-map-nothing-hidden.js`,
+`check-photo-strips.js`.
+**Zwei Entscheidungen festgehalten:** Französisch-Guayana bleibt Frankreich/
+Europa (politisch korrekt, Preis bewusst); und die Wikipedia-Frage —
+**ein ausgehender Abruf muss einer GESPEICHERTEN eigenen Tatsache dienen**
+(Anm. 100), deshalb Stadtbeschreibung ja, Geburtstag „des Tages" nein.
 
 **P2.1 Stufe 2 fertig (v0.37.0, Anmerkung 109).** Immich schlägt jetzt
 Ereignisse vor: Fototage (Tag + Ort) und Alben, beide `unconfirmed`, jahresweise

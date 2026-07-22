@@ -361,9 +361,23 @@
   .db-table input { width: 100%; min-width: 120px; }
   .job-name { min-width: 230px; }
   .map-layout { display: flex; gap: 16px; align-items: flex-start; }
-  .map-layout #map { flex: 1; min-width: 0; }
+  .map-layout .map-wrap { flex: 1; min-width: 0; }
   #mp-stops { width: 320px; flex-shrink: 0; max-height: max(420px, calc(100dvh - 330px)); overflow-y: auto; }
   #map:fullscreen { border-radius: 0; border: none; height: 100%; }
+  /* Eine Karte, die Punkte weglässt, muss das auf der Karte sagen. Ein
+     Hinweis in der Liste daneben erreicht den nicht, der auf die Karte
+     schaut — und „mein Besuch in Amerika fehlt" war genau dieser Fall. */
+  .map-wrap { position: relative; }
+  .map-note {
+    position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 500;
+    background: var(--warn); color: #10131a; border-radius: 10px;
+    padding: 9px 13px; font-size: 12.5px; font-weight: 600;
+    box-shadow: 0 4px 14px rgba(0,0,0,.35); line-height: 1.45;
+  }
+  .map-note button {
+    margin-left: 8px; border: none; border-radius: 7px; cursor: pointer;
+    background: rgba(0,0,0,.18); color: inherit; font: inherit; padding: 3px 9px;
+  }
 
   /* --- Welt-Reiter (F5) --- */
   #world-map { height: max(380px, calc(100dvh - 520px)); border-radius: var(--radius); border: 1px solid var(--border); }
@@ -980,6 +994,16 @@
             <div class="stat-label" data-i18n="today.pending">Warten auf Prüfung</div>
             <div class="stat-sub" data-i18n="today.pending.sub">Vorschläge in der Moderation</div>
           </div>
+          <!-- Anmerkung 110: der zweite Rückstand. „Unbestätigt" fragt „stimmt
+               das?", „unscharf" fragt „wann war das?" — zwei Fragen, also zwei
+               Kacheln statt einer gemischten Zahl. Erscheint nur, wenn es
+               wirklich etwas zu tun gibt; eine Dauer-Null ist keine Aufgabe. -->
+          <div class="stat-card" id="today-fuzzy-card" data-go="admin:fuzzy-title"
+               style="cursor:pointer; display:none">
+            <div class="stat-num" id="today-fuzzy">–</div>
+            <div class="stat-label" data-i18n="today.fuzzy">Unscharf datiert</div>
+            <div class="stat-sub" data-i18n="today.fuzzy.sub">Monat, Jahr oder ganz ohne Datum</div>
+          </div>
           <div class="stat-card">
             <div class="stat-num" id="today-events">–</div>
             <div class="stat-label" data-i18n="today.total">Ereignisse gesamt</div>
@@ -1095,7 +1119,13 @@
           </div>
         </div>
         <div class="map-layout">
-          <div id="map"></div>
+          <div class="map-wrap">
+            <div id="map"></div>
+            <!-- Wenn die Karte Punkte weglässt, sagt sie es HIER. Der Hinweis
+                 stand bisher nur in der Stopp-Liste daneben — und wer auf die
+                 Karte sieht, sieht die Liste nicht. -->
+            <div id="mp-cap-note" class="map-note" style="display:none"></div>
+          </div>
           <div class="panel" id="mp-stops"></div>
         </div>
       </div>
@@ -2519,6 +2549,12 @@ const I18N_EN = {
   'today.capture.sub': "Free text — the AI structures it",
   'today.pending': "Waiting for review",
   'today.pending.sub': "suggestions in moderation",
+  'today.fuzzy': "Vaguely dated",
+  'otd.visits': "Include imported location visits",
+  'tl.weekphotos': "Pictures from this week",
+  'tl.periodphotos': "Pictures from this period",
+  'tl.periodphotos.some': "{n} of {total} pictures from this period",
+  'today.fuzzy.sub': "month, year or no date at all",
   'today.total': "Entries in total",
   'today.timeline': "Go to the timeline",
   'today.timeline.sub': "everything in order",
@@ -2681,6 +2717,8 @@ const I18N_EN = {
 
   // --- Nachtrag: Kopfzeile & fehlende Attribute ---
   'map.cluster.tip': "If the range holds at most this many points, you get individual markers plus a numbered route. Above that the map switches to cluster mode — nearby points are bundled depending on zoom (click/zoom splits the bubbles). The 10–300 range protects performance.",
+  'map.cap': "{h} of {n} points are hidden.",
+  'map.cap.fix': "🔁 Merge points",
   'jr.ph': "How was your day? Just write freely …",
   'adm.tracking.title': "Tracking",
   'of.dash': "of –",
@@ -3395,9 +3433,23 @@ async function renderOnThisDay() {
     // F16: Der Server deckelt auf 3 Einträge je Jahrgang und lässt importierte
     // Standort-Besuche weg — sonst wird aus dem Rückblick eine Liste, und die
     // Erinnerung geht darin unter.
-    groups = await api('/api/events/on-this-day');
+    //
+    // Anmerkung 110: Der Parameter dafür gab es seit F16, die Oberfläche hat
+    // ihn nie gesetzt — die Voreinstellung war damit unumkehrbar, und wer sich
+    // fragte „warum sehe ich meine Reise von damals nicht?", bekam keine
+    // Antwort. Jetzt ein Schalter; die Voreinstellung bleibt „ohne Besuche".
+    groups = await api('/api/events/on-this-day'
+      + (otdVisits ? '?include_visits=1' : ''));
   } catch (err) { box.innerHTML = ''; return; }
-  if (!groups.length) { box.innerHTML = ''; empty.style.display = ''; return; }
+  if (!groups.length) {
+    // Der Schalter bleibt stehen: „hier ist nichts" und „hier ist nichts, weil
+    // die Besuche ausgeblendet sind" sind zwei verschiedene Auskünfte, und die
+    // zweite kann man nur geben, wenn der Schalter sichtbar ist.
+    box.innerHTML = otdSwitchHtml();
+    otdBindSwitch();
+    empty.style.display = '';
+    return;
+  }
   empty.style.display = 'none';
 
   const years = n => n === 1
@@ -3417,7 +3469,31 @@ async function renderOnThisDay() {
           ${g.events.map(e => eventCard(e)).join('')}
         </div>`;
       }).join('')}
+      ${otdSwitchHtml()}
     </div>`;
+  otdBindSwitch();
+}
+
+// Anmerkung 110: „An diesem Tag" ließ importierte Standort-Besuche immer weg.
+// Die Entscheidung ist richtig (F16: ein Tag vor fünf Jahren trägt sonst
+// dreißig Besuche und der Rückblick wird zur Liste) — sie war nur
+// unumkehrbar. Der Server kannte den Parameter von Anfang an; nur gefragt hat
+// ihn niemand. Die Wahl bleibt auf dem Gerät: sie ist eine Ansichtssache.
+let otdVisits = localStorage.getItem('lifedash_otd_visits') === '1';
+function otdSwitchHtml() {
+  return `<label class="stat-label" style="display:flex; align-items:center; gap:8px; margin-top:14px; cursor:pointer">
+    <input type="checkbox" id="otd-visits"${otdVisits ? ' checked' : ''}>
+    <span>${esc(t('otd.visits', 'Importierte Standort-Besuche mitzeigen'))}</span>
+  </label>`;
+}
+function otdBindSwitch() {
+  const box = document.getElementById('otd-visits');
+  if (!box) return;
+  box.addEventListener('change', () => {
+    otdVisits = box.checked;
+    localStorage.setItem('lifedash_otd_visits', otdVisits ? '1' : '0');
+    renderOnThisDay();
+  });
 }
 
 // F16: Kennzahlen des Heute-Reiters.
@@ -3431,6 +3507,10 @@ async function loadToday() {
     document.getElementById('today-events').textContent = idx.total.toLocaleString('de-DE');
     document.getElementById('today-unconfirmed').textContent =
       idx.unconfirmed.toLocaleString('de-DE');
+    // Anmerkung 110: zweiter Rückstand, eigene Kachel — und nur, wenn es ihn gibt.
+    const fz = idx.fuzzy || 0;
+    document.getElementById('today-fuzzy').textContent = fz.toLocaleString('de-DE');
+    document.getElementById('today-fuzzy-card').style.display = fz ? '' : 'none';
     document.getElementById('today-span').textContent =
       idx.year_min ? `${idx.year_min} – ${idx.year_max}` : '–';
     // A35/Anmerkung 73: Startformular nur bei komplett leerer Lebensdatenbank
@@ -3480,6 +3560,10 @@ const TL_GROUP_CAP = 25;
 function renderTimelineList() {
   const el = document.getElementById('timeline-list');
   el.style.display = '';
+  // Die Leisten werden bei jedem Durchgang neu registriert; ohne dieses
+  // Leeren wüchse die Zuordnung bei jedem Nachladen weiter, obwohl die alten
+  // Schlüssel im Markup längst nicht mehr vorkommen.
+  TL_STRIP_MEDIA.clear();
   let filtered = tl.events.filter(e => passesFilter(e, tl.catFilter));
   // F7: Tages-Unterereignisse sammeln und (außer im Tages-Zoom) unterm
   // Eltern-Event einklappen — der Chip „📅 N Tages-Einträge" klappt sie auf.
@@ -3531,12 +3615,30 @@ function renderTimelineList() {
     // F18: Bilder, die an einem TAG hängen statt an einem Ereignis, treten als
     // eigene Zeile in den Tag ein — oben, wie der Tagebuch-Kopf. Kein neues
     // Objekt in der Datenbank, nur eine Zeile im Fluss (Anmerkung 87).
-    const days = new Set(g.items.map(dayOf).filter(Boolean));
-    days.forEach(d => {
-      const media = TL_DAY_MEDIA.get(d);
-      if (media && media.length)
-        g.items.push({ dayMedia: media, day: d, date_start: `${d}T00:00:00` });
-    });
+    // Anmerkung 110: Wie die Fotos auftreten, hängt an der Zoomstufe. Im Tag
+    // ist eine Leiste je Tag richtig; in der Woche stapelten sich sieben
+    // untereinander, und ab dem Monat werden es dreißig Leisten mit hunderten
+    // Bildern — dann ist es keine Erinnerung mehr, sondern eine Wand.
+    const days = [...new Set(g.items.map(dayOf).filter(Boolean))].sort();
+    if (tl.zoom === 'day') {
+      days.forEach(d => {
+        const media = TL_DAY_MEDIA.get(d);
+        if (media && media.length)
+          g.items.push({ dayMedia: media, day: d, date_start: `${d}T00:00:00` });
+      });
+    } else {
+      // Eine Leiste für die ganze Gruppe. Ab Monat wird ausgewählt statt
+      // gezeigt — und die Leiste SAGT, dass sie auswählt (siehe dayMediaCard).
+      const all = [];
+      days.forEach(d => (TL_DAY_MEDIA.get(d) || []).forEach(m => all.push(m)));
+      if (all.length) {
+        g.items.push({
+          dayMedia: tl.zoom === 'week' ? all : spreadPick(all, TL_PERIOD_PHOTOS),
+          day: days[0], total: all.length,
+          span: tl.zoom, date_start: `${days[0]}T00:00:00`,
+        });
+      }
+    }
     g.items.sort((a, b) => dayOf(a) === dayOf(b) ? jr(b) - jr(a) : 0);
   });
   const renderItem = x => x.dayMedia ? dayMediaCard(x)
@@ -3712,12 +3814,46 @@ function eventCard(e) {
 // schlichte Leiste und nicht als Karte mit Titel — ein Tag ist kein Ereignis,
 // und ihm einen Titel zu geben würde ihn wieder zu einem machen (Anm. 87).
 const TL_DAY_MEDIA = new Map();
+// Was eine GERENDERTE Leiste zeigt, Schlüssel -> Bilderliste. Nötig, seit eine
+// Leiste mehr als einen Tag umfassen kann: der Betrachter löste die Bilder
+// vorher über das Datum auf, und bei einer Wochen-Leiste wäre das der Satz des
+// ERSTEN Tages gewesen — falsche Bilder, und der angeklickte Index gar nicht
+// darin. Eine Leiste, eine Liste, ein Nachschlagen.
+const TL_STRIP_MEDIA = new Map();
+let TL_STRIP_SEQ = 0;
+// Ab Monatszoom wird eine AUSWAHL gezeigt. Zwölf, weil eine Reihe daraus
+// aufgeht und weil dreihundert Vorschaubilder je Gruppe die Seite (und den
+// Bild-Endpunkt) erschlagen — genau das hat den Verbindungspool umgebracht.
+const TL_PERIOD_PHOTOS = 12;
+// Gleichmäßig über den Zeitraum greifen statt vorne abzuschneiden: die ersten
+// zwölf eines Monats stammen alle vom ersten Tag, und dann zeigt die „Auswahl
+// aus diesem Zeitraum" einen einzigen Nachmittag. Bewusst DETERMINISTISCH und
+// nicht zufällig — eine Leiste, die bei jedem Nachladen andere Bilder zeigt,
+// verunsichert mehr, als die Abwechslung wert ist.
+function spreadPick(list, n) {
+  if (list.length <= n) return list;
+  const step = list.length / n;
+  return Array.from({ length: n }, (_, i) => list[Math.floor(i * step)]);
+}
 function dayMediaCard(x) {
   const shots = x.dayMedia.map((m, i) =>
     `<img src="${esc(m.thumb_url)}" data-day-photo="${i}" alt=""
           loading="lazy" title="${esc(m.caption || '')}">`).join('');
-  return `<div class="day-media" data-day-media="${esc(x.day)}">
-    <span class="day-media-label">📷 ${esc(t('tl.dayphotos', 'Fotos dieses Tages'))}</span>
+  // Die Beschriftung muss die Wahrheit sagen: „Fotos dieses Tages" über einer
+  // Monatsauswahl wäre falsch, und „Fotos" über zwölf von dreihundert
+  // behauptete Vollständigkeit. Beides steht deshalb im Text.
+  let label;
+  if (!x.span) label = t('tl.dayphotos', 'Fotos dieses Tages');
+  else if (x.span === 'week') label = t('tl.weekphotos', 'Bilder dieser Woche');
+  else if (x.total > x.dayMedia.length)
+    label = t('tl.periodphotos.some', '{n} von {total} Bildern aus diesem Zeitraum')
+      .replace('{n}', x.dayMedia.length).replace('{total}', x.total);
+  else label = t('tl.periodphotos', 'Bilder aus diesem Zeitraum');
+  const key = `s${++TL_STRIP_SEQ}`;
+  TL_STRIP_MEDIA.set(key, x.dayMedia);
+  return `<div class="day-media" data-day-media="${key}"${
+      x.span ? ` data-span="${esc(x.span)}"` : ''}>
+    <span class="day-media-label">📷 ${esc(label)}</span>
     <div class="day-media-strip">${shots}</div>
   </div>`;
 }
@@ -4355,7 +4491,16 @@ document.querySelectorAll('.stat-card[data-go]').forEach(card =>
     const go = card.dataset.go;
     if (go.startsWith('comp:')) openCompendiumType(go.slice(5));
     else if (go.startsWith('timeline:')) tlFilterOnly(go.slice(9));
-    else gotoView(go);   // input, timeline, admin, map …
+    else if (go.startsWith('admin:')) {
+      // Anmerkung 94/110: Eine Zahl, die irgendwo hin führt, ist keine
+      // Antwort — sie muss zu IHRER Liste führen. Die unscharfen Daten stehen
+      // unter der Moderations-Queue; ohne das Scrollen landet man oben und
+      // sucht selbst.
+      gotoView('admin');
+      showAdminTab('moderation');
+      const target = document.getElementById(go.slice(6));
+      if (target) setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+    } else gotoView(go);   // input, timeline, admin, map …
   }));
 document.querySelectorAll('#view-stats .stat-card[data-event-slot]').forEach(card =>
   card.addEventListener('click', () => { if (card.dataset.eventId) openEventEdit(card.dataset.eventId); }));
@@ -5337,7 +5482,7 @@ document.querySelector('.content').addEventListener('click', ev => {
   if (dayPhoto) {
     ev.stopPropagation();
     const strip = dayPhoto.closest('[data-day-media]');
-    const media = TL_DAY_MEDIA.get(strip.dataset.dayMedia) || [];
+    const media = TL_STRIP_MEDIA.get(strip.dataset.dayMedia) || [];
     if (media.length) openLightbox(media, +dayPhoto.dataset.dayPhoto || 0);
     return;
   }
@@ -5722,6 +5867,7 @@ function renderPeriod() {
   };
   if (!mp.periods.length) {
     mapTracks.clearLayers();
+    mpCapNote(0, 0);
     setLabel('keine verorteten Events');
     stops.innerHTML = '<div class="stat-label">Keine Orte in diesem Zeitraum.</div>';
     return;
@@ -5776,6 +5922,11 @@ function renderPeriod() {
   if (latlngs.length) {
     try { mapObj.fitBounds(L.latLngBounds(latlngs).pad(0.35)); } catch (_) {}
   }
+  // Der stille Verlust, der diesen Hinweis erzwungen hat: ohne Bündelung
+  // zeichnet die Karte `all.slice(0, 300)` — die ersten dreihundert
+  // CHRONOLOGISCH. Bei 2000 Besuchen im Monat fehlt damit alles ab der
+  // Monatsmitte, und ein einzelner Besuch in Amerika ist garantiert dabei.
+  mpCapNote(clustered ? 0 : all.length - items.length, all.length);
   stops.innerHTML = `<h3>${all.length} Stopp${all.length===1?'':'s'} · ${periodLabel(key)}</h3>`
     + (all.length > MP_MAX ? `<div class="hint">${clustered
         ? `Karte zeigt alle ${all.length} Punkte (gebündelt) — Liste zeigt die ersten ${MP_MAX}.`
@@ -5796,6 +5947,26 @@ function renderPeriod() {
       </div>`;
     }).join('');
 }
+// Sagt auf der KARTE, wie viele Punkte sie gerade weglässt — und bietet den
+// einen Klick an, der sie zurückholt. Vorher stand das nur in der Stopp-Liste
+// nebenan; wer auf die Karte sieht, liest die nicht, und das Ergebnis war ein
+// Bericht über verschwundene Besuche in Amerika (Anmerkung 110).
+//
+// Bewusst kein Wegklick-Knopf, der es dauerhaft stummschaltet: der Hinweis
+// verschwindet, sobald er nicht mehr zutrifft, und sonst nicht.
+function mpCapNote(hidden, total) {
+  const box = document.getElementById('mp-cap-note');
+  if (!box) return;
+  if (hidden <= 0) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.style.display = '';
+  box.innerHTML = `⚠️ ${esc(t('map.cap', '{h} von {n} Punkten sind ausgeblendet.')
+      .replace('{h}', hidden.toLocaleString('de-DE')).replace('{n}', total.toLocaleString('de-DE')))}`
+    + ` <button type="button" id="mp-cap-fix">${esc(t('map.cap.fix', '🔁 Punkte zusammenfassen'))}</button>`;
+  document.getElementById('mp-cap-fix').addEventListener('click', () => {
+    if (!mp.condense) document.getElementById('mp-group-toggle').click();
+  });
+}
+
 // A5: Gebündelte Darstellung eines Zeitraums — Events nach Ort gruppiert.
 // Alltagsorte (Zuhause/Arbeit) fallen damit automatisch zu je einer Zeile
 // zusammen. Marker wandern in den Cluster-Layer (Dichte-Darstellung).
@@ -5829,6 +6000,11 @@ function renderGroupedPeriod(all, key, stops) {
     try { mapObj.fitBounds(L.latLngBounds(latlngs).pad(0.35)); } catch (_) {}
   }
   const MP_MAX = 300;
+  // Der gebündelte Pfad zeigt auf der KARTE alle Orte; gedeckelt ist nur die
+  // Liste. Trotzdem hier gemeldet — mit 0, damit ein Hinweis aus der vorigen
+  // Ansicht verschwindet, statt über einer vollständigen Karte stehen zu
+  // bleiben und etwas Falsches zu behaupten.
+  mpCapNote(0, all.length);
   stops.innerHTML = `<h3>${all.length} Besuch${all.length === 1 ? '' : 'e'} an `
     + `${groups.length} Ort${groups.length === 1 ? '' : 'en'} · ${periodLabel(key)}</h3>`
     + (groups.length > MP_MAX ? `<div class="hint">Liste zeigt die ${MP_MAX} meistbesuchten Orte — Karte zeigt alle.</div>` : '')

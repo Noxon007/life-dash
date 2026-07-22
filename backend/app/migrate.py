@@ -15,8 +15,14 @@ _MISSING_COLUMNS: dict[str, dict[str, str]] = {
                   "capture_lat": "FLOAT", "capture_lng": "FLOAT"},
     # A39: `city` neben `country` — bis dahin steckte die Stadt nur als
     # Textbaustein im zusammengesetzten Namen und war nicht gruppierbar.
+    # Anmerkung 110: `address` bewahrt die Roh-Bausteine des Geocoders
+    # (Straße, Bezirk, PLZ, Region …). Bis dahin wurden sie verworfen, sobald
+    # `short_name()` daraus einen Anzeigenamen gebaut hatte — und damit war ein
+    # anderes Namensformat nur über einen neuen Nominatim-Lauf zu haben,
+    # gedrosselt auf eine Abfrage je 1,2 Sekunden. Mit den Bausteinen ist es
+    # eine reine Rechenoperation.
     "locations": {"user_id": "VARCHAR(36)", "country": "VARCHAR(64)",
-                  "city": "VARCHAR(128)"},
+                  "city": "VARCHAR(128)", "address": "JSON"},
     "events": {"user_id": "VARCHAR(36)", "embedding": "JSON", "note": "TEXT",
                "external_id": "VARCHAR(64)",
                "confirmed_at": "TIMESTAMP", "confirmed_by": "VARCHAR(16)",

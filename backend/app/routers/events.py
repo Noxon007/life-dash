@@ -488,9 +488,21 @@ def events_index(
     visits = (db.query(func.count(Event.id))
               .filter(Event.user_id == user.id,
                       Event.source == Source.google_timeline).scalar() or 0)
+    # Anmerkung 110: Unscharf datierte Einträge sind ein ZWEITER Rückstand
+    # neben den unbestätigten — und er lebte bisher nur im Verwaltungs-Reiter,
+    # wo ihn niemand sucht. Bewusst eine eigene Zahl und nicht in `unconfirmed`
+    # gemischt: „unbestätigt" heißt „stimmt das?", „unscharf" heißt „wann war
+    # das?". Zwei Fragen, zwei Kacheln.
+    # Importierte Besuche zählen nicht mit — sie sind immer exakt datiert und
+    # würden die Zahl nur verwässern.
+    fuzzy = (db.query(func.count(Event.id))
+             .filter(Event.user_id == user.id,
+                     Event.source != Source.google_timeline,
+                     Event.date_start.is_(None)
+                     | Event.date_precision.in_(_VAGUE_PRECISIONS)).scalar() or 0)
     return EventsIndex(
         total=total, dated=dated, undated=total - dated, unconfirmed=unconfirmed,
-        visits=visits,
+        visits=visits, fuzzy=fuzzy,
         year_min=years[0].year if years else None,
         year_max=years[-1].year if years else None,
         years=years,

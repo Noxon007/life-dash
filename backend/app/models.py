@@ -148,6 +148,20 @@ class Location(Base):
     # Zeitstrahls, beide unabhängig vom gewählten Namensformat. Indiziert, weil
     # genau darüber gruppiert wird.
     city: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    # Anmerkung 110: die ROHEN Adressbausteine des Geocoders (`address` aus
+    # Nominatims addressdetails: road, suburb, postcode, state …).
+    #
+    # Warum sie überhaupt aufbewahrt werden: `name` ist eine ZUSAMMENFASSUNG,
+    # gebaut aus den vom Nutzer gewählten Bausteinen (`place_name_parts`).
+    # Wer das Format später ändert, will keine neue Auskunft — er will
+    # dieselben Daten anders geschrieben. Bis 0.37 war das trotzdem nur über
+    # einen neuen Nominatim-Lauf zu haben (1,2 s je Ort, für tausende Orte
+    # Stunden), weil die Bausteine nach dem Zusammensetzen weggeworfen wurden.
+    #
+    # Schicht 4 im Sinne von Kap. 3.1: reine Ableitungsgrundlage, jederzeit
+    # verwerfbar, nie eine Aussage für sich. Für Bestandsorte bleibt das Feld
+    # leer, bis der Ortsnamen-Lauf sie das nächste Mal anfasst.
+    address: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     external_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     events: Mapped[list["Event"]] = relationship(back_populates="location")

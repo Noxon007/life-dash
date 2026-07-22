@@ -248,6 +248,10 @@ class EventsIndex(BaseModel):
     # Importierte Standort-Besuche — der Zeitstrahl blendet sie aus und nennt
     # ihre Zahl auf dem Schalter
     visits: int = 0
+    # Anmerkung 110: unscharf datierte Einträge (Monat/Jahreszeit/Jahr/Jahrzehnt
+    # oder ganz ohne Datum). Ein eigener Rückstand neben `unconfirmed`, nicht
+    # dieselbe Frage: „stimmt das?" gegen „wann war das?".
+    fuzzy: int = 0
     year_min: int | None = None
     year_max: int | None = None
     years: list[YearCount] = []

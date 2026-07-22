@@ -7,6 +7,8 @@ gehört zur **Lebensdatenbank**, nicht zu den Ableitungen (Anmerkung 57).
 from __future__ import annotations
 
 import logging
+import threading
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Annotated
 
@@ -210,44 +212,95 @@ def upload_media(
     )
 
 
-def _send(ref: MediaRef, user: User, thumb: bool) -> Response:
+# --------------------------------------------------------------------------- #
+# Bilder ausliefern — und dabei die Datenbankverbindung NICHT festhalten
+# --------------------------------------------------------------------------- #
+# Beobachtet im Betrieb: schnelles Scrollen im Zeitstrahl endete in
+# `QueuePool limit of size 5 overflow 10 reached` — und damit scheiterte JEDE
+# weitere Anfrage, auch `/api/events`. Der Zeitstrahl sah aus, als lade er
+# endlos; tatsächlich bekam er keine Verbindung mehr.
+#
+# Ursache ist nicht die Menge der Anfragen, sondern ihre DAUER: Dieser Endpunkt
+# holt das Bild bei Immich (Zeitlimit 15 s, mit Wiederholungen mehr) und hielt
+# währenddessen die per `Depends(get_db)` zugeteilte Verbindung. Hinter HTTP/2
+# stellt ein Browser dutzende Bildanfragen gleichzeitig — nach fünfzehn davon
+# ist der Pool leer, und er bleibt es, solange der fremde Dienst antwortet.
+#
+# Die Verbindung wird deshalb **vor** dem Netzaufruf zurückgegeben. Alles, was
+# danach gebraucht wird, muss vorher aus dem ORM-Objekt herausgelesen sein —
+# nach `close()` würde jeder Attributzugriff nachladen wollen und wäre genau
+# der Zugriff, den wir gerade vermeiden.
+@dataclass
+class _Delivery:
+    """Was zum Ausliefern nötig ist — reine Werte, kein ORM."""
+
+    provider: str
+    external_id: str
+    owner_id: str
+    mime: str | None
+    immich: tuple[str, str] | None
+
+
+def _plan(ref: MediaRef, user: User) -> _Delivery:
+    return _Delivery(
+        provider=ref.provider,
+        external_id=ref.external_id,
+        owner_id=ref.user_id or user.id,
+        mime=ref.mime,
+        immich=immich_api.config_for(user) if ref.provider == IMMICH else None,
+    )
+
+
+def _deliver(plan: _Delivery, thumb: bool) -> Response:
     # P2.1: Immich-Verweise kommen aus dem fremden Dienst — durchgereicht,
     # nie zwischengespeichert (Kap. 9: Verweise, keine Kopien). Der
     # API-Schlüssel bleibt dabei serverseitig und erreicht den Browser nie.
-    if ref.provider == IMMICH:
-        cfg = immich_api.config_for(user)
-        if cfg is None:
+    if plan.provider == IMMICH:
+        if plan.immich is None:
             raise HTTPException(status_code=404, detail="Immich nicht eingerichtet")
         try:
-            data = immich_api.thumbnail(*cfg, ref.external_id)
+            with _IMMICH_SLOTS:
+                data = immich_api.thumbnail(*plan.immich, plan.external_id)
         except immich_api.ImmichError as exc:
             # 502: der Fehler liegt beim fremden Dienst, nicht bei uns
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         return Response(content=data, media_type="image/jpeg", headers=_SAFE_HEADERS)
 
-    name = ref.external_id + (media_svc.THUMB_SUFFIX if thumb else "")
+    name = plan.external_id + (media_svc.THUMB_SUFFIX if thumb else "")
     try:
-        path = media_svc.path_for(ref.user_id or user.id, name)
+        path = media_svc.path_for(plan.owner_id, name)
         data = path.read_bytes()
     except (media_svc.MediaError, OSError):
         raise HTTPException(status_code=404, detail="Datei nicht gefunden") from None
     return Response(content=data,
-                    media_type="image/jpeg" if thumb else (ref.mime or "image/jpeg"),
+                    media_type="image/jpeg" if thumb else (plan.mime or "image/jpeg"),
                     headers=_SAFE_HEADERS)
+
+
+# Zweite Bremse, unabhängig vom Pool: Sync-Endpunkte laufen in einem
+# Threadpool fester Größe. Vierzig gleichzeitig wartende Immich-Abrufe würden
+# auch den blockieren — dann steht die App wieder, nur eine Schicht höher.
+# Sechs entspricht ungefähr dem, was ein Browser über HTTP/1.1 selbst getan
+# hätte; die übrigen warten kurz, statt den Server lahmzulegen.
+_IMMICH_SLOTS = threading.BoundedSemaphore(6)
 
 
 @router.get("/media/{media_id}/file")
 def get_file(media_id: str, db: Session = Depends(get_db),
              user: User = Depends(get_current_user)) -> Response:
     """Das Original — nur für den Besitzer."""
-    return _send(_own_media(db, media_id, user), user, thumb=False)
+    plan = _plan(_own_media(db, media_id, user), user)
+    db.close()          # Verbindung zurück in den Pool, VOR dem Ausliefern
+    return _deliver(plan, thumb=False)
 
 
 @router.get("/media/{media_id}/thumb")
 def get_thumb(media_id: str, db: Session = Depends(get_db),
               user: User = Depends(get_current_user)) -> Response:
     """Die Vorschau (serverseitig erzeugt, aufgerichtet)."""
-    return _send(_own_media(db, media_id, user), user, thumb=True)
+    plan = _plan(_own_media(db, media_id, user), user)
+    db.close()
+    return _deliver(plan, thumb=True)
 
 
 @router.patch("/media/{media_id}", response_model=MediaRead)

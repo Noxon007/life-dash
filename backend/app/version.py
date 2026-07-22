@@ -5,7 +5,7 @@ Wird bei jedem Release zusammen mit CHANGELOG.md und dem Git-Tag gepflegt
 """
 import os
 
-APP_VERSION = "0.37.0"
+APP_VERSION = "0.38.0"
 
 
 def release_channel() -> str:

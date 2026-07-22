@@ -15,6 +15,48 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.38.0] – 2026-07-22
+
+### Fixed
+- **Scrolling fast through the timeline no longer breaks the whole app.** With
+  many photos on screen, image requests could occupy every database connection
+  at once — and then *nothing* worked any more, including the timeline itself,
+  which looked as if it were loading forever. Image requests now hand their
+  connection back before they go and fetch the picture.
+- **The map no longer drops points in silence.** Without “Merge points” it only
+  ever drew the first 300 entries of a period, chronologically — so after a
+  location import a single trip in the middle of the month simply was not
+  there. The map now says how many points it is hiding, with one button to
+  bring them back. (Nothing is dropped when merging is on.)
+
+### Added
+- **“Vaguely dated” is now visible where the work is.** The Today view has a
+  second counter beside “waiting for review”: entries dated only by month, year
+  or not at all. Two different backlogs, two numbers — “is this right?” and
+  “when was this?” are not the same question. It only appears when there is
+  something to do.
+- **“On this day” can include imported location visits.** It always left them
+  out, for a good reason — a day five years ago can hold thirty of them and the
+  look-back turns into a list. But the choice was never offered. Now there is a
+  switch, stored per device; the default is unchanged.
+- **Address building blocks are kept.** Until now the parts a place name is
+  built from were thrown away once the name was assembled, so changing the
+  format meant asking the geocoder about every place again — throttled to one
+  per 1.2 seconds. They are stored from now on, and reformatting those places
+  is instant and needs no network at all. Places you already have get their
+  parts back the next time the place-name run touches them.
+
+### Changed
+- **Photos in the timeline follow the zoom.** In week view the day strips are
+  merged into one “pictures from this week”; from month view up you get a
+  selection of twelve, labelled as one (“12 of 340 pictures”) so it never
+  pretends to be complete. Day view is unchanged.
+- **French Guiana stays France, and so does Réunion.** Recorded as a decision
+  rather than an oversight: they really are French overseas departments — part
+  of France and of the EU — and that is what the geocoder reports. The
+  consequence is that a trip there counts towards Europe on the world map,
+  which is the price of following politics rather than geography.
+
 ## [0.37.0] – 2026-07-22
 
 ### Added

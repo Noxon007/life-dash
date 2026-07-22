@@ -294,6 +294,43 @@ def _semantic_label(name: str | None) -> str | None:
     return first if first in SEMANTIC_LABELS else None
 
 
+def _rename_from_stored(db: Session, loc: Location, user_id: str,
+                        parts: list[str] | None) -> bool:
+    """Setzt den Anzeigenamen aus den GESPEICHERTEN Bausteinen neu zusammen.
+
+    Anmerkung 110: Ein anderes Namensformat ist keine neue Auskunft, sondern
+    dieselben Daten anders geschrieben — trotzdem kostete es bis 0.37 einen
+    vollen Nominatim-Lauf (1,2 s je Ort, bei tausenden Orten Stunden), weil die
+    Bausteine nach dem Zusammensetzen verworfen wurden. Liegen sie vor, ist es
+    eine Rechnung: kein Netz, keine Drossel, keine Wartezeit.
+
+    Gibt False zurück, wenn nichts gespeichert ist oder sich nichts ändert —
+    dann geht der Aufrufer den normalen Weg über den Geocoder.
+    """
+    if not loc.address:
+        return False
+    short = geocode_svc.short_name({"address": loc.address,
+                                    "poi": loc.address.get("poi")}, parts)
+    if not short:
+        return False
+    label = _semantic_label(loc.name)
+    if label:
+        short = f"{label} — {short}"
+    short = short[:255]
+    if short == loc.name:
+        return False
+    loc.name = short
+    # Die Besuchs-Titel hängen am Ortsnamen und müssen mitwandern — dieselbe
+    # Regel wie im Geocoder-Weg, nur ohne den Abruf.
+    for ev in (db.query(Event)
+               .filter(Event.user_id == user_id, Event.location_id == loc.id,
+                       Event.title.like("Besuch:%")).all()):
+        if (ev.field_overrides or {}).get("title"):
+            continue
+        ev.title = f"Besuch: {short}"[:255]
+    return True
+
+
 def _apply_resolved_name(db: Session, loc: Location, user_id: str,
                          parts: list[str] | None = None,
                          lang: str | None = None) -> bool:
@@ -317,6 +354,21 @@ def _apply_resolved_name(db: Session, loc: Location, user_id: str,
     if label:
         short = f"{label} — {short}"
     loc.name = short[:255]
+    # Anmerkung 110: die ROHEN Bausteine aufbewahren, nicht nur das Ergebnis.
+    # `name` ist eine Zusammenfassung; wer später ein anderes Format wählt,
+    # will dieselben Daten anders geschrieben — und musste dafür bis 0.37
+    # jeden Ort erneut bei Nominatim abfragen (1,2 s je Ort). Mit den
+    # Bausteinen ist das Umformatieren eine Rechnung ohne Netz.
+    if hit.get("address"):
+        raw = dict(hit["address"])
+        # Der Eigenname eines POI („Café Central") steht NICHT in den
+        # Adress-Bausteinen, `short_name` stellt ihn aber voran. Ohne ihn
+        # verlöre das spätere Umformatieren genau die Information, die den
+        # Namen ausmacht. Nominatims Bausteine kennen keinen Schlüssel `poi`,
+        # die Ablage daneben kollidiert also mit nichts.
+        if hit.get("poi"):
+            raw["poi"] = hit["poi"]
+        loc.address = raw
     if not label and hit.get("type"):
         loc.type = hit["type"]
     linked = (
@@ -689,10 +741,23 @@ def resolve_names_batch(
              scope or "alle", len(locs), len(all_candidates), len(locs) * _geo_delay(),
              _geo_delay())
     resolved = failed = 0
+    asked = False          # wurde in diesem Batch schon einmal gefragt?
     for i, loc in enumerate(locs):
-        if i:
-            time.sleep(_geo_delay())
         before = loc.name
+        # Anmerkung 110: Erst der Schnellweg. Liegen die Bausteine vor, ist ein
+        # neues Format reine Rechnerei — und die Drossel gilt nur für Abrufe,
+        # nicht für Rechnungen. Deshalb wird hier auch NICHT geschlafen: bei
+        # gespeicherten Orten läuft der Lauf mit voller Geschwindigkeit durch,
+        # statt für jeden 1,2 Sekunden zu warten, die niemand braucht.
+        if _rename_from_stored(db, loc, user.id, parts):
+            db.commit()
+            log.info("Ortsname %d/%d: %r → %r (aus gespeicherten Bausteinen)",
+                     i + 1, len(locs), before, loc.name)
+            resolved += 1
+            continue
+        if asked:
+            time.sleep(_geo_delay())
+        asked = True
         ok = _apply_resolved_name(db, loc, user.id, parts, lang)
         if ok:
             db.commit()
