@@ -97,7 +97,12 @@ def export_data(
     links = [
         l for l in db.query(EventEntityLink).all() if l.event_id in event_ids
     ]
-    media = [m for m in db.query(MediaRef).all() if m.event_id in event_ids]
+    # F18: Bilder gehören dem NUTZER, nicht zwingend einem Ereignis. Ein Filter
+    # allein über `event_id` ließe alle Tages-Bilder aus dem Backup fallen —
+    # lautlos, denn die Datei sähe vollständig aus. Bilder an Ereignissen, die
+    # der Export bewusst weglässt (A21), bleiben weiterhin draußen.
+    media = [m for m in db.query(MediaRef).filter(MediaRef.user_id == user.id).all()
+             if m.event_id is None or m.event_id in event_ids]
     metrics = [m for m in db.query(Metric).all() if m.event_id in event_ids]
 
     log.info("Export: %d Fragmente, %d Orte, %d Entities, %d Events, %d Tracks "

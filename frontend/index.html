@@ -429,6 +429,16 @@
      außer Kraft statt stumm wirkungslos. Bewusst anders als `.off` (aus): der
      Nutzer hat ihn nicht ausgeschaltet, die Lage lässt ihn nur nicht zu. */
   .filter-chip.inert { opacity: .45; text-decoration: line-through; cursor: help; }
+  /* F18: Fotoleiste eines Tages — bewusst KEINE Karte: ein Tag ist kein
+     Ereignis, und ein Titel würde ihn wieder zu einem machen (Anm. 87). */
+  .day-media { margin: 6px 0 14px; }
+  .day-media-label { font-size: 11px; color: var(--text-dim); }
+  .day-media-strip { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 5px; }
+  .day-media-strip img {
+    width: 74px; height: 74px; object-fit: cover; border-radius: 8px;
+    border: 1px solid var(--border); cursor: pointer;
+  }
+  .day-media-strip img:hover { border-color: var(--accent); }
   /* A39: zusammengefasste Besuchs-Karte — als Sammeleintrag erkennbar */
   .event-card.is-group { border-left-style: dashed; }
   .chip.is-loading { opacity: .5; }
@@ -998,6 +1008,11 @@
           <span class="filter-chip off" id="tl-visits-toggle" data-i18n-title="tl.visits.tip" title="Importierte Timeline-Besuche (Google) im Zeitstrahl anzeigen — auf der Karte sind sie immer sichtbar" data-i18n="tl.visits">🛰️ Besuche</span>
           <span class="filter-chip" id="tl-journal-btn" data-i18n-title="tl.journal.tip" title="Tagebuch-Eintrag für einen Tag schreiben (Markdown) — erscheint als Tageskopf über den Ereignissen des Tages" data-i18n="tl.journal">📖 Tagebuch schreiben</span>
           <span class="filter-chip" id="tl-print-btn" data-i18n-title="tl.print.tip" title="Zeitraum wählen und drucken oder als PDF sichern — gedruckt wird hell, ohne Navigation und mit allen Ereignissen des Zeitraums" data-i18n="tl.print">🖨️ Drucken</span>
+          <!-- F18: Ein Foto gehört oft zu einem Tag, nicht zu einem einzelnen
+               Ereignis. Der Einstieg liegt hier, weil es sonst keinen Ort
+               gäbe, an dem man einen leeren Tag anspricht. -->
+          <span class="filter-chip" id="tl-dayphoto-btn" data-i18n-title="tl.dayphoto.tip" title="Ein Bild an einen Tag hängen, ohne es einem einzelnen Ereignis zuzuordnen" data-i18n="tl.dayphoto">📷 Foto zu einem Tag</span>
+          <input type="file" id="tl-dayphoto-file" accept="image/*" style="display:none">
         </div>
         <div id="tl-search-note" class="hint" style="display:none"></div>
         <div class="timeline" id="timeline-list"></div>
@@ -2142,6 +2157,13 @@ const I18N_EN = {
   'tl.visits': "visits",
   'tl.group.tip': "Show the individual visits of this day",
   'tl.group.fail': "Could not load the individual visits.",
+  'tl.dayphotos': "Photos from this day",
+  'tl.dayphoto': "📷 Photo for a day",
+  'tl.dayphoto.tip': "Attach a picture to a day without tying it to a single entry",
+  'tl.dayphoto.ask': "Which day is this picture from? (YYYY-MM-DD)",
+  'tl.dayphoto.baddate': "Please give a date as YYYY-MM-DD.",
+  'tl.dayphoto.ok': "✓ Picture attached to the day.",
+  'tl.dayphoto.fail': "Upload failed",
   'chart.topanimals': "Most-seen animals",
   'world.continents': "Continents",
   'world.share': "World explored",
@@ -3014,6 +3036,51 @@ function fetchEvents(params = {}) {
   return api(`/api/events?${q}`);
 }
 
+// F18: „Foto zu einem Tag" — erst den Tag erfragen, dann die Datei. Der Tag
+// wird vorbelegt mit heute; ein Bild mit EXIF-Zeitpunkt behält seinen eigenen,
+// solange er auf diesen Tag fällt (der Server entscheidet das).
+document.getElementById('tl-dayphoto-btn')?.addEventListener('click', () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const day = prompt(t('tl.dayphoto.ask', 'An welchen Tag soll das Bild? (JJJJ-MM-TT)'), today);
+  if (!day) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    toast(t('tl.dayphoto.baddate', 'Bitte ein Datum als JJJJ-MM-TT angeben.'), 'warn');
+    return;
+  }
+  const input = document.getElementById('tl-dayphoto-file');
+  input.dataset.day = day;
+  input.value = '';
+  input.click();
+});
+document.getElementById('tl-dayphoto-file')?.addEventListener('change', async ev => {
+  const file = ev.target.files[0];
+  const day = ev.target.dataset.day;
+  if (!file || !day) return;
+  const body = new FormData();
+  body.append('file', file);
+  try {
+    await api(`/api/days/${day}/media`, { method: 'POST', body });
+    toast(t('tl.dayphoto.ok', '✓ Bild an den Tag gehängt.'), 'ok');
+    TL_DAY_MEDIA.clear();
+    await loadTimeline();
+  } catch (err) {
+    toast(`${t('tl.dayphoto.fail', 'Upload fehlgeschlagen')}: ${err.message}`, 'warn', 6000);
+  }
+});
+
+// F18: Die Tages-Bilder der gerade geladenen Seite — EINE Abfrage für die
+// ganze Spanne. Eine je sichtbarem Tag wären beim Scrollen dutzende; das ist
+// dieselbe Regel, die A37 für Wetter und Kinder-Zählungen aufgestellt hat.
+async function loadDayMedia(page) {
+  const days = page.map(e => (e.date_start || '').slice(0, 10)).filter(Boolean);
+  if (!days.length) return;
+  const from = days[days.length - 1], to = days[0];
+  try {
+    const byDay = await api(`/api/days/media?from=${from}&to=${to}`);
+    Object.entries(byDay).forEach(([d, media]) => TL_DAY_MEDIA.set(d, media));
+  } catch { /* Bilder sind Beiwerk — ohne sie bleibt der Zeitstrahl gültig */ }
+}
+
 async function loadTimeline(more = false) {
   if (tl.loading) return;
   tl.loading = true;
@@ -3055,6 +3122,7 @@ async function loadTimeline(more = false) {
       tl.events = more ? tl.events.concat(page) : page;
       tl.offset += page.length;
       tl.done = page.length < TL_PAGE;
+      await loadDayMedia(page);   // F18: Tages-Bilder derselben Spanne
     }
   } finally {
     tl.loading = false;
@@ -3265,9 +3333,19 @@ function renderTimelineList() {
   const jr = x => x.category === 'journal' ? 1 : 0;
   Object.values(groups).forEach(g => {
     g.items = compressVisits(g.items);
+    // F18: Bilder, die an einem TAG hängen statt an einem Ereignis, treten als
+    // eigene Zeile in den Tag ein — oben, wie der Tagebuch-Kopf. Kein neues
+    // Objekt in der Datenbank, nur eine Zeile im Fluss (Anmerkung 87).
+    const days = new Set(g.items.map(dayOf).filter(Boolean));
+    days.forEach(d => {
+      const media = TL_DAY_MEDIA.get(d);
+      if (media && media.length)
+        g.items.push({ dayMedia: media, day: d, date_start: `${d}T00:00:00` });
+    });
     g.items.sort((a, b) => dayOf(a) === dayOf(b) ? jr(b) - jr(a) : 0);
   });
-  const renderItem = x => x.visitGroup ? visitGroupCard(x)
+  const renderItem = x => x.dayMedia ? dayMediaCard(x)
+    : x.visitGroup ? visitGroupCard(x)
     : (x.category === 'journal' ? journalCard(x) : eventCard(x));
   const ordered = Object.values(groups).sort((a,b) => b.sort - a.sort);
   el.innerHTML = ordered.map((g, gi) => `
@@ -3434,6 +3512,19 @@ function eventCard(e) {
         </span>
       </div>
     </div>`;
+}
+// F18: Die Bilder eines Tages, die an keinem Ereignis hängen. Bewusst als
+// schlichte Leiste und nicht als Karte mit Titel — ein Tag ist kein Ereignis,
+// und ihm einen Titel zu geben würde ihn wieder zu einem machen (Anm. 87).
+const TL_DAY_MEDIA = new Map();
+function dayMediaCard(x) {
+  const shots = x.dayMedia.map((m, i) =>
+    `<img src="${esc(m.thumb_url)}" data-day-photo="${i}" alt=""
+          loading="lazy" title="${esc(m.caption || '')}">`).join('');
+  return `<div class="day-media" data-day-media="${esc(x.day)}">
+    <span class="day-media-label">📷 ${esc(t('tl.dayphotos', 'Fotos dieses Tages'))}</span>
+    <div class="day-media-strip">${shots}</div>
+  </div>`;
 }
 // F1: Tagebuch-Karte — Tageskopf mit gerendertem Markdown (sanitisiert)
 function journalCard(e) {
@@ -4600,6 +4691,16 @@ document.querySelector('.content').addEventListener('click', ev => {
         rows.map(r => eventCard(r)).join('')}</div>`))
       .catch(() => toast(t('tl.group.fail', 'Die einzelnen Besuche konnten nicht geladen werden.'), 'warn'))
       .finally(() => gtog.classList.remove('is-loading'));
+    return;
+  }
+  // F18: Klick auf ein Tages-Foto öffnet den Betrachter. Eigener Zweig, weil
+  // diese Bilder zu keinem Ereignis gehören und der Cache sie nicht kennt.
+  const dayPhoto = ev.target.closest('[data-day-photo]');
+  if (dayPhoto) {
+    ev.stopPropagation();
+    const strip = dayPhoto.closest('[data-day-media]');
+    const media = TL_DAY_MEDIA.get(strip.dataset.dayMedia) || [];
+    if (media.length) openLightbox(media, +dayPhoto.dataset.dayPhoto || 0);
     return;
   }
   // F15: Klick auf ein Foto öffnet den Betrachter, NICHT den Bearbeiten-Dialog

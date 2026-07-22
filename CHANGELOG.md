@@ -15,7 +15,15 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.34.0] – 2026-07-22
+
 ### Added
+- **Photos can belong to a day.** Until now every picture had to hang on a
+  single entry — the one place a photo most obviously belongs, “that day”, was
+  the one place it could not go. A picture attached to a day appears as a strip
+  in the timeline at that day, and “📷 Photo for a day” in the timeline bar
+  attaches one. No day object is created for it: the day is the date the
+  picture was taken, nothing more.
 - **Cities are their own thing now.** Until now a city existed only as a piece
   of text inside a place name — and which pieces a name contains is your
   setting, so anyone who had switched “City” off had no cities at all. Every

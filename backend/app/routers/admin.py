@@ -483,15 +483,18 @@ def delete_user(
 
     event_ids = select(Event.id).where(Event.user_id == user_id).scalar_subquery()
     deleted: dict[str, int] = {}
-    # F15: Bilddateien vor den Datensätzen — sonst bleiben sie auf der Platte
-    deleted["media_files"] = media_svc.purge_for_events(
-        db, [i for (i,) in db.query(Event.id).filter(Event.user_id == user_id).all()])
+    # F15: Bilddateien vor den Datensätzen — sonst bleiben sie auf der Platte.
+    # F18: über den NUTZER, nicht über seine Ereignisse — Bilder können an
+    # einem Tag statt an einem Ereignis hängen und wären sonst übersehen worden.
+    deleted["media_files"] = media_svc.purge_for_user(db, user_id)
     # Kinder zuerst (Fremdschlüssel): Metriken/Medien/Links hängen an Events
     deleted["metrics"] = (db.query(Metric)
                           .filter(Metric.event_id.in_(event_ids))
                           .delete(synchronize_session=False))
+    # F18: ebenfalls über den Nutzer — ein Bild am Tag hat kein Ereignis, über
+    # das es hier erwischt würde, und bliebe als Datensatz ohne Besitzer zurück.
     deleted["media_refs"] = (db.query(MediaRef)
-                             .filter(MediaRef.event_id.in_(event_ids))
+                             .filter(MediaRef.user_id == user_id)
                              .delete(synchronize_session=False))
     deleted["event_entity_links"] = (db.query(EventEntityLink)
                                      .filter(EventEntityLink.event_id.in_(event_ids))

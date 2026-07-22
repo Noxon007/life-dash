@@ -282,7 +282,9 @@ class MediaRead(BaseModel):
     """F15: ein Bild an einem Event. `url`/`thumb_url` zeigen auf die
     geschützten Endpunkte — Dateien werden nie direkt statisch ausgeliefert."""
     id: str
-    event_id: str
+    # F18: None heißt „hängt an einem Tag, nicht an einem Ereignis" — dann
+    # sagt `captured_at`, an welchem.
+    event_id: str | None = None
     provider: str
     mime: str | None = None
     bytes: int | None = None

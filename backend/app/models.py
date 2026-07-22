@@ -293,10 +293,19 @@ class MediaRef(Base):
     # nur über ihr Event erreichbar waren, war das folgenlos — mit eigenen
     # Uploads wäre es der Weg zu fremden Bildern.
     user_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
-    event_id: Mapped[str] = mapped_column(ForeignKey("events.id"), index=True)
+    # F18: nullable seit 0.34. Ein Bild kann statt an einem Ereignis auch an
+    # einem TAG hängen — der Ort, an den ein Foto am ehesten gehört, war bis
+    # dahin der einzige, an den es nicht konnte (Anmerkung 87). Der Tag ist
+    # dabei kein Objekt, sondern `captured_at`: die Zeitachse trägt die
+    # Zuordnung, wie überall sonst in diesem Modell auch.
+    event_id: Mapped[str | None] = mapped_column(
+        ForeignKey("events.id"), nullable=True, index=True)
     provider: Mapped[str] = mapped_column(String(32), default="immich")
     external_id: Mapped[str] = mapped_column(String(255))
-    captured_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Ohne Ereignis ist dies der einzige Anker — dann PFLICHT (im Endpunkt
+    # geprüft, nicht per DB-Constraint: mit Ereignis darf es weiterhin fehlen).
+    captured_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True,
+                                                        index=True)
 
     # --- F15: Angaben zur hochgeladenen Datei ---
     mime: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -307,7 +316,7 @@ class MediaRef(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
-    event: Mapped[Event] = relationship(back_populates="media")
+    event: Mapped[Event | None] = relationship(back_populates="media")
 
     @property
     def is_upload(self) -> bool:

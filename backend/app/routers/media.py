@@ -1,4 +1,4 @@
-"""F15 — Bilder von Hand an Events hängen.
+"""F15/F18 — Bilder von Hand anhängen: an ein Ereignis oder an einen Tag.
 
 Anders als der Immich-Konnektor (P2.1) braucht das hier keinen fremden Dienst:
 die Datei liegt im Medienverzeichnis, der Datensatz zeigt darauf. Beides
@@ -7,10 +7,12 @@ gehört zur **Lebensdatenbank**, nicht zu den Ableitungen (Anmerkung 57).
 from __future__ import annotations
 
 import logging
+from datetime import date, datetime, timedelta
 from typing import Annotated
 
-from fastapi import (APIRouter, Body, Depends, File, HTTPException, Response,
-                     UploadFile)
+from fastapi import (APIRouter, Body, Depends, File, HTTPException, Query,
+                     Response, UploadFile)
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
@@ -70,6 +72,96 @@ def list_media(event_id: str, db: Session = Depends(get_db),
     event = _own_event(db, event_id, user)
     refs = sorted(event.media, key=lambda m: (m.sort_order or 0, m.created_at or 0))
     return [_to_read(m) for m in refs]
+
+
+# F18 (Anmerkung 87): Bilder eines TAGES — die, die an keinem Ereignis hängen.
+# Der Tag ist kein Objekt, sondern der Kalendertag von `captured_at`; die
+# Zeitachse trägt die Zuordnung, wie überall sonst in diesem Modell.
+@router.get("/days/{day}/media", response_model=list[MediaRead])
+def list_day_media(day: date, db: Session = Depends(get_db),
+                   user: User = Depends(get_current_user)) -> list[MediaRead]:
+    """Bilder, die an diesem Kalendertag hängen (ohne Ereignis)."""
+    start = datetime(day.year, day.month, day.day)
+    end = start + timedelta(days=1)
+    refs = (db.query(MediaRef)
+            .filter(MediaRef.user_id == user.id,
+                    MediaRef.event_id.is_(None),
+                    MediaRef.captured_at >= start, MediaRef.captured_at < end)
+            .order_by(MediaRef.sort_order, MediaRef.created_at).all())
+    return [_to_read(m) for m in refs]
+
+
+@router.get("/days/media", response_model=dict[str, list[MediaRead]])
+def list_day_media_range(
+    date_from: Annotated[date, Query(alias="from")],
+    date_to: Annotated[date, Query(alias="to")],
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict[str, list[MediaRead]]:
+    """Tages-Bilder eines Zeitraums, nach Tag gebündelt (`{"2026-07-05": [...]}`).
+
+    Der Zeitstrahl lädt seit A37 Seiten; eine Abfrage je sichtbarem Tag wären
+    dutzende Anfragen beim Scrollen. Eine je Seite reicht — dieselbe Regel wie
+    beim Wetter und bei den Kinder-Zählungen.
+    """
+    start = datetime(date_from.year, date_from.month, date_from.day)
+    end = datetime(date_to.year, date_to.month, date_to.day) + timedelta(days=1)
+    refs = (db.query(MediaRef)
+            .filter(MediaRef.user_id == user.id,
+                    MediaRef.event_id.is_(None),
+                    MediaRef.captured_at >= start, MediaRef.captured_at < end)
+            .order_by(MediaRef.captured_at, MediaRef.sort_order).all())
+    out: dict[str, list[MediaRead]] = {}
+    for ref in refs:
+        out.setdefault(ref.captured_at.date().isoformat(), []).append(_to_read(ref))
+    return out
+
+
+@router.post("/days/{day}/media", response_model=MediaUploadResult,
+             status_code=201)
+def upload_day_media(
+    day: date,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> MediaUploadResult:
+    """Lädt ein Bild hoch und hängt es an einen TAG statt an ein Ereignis.
+
+    Der Aufnahmezeitpunkt aus den EXIF-Daten wird übernommen, sofern er auf
+    diesen Tag fällt — sonst gilt der gewählte Tag. Ohne Ereignis ist
+    `captured_at` der einzige Anker, es darf hier also nicht leer bleiben;
+    das ist der einzige Unterschied zum Upload an ein Ereignis, wo ein Bild
+    ohne Aufnahmezeit weiterhin erlaubt ist (es hängt ja am Ereignis).
+    """
+    try:
+        data = media_svc.read_upload(file.file)
+        info = media_svc.store(user.id, data)
+    except media_svc.MediaError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    taken = info["captured_at"]
+    if not taken or taken.date() != day:
+        taken = datetime(day.year, day.month, day.day, 12, 0)
+    highest = (db.query(func.max(MediaRef.sort_order))
+               .filter(MediaRef.user_id == user.id, MediaRef.event_id.is_(None))
+               .scalar())
+    ref = MediaRef(
+        user_id=user.id, event_id=None, provider="local",
+        external_id=info["filename"], mime=info["mime"], bytes=info["bytes"],
+        width=info["width"], height=info["height"],
+        captured_at=taken, sort_order=(highest or 0) + 1,
+    )
+    db.add(ref)
+    db.commit()
+    db.refresh(ref)
+
+    gps = info["gps"]
+    return MediaUploadResult(
+        media=_to_read(ref),
+        suggested_captured_at=info["captured_at"],
+        suggested_lat=gps[0] if gps else None,
+        suggested_lng=gps[1] if gps else None,
+    )
 
 
 @router.post("/events/{event_id}/media", response_model=MediaUploadResult,

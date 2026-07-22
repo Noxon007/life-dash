@@ -242,6 +242,25 @@ def purge_for_events(db, event_ids) -> int:
     return len(refs)
 
 
+def purge_for_user(db, user_id: str) -> int:
+    """F18: Dateien ALLER hochgeladenen Bilder eines Nutzers — auch der Bilder,
+    die an keinem Ereignis hängen.
+
+    `purge_for_events` findet sie nicht: seit ein Bild an einem Tag statt an
+    einem Ereignis hängen kann, ist „alle Ereignisse des Nutzers" nicht mehr
+    dasselbe wie „alle Bilder des Nutzers". Beim Löschen eines Kontos wäre die
+    Differenz eine Datei ohne Besitzer auf der Platte.
+    """
+    from app.models import MediaRef
+
+    refs = (db.query(MediaRef)
+            .filter(MediaRef.user_id == user_id, MediaRef.provider == "local")
+            .all())
+    for ref in refs:
+        delete(ref.user_id or "", ref.external_id)
+    return len(refs)
+
+
 def list_uploads(db) -> list[tuple[str, str]]:
     """(Nutzer-ID, Dateiname) aller hochgeladenen Bilder — VOR dem Löschen der
     Zeilen einzusammeln, denn danach ist nicht mehr bekannt, welche Dateien

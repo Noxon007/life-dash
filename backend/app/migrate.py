@@ -52,6 +52,84 @@ _BACKFILLS: dict[str, str] = {
 }
 
 
+# F18: Spalten, die nachträglich NULL erlauben müssen. Bis 0.33 hing jedes Bild
+# zwingend an einem Ereignis; seit 0.34 kann es auch nur an einem Tag hängen.
+#
+# Das ist die erste Migration hier, die eine Spalte ÄNDERT statt eine
+# hinzuzufügen — und die beiden Datenbanken gehen dabei getrennte Wege:
+# PostgreSQL kann `DROP NOT NULL`, SQLite kann es nicht und verlangt den
+# Neubau der Tabelle. Deshalb steht das nicht in `_MISSING_COLUMNS`.
+_DROP_NOT_NULL: dict[str, tuple[str, ...]] = {"media_refs": ("event_id",)}
+
+
+def _copy_expr(column) -> str:
+    """Der SELECT-Ausdruck für eine Spalte beim Tabellen-Neubau.
+
+    Nullbare Spalten werden unverändert übernommen. Für NOT-NULL-Spalten tritt
+    ein typgerechter Ersatzwert an die Stelle eines vorgefundenen NULL — das
+    entspricht dem, was das ORM beim Schreiben ohnehin eingesetzt hätte, und
+    ist die einzige Stelle, an der der Umzug an Altdaten scheitern könnte.
+    """
+    name = f'"{column.name}"'
+    if column.nullable:
+        return name
+    kind = column.type.__class__.__name__.lower()
+    if "int" in kind:
+        fallback = "0"
+    elif "date" in kind or "time" in kind:
+        fallback = "CURRENT_TIMESTAMP"
+    else:
+        fallback = "''"
+    return f"COALESCE({name}, {fallback})"
+
+
+def _relax_not_null(engine: Engine, insp) -> list[str]:
+    """Macht die Spalten aus `_DROP_NOT_NULL` nullable — idempotent.
+
+    SQLite kennt kein `ALTER COLUMN`. Der offizielle Weg ist der Tabellen-
+    Neubau; er läuft in EINER Transaktion, damit ein Abbruch mittendrin nicht
+    eine halbe Tabelle hinterlässt. Die neue Tabelle entsteht aus dem Modell
+    (`create_all`), nicht aus handgeschriebenem DDL — sonst hätte das Schema
+    zwei Quellen, die auseinanderlaufen können.
+    """
+    from app.models import Base
+
+    applied: list[str] = []
+    tables = set(insp.get_table_names())
+    for table, columns in _DROP_NOT_NULL.items():
+        if table not in tables:
+            continue
+        nullable = {c["name"]: c["nullable"] for c in insp.get_columns(table)}
+        todo = [c for c in columns if nullable.get(c) is False]
+        if not todo:
+            continue
+        if engine.dialect.name == "sqlite":
+            model = Base.metadata.tables[table]
+            keep = [c["name"] for c in insp.get_columns(table)
+                    if c["name"] in model.columns]
+            cols = ", ".join(f'"{c}"' for c in keep)
+            # Beim Kopieren muss jede NOT-NULL-Spalte einen Wert bekommen.
+            # Bestandszeilen können dort NULL stehen haben: Spalten wie
+            # `sort_order` kamen per ADD COLUMN in die alte Tabelle, und das
+            # füllt nichts nach — der Wert entstand bisher erst beim Schreiben
+            # über das ORM. Die neue Tabelle verbietet NULL, der Umzug bräche
+            # also genau bei den ältesten Zeilen ab.
+            src = ", ".join(_copy_expr(model.columns[c]) for c in keep)
+            with engine.begin() as conn:
+                conn.execute(text(f'ALTER TABLE "{table}" RENAME TO "{table}__old"'))
+                model.create(conn)
+                conn.execute(text(
+                    f'INSERT INTO "{table}" ({cols}) SELECT {src} FROM "{table}__old"'))
+                conn.execute(text(f'DROP TABLE "{table}__old"'))
+        else:
+            with engine.begin() as conn:
+                for col in todo:
+                    conn.execute(text(
+                        f'ALTER TABLE "{table}" ALTER COLUMN "{col}" DROP NOT NULL'))
+        applied += [f"{table}.{c} (nullable)" for c in todo]
+    return applied
+
+
 def ensure_schema(engine: Engine) -> list[str]:
     """Fügt fehlende Spalten hinzu. Gibt die durchgeführten Änderungen zurück."""
     insp = inspect(engine)
@@ -70,6 +148,9 @@ def ensure_schema(engine: Engine) -> list[str]:
                 if backfill:
                     conn.execute(text(backfill))
             applied.append(f"{table}.{col}")
+    # F18: erst die Spalten, dann die Lockerung — der Neubau kopiert sonst ein
+    # Schema, dem gerade hinzugefügte Spalten noch fehlen.
+    applied += _relax_not_null(engine, inspect(engine))
     if "metrics" in existing_tables:
         ensure_weather_unique_index(engine)
     if "locations" in existing_tables:

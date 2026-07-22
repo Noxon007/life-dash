@@ -99,7 +99,21 @@ Begründung im Titel), bewusst anders als `.off` (vom Nutzer ausgeschaltet).
 Der wiederkehrende Defekt in diesem Projekt ist nicht Kaputtheit, sondern
 **Stille** (siehe auch A37-Kacheln, Anm. 79 Immich-Verknüpfung).
 
-**0.34 (vormals 0.33) eingeschoben (2026-07-22, Anmerkungen 87/88).** Beides sind
+**A39+F18 fertig (v0.34.0).** `Location.city` als echtes Feld (Rückfüllung im
+A28-Lauf; **Leerstring = „nachgesehen, keine Stadt", NULL = „nie nachgesehen"** —
+ohne die Unterscheidung fragt der Lauf stadtlose Orte ewig neu ab, vgl. F12
+`weather_rev`). Zeitstrahl verdichtet importierte Besuche je (Tag, Stadt);
+**verdichtet wird VOR dem Blättern**, sonst zerschneidet die Seitengrenze eine
+Gruppe und beide Hälften zeigen zu kleine Zahlen. Sammelkarte ist kein
+Ereignis → Klick klappt auf statt zu bearbeiten. `MediaRef.event_id` nullable:
+Fotos hängen wahlweise am Tag (`captured_at`). **Erste Migration, die eine
+Spalte ÄNDERT** — SQLite braucht Tabellen-Neubau (`_relax_not_null` in
+migrate.py), und beim Kopieren muss jede NOT-NULL-Spalte einen Ersatzwert
+bekommen: Bestandszeilen haben dort NULL, weil die Spalte per ADD COLUMN kam.
+**Wer Medien sucht, sucht sie über `user_id`, nicht über Events** — sonst
+fehlen Tages-Fotos beim Löschen, Aufräumen und im Export.
+
+**0.35 = Demo-Modus (vormals 0.33) — Anmerkungen 87/88 dokumentieren 0.34.** Beides sind
 Schema-Änderungen — und genau deshalb VOR dem Demo-Modus, ab dem Datensatz
 und Upgrade-Pfad das Modell stillhalten. **A39:** `Location.city` als echtes
 Feld (heute steckt die Stadt nur als Textbaustein im zusammengesetzten Namen,
