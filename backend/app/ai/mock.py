@@ -7,7 +7,7 @@ Später ersetzbar durch einen echten Ollama-Provider mit gleicher Schnittstelle.
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import date, datetime
 
 from app.ai.base import ExtractedEntity, ExtractedEvent, LLMProvider
 from app.modules.registry import registry
@@ -35,6 +35,9 @@ MONTHS = {
     "juni": 6, "juli": 7, "august": 8, "september": 9, "oktober": 10,
     "november": 11, "dezember": 12,
 }
+
+WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag",
+            "Freitag", "Samstag", "Sonntag"]
 
 SEASONS = {
     "frühling": (3, 1, 5, 31), "fruehling": (3, 1, 5, 31), "frühjahr": (3, 1, 5, 31),
@@ -210,3 +213,18 @@ class MockProvider(LLMProvider):
         # Fallback: erste ~6 Wörter
         words = text.split()
         return " ".join(words[:8]) + ("…" if len(words) > 8 else "")
+
+    # ------------------------------------------------------------------ #
+    # F1: Tages-Zusammenfassung (Vorschlag)
+    # ------------------------------------------------------------------ #
+    # Der Mock ist kein Sprachmodell und tut auch nicht so. Er baut ein
+    # **Gerüst**: Datum als Überschrift, die Stichpunkte darunter, ein Satz
+    # zum Schreiben. Das ist offline verlässlich (Tests, AI_PROVIDER=mock)
+    # und ehrlicher als ein erfundener Fließtext — der Nutzer sieht sofort,
+    # dass hier noch nichts formuliert wurde.
+    def summarize_day(self, day: date, lines: list[str]) -> str | None:
+        if not lines:
+            return None
+        head = f"{WEEKDAYS[day.weekday()]}, {day.strftime('%d.%m.%Y')}"
+        body = "\n".join(f"- {line}" for line in lines)
+        return f"## {head}\n\n{body}\n\n*(Gerüst aus den Ereignissen des Tages — frei überschreiben.)*"

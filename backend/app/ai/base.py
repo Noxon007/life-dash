@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 
 
 @dataclass
@@ -56,5 +56,21 @@ class LLMProvider(ABC):
         manche Modelle (z. B. nomic-embed-text) erwarten dafür Präfixe.
         Default: None (Provider kann keine Embeddings) -> die Suche
         fällt automatisch auf Volltext zurück.
+        """
+        return None
+
+    def summarize_day(self, day: date, lines: list[str]) -> str | None:
+        """F1: Vorschlag für einen Tagebuch-Text aus den Ereignissen eines Tages.
+
+        `lines` sind bereits fertig formulierte Stichpunkte (Zeit, Titel, Ort,
+        Wetter) — die Auswahl trifft der Server, nicht der Provider, damit jeder
+        Provider dieselben Fakten sieht.
+
+        Rückgabe ist ein **Vorschlag** und wird nirgends gespeichert: der Text
+        landet im Editor, und erst der Mensch drückt Speichern. Damit bleibt die
+        Regel aus 0.15.0 unangetastet — die KI fasst `note` nie an.
+
+        Default: None (dieser Provider kann es nicht) -> der Aufrufer sagt das,
+        statt einen leeren Text auszugeben.
         """
         return None

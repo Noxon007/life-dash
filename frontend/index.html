@@ -429,6 +429,21 @@
      außer Kraft statt stumm wirkungslos. Bewusst anders als `.off` (aus): der
      Nutzer hat ihn nicht ausgeschaltet, die Lage lässt ihn nur nicht zu. */
   .filter-chip.inert { opacity: .45; text-decoration: line-through; cursor: help; }
+  /* A40 (dieselbe Regel, anderes Bedienelement): der Umschalter „Manuell" kann
+     ohne Verbindung nichts speichern — das muss man ihm ansehen. */
+  .zoom-btn.inert { opacity: .45; text-decoration: line-through; cursor: help; }
+  /* P5.1: Die Offline-Warteschlange. Warntönung, weil sie NICHT der Normalfall
+     ist — sie steht für „liegt hier noch, ist noch nicht in der Datenbank". */
+  .outbox { border-color: var(--warn); margin-bottom: 18px; padding: 16px 18px; }
+  .outbox-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .ob-item { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-top: 1px solid var(--border); font-size: 13px; }
+  .ob-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .ob-when { font-size: 11px; color: var(--text-dim); }
+  /* Ein Eintrag, den der Server ABGELEHNT hat, ist etwas anderes als einer,
+     der auf Netz wartet: erneutes Senden hilft ihm nicht. Deshalb eigene
+     Farbe, eigener Text und ein Weg hinaus, statt stillem Dauerversuch. */
+  .ob-item.failed .ob-text { color: var(--danger); }
+  .ob-item .btn { padding: 4px 10px; font-size: 12px; min-width: 0; }
   /* F18: Fotoleiste eines Tages — bewusst KEINE Karte: ein Tag ist kein
      Ereignis, und ein Titel würde ihn wieder zu einem machen (Anm. 87). */
   .day-media { margin: 6px 0 14px; }
@@ -899,7 +914,7 @@
     <div class="nav-item nav-primary active" data-view="today"><span class="ico">🕰️</span> <span class="lbl" data-i18n="nav.today">Heute</span></div>
     <div class="nav-item nav-primary" data-view="timeline"><span class="ico">📅</span> <span class="lbl" data-i18n="nav.timeline">Zeitstrahl</span></div>
     <div class="nav-item nav-primary" data-view="map"><span class="ico">🗺️</span> <span class="lbl" data-i18n="nav.map">Karte</span></div>
-    <div class="nav-item nav-primary" data-view="input"><span class="ico">✍️</span> <span class="lbl" data-i18n="nav.input">Eingabe</span></div>
+    <div class="nav-item nav-primary" data-view="input"><span class="ico">✍️</span> <span class="lbl" data-i18n="nav.input">Eingabe</span> <span class="nav-badge" id="nav-outbox-badge" style="display:none">0</span></div>
     <div class="nav-item" data-view="stats"><span class="ico">📊</span> <span class="lbl" data-i18n="nav.stats">Statistik</span></div>
     <div class="nav-item" data-view="compendium"><span class="ico">📚</span> <span class="lbl" data-i18n="nav.compendium">Kompendium</span></div>
     <div class="nav-item" data-view="world"><span class="ico">🌍</span> <span class="lbl" data-i18n="nav.world">Welt</span></div>
@@ -1248,6 +1263,19 @@
 
       <!-- ===== INPUT ===== -->
       <div class="view" id="view-input">
+        <!-- P5.1: Was offline erfasst wurde, wartet hier SICHTBAR — mit Text,
+             Zeitpunkt und Grund. Eine unsichtbare Warteschlange wäre wieder die
+             Stille, die in diesem Projekt der eigentliche Defekt ist. -->
+        <div class="panel outbox" id="outbox-panel" style="display:none">
+          <div class="outbox-head">
+            <b id="outbox-title" data-i18n="ob.title">📥 Wartet auf Verbindung</b>
+            <span class="stat-label" id="outbox-state"></span>
+            <button class="btn secondary" id="outbox-send" style="margin-left:auto" data-i18n="ob.send">↻ Jetzt senden</button>
+          </div>
+          <div id="outbox-list"></div>
+          <div class="stat-label" style="margin-top:8px" data-i18n="ob.hint">Nichts geht verloren: Erfasstes bleibt auf diesem Gerät, bis der Server es bestätigt hat.</div>
+        </div>
+
         <div class="zoom-bar">
           <div class="zoom-btn active" id="input-mode-ai" data-i18n="in.mode.ai">🤖 KI-Analyse</div>
           <div class="zoom-btn" id="input-mode-manual" data-i18n="in.mode.manual">📝 Manuell</div>
@@ -1783,14 +1811,34 @@
     <div class="stat-label" style="margin:6px 0 12px; line-height:1.5" data-i18n="jr.hint">Ein Eintrag pro Tag — erscheint im
       Zeitstrahl als Tageskopf über den Ereignissen des Tages. Formatierung mit Markdown:
       <code>**fett**</code>, <code>*kursiv*</code>, <code># Überschrift</code>, <code>- Liste</code>, <code>&gt; Zitat</code>.
-      Die KI fasst den Text nie an.</div>
+      Die KI schreibt hier nie selbst — sie kann dir nur einen Vorschlag machen, den du übernimmst.</div>
     <div class="field-row"><div class="field-key" data-i18n="field.day">Tag</div>
       <div class="field-val"><input id="jr-date" type="date" class="mf-select"></div></div>
     <textarea id="jr-text" class="input-area" rows="10" style="margin-top:12px; font-size:14px"
       data-i18n-ph="jr.ph" placeholder="Wie war der Tag? Schreib frei drauflos …"></textarea>
     <div id="jr-preview-box" class="ev-note md" style="display:none; margin-top:12px"></div>
+
+    <!-- F1 (zweite Hälfte): der KI-Vorschlag steht ABSICHTLICH neben dem Text
+         und nicht darin. Er ist unbestätigt, bis der Mensch „Übernehmen" und
+         danach „Speichern" drückt — dieselbe Trennung wie zwischen Vorschlag
+         und Lebensdatenbank überall sonst. -->
+    <div id="jr-suggestion" class="ai-preview" style="display:none; margin-top:14px">
+      <div class="ai-head">
+        <span class="pulse"></span>
+        <b data-i18n="jr.sug.title">KI-Vorschlag für diesen Tag</b>
+        <span class="chip badge-unconfirmed" style="margin-left:auto" data-i18n="jr.sug.tag">nicht gespeichert</span>
+      </div>
+      <div id="jr-sug-meta" class="stat-label" style="margin:8px 0"></div>
+      <div id="jr-sug-text" class="ev-note md"></div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn secondary" id="jr-sug-take" data-i18n="jr.sug.take">⬇ In den Text übernehmen</button>
+        <button class="btn ghost" id="jr-sug-drop" data-i18n="btn.discard">Verwerfen</button>
+      </div>
+    </div>
+
     <div class="btn-row" style="margin-top:14px">
       <button class="btn" id="jr-save" data-i18n="btn.save">💾 Speichern</button>
+      <button class="btn secondary" id="jr-suggest" data-i18n-title="jr.sug.tip" title="Fasst die bestätigten Ereignisse dieses Tages zu einem Textvorschlag zusammen. Der Vorschlag wird nicht gespeichert — du übernimmst ihn oder verwirfst ihn." data-i18n="jr.sug">✨ Tag zusammenfassen</button>
       <button class="btn secondary" id="jr-preview" data-i18n="jr.preview">👁 Vorschau</button>
       <button class="btn ghost" id="jr-cancel" data-i18n="btn.cancel">Abbrechen</button>
     </div>
@@ -1899,7 +1947,16 @@ async function api(path, opts) {
 }
 async function _apiCall(path, opts) {
   const res = await fetch(API + path, Object.assign({ credentials: "same-origin" }, opts));
-  if (res.status === 401) { showLogin(); throw new Error("401 nicht angemeldet"); }
+  if (res.status === 401) {
+    showLogin();
+    // P5.1: `status` auch hier setzen. Ohne das Feld ist „abgemeldet" von
+    // „kein Netz" nur am Text der Meldung zu unterscheiden — und genau diese
+    // Unterscheidung entscheidet, ob eine Erfassung gepuffert oder als
+    // abgelehnt markiert wird.
+    const err401 = new Error("401 nicht angemeldet");
+    err401.status = 401;
+    throw err401;
+  }
   if (!res.ok) {
     // Backend-Fehlermeldung (detail) durchreichen — z. B. Validierung (A4)
     // oder „Job läuft bereits" (A11) — statt nacktem Statuscode
@@ -2217,6 +2274,23 @@ const I18N_EN = {
   // --- Eingabe & Verwaltung ---
   'in.mode.ai': "🤖 AI analysis",
   'in.mode.manual': "📝 Manual",
+  // P5.1 (0.36.0) — capturing offline
+  'in.manual.offline': "Not possible without a connection — manual entry saves as confirmed straight away. Use the AI analysis meanwhile: that one is buffered.",
+  'ob.title': "📥 Waiting for a connection",
+  'ob.send': "↻ Send now",
+  'ob.drop': "Discard",
+  'ob.drop.ask': "Discard this capture for good? It was never saved.\n\n",
+  'ob.hint': "Nothing is lost: what you capture stays on this device until the server has confirmed it.",
+  'ob.state.offline': "No network — will be sent as soon as there is a connection again",
+  'ob.state.online': "Connection is back — sending",
+  'ob.state.failed': "{n} rejected — please have a look",
+  'ob.full': "The device storage is full — this capture could not be buffered.",
+  'toast.queued': "📥 Captured without a connection — saved, and it goes out as soon as there is network again.",
+  'toast.queued.auth': "📥 Session expired — the text is saved and goes out once you sign in.",
+  'toast.outboxsent': "✓ {n} buffered capture(s) sent.",
+  'toast.outboxstuck': "Sending is not possible — the entries stay saved.",
+  'toast.shared': "📨 Shared text taken over — check it and capture it.",
+  'banner.capture.only': "📴 No connection — <b>capturing still works</b>. Everything else (timeline, map, statistics) needs the server; what you capture is sent automatically once it is back.",
   'in.ai.hint': "✍️ Just write freely. The AI recognises date, place, category and items. Your raw text is stored <b>unchanged in the raw inbox</b>.",
   'in.ai.ph': "e.g. “12/07/2026 was in Detmold and saw an eagle”",
   'in.ex1': "12/07/2026 was in Detmold and saw an eagle",
@@ -2509,9 +2583,21 @@ const I18N_EN = {
   'adm.fuzzy.hint': "Events with a vague date (month, season, year, decade or no date at all). Clicking one opens the quick editor — the more precise the dates, the better the timeline and map.",
   'track.modal.title': "🧩 What would you like to track?",
   'jr.title': "📖 Journal entry",
-  'jr.hint': "One entry per day — appears in the timeline as a day header above that day’s events. Formatting with Markdown: <code>**bold**</code>, <code>*italic*</code>, <code># heading</code>, <code>- list</code>, <code>&gt; quote</code>. The AI never touches this text.",
+  'jr.hint': "One entry per day — appears in the timeline as a day header above that day’s events. Formatting with Markdown: <code>**bold**</code>, <code>*italic*</code>, <code># heading</code>, <code>- list</code>, <code>&gt; quote</code>. The AI never writes here itself — it can only offer a draft for you to take over.",
   'field.day': "Day",
   'jr.preview': "👁 Preview",
+  // F1 (second half, 0.36.0) — the AI-suggested daily summary
+  'jr.sug': "✨ Summarise the day",
+  'jr.sug.tip': "Turns this day’s confirmed events into a draft. The draft is not saved — you either take it over or discard it.",
+  'jr.sug.busy': "✨ drafting…",
+  'jr.sug.title': "AI draft for this day",
+  'jr.sug.tag': "not saved",
+  'jr.sug.take': "⬇ Take into the text",
+  'jr.sug.used': "{n} event(s) used",
+  'jr.sug.skipped': "{n} unconfirmed skipped",
+  'jr.sug.none': "Nothing is recorded for this day that could be summarised.",
+  'jr.sug.none.unconfirmed': "This day has only unconfirmed events ({n}). Confirm them first — a journal does not turn guesses into memories.",
+  'toast.jrtaken': "Taken over — not saved yet. Check it and press Save.",
   'pr.title': "🖨️ Print",
   'pr.hint': "Pick the date range — what gets printed is a dedicated light page with every event in it, grouped by day. Collapsed groups and “show more” play no role. Your browser’s print dialog can also save the result as a PDF.",
   'pr.all': "Everything",
@@ -2785,6 +2871,10 @@ function redrawForLang() {
   });
   // Kategorie-Chips, Kompendium-Reiter und Selects tragen übersetzte Namen
   step(applyModules);
+  // P5.1: Die Warteschlange wird im JS gebaut (Zähler im Titel, Zustandszeile,
+  // Verwerfen-Knopf) — `data-i18n` allein setzte den Titel auf die Fassung OHNE
+  // Zahl zurück und ließe die Liste in der alten Sprache stehen.
+  step(() => { reflectOnline(); });
   step(() => { if (tl.events.length) renderTimeline(); });
   step(() => {
     if (view === 'stats') loadStats();
@@ -3637,6 +3727,10 @@ async function jrLoad(dateStr) {
   jrExisting = events[0] || null;
   document.getElementById('jr-text').value = jrExisting ? (jrExisting.note || '') : '';
   jrPreview(false);
+  // F1: Ein Vorschlag gehört zu EINEM Tag. Beim Tageswechsel stehen zu lassen,
+  // was gestern vorgeschlagen wurde, wäre die stille Sorte Fehler.
+  jrSuggestion = null;
+  document.getElementById('jr-suggestion').style.display = 'none';
 }
 function jrPreview(show) {
   const box = document.getElementById('jr-preview-box');
@@ -3653,6 +3747,61 @@ function openJournal(dateStr) {
 }
 function closeJournal() { document.getElementById('journal-modal').classList.remove('show'); }
 document.getElementById('tl-journal-btn').addEventListener('click', () => openJournal());
+
+// ---------- F1 (zweite Hälfte): KI-Vorschlag für den Tag ----------
+// Die KI schreibt hier NICHT ins Tagebuch. Sie liefert einen Text, der neben
+// dem Feld steht; erst „Übernehmen" bringt ihn hinein, erst „Speichern" in die
+// Datenbank. Damit gilt die Zusage aus 0.15.0 unverändert — `note` gehört dem
+// Menschen. Der Server hält sich an dieselbe Linie: der Endpunkt ist ein GET
+// und speichert nichts.
+let jrSuggestion = null;
+function jrShowSuggestion(res) {
+  const box = document.getElementById('jr-suggestion');
+  jrSuggestion = res && res.text ? res.text : null;
+  if (!jrSuggestion) {
+    box.style.display = 'none';
+    // Kein Text ist ein ERGEBNIS und muss begründet werden — sonst sieht ein
+    // Knopf, der nichts tut, aus wie ein Knopf, der kaputt ist.
+    toast(res && res.skipped_unconfirmed
+      ? t('jr.sug.none.unconfirmed', 'Für diesen Tag gibt es nur unbestätigte Ereignisse ({n}). Bestätige sie zuerst — aus Vermutungen macht das Tagebuch keine Erinnerung.').replace('{n}', res.skipped_unconfirmed)
+      : t('jr.sug.none', 'Für diesen Tag ist nichts erfasst, das sich zusammenfassen ließe.'), 'warn', 8000);
+    return;
+  }
+  box.style.display = '';
+  const meta = [];
+  meta.push(t('jr.sug.used', '{n} Ereignis(se) eingeflossen').replace('{n}', res.used_events));
+  if (res.skipped_unconfirmed)
+    meta.push(t('jr.sug.skipped', '{n} unbestätigte übergangen').replace('{n}', res.skipped_unconfirmed));
+  document.getElementById('jr-sug-meta').textContent = meta.join(' · ');
+  document.getElementById('jr-sug-text').innerHTML = mdRender(jrSuggestion);
+}
+document.getElementById('jr-suggest').addEventListener('click', async ev => {
+  const btn = ev.target, day = document.getElementById('jr-date').value;
+  if (!day) return;
+  btn.disabled = true; btn.textContent = t('jr.sug.busy', '✨ formuliere…');
+  try {
+    jrShowSuggestion(await api(`/api/journal/suggest?day=${day}`));
+  } catch (err) {
+    toast(err.message, 'error', 9000);
+  } finally {
+    btn.disabled = false; btn.textContent = t('jr.sug', '✨ Tag zusammenfassen');
+  }
+});
+document.getElementById('jr-sug-take').addEventListener('click', () => {
+  const ta = document.getElementById('jr-text');
+  if (!jrSuggestion) return;
+  // Anhängen statt ersetzen: was schon dasteht, hat der Mensch geschrieben —
+  // das darf ein Vorschlag nicht überschreiben.
+  ta.value = ta.value.trim() ? ta.value.trim() + '\n\n' + jrSuggestion : jrSuggestion;
+  document.getElementById('jr-suggestion').style.display = 'none';
+  jrSuggestion = null;
+  ta.focus();
+  toast(t('toast.jrtaken', 'Übernommen — noch nicht gespeichert. Prüfen und auf Speichern drücken.'), 'ok', 7000);
+});
+document.getElementById('jr-sug-drop').addEventListener('click', () => {
+  document.getElementById('jr-suggestion').style.display = 'none';
+  jrSuggestion = null;
+});
 // F8 (erste Ausbaustufe): druckt die aktuell gefilterte Zeitstrahl-Ansicht
 // ---------- F8: Drucken mit Zeitraum-Auswahl ----------
 // Statt die Bildschirmansicht zu drucken, wird #print-area frisch aufgebaut:
@@ -4542,10 +4691,209 @@ document.getElementById('mf-geo-btn').addEventListener('click', async ev => {
     btn.disabled = false;
   }
 });
+// ---------- P5.1: Offline erfassen ----------
+// Stufe 1 des Konzepts lautet „capture first — nie etwas verlieren", und ohne
+// Netz galt sie bis 0.36 nicht: der Knopf lief in einen Fehler, der Text stand
+// noch im Feld und war beim nächsten Neuladen weg.
+//
+// Die Warteschlange liegt in localStorage und nicht in IndexedDB: es sind
+// Textzeilen, keine Dateien, und ein Speicher, den man in der Konsole in einer
+// Zeile ansehen kann, ist bei „meine Aufzeichnung ist noch nicht angekommen"
+// mehr wert als der lehrbuchrichtige.
+//
+// Drei Regeln, die den Rest des Codes erklären:
+//  1. Ein Eintrag wird erst gelöscht, wenn der SERVER ihn bestätigt hat.
+//  2. Ein NETZ-Fehler heißt „später nochmal" — eine ANTWORT des Servers
+//     (400, 422, …) heißt „so nicht", und ewiges Neusenden würde daraus nie
+//     etwas anderes machen. Der Eintrag bleibt sichtbar liegen und trägt den
+//     Grund, statt im Hintergrund zu kreisen.
+//  3. Jeder Eintrag hat eine `client_id`. Bricht die Leitung NACH dem
+//     Speichern und VOR der Antwort ab, erkennt der Server die Wiederholung.
+const OUTBOX_KEY = 'lifedash.outbox';
+let outboxFlushing = false;
+
+function outboxRead() {
+  try { return JSON.parse(localStorage.getItem(OUTBOX_KEY) || '[]'); }
+  catch (_) { return []; }
+}
+// Gibt zurück, ob der Schreibvorgang geklappt hat. Der Rückgabewert ist nicht
+// Kosmetik: der Aufrufer räumt das Eingabefeld erst danach, sonst wäre ein
+// voller Gerätespeicher genau der Datenverlust, den P5.1 verhindern soll.
+function outboxWrite(items) {
+  try {
+    localStorage.setItem(OUTBOX_KEY, JSON.stringify(items));
+  } catch (_) {
+    toast(t('ob.full', 'Der Gerätespeicher ist voll — diese Erfassung konnte nicht gepuffert werden. Bitte den Text sichern.'), 'error', 15000);
+    renderOutbox();
+    return false;
+  }
+  renderOutbox();
+  return true;
+}
+function outboxAdd(entry) {
+  const items = outboxRead();
+  items.push(Object.assign({
+    // `crypto.randomUUID` fehlt auf älteren/unsicheren Kontexten — dann ein
+    // Ersatz, denn ohne Kennung wäre nur die Doppel-Erkennung dahin, nicht die
+    // Erfassung.
+    id: (self.crypto && crypto.randomUUID) ? crypto.randomUUID()
+        : `c${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    at: new Date().toISOString(),
+  }, entry));
+  return outboxWrite(items);
+}
+function outboxRemove(id) { outboxWrite(outboxRead().filter(x => x.id !== id)); }
+
+function renderOutbox() {
+  const items = outboxRead();
+  const panel = document.getElementById('outbox-panel');
+  if (!panel) return;
+  panel.style.display = items.length ? '' : 'none';
+  // Der Zähler hängt an „Eingabe" — dort liegt auch die Liste, also führt der
+  // Weg vom Hinweis zur Sache (A38 spiegelt denselben Gedanken für „Mehr").
+  const badge = document.getElementById('nav-outbox-badge');
+  if (badge) { badge.textContent = items.length; badge.style.display = items.length ? '' : 'none'; }
+  if (!items.length) return;
+
+  const failed = items.filter(x => x.error).length;
+  document.getElementById('outbox-title').textContent =
+    t('ob.title', '📥 Wartet auf Verbindung') + ` (${items.length})`;
+  const state = document.getElementById('outbox-state');
+  state.textContent = failed
+    ? t('ob.state.failed', '{n} abgelehnt — bitte ansehen').replace('{n}', failed)
+    : (navigator.onLine ? t('ob.state.online', 'Verbindung da — wird gesendet')
+                        : t('ob.state.offline', 'Kein Netz — Senden sobald wieder Verbindung besteht'));
+  document.getElementById('outbox-send').disabled = !navigator.onLine || outboxFlushing;
+
+  document.getElementById('outbox-list').innerHTML = items.map(x => `
+    <div class="ob-item${x.error ? ' failed' : ''}">
+      <div class="ob-text">
+        ${esc(x.raw_text.length > 160 ? x.raw_text.slice(0, 160) + '…' : x.raw_text)}
+        <div class="ob-when">${esc(fmtDateTime(x.at))}${x.capture_lat != null ? ' · 📍' : ''}${
+          x.error ? ' · ' + esc(x.error) : ''}</div>
+      </div>
+      <button class="btn ghost" data-outbox-drop="${esc(x.id)}">${esc(t('ob.drop', 'Verwerfen'))}</button>
+    </div>`).join('');
+}
+function fmtDateTime(iso) {
+  const d = new Date(iso);
+  return isNaN(d) ? iso : d.toLocaleString(LANG === 'en' ? 'en-GB' : 'de-DE',
+    { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+// Sendet die Warteschlange der Reihe nach. Beim ersten NETZ-Fehler wird
+// abgebrochen — die Reihenfolge der Erfassung bleibt so erhalten, und ein
+// totes Netz muss nicht für jeden Eintrag einzeln bewiesen werden.
+async function flushOutbox(manual = false) {
+  if (outboxFlushing) return;
+  const items = outboxRead().filter(x => !x.error);
+  if (!items.length) { renderOutbox(); return; }
+  if (!navigator.onLine) { renderOutbox(); return; }
+  outboxFlushing = true;
+  renderOutbox();
+  let sent = 0;
+  try {
+    for (const item of items) {
+      try {
+        await api('/api/ingest', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            raw_text: item.raw_text, client_id: item.id,
+            capture_lat: item.capture_lat ?? null, capture_lng: item.capture_lng ?? null,
+          }),
+        });
+        outboxRemove(item.id);
+        sent++;
+      } catch (err) {
+        // 401 ist die Ausnahme unter den Antworten: der Server hat den Eintrag
+        // nicht abgelehnt, er kennt uns gerade nicht. Nach dem Anmelden geht
+        // derselbe Eintrag durch — also aufheben, nicht abstempeln.
+        if (err.status && err.status !== 401) {
+          const all = outboxRead();
+          const hit = all.find(x => x.id === item.id);
+          if (hit) { hit.error = err.message; outboxWrite(all); }
+          continue;                  // die übrigen dürfen es trotzdem versuchen
+        }
+        break;                       // Netz weg oder abgemeldet: aufhören, nichts verwerfen
+      }
+    }
+  } finally {
+    outboxFlushing = false;
+    renderOutbox();
+  }
+  if (sent) {
+    toast(t('toast.outboxsent', '✓ {n} gepufferte Erfassung(en) gesendet.').replace('{n}', sent));
+    await refreshAll();
+  } else if (manual) {
+    toast(t('toast.outboxstuck', 'Senden nicht möglich — die Einträge bleiben gespeichert.'), 'warn');
+  }
+}
+
+// A40-Regel: Ein Bedienelement, das gerade nichts bewirken kann, zeigt das.
+// Die manuelle Eingabe schreibt direkt in die Lebensdatenbank und hat bewusst
+// KEINE Warteschlange — ein bestätigter Eintrag ohne Server ist kein
+// Roh-Eingang mehr, sondern eine zweite Wahrheit. Also sagen, statt scheitern.
+function reflectOnline() {
+  const on = navigator.onLine;
+  const manual = document.getElementById('input-mode-manual');
+  if (manual) {
+    manual.classList.toggle('inert', !on);
+    manual.title = on ? '' : t('in.manual.offline',
+      'Ohne Verbindung nicht möglich — die manuelle Eingabe speichert sofort bestätigt. Nutze so lange die KI-Analyse: die wird gepuffert.');
+  }
+  renderOutbox();
+}
+window.addEventListener('online', () => { reflectOnline(); flushOutbox(); });
+window.addEventListener('offline', reflectOnline);
+document.getElementById('outbox-send')?.addEventListener('click', () => flushOutbox(true));
+document.getElementById('outbox-list')?.addEventListener('click', async ev => {
+  const id = ev.target.dataset && ev.target.dataset.outboxDrop;
+  if (!id) return;
+  const item = outboxRead().find(x => x.id === id);
+  if (!item) return;
+  // Verwerfen ist der einzige Weg, an dem hier etwas ohne Server verschwindet
+  // — deshalb mit Rückfrage und mit dem Text vor Augen.
+  if (await uiDialog(t('ob.drop.ask', 'Diese Erfassung endgültig verwerfen? Sie wurde nie gespeichert.\n\n') + item.raw_text.slice(0, 200), { danger: true }))
+    outboxRemove(id);
+});
+
+// P5.1: Teilen aus einer anderen App. Das Betriebssystem NAVIGIERT nach
+// `/share?title=…&text=…&url=…` (siehe manifest.json) — hier wird daraus ein
+// Textentwurf im Eingabefeld, und die Adresse wird auf `/` zurückgeschrieben,
+// damit ein Neuladen nicht denselben Inhalt ein zweites Mal einträgt.
+//
+// Bewusst KEIN automatisches Absenden: geteilt wird oft ein halber Satz, ein
+// Link oder eine Überschrift, und was in den Roh-Eingang geht, entscheidet der
+// Mensch (Kap. 4, Stufe 1). Er sieht den Text und drückt den Knopf.
+function handleShareTarget() {
+  const params = new URLSearchParams(location.search);
+  const shared = ['title', 'text', 'url'].map(k => (params.get(k) || '').trim()).filter(Boolean);
+  const view = params.get('view');
+  if (shared.length) {
+    // Doppeltes wegwerfen: viele Apps schicken den Link zugleich als `text`
+    // UND als `url`, manche den Titel zusätzlich im Text.
+    const parts = [];
+    shared.forEach(s => { if (!parts.some(p => p.includes(s))) parts.push(s); });
+    const ta = document.getElementById('input-text');
+    ta.value = (ta.value ? ta.value.trim() + '\n\n' : '') + parts.join('\n');
+    setInputMode(false);
+    gotoView('input');
+    ta.focus();
+    toast(t('toast.shared', '📨 Geteilter Text übernommen — prüfen und erfassen.'), 'ok', 7000);
+  } else if (view === 'input') {
+    gotoView('input');
+  }
+  if (shared.length || view) history.replaceState(null, '', '/');
+}
+
 async function analyze() {
   const text = document.getElementById('input-text').value.trim();
   if (!text) return;
   const btn = document.getElementById('analyze-btn');
+  const pos = capturePos;
+  // Offline gar nicht erst losschicken: das spart den Fehlversuch und sagt
+  // sofort das Richtige.
+  if (!navigator.onLine) { queueCapture(text, pos); return; }
   btn.disabled = true; btn.textContent = '🤖 analysiere…';
   showLoading('🤖 KI analysiert…');
   try {
@@ -4562,12 +4910,35 @@ async function analyze() {
     previewEvents = result.events || [];
     renderPreview(previewEvents);
   } catch (err) {
-    if (!String(err.message).startsWith('401'))
-      showBanner(`Backend-Fehler: ${err.message}`);
+    // Kein `err.status` = die Anfrage kam nie an; 401 = die Sitzung ist
+    // abgelaufen, während der Text schon geschrieben war. Beides ist zu
+    // retten, nicht zu beklagen. Jede andere Antwort ist ein echter Fehler
+    // und gehört gezeigt — puffern würde ihn nur endlos wiederholen.
+    if (!err.status || err.status === 401) { queueCapture(text, pos, err.status === 401 ? 'auth' : 'offline'); return; }
+    showBanner(`Backend-Fehler: ${err.message}`);
   } finally {
     btn.disabled = false; btn.textContent = '🤖 KI analysieren';
     showLoading(false);
   }
+}
+
+function queueCapture(text, pos, reason = 'offline') {
+  // Das Eingabefeld wird ERST geräumt, wenn der Text nachweislich woanders
+  // liegt. Andernfalls (voller Gerätespeicher) stünde er nirgends mehr — der
+  // Verlust, gegen den dieses Paket antritt, ausgelöst von ihm selbst.
+  if (!outboxAdd({ raw_text: text, capture_lat: pos ? pos.lat : null,
+                   capture_lng: pos ? pos.lng : null })) return;
+  document.getElementById('input-text').value = '';
+  capturePos = null;
+  document.getElementById('geo-btn').classList.remove('active');
+  document.getElementById('geo-hint').style.display = 'none';
+  // Eine offene KI-Vorschau gehört zum vorigen Text und stünde sonst über
+  // einem leeren Feld, als wäre sie das Ergebnis dieser Erfassung.
+  document.getElementById('ai-preview').classList.remove('show');
+  toast(reason === 'auth'
+    ? t('toast.queued.auth', '📥 Sitzung abgelaufen — der Text ist gespeichert und geht nach dem Anmelden raus.')
+    : t('toast.queued', '📥 Ohne Verbindung erfasst — gespeichert und wird gesendet, sobald wieder Netz da ist.'),
+    'warn', 8000);
 }
 function renderPreview(events) {
   if (!events.length) return;
@@ -5012,7 +5383,16 @@ function setInputMode(manual) {
   document.getElementById('input-mode-manual').classList.toggle('active', manual);
 }
 document.getElementById('input-mode-ai').addEventListener('click', () => setInputMode(false));
-document.getElementById('input-mode-manual').addEventListener('click', () => setInputMode(true));
+document.getElementById('input-mode-manual').addEventListener('click', ev => {
+  // P5.1: Ohne Verbindung ist der Reiter durchgestrichen (`inert`) — dann auch
+  // nicht hineinlassen. Ein Formular, das man ausfüllen darf und nicht abschicken
+  // kann, ist die teurere Enttäuschung.
+  if (ev.currentTarget.classList.contains('inert')) {
+    toast(t('in.manual.offline', 'Ohne Verbindung nicht möglich — die manuelle Eingabe speichert sofort bestätigt. Nutze so lange die KI-Analyse: die wird gepuffert.'), 'warn', 7000);
+    return;
+  }
+  setInputMode(true);
+});
 
 const ENT_TYPE_LABEL = { animal:'🐾', country:'🌍', movie:'🎬', game:'🎮', book:'📖' };
 function renderManualEntities() {
@@ -6705,11 +7085,35 @@ document.getElementById('logout-link').addEventListener('click', async ev => {
 });
 
 // ---------- INIT ----------
+// P5.1: Die App ist ohne Netz gestartet (oder das Backend antwortet nicht).
+// Statt einer Anmeldemaske oder eines toten Zeitstrahls bleibt genau das übrig,
+// was ohne Server geht: erfassen. Alles andere wäre eine leere Hülle, die
+// aussieht, als hätte sie keine Daten — der Unterschied zwischen „nichts da"
+// und „gerade nicht erreichbar" ist der wichtigste in dieser Lage.
+function enterOfflineCapture() {
+  showBanner(t('banner.capture.only',
+    '📴 Keine Verbindung — <b>Erfassen geht trotzdem</b>. Alles andere (Zeitstrahl, Karte, Statistik) '
+    + 'braucht den Server; Erfasstes wird automatisch gesendet, sobald er wieder da ist.'));
+  gotoView('input');
+  reflectOnline();
+  handleShareTarget();
+  // Kommt das Netz zurück, ist die halbe App noch leer — dann ist Neuladen der
+  // ehrliche Weg. Erst senden, was wartet, DANN neu laden: sonst geht die
+  // Warteschlange zwar nicht verloren, wird aber grundlos später verschickt.
+  window.addEventListener('online', async () => {
+    await flushOutbox();
+    location.reload();
+  }, { once: true });
+}
+
 (async function init() {
   // Service Worker (PWA)
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
+  // P5.1: vor allem anderen — die Warteschlange gehört auf den Schirm, auch
+  // wenn gleich die Anmeldung dazwischenkommt oder der Server schweigt.
+  reflectOnline();
   let cfg = null;
   try {
     cfg = await api("/api/auth/config");
@@ -6732,6 +7136,11 @@ document.getElementById('logout-link').addEventListener('click', async ev => {
   try {
     AUTH.user = await api("/api/auth/me");
   } catch (err) {
+    // P5.1: Ein NETZ-Fehler ist kein Anmeldeproblem. Bis 0.35 landete beides
+    // im selben Zweig — und damit stand man ohne Netz vor einer Anmeldemaske,
+    // die man ohne Netz nicht bedienen kann. Für die Erfassung unterwegs, also
+    // genau den Fall, für den P5.1 existiert, war die App damit zu.
+    if (!err.status) { enterOfflineCapture(); return; }
     if (AUTH.mode === 'oidc' || AUTH.mode === 'local') { showLogin(); return; }
     showBanner(`${t('banner.offline', '⚠ Backend nicht erreichbar. Starte es mit <code>uvicorn app.main:app</code> im Ordner <code>backend/</code> und lade neu.')}`);
     return;
@@ -6763,6 +7172,12 @@ document.getElementById('logout-link').addEventListener('click', async ev => {
   if (AUTH.mode === 'local')
     document.querySelectorAll('.local-only').forEach(el => el.style.display = '');
   if (!isAdmin()) document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+
+  // P5.1: erst jetzt, denn beides setzt einen angemeldeten Nutzer voraus —
+  // ein geteilter Text vor der Anmeldung stünde in einem Feld, das gleich von
+  // der Anmeldemaske verdeckt wird, und ein Senden liefe in ein 401.
+  handleShareTarget();
+  flushOutbox();          // absichtlich ohne await: der Start wartet nicht darauf
 
   try {
     const h = await api("/health");

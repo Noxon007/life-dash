@@ -15,6 +15,49 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.36.0] – 2026-07-22
+
+### Added
+- **Capturing works without a connection.** Write something down on a train, in
+  a cellar, on a mountain — it is kept on the device and sent by itself the
+  moment there is network again. Until then it sits in a visible list on the
+  capture page, with its full text and a counter next to “Capture”, so “where
+  did my note go?” never becomes a question. Nothing is deleted until the
+  server has confirmed it.
+  - Entries the server genuinely *rejects* stop being retried and say why, with
+    a button to discard them — endlessly resending something that will never be
+    accepted is only a quieter way of losing it.
+  - If your session has expired in the meantime, the text is kept too and goes
+    out after you sign in.
+- **Life-Dash appears in the share menu of other apps.** Share a link, a
+  passage of text or a headline into Life-Dash and it lands in the capture
+  field, ready to check and record. It is deliberately not recorded for you:
+  what goes into your database is your decision.
+- **Opening the app without a connection now shows the app.** Until now a
+  missing network looked exactly like being signed out — you were left with a
+  login screen that cannot be used without network, which is precisely the
+  situation offline capture exists for. Now you get the capture page, a plain
+  explanation, and everything that needs the server clearly marked as such.
+- **A suggested journal entry for a day.** In the journal dialog, “Summarise
+  the day” turns that day's confirmed events — with places, weather and photos
+  — into a short draft in the first person. The draft appears **beside** your
+  text, never inside it: you take it over, edit it, and save it yourself. The
+  AI still never writes in your journal, and never saves anything.
+  - Unconfirmed entries stay out of it and are counted instead (“3 unconfirmed
+    skipped”), because a journal should not turn a guess into a memory.
+  - A day with nothing to summarise says so, rather than producing an empty
+    draft.
+
+### Changed
+- The manual entry form is shown as unavailable while there is no connection,
+  instead of letting you fill it in and fail at the end. It saves straight into
+  the life database, which is why it has no offline queue.
+- `POST /api/ingest` accepts an optional `client_id`; sending the same one
+  twice returns the first result with `duplicate: true` instead of recording
+  the capture a second time. Without it, two identical captures stay two
+  captures — a person can mean that.
+- New endpoint `GET /api/journal/suggest?day=…`. It only reads.
+
 ## [0.35.0] – 2026-07-22
 
 ### Added

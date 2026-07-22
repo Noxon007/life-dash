@@ -209,6 +209,15 @@ Two pitfalls:
   application. Life-Dash brings its own OIDC login; otherwise you get a double
   login, and PWA/API calls from a phone fail on the proxy's auth redirect.
 
+**HTTPS is what makes the phone features work**, not only what protects them.
+Browsers only register a service worker in a *secure context*, so over plain
+`http://<ip>:8000` the app still works but stops being a proper PWA: it will
+not start without a connection, **offline capture never gets the chance to
+buffer anything**, and Life-Dash does not appear in the share menu of other
+apps. `http://localhost` counts as secure, which is why this never shows up
+while developing. If you reach the app by IP on your LAN and those features are
+missing, this is why.
+
 ## 5. First login & migrating data
 
 - **The first OIDC login becomes admin** and adopts existing single-user legacy

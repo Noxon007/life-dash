@@ -69,6 +69,12 @@ class FragmentCreate(BaseModel):
     # der Text hat Vorrang, wenn er selbst einen Ort nennt
     capture_lat: float | None = Field(None, ge=-90, le=90)
     capture_lng: float | None = Field(None, ge=-180, le=180)
+    # P5.1: Kennung des Clients für EINE Erfassung. Nur die Offline-Warteschlange
+    # setzt sie — sie ist die einzige Stelle, die dieselbe Erfassung ein zweites
+    # Mal senden kann, wenn die Antwort unterwegs verloren ging. Ohne das Feld
+    # verhält sich /api/ingest wie bisher: zweimal derselbe Text sind zwei
+    # Erfassungen, weil ein Mensch das genau so meinen kann.
+    client_id: str | None = Field(None, max_length=64)
 
 
 class EntityRead(BaseModel):
@@ -263,6 +269,24 @@ class IngestResult(BaseModel):
     """Ergebnis der Ingestion: das Roh-Fragment + die erzeugten Events (Stufe-2-Vorschau)."""
     fragment: FragmentRead
     events: list[EventRead]
+    # P5.1: true, wenn dieselbe `client_id` schon einmal ankam — die
+    # Warteschlange darf dann streichen, ohne ein zweites Fragment erzeugt zu haben.
+    duplicate: bool = False
+
+
+class JournalSuggestion(BaseModel):
+    """F1: Vorschlag für den Tagebuch-Text eines Tages — nichts davon ist gespeichert.
+
+    `text=None` heißt „für diesen Tag gibt es nichts zusammenzufassen"; das ist
+    ein Ergebnis und keine Panne, deshalb 200 und kein Fehler. Damit die
+    Oberfläche den Grund nennen kann, kommen beide Zählungen mit:
+    `used_events` (eingeflossen) und `skipped_unconfirmed` (übergangen, weil
+    unbestätigt).
+    """
+    day: date_type
+    text: str | None = None
+    used_events: int = 0
+    skipped_unconfirmed: int = 0
 
 
 # --------------------------------------------------------------------------- #

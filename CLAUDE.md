@@ -45,10 +45,10 @@ Entscheidungen/Anmerkungen in Kap. 15. Erst dort gezielt nachlesen statt Code ra
   etc. aus Config); `.env.example` ist die Setup-Referenz
 
 ## Stand
-Umgesetzt bis **v0.35.0** (2026-07-22). **Gruppe A ist komplett** (A1–A42),
-Gruppe B bis **F19**. Offen ist damit nur noch: **P5.1** (Offline-Erfassung),
-**F1-Rest** (KI-Tageszusammenfassung), **P2.1 Stufe 2** (Immich als
-Ereignisquelle), dann **Demo-Modus** und **R1** (Veröffentlichungsreife).
+Umgesetzt bis **v0.36.0** (2026-07-22). **Gruppe A ist komplett** (A1–A42),
+Gruppe B bis **F19**; **P5.1 und F1 sind fertig**. Offen ist damit nur noch:
+**P2.1 Stufe 2** (Immich als Ereignisquelle), dann **Demo-Modus** und **R1**
+(Veröffentlichungsreife).
 Hinter 1.0 bleiben
 nur noch neue Import-Konnektoren (P2.8 OwnTracks, P2.9 Automatisierung,
 P2.10 Trakt, P2.11 Dawarich/GPX, P4.1 Health, P4.2 PSN) plus **P5.2**
@@ -59,9 +59,9 @@ P2.10 Trakt, P2.11 Dawarich/GPX, P4.1 Health, P4.2 PSN) plus **P5.2**
 0.26 A29 (ZIP-Backup) · 0.27 Fixes (A31/A32/A30) · 0.28 F16+A33+A34 ·
 0.29 A35 (lokale Konten) · 0.30 P3.1 · 0.31 A36+F17 (schlanke Liste, Alter) ·
 0.32 A37 (serverseitiges Zeitfenster) · 0.33 A38+A40 (Mobil-Layout,
-Kartenschalter) + dev-Kennung · 0.34 A39+F18+A41 (Städte, Tages-Fotos) · 0.35 F19+A42 (Sammlung).
-Offen: **0.36 P5.1+F1-Rest (Erfassen)** ·
-**0.37 P2.1 Stufe 2 (Immich als Quelle)** · **0.38 Demo-Modus** ·
+Kartenschalter) + dev-Kennung · 0.34 A39+F18+A41 (Städte, Tages-Fotos) · 0.35 F19+A42 (Sammlung) ·
+0.36 P5.1+F1-Rest (Erfassen).
+Offen: **0.37 P2.1 Stufe 2 (Immich als Quelle)** · **0.38 Demo-Modus** ·
 **1.0 = Veröffentlichung**. Kein Termindruck (Anmerkung 58).
 Dort nachsehen statt Reihenfolge raten.
 
@@ -140,6 +140,31 @@ Kontinente, „nächste Marke: 10" wäre ein Rechenfehler mit Anspruch (Anm. 104
 Schwelle** (Anm. 103): die Wettermetriken zählten Einträge, wo überall „Tage"
 stand — A31/Anm. 64 hatte in dieser Datei überlebt. Frage bei jeder
 Invarianten-Reparatur: *wo gilt derselbe Satz noch?*
+
+**P5.1+F1 fertig (v0.36.0, Anmerkung 108).** Das Loch beim Offline-Erfassen war
+nicht die fehlende Warteschlange, sondern die **Eingangstür**: `init()` hatte
+EINEN Zweig für zwei Fehler — „nicht angemeldet" und „Anfrage kam nie an" —,
+also stand man ohne Netz vor einer Anmeldemaske, die ohne Netz nicht bedienbar
+ist. Unterscheidungsmerkmal ist jetzt `err.status` (vorhanden = der Server hat
+GEANTWORTET), und dieselbe Unterscheidung braucht die Warteschlange dreimal:
+**puffern** nur ohne Status (ein gepuffertes 422 wird ewig wiederholt),
+**abbrechen** bei Netzverlust, **nicht abstempeln** bei 401 (nach dem Anmelden
+geht derselbe Eintrag durch — die einzige unumkehrbare Fehlentscheidung in
+einem Mechanismus, dessen Zweck Umkehrbarkeit ist). Wiederholen heißt
+Doppelte in Kauf nehmen: die `client_id` liegt bewusst im Arbeitsspeicher
+(`_seen` in `routers/ingest.py`), **kein Schema** — ein doppelter Vorschlag ist
+sichtbar und verwerfbar, eine verlorene Erfassung endgültig. Ohne `client_id`
+wird NICHT entdoppelt (zwei gleiche Sätze von Hand sind zwei Erfassungen).
+**Eine Warteschlange ist so viel wert wie das, was sie zeigt** — Text, Zähler,
+Grund; die manuelle Eingabe bekommt gar keine (sie schreibt Bestätigtes) und
+wird stattdessen nach der A40-Regel `inert` gestellt.
+**F1 war eine Grenzfrage, keine Textfrage:** der Vorschlag steht NEBEN dem
+Tagebuchfeld, „Übernehmen" hängt an (überschreibt nie), der Endpunkt ist ein
+GET und speichert nichts — so gilt die Zusage aus 0.15.0 unverändert.
+Unbestätigte fließen nicht ein, werden aber GEZÄHLT und genannt; der
+Tagebuch-Eintrag ist aus seinem eigenen Material ausgeschlossen, sonst frisst
+sich der Text selbst. Wächter: `tools/check-p51-outbox.js` (stellt `onLine`
+und Netzfehler HER) und `tools/check-f1-journal-ai.js`.
 
 **Immich hängt Tages-Fotos an den TAG (Anmerkung 106, in 0.35.0).** Vorher ging
 ein Foto an den ersten Besuch, dessen ±6-h-Fenster es traf — bei `exact`-Präzision

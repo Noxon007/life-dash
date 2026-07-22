@@ -124,6 +124,24 @@ Output:
 {"events":[{"title":"Pho beim Vietnamesen in Köln","description":"Heute Mittag beim Vietnamesen in Köln eine Pho gegessen","date_start":"2026-07-14","date_end":"2026-07-14","date_precision":"day","category":"meal","confidence":0.9,"location":{"name":"Köln","lat":50.9375,"lng":6.9603},"entities":[{"type":"food","name":"Pho","attributes":{"cuisine":"vietnamesisch"}}]}]}"""
 
 
+# F1: Der zweite Prompt dieses Providers — und der einzige, der Prosa will.
+# „Erfinde nichts" steht bewusst zweimal drin: die Stichpunkte sind dünn (Titel,
+# Ort, Wetter), und ein Modell füllt Lücken gern mit Stimmung, die dann als
+# eigene Erinnerung im Tagebuch steht.
+JOURNAL_PROMPT = """Du hilfst beim Führen eines persönlichen Tagebuchs.
+Aufgabe: Aus den Stichpunkten eines Tages einen kurzen Tagebuch-Eintrag formulieren.
+
+REGELN:
+- Schreibe in der ICH-Form und in der Vergangenheit, so wie der Mensch selbst schreiben würde.
+- 3 bis 6 Sätze, ein bis zwei Absätze. Keine Überschrift, keine Aufzählung, keine Anrede.
+- Nutze AUSSCHLIESSLICH die genannten Fakten. Erfinde nichts dazu — keine Gefühle,
+  keine Gespräche, keine Personen, keine Orte, die nicht dastehen.
+- Ist ein Tag dünn belegt, ist der Eintrag eben kurz. Fülle nicht auf.
+- Wetter und Uhrzeiten nur erwähnen, wenn sie zum Tag etwas beitragen.
+- Markdown ist erlaubt (**fett**, *kursiv*), aber sparsam.
+- Antworte nur mit dem Text des Eintrags, ohne Vorrede und ohne Erklärung."""
+
+
 def build_system_prompt(tracked: list[str] | None = None) -> str:
     """A7/A15: Basis-Prompt + Regeln der (getrackten) Module aus den YAMLs.
     Neue Module bringen ihre Extraktions-Regeln selbst mit (prompt_rules)."""
@@ -161,6 +179,31 @@ class OpenAICompatProvider(LLMProvider):
                 ExtractedEvent(title=raw_text[:80], description=raw_text, confidence=0.3)
             )
         return events
+
+    # ------------------------------------------------------------------ #
+    def summarize_day(self, day, lines: list[str]) -> str | None:
+        """F1: Tages-Zusammenfassung als Tagebuch-VORSCHLAG.
+
+        Anders als `extract` wird hier kein JSON verlangt — die Antwort IST der
+        Text. Deshalb auch kein `_parse_json`: ein Modell, das hier Fences
+        setzt, liefert Markdown, und Markdown ist im Tagebuch erwünscht (F1).
+        """
+        if not lines:
+            return None
+        user = (f"Datum: {day.strftime('%d.%m.%Y')}\n"
+                "Ereignisse dieses Tages:\n" + "\n".join(f"- {line}" for line in lines))
+        try:
+            content = self._chat(JOURNAL_PROMPT, user)
+        except Exception as err:
+            log.warning("KI-Provider-Fehler (Tageszusammenfassung): %s", err)
+            raise ProviderUnavailable(str(err)) from err
+        text = content.strip()
+        # Manche Modelle verpacken die ganze Antwort trotzdem in einen Fence.
+        if text.startswith("```"):
+            text = text.split("\n", 1)[-1]
+            if text.rstrip().endswith("```"):
+                text = text.rstrip()[:-3]
+        return text.strip() or None
 
     # ------------------------------------------------------------------ #
     def embed(self, text: str, kind: str = "document") -> list[float] | None:

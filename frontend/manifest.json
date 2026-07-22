@@ -8,6 +8,23 @@
   "background_color": "#0f1420",
   "theme_color": "#0f1420",
   "lang": "de",
+  "share_target": {
+    "action": "/share",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "shortcuts": [
+    {
+      "name": "Erfassen",
+      "short_name": "Erfassen",
+      "url": "/?view=input",
+      "description": "Direkt etwas erfassen — offline gepuffert, bis wieder Netz da ist"
+    }
+  ],
   "icons": [
     {
       "src": "icon.svg",

@@ -5,7 +5,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -22,6 +22,7 @@ from app.routers import (
     events,
     ingest,
     jobs,
+    journal,
     media,
     moderation,
     modules,
@@ -125,6 +126,7 @@ app.include_router(tracks.router)
 app.include_router(jobs.router)
 app.include_router(world.router)
 app.include_router(achievements.router)
+app.include_router(journal.router)    # F1: Tages-Zusammenfassung (Vorschlag)
 app.include_router(admin.router)
 
 
@@ -151,6 +153,23 @@ def health() -> dict:
     if ref or sha:
         out["build"] = {"ref": ref or None, "sha": sha[:7] or None}
     return out
+
+
+# P5.1: Ziel des Teilen-Menüs anderer Apps. Das Manifest verweist auf `/share`,
+# das Betriebssystem NAVIGIERT dorthin (GET mit ?title&text&url) — es ist also
+# kein API-Aufruf, sondern ein Aufruf der App selbst. StaticFiles kennt den Pfad
+# nicht und lieferte 404, deshalb dieselbe index.html von Hand, VOR dem Mount.
+# Die Adresse auszuwerten und wieder auf `/` zurückzuschreiben ist Sache des
+# Frontends; der Server sieht den geteilten Text bewusst nie — geschrieben wird
+# erst über /api/ingest, mit den üblichen Prüfungen.
+@app.get("/share", include_in_schema=False)
+def share_target():
+    from fastapi.responses import FileResponse
+
+    index = settings.frontend_dir / "index.html"
+    if not index.exists():
+        raise HTTPException(404, "Frontend nicht ausgeliefert")
+    return FileResponse(index)
 
 
 # Frontend (responsive PWA) — zuletzt gemountet, damit /api/* & /docs gewinnen
