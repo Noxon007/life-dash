@@ -50,13 +50,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Denselben Weg wie im Release-Workflow gehen, statt den Image-Namen von
+      # Hand zusammenzusetzen: `github.repository` enthält den Kontonamen in
+      # Originalschreibweise (Noxon007), Docker verlangt aber Kleinschreibung.
+      # metadata-action erledigt das — und setzt nebenbei die OCI-Labels.
+      - name: Image-Tags ableiten
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: type=raw,value=main      # Testgleis: immer genau dieser Tag
+
       - name: Build & Push :main
         uses: docker/build-push-action@v7
         with:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64  # arm64: Raspberry Pi 5
-          tags: ghcr.io/${{ github.repository }}:main
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           # Damit ein laufender Container sagen kann, WELCHER Stand er ist:
           # die Versionsnummer allein genügt dafür nicht mehr, sobald es
           # Test-Images zwischen zwei Versionen gibt (siehe /health).
