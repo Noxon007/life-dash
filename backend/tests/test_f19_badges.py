@@ -127,6 +127,21 @@ def test_sonnenstunden_werden_nicht_vervielfacht(db, user):
     assert _achievement(db, user, "sun_collector").value == 20
 
 
+def test_reisetag_zaehlt_den_vorsichtigeren_wert(db, user):
+    """Der Sonderfall hinter dem Tages-Vertreter: an einem Reisetag tragen die
+    Einträge NICHT dasselbe Wetter (die Anreicherung hängt an Ort und Datum).
+    Dann zählt der niedrigere Wert — das verzögert einen Erfolg und löst ihn
+    nie zu früh aus, und diese Richtung ist der ganze Sinn von Anmerkung 103."""
+    _sunny_event(db, user, 3, 11.0, "Vormittags im Norden")
+    _sunny_event(db, user, 3, 3.0, "Abends im Süden")
+    db.commit()
+
+    # Der Tag qualifiziert sich (ein Eintrag über der Schwelle) …
+    assert _achievement(db, user, "sun_worshipper").value == 1
+    # … und geht mit dem niedrigeren Wert in die Summe ein, nicht mit beiden.
+    assert _achievement(db, user, "sun_collector").value == 3
+
+
 def test_unbestaetigtes_zaehlt_weiterhin_nicht(db, user):
     ev = _sunny_event(db, user, 3, 11.2, "Vorschlag")
     ev.confirmed = ConfirmState.unconfirmed

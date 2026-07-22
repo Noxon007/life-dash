@@ -34,7 +34,10 @@ const detail = () => ({
              confirmed: 'confirmed', source: 'google_timeline',
              entities: [], metrics: [], media: [] }],
   events_shown: 1,
-  info: cached ? { name: 'Düsseldorf', lang: 'de', description: 'Landeshauptstadt.' } : null,
+  // cached: false = noch nie nachgesehen · 'leer' = nachgesehen, kein Artikel
+  info: cached === 'leer' ? { name: 'Düsseldorf', lang: 'de', description: null }
+        : cached ? { name: 'Düsseldorf', lang: 'de', description: 'Landeshauptstadt.' }
+        : null,
 });
 
 const dom = new JSDOM(html, {
@@ -120,6 +123,18 @@ setTimeout(async () => {
   ok('zwischengespeicherte Beschreibung wird nicht erneut geholt',
      calls.filter(u => /describe/.test(u)).length === 0,
      'jedes Öffnen fragt erneut bei Wikipedia an');
+
+  // Und derselbe Verzicht für den Fall, den man leicht übersieht: eine Stadt
+  // OHNE Wikipedia-Artikel. Der Server hat dafür eine Zeile ohne Text — das ist
+  // eine Antwort. Wer auf den Text statt auf die Zeile prüft, fragt für jede
+  // artikellose Stadt bei jedem Öffnen erneut nach.
+  cached = 'leer';
+  calls.length = 0;
+  await w.openCityDetail('Düsseldorf');
+  await new Promise(r => setTimeout(r, 30));
+  ok('„kein Artikel" gilt als Antwort, nicht als Lücke',
+     calls.filter(u => /describe/.test(u)).length === 0,
+     'artikellose Städte fragen bei jedem Öffnen erneut');
 
   // --- 5. Die Seite lädt nicht die ganze Stadt ---------------------------- //
   ok('Stadtseite holt keine unbegrenzte Ereignisliste',

@@ -3951,11 +3951,13 @@ async function openCityDetail(name) {
   catch { detail.innerHTML = `<div class="hint">${t('comp.city.gone',
     'Diese Stadt gibt es nicht mehr in deinen Orten.')}</div>`; return; }
 
-  // Beschreibung: kommt aus dem Server-Cache — fehlt sie, einmal holen lassen.
-  // Ein Fehlschlag wird dort vermerkt, dieser Aufruf wiederholt sich also nicht
-  // bei jedem Öffnen.
+  // Beschreibung: kommt aus dem Server-Cache. Geholt wird nur, wenn dort noch
+  // GAR NICHTS steht — eine Zeile ohne Text heißt „nachgesehen, kein Artikel"
+  // und ist eine Antwort, keine Lücke. Auf den Text statt auf die Zeile zu
+  // prüfen hieße: für jede artikellose Stadt bei jedem Öffnen eine Anfrage,
+  // die der Server ohnehin nur aus dem Cache beantwortet.
   let info = city.info;
-  if (!info || (!info.description && !info.wiki_url)) {
+  if (!info) {
     try { info = await api(`/api/cities/describe?name=${encodeURIComponent(name)}`,
       { method: 'POST' }); } catch (_) {}
   }

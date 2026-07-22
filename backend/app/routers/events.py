@@ -13,7 +13,7 @@ from app.auth import get_current_user
 from app.database import get_db
 from app.models import (ConfirmState, DatePrecision, Event, EventEntityLink,
                         Location, Metric, Source, User)
-from app.routers._serialize import event_to_read
+from app.routers._serialize import EAGER, EAGER_SLIM, event_to_read
 from app.schemas import (EventGeo, EventManualCreate, EventRead, EventsIndex,
                          LocationGeo, OnThisDayGroup, YearCount)
 from app.services.ingestion import create_manual_event
@@ -22,21 +22,9 @@ from app.sqlutil import day_parts
 
 router = APIRouter(prefix="/api/events", tags=["Events"])
 
-# Verknüpfungen in wenigen Sammel-Queries vorladen statt lazy pro Event
-# (bei 10k+ importierten Events wird das N+1-Lazy-Loading sonst zur Bremse)
-_EAGER = (
-    selectinload(Event.entity_links).selectinload(EventEntityLink.entity),
-    selectinload(Event.metrics),
-    selectinload(Event.location),
-    selectinload(Event.media),
-)
-# A36: slim lädt die Metriken NICHT (Wetter kommt separat als Tupel-Abfrage);
-# Medien bleiben eager, damit die Fotostreifen ohne N+1 rendern.
-_EAGER_SLIM = (
-    selectinload(Event.entity_links).selectinload(EventEntityLink.entity),
-    selectinload(Event.location),
-    selectinload(Event.media),
-)
+# Seit 0.35.0 in `_serialize.py` — dort, wo `event_to_read` steht: wer ein
+# Ereignis serialisiert, braucht genau diese Beziehungen (A42).
+_EAGER, _EAGER_SLIM = EAGER, EAGER_SLIM
 
 
 @router.post("", response_model=EventRead, status_code=201)

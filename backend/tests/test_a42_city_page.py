@@ -103,6 +103,27 @@ def test_fremde_stadt_gibt_es_nicht(db, user, other_user, duesseldorf):
     assert err.value.status_code == 404
 
 
+def test_liste_und_seite_nennen_dasselbe_land(db, user):
+    """Die Liste nimmt `min(country)`, die Seite muss dieselbe Regel nehmen —
+    sonst zeigen beide für dieselbe Stadt verschiedene Länder, und die
+    Beschreibung landet unter einem anderen Schlüssel als sie gesucht wird."""
+    from app.routers.modules import cities
+
+    # Der einzige Fall, in dem die beiden Regeln auseinandergehen: derselbe
+    # Stadtname in zwei Ländern (London/GB und London/Kanada). Der Ortsname, der
+    # im Alphabet vorn steht, gehört hier zum Land, das im Alphabet HINTEN steht
+    # — „erstes Vorkommen" und „min(country)" liefern also Verschiedenes.
+    _place(db, user, "Buckingham Palace", "London", country="Vereinigtes Königreich")
+    _place(db, user, "Covent Market", "London", country="Kanada")
+    for loc in db.query(Location).filter(Location.city == "London"):
+        _visit(db, user, loc, 4)
+    db.commit()
+
+    aus_der_liste = next(c for c in cities(db=db, user=user) if c.name == "London")
+    aus_der_seite = city_detail(name="London", db=db, user=user)
+    assert aus_der_liste.country == aus_der_seite.country
+
+
 def test_unbekannte_stadt_gibt_404(db, user, duesseldorf):
     with pytest.raises(HTTPException):
         city_detail(name="Atlantis", db=db, user=user)

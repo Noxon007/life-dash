@@ -12,7 +12,7 @@ from app.database import get_db
 from app.models import (CityInfo, Entity, Event, EventEntityLink, Location,
                         User)
 from app.modules.registry import registry
-from app.routers._serialize import event_to_read
+from app.routers._serialize import EAGER, event_to_read
 from app.schemas import (CityDetailRead, CityInfoRead, CityPlaceRead, CityRead,
                          EntityRead, EventRead, ModuleRead)
 from app.services.geocode import lang_for
@@ -140,6 +140,18 @@ def _city_places(db: Session, user_id: str, name: str) -> list[Location]:
             .all())
 
 
+def _city_country(places: list[Location]) -> str | None:
+    """Das Land einer Stadt — nach derselben Regel wie in der Liste.
+
+    `/api/cities` nimmt `func.min(country)`; stünde hier „das erste Vorkommen",
+    könnten Liste und Seite für dieselbe Stadt zwei verschiedene Länder nennen,
+    und die Beschreibung würde unter einem anderen Schlüssel abgelegt als
+    gesucht — der Cache liefe dann bei jedem Öffnen ins Leere.
+    """
+    known = sorted(p.country for p in places if p.country)
+    return known[0] if known else None
+
+
 @router.get("/cities/detail", response_model=CityDetailRead)
 def city_detail(
     name: str = Query(..., min_length=1),
@@ -161,7 +173,10 @@ def city_detail(
     base = (db.query(Event)
             .filter(Event.user_id == user.id, Event.location_id.in_(place_ids)))
     total = base.count()
-    events = (base.order_by(Event.date_start.desc().nullslast())
+    # Vorladen statt lazy je Ereignis: hundert Karten wären sonst dreihundert
+    # Nachfragen (Metriken, Verknüpfungen, Bilder) — dasselbe N+1, das A36/A37
+    # aus dem Zeitstrahl entfernt haben.
+    events = (base.options(*EAGER).order_by(Event.date_start.desc().nullslast())
               .limit(CITY_EVENT_LIMIT).all())
 
     counts = dict(db.query(Event.location_id, func.count(Event.id))
@@ -175,7 +190,7 @@ def city_detail(
                            Event.location_id.in_(place_ids))
                    .one())
 
-    country = next((p.country for p in places if p.country), None)
+    country = _city_country(places)
     info = (db.query(CityInfo)
             .filter(CityInfo.name == name, CityInfo.country == (country or ""),
                     CityInfo.lang == lang_for(user))
@@ -223,7 +238,7 @@ def describe_city(
         raise HTTPException(status_code=404, detail="Stadt nicht gefunden")
 
     lang = lang_for(user)
-    country = next((p.country for p in places if p.country), None) or ""
+    country = _city_country(places) or ""
     row = (db.query(CityInfo)
            .filter(CityInfo.name == name, CityInfo.country == country,
                    CityInfo.lang == lang)

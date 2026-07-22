@@ -108,9 +108,13 @@ def _weather_days(db: Session, user_id: str, spec: dict):
     überlebt, weil die Erfolge in einer anderen Datei stehen. Die Beschreibungen
     im YAML sagten die ganze Zeit „Tage" — jetzt tut es der Code auch.
 
-    Alle Einträge eines Tages tragen denselben Wetterwert (eine Anreicherung je
-    Tag), deshalb ist `min` ein beliebiger, aber **stabiler** Vertreter — dieselbe
-    Überlegung wie beim `min(id)`-Vertreter der A39-Verdichtung.
+    `min` ist dabei nicht nur ein stabiler Vertreter (wie `min(id)` bei der
+    A39-Verdichtung), sondern der **vorsichtige**: meistens tragen alle Einträge
+    eines Tages denselben Wert, weil die Anreicherung an Ort und Datum hängt —
+    an einem Reisetag mit Einträgen in zwei Wetterregionen aber nicht. Dann
+    zählt der niedrigere. Das kann einen Erfolg verzögern und nie vorzeitig
+    auslösen, und die Richtung ist Absicht: zu früh vergebene Abzeichen sind
+    genau der Defekt, den dieses Paket beseitigt (Anmerkung 103).
     """
     cfg = spec.get("weather") or {}
     key = cfg.get("key")

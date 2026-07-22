@@ -1,9 +1,29 @@
 """Hilfsfunktionen zum Serialisieren von ORM-Objekten in Schemas."""
 from __future__ import annotations
 
-from app.models import Event, Source
+from sqlalchemy.orm import selectinload
+
+from app.models import Event, EventEntityLink, Source
 from app.schemas import (EntityRead, EventGroup, EventRead, LocationRead,
                          MediaRead, MetricRead)
+
+# Verknüpfungen in wenigen Sammel-Queries vorladen statt lazy pro Event
+# (bei 10k+ importierten Events wird das N+1-Lazy-Loading sonst zur Bremse).
+# Steht hier und nicht im Router, weil jeder, der `event_to_read` benutzt,
+# dieselben Beziehungen braucht — die Städteseite (A42) hat es sonst vergessen.
+EAGER = (
+    selectinload(Event.entity_links).selectinload(EventEntityLink.entity),
+    selectinload(Event.metrics),
+    selectinload(Event.location),
+    selectinload(Event.media),
+)
+# A36: slim lädt die Metriken NICHT (Wetter kommt separat als Tupel-Abfrage);
+# Medien bleiben eager, damit die Fotostreifen ohne N+1 rendern.
+EAGER_SLIM = (
+    selectinload(Event.entity_links).selectinload(EventEntityLink.entity),
+    selectinload(Event.location),
+    selectinload(Event.media),
+)
 
 
 def _weather_compact(event: Event) -> dict | None:
