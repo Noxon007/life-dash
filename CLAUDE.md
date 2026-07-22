@@ -89,6 +89,16 @@ Karte öffnet ihn) und jetzt Bottom Sheet mit `dvh` + klebender Knopfleiste.
 kein `max-height` in `vh` (rechnet ohne Adressleiste). Beide Defekte saßen
 an mehr Stellen, als die Audit-Liste kannte.
 
+**A40 fertig (v0.33.0, Anmerkung 92).** Kartenschalter: „Zurückgelegte Wege"
+(gemessen) vs. „Reihenfolge verbinden" (gezeichnet) — hießen vorher beide
+„Route"; „Punkte zusammenfassen" ist EIN Schalter für Bündeln (ab Monat, je
+Ort) und Clustern (Tag/Woche, nach Nähe), Schwelle jetzt in den Einstellungen.
+**Design-Regel daraus (gilt allgemein):** Ein Bedienelement, das gerade nichts
+bewirken kann, muss das ZEIGEN — `.filter-chip.inert` (durchgestrichen +
+Begründung im Titel), bewusst anders als `.off` (vom Nutzer ausgeschaltet).
+Der wiederkehrende Defekt in diesem Projekt ist nicht Kaputtheit, sondern
+**Stille** (siehe auch A37-Kacheln, Anm. 79 Immich-Verknüpfung).
+
 **0.34 (vormals 0.33) eingeschoben (2026-07-22, Anmerkungen 87/88).** Beides sind
 Schema-Änderungen — und genau deshalb VOR dem Demo-Modus, ab dem Datensatz
 und Upgrade-Pfad das Modell stillhalten. **A39:** `Location.city` als echtes

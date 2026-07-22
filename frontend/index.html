@@ -425,6 +425,10 @@
   .filter-chip .fdot { width: 9px; height: 9px; border-radius: 50%; }
   .filter-chip.active { color: var(--text); border-color: transparent; }
   .filter-chip.off { opacity: .4; }
+  /* A40: Der Schalter ist an, kann aber gerade nichts bewirken — sichtbar
+     außer Kraft statt stumm wirkungslos. Bewusst anders als `.off` (aus): der
+     Nutzer hat ihn nicht ausgeschaltet, die Lage lässt ihn nur nicht zu. */
+  .filter-chip.inert { opacity: .45; text-decoration: line-through; cursor: help; }
   .section-title { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); margin: 28px 0 14px; font-weight: 600; }
   .hint { background: rgba(91,140,255,.08); border: 1px solid rgba(91,140,255,.3); border-radius: 10px; padding: 12px 16px; font-size: 13px; color: var(--text-dim); margin-bottom: 20px; }
   .hint b { color: var(--accent); }
@@ -1028,16 +1032,13 @@
           <div class="filter-group">
             <label data-i18n="map.display">Darstellung</label>
             <div class="filter-chips">
-              <span class="filter-chip active" id="mp-route-toggle" data-i18n="map.route">🧭 Route verbinden</span>
-              <span class="filter-chip active" id="mp-tracks-toggle" data-i18n="map.tracks">🛰️ Timeline-Routen</span>
-              <span class="filter-chip active" id="mp-group-toggle" data-i18n-title="map.group.tip" title="Ab Monats-Ansicht: wiederholte Besuche desselben Orts zu einem Eintrag bündeln" data-i18n="map.group">🔁 Orte bündeln</span>
+              <!-- A40 (Anm. 92): Zwei Ebenen und eine Verdichtung. Die beiden
+                   Linien hießen bis 0.33 beide „Route“, meinten aber Verschiedenes:
+                   gemessene Wege gegen eine gedachte Verbindung. -->
+              <span class="filter-chip active" id="mp-tracks-toggle" data-i18n-title="map.tracks.tip" title="Die tatsächlich zurückgelegten Wege aus dem Timeline-Import — echte Aufzeichnungen, eingefärbt nach Fortbewegungsart" data-i18n="map.tracks">🛰️ Zurückgelegte Wege</span>
+              <span class="filter-chip active" id="mp-route-toggle" data-i18n-title="map.route.tip" title="Verbindet die Orte dieses Zeitraums in ihrer zeitlichen Reihenfolge — eine gedachte Linie, kein gefahrener Weg. Bei zusammengefassten Punkten gibt es keine Reihenfolge zu zeigen." data-i18n="map.route">🧭 Reihenfolge verbinden</span>
+              <span class="filter-chip active" id="mp-group-toggle" data-i18n-title="map.group.tip" title="Fasst dicht beieinander liegende Punkte zusammen: im Monat und darüber je Ort („59× Zuhause“), in Tag und Woche nach Nähe. Aus heißt: jeder Besuch einzeln." data-i18n="map.group">🔁 Punkte zusammenfassen</span>
               <span class="filter-chip" id="mp-fullscreen" data-i18n-title="map.fs.tip" title="Karte im Vollbild (Esc beendet)" data-i18n="map.fs">⛶ Vollbild</span>
-              <label class="stat-label" style="display:flex; align-items:center; gap:6px" data-i18n-title="map.cluster.tip" title="Hat der Zeitraum höchstens so viele Punkte, gibt es Einzelmarker + nummerierte Route. Darüber schaltet die Karte in den Cluster-Modus — dort bündeln sich nahe Punkte je nach Zoom (Klick/Zoom teilt Bubbles auf). Rahmen 10–300 schützt die Performance.">
-                Cluster ab
-                <input id="mp-cluster-min" type="number" min="10" max="300" step="10" value="50"
-                       style="width:64px; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:4px 6px; color:var(--text)">
-                Punkten
-              </label>
             </div>
           </div>
           <div class="filter-group" style="flex-basis:100%">
@@ -1531,6 +1532,21 @@
               <span data-i18n="adm.format.desc2">Benannte Orte (Restaurant, Museum …) behalten ihren Eigennamen immer vorn.
               Die Auswahl gilt sofort für alle neuen Auflösungen; Bestandsdaten bringt der Lauf
               oben aufs gewählte Muster.</span></div>
+          </div>
+          <!-- A40 (Anm. 92): Aus der Kartenansicht hierher. Es ist ein
+               Schutzwert, keine Vorliebe — er gehört zu den Einstellungen,
+               nicht neben die drei Schalter, die man beim Kartengucken bedient. -->
+          <div class="action-row">
+            <div class="action-key"><b style="font-size:13px" data-i18n="adm.cluster">🔵 Kartenpunkte bündeln</b></div>
+            <div class="action-desc"><span data-i18n="adm.cluster.desc"><b>Ab wie vielen Punkten die Karte zusammenfasst.</b><br>
+              „Punkte zusammenfassen“ ist auf der Karte ein Schalter; diese Zahl bestimmt, ab wann er
+              greift. Niedriger heißt: früher Zahlenblasen statt Einzelpunkte — schont schwächere Geräte.
+              Höher heißt: länger jeder Besuch für sich.</span><br>
+              <label class="stat-label" style="display:inline-flex; align-items:center; gap:6px; margin-top:8px">
+                <span data-i18n="adm.cluster.from">Ab</span>
+                <input id="mp-cluster-min" type="number" min="10" max="300" step="10" value="50" class="mf-select" style="width:80px">
+                <span data-i18n="adm.cluster.points">Punkten</span>
+              </label></div>
           </div>
         </div>
 
@@ -2060,15 +2076,22 @@ const I18N_EN = {
   'map.prev': "‹ back",
   'map.next': "next ›",
   'map.pickday': "Pick a day from the calendar",
-  'map.route': "🧭 Connect route",
-  'map.tracks': "🛰️ Timeline tracks",
-  'map.group.tip': "From month view up: merge repeated visits to the same place into one entry",
+  'map.route': "🧭 Connect in order",
+  'map.route.tip': "Joins this period's places in the order they happened — a drawn line, not a route you travelled. With points merged there is no order left to show.",
+  'map.route.blocked': "Not possible while points are merged — there is no order left to show.",
+  'map.tracks': "🛰️ Paths travelled",
+  'map.tracks.tip': "The paths you actually travelled, from the timeline import — real recordings, coloured by how you moved.",
+  'map.group.tip': "Merges points that sit close together: per place from month view up (“59× Home”), by proximity in day and week view. Off means every visit on its own.",
   'map.fs.tip': "Map in fullscreen (Esc exits)",
   'tl.visits': "🛰️ Visits",
   'tl.visits.n': "visits",
   'tl.journal': "📖 Write journal",
   'tl.print': "🖨️ Print",
-  'map.group': "🔁 Merge places",
+  'map.group': "🔁 Merge points",
+  'adm.cluster': "🔵 Merging map points",
+  'adm.cluster.desc': "<b>How many points before the map merges them.</b><br>“Merge points” is a switch on the map; this number decides when it takes effect. Lower means bubbles instead of single points sooner — easier on weaker devices. Higher means every visit stays on its own for longer.",
+  'adm.cluster.from': "From",
+  'adm.cluster.points': "points",
   'map.fs': "⛶ Fullscreen",
 
   // --- Statistik, Welt & Erfolge ---
@@ -4675,10 +4698,24 @@ function startVoice() {
 
 // ---------- KARTE ----------
 let mapObj = null, mapMarkers = null, mapCluster = null, mapRoute = null, mapTracks = null;
-const mp = { mode: 'day', periods: [], index: 0, showRoute: true, showTracks: true, groupPlaces: true, located: [], catFilter: new Set(FILTER_CATS) };
+const mp = { mode: 'day', periods: [], index: 0, showRoute: true, showTracks: true, condense: true, located: [], catFilter: new Set(FILTER_CATS) };
 // A18: Cluster-Schwelle — vom Nutzer einstellbar (10–300, in User.settings)
 const SETTINGS = { map_cluster_min: 50 };
 function mpClusterMin() { return SETTINGS.map_cluster_min || 50; }
+
+// A40 (Anmerkung 92): „Reihenfolge verbinden" kann nicht gezeichnet werden,
+// solange Punkte zusammengefasst sind — es gibt dann keine Reihenfolge, die
+// eine Linie zeigen könnte. Bis 0.33 blieb der Schalter dabei aktiv aussehen
+// und tat nichts. Jetzt sagt er es: sichtbar außer Kraft, mit Begründung im
+// Titel. Der gewählte Zustand bleibt erhalten und gilt wieder, sobald er kann.
+function mpSyncChips(condensed) {
+  const chip = document.getElementById('mp-route-toggle');
+  if (!chip) return;
+  chip.classList.toggle('inert', !!condensed);
+  chip.title = condensed
+    ? t('map.route.blocked', 'Nicht möglich, solange Punkte zusammengefasst sind — dann gibt es keine Reihenfolge zu zeigen.')
+    : t('map.route.tip', 'Verbindet die Orte dieses Zeitraums in ihrer zeitlichen Reihenfolge — eine gedachte Linie, kein gefahrener Weg. Bei zusammengefassten Punkten gibt es keine Reihenfolge zu zeigen.');
+}
 // Nur Events, die den aktiven Kategorie-Filter passieren
 function mpFiltered() { return mp.located.filter(e => passesFilter(e, mp.catFilter)); }
 
@@ -4868,10 +4905,11 @@ function renderPeriod() {
   // A37: Wetter für genau diesen Zeitraum nachladen und neu zeichnen, sobald
   // es da ist. Die Karte steht sofort; das Wetter kommt in die Popups nach.
   mpEnsureWeather(key, all).then(got => { if (got) renderPeriod(); });
-  // A5 (Besuchs-Verdichtung): Ab Monats-Ansicht wiederholte Besuche desselben
-  // Orts bündeln — ein Marker + eine Listenzeile je Ort („59× Zuhause — …")
-  // statt langer Kartenlisten. In Tag/Woche bleibt die nummerierte Route.
-  if (mp.groupPlaces && !['day', 'week'].includes(mp.mode) && all.length) {
+  // A5/A40 (Besuchs-Verdichtung): EIN Schalter, zwei Verfahren — welches
+  // greift, entscheidet die Zoomstufe, nicht der Nutzer. Ab Monats-Ansicht
+  // wird je Ort gebündelt („59× Zuhause"), in Tag/Woche nach Nähe geclustert.
+  if (mp.condense && !['day', 'week'].includes(mp.mode) && all.length) {
+    mpSyncChips(true);
     renderGroupedPeriod(all, key, stops);
     return;
   }
@@ -4881,7 +4919,10 @@ function renderPeriod() {
   // bedeutungslos). Die Stopp-Liste bleibt als DOM-Schutz gedeckelt.
   // Ohne Cluster-Plugin (CDN offline): alter 300er-Deckel.
   const MP_MAX = 300;
-  const clustered = all.length > mpClusterMin() && !!mapCluster;
+  // A40: Geclustert wird nur noch, wenn „Punkte zusammenfassen" an ist. Aus
+  // heißt aus — dann greift der Deckel unten, und die Liste sagt das auch.
+  const clustered = mp.condense && all.length > mpClusterMin() && !!mapCluster;
+  mpSyncChips(clustered);
   const items = all.slice(0, MP_MAX);
   const markerTarget = clustered ? mapCluster : mapMarkers;
   // Datepicker mit dem angezeigten Zeitraum synchron halten
@@ -4909,7 +4950,11 @@ function renderPeriod() {
   stops.innerHTML = `<h3>${all.length} Stopp${all.length===1?'':'s'} · ${periodLabel(key)}</h3>`
     + (all.length > MP_MAX ? `<div class="hint">${clustered
         ? `Karte zeigt alle ${all.length} Punkte (gebündelt) — Liste zeigt die ersten ${MP_MAX}.`
-        : `Zeige die ersten ${MP_MAX} — feinere Zoomstufe wählen für alle.`}</div>` : '')
+        : mp.condense
+          ? `Zeige die ersten ${MP_MAX} — feinere Zoomstufe wählen für alle.`
+          // A40: Wer die Verdichtung abschaltet, soll den Preis sehen statt
+          // sich zu wundern, warum Punkte fehlen.
+          : `Zeige die ersten ${MP_MAX} von ${all.length} — „Punkte zusammenfassen" einschalten, um alle zu sehen.`}</div>` : '')
     + items.map((e, i) => {
       const w = weatherOf(e);
       return `<div style="padding:10px 0; border-bottom:1px solid var(--border)">
@@ -4995,11 +5040,11 @@ document.getElementById('mp-tracks-toggle').addEventListener('click', function (
   this.classList.toggle('off', !mp.showTracks);
   renderPeriod();
 });
-// A5: Besuchs-Verdichtung ein/aus (greift ab Monats-Ansicht)
+// A5/A40: Verdichtung ein/aus — ein Schalter für Bündeln UND Clustern
 document.getElementById('mp-group-toggle').addEventListener('click', function () {
-  mp.groupPlaces = !mp.groupPlaces;
-  this.classList.toggle('active', mp.groupPlaces);
-  this.classList.toggle('off', !mp.groupPlaces);
+  mp.condense = !mp.condense;
+  this.classList.toggle('active', mp.condense);
+  this.classList.toggle('off', !mp.condense);
   renderPeriod();
 });
 // A24: Karte im Vollbild — nach dem Wechsel neu vermessen (Esc beendet)

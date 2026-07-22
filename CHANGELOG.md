@@ -43,6 +43,24 @@ any `MINOR`.
     space they leave.
   - **Raw-data tables wrap** instead of forcing a sideways scroll through
     unbreakable lines.
+- **The map controls say what they do — and admit when they cannot.** Under
+  “Display” there were four controls whose names did not distinguish them:
+  two different things were both called a “route”, and two of them regularly
+  did nothing at all while still looking switched on.
+  - **“Paths travelled”** (formerly “Timeline tracks”) draws the routes you
+    actually took, as recorded by the timeline import.
+  - **“Connect in order”** (formerly “Connect route”) draws a line through
+    this period's places in the order they happened — not a route you
+    travelled. When points are merged there is no order left to show, so the
+    control now shows itself as struck through and says why, instead of
+    staying lit and drawing nothing.
+  - **“Merge points”** (formerly “Merge places”) is now the single switch for
+    all condensing. Whether points are merged per place or by proximity
+    depends on how far you are zoomed out — a technical detail you no longer
+    have to know. Switching it off now really shows every visit, and the list
+    says so when that runs into the display limit.
+  - **The clustering threshold moved to Settings.** It protects performance
+    on weaker devices; it is not something you decide while looking at a map.
 
 ### Added
 - **A test build now says it is one.** When the app is not running a published
