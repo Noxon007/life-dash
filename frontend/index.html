@@ -241,6 +241,11 @@
   .action-row { display: flex; gap: 16px; padding: 16px 18px; border-bottom: 1px solid var(--border); align-items: flex-start; }
   .action-row:last-child { border-bottom: none; }
   .action-row .btn { flex-shrink: 0; min-width: 215px; text-align: left; }
+  /* A38: Die Beschriftungsspalte der Einstellungszeilen. Stand bis dahin als
+     Inline-Stil an zehn Stellen und war damit für jede Media Query unerreichbar
+     (Inline schlägt Stylesheet) — der Grund, warum der Mobilblock sie nie
+     aufheben konnte. */
+  .action-key { flex-shrink: 0; min-width: 215px; }
   .action-desc { font-size: 12.5px; color: var(--text-dim); line-height: 1.55; }
   .action-desc b { color: var(--text); font-size: 13px; }
   @media (max-width: 860px) {
@@ -315,7 +320,7 @@
   .lightbox { position: fixed; inset: 0; z-index: 3000; background: rgba(0,0,0,.92);
     display: none; align-items: center; justify-content: center; flex-direction: column; gap: 12px; }
   .lightbox.show { display: flex; }
-  .lightbox img { max-width: 94vw; max-height: 82vh; object-fit: contain; border-radius: 6px; }
+  .lightbox img { max-width: 94vw; max-height: 82dvh; object-fit: contain; border-radius: 6px; }
   .lightbox .lb-cap { color: #ddd; font-size: 13px; max-width: 80vw; text-align: center; }
   .lightbox .lb-nav { position: absolute; top: 50%; transform: translateY(-50%); font-size: 34px;
     color: #fff; background: none; border: none; cursor: pointer; padding: 12px; opacity: .75; }
@@ -348,6 +353,12 @@
   .stage-arrow { display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 24px; }
   /* A24: Karte füllt den Viewport statt fixer 520 px (Topbar+Filter ≈ 330 px) */
   #map { height: max(420px, calc(100dvh - 330px)); border-radius: var(--radius); border: 1px solid var(--border); }
+  /* Am Schreibtisch gibt es den Klapp-Knopf nicht — dort ist Platz für beides. */
+  #mp-filter-toggle { display: none; }
+  /* A38: war ein Inline-Stil und damit im Mobilblock nicht aufhebbar. */
+  .time-range-label { min-width: 150px; text-align: center; }
+  .db-table input { width: 100%; min-width: 120px; }
+  .job-name { min-width: 230px; }
   .map-layout { display: flex; gap: 16px; align-items: flex-start; }
   .map-layout #map { flex: 1; min-width: 0; }
   #mp-stops { width: 320px; flex-shrink: 0; max-height: max(420px, calc(100dvh - 330px)); overflow-y: auto; }
@@ -440,11 +451,48 @@
   .modal-overlay.show { display: flex; }
   .modal-box {
     background: var(--bg-panel); border: 1px solid var(--border); border-radius: 16px;
-    padding: 24px; width: min(560px, 100%); max-height: 90vh; overflow-y: auto;
+    padding: 24px; width: min(560px, 100%); max-height: 90dvh; overflow-y: auto;
     animation: fade .2s;
   }
   .modal-box h3 { margin: 0 0 6px; }
   .btn.danger { background: var(--danger); color: #fff; }
+
+  /* ---------- Sheet (A38) ----------
+     Ein Muster für alles, was auf dem Handy von unten kommt: „Mehr“ und der
+     Bearbeiten-Dialog. Höhen in dvh statt vh — vh rechnet mit ausgeblendeter
+     Adressleiste, weshalb der Speichern-Knopf bisher darunter verschwand. */
+  .sheet-overlay {
+    position: fixed; inset: 0; z-index: 1600; display: none;
+    background: rgba(5,8,16,.7); align-items: flex-end; justify-content: center;
+  }
+  .sheet-overlay.show { display: flex; }
+  .sheet {
+    background: var(--bg-panel); border-top: 1px solid var(--border);
+    border-radius: 18px 18px 0 0; width: min(560px, 100%);
+    max-height: 88dvh; display: flex; flex-direction: column;
+    padding-bottom: env(safe-area-inset-bottom);
+    animation: sheet-up .22s ease-out;
+  }
+  @keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+  .sheet-grip {
+    width: 38px; height: 4px; border-radius: 2px; background: var(--border);
+    margin: 10px auto 4px; flex-shrink: 0;
+  }
+  .sheet-head { padding: 6px 18px 10px; flex-shrink: 0; }
+  .sheet-body { overflow-y: auto; padding: 0 10px 10px; }
+  .sheet-foot {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    padding: 12px 18px; border-top: 1px solid var(--border); flex-shrink: 0;
+    font-size: 12px; color: var(--text-dim);
+  }
+  .sheet-foot a { color: var(--accent); text-decoration: none; }
+  /* Nav-Zeilen im Sheet: volle Breite, 48 px hoch — klar über dem 44-px-Ziel */
+  .sheet .nav-item {
+    width: 100%; min-height: 48px; font-size: 15px; border-radius: 10px;
+    margin: 2px 0; padding: 10px 14px;
+  }
+  .sheet .nav-item .ico { font-size: 20px; width: 28px; }
+  .nav-more { display: none; }
 
   /* ---------- Login-Overlay ---------- */
   .login-overlay {
@@ -575,19 +623,33 @@
     .logo, .sidebar-foot { display: none; }
     /* Toasts über der Bottom-Navigation einblenden */
     .toast-wrap { left: 8px; right: 8px; bottom: calc(74px + env(safe-area-inset-bottom)); max-width: none; }
+    /* A38: nur die vier Hauptziele plus „Mehr“ — neun Einträge ergaben je
+       ~40 px auf einem 360-px-Schirm, unter dem 44-px-Mindestziel. Fünf
+       ergeben 72 px. Die übrigen stehen im Sheet, mit ausgeschriebenem Namen. */
+    .sidebar > .nav-item:not(.nav-primary):not(.nav-more) { display: none; }
+    .nav-more { display: flex; }
     .nav-item {
       flex-direction: column;
       gap: 3px;
-      padding: 6px 8px;
-      font-size: 10px;
+      padding: 6px 4px;
+      font-size: 11px;
+      min-height: 52px;
       flex: 1;
       text-align: center;
       position: relative;
       justify-content: center;
     }
-    .nav-item .ico { width: auto; font-size: 20px; }
+    .nav-item .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+    .nav-item .ico { width: auto; font-size: 21px; }
     .nav-item.active { background: transparent; color: var(--accent); }
     .nav-badge { position: absolute; top: 0; right: 12%; margin-left: 0; }
+    /* Im Sheet gilt wieder das Zeilen-Layout, nicht das der unteren Leiste */
+    .sheet .nav-item {
+      flex-direction: row; justify-content: flex-start; text-align: left;
+      font-size: 15px; gap: 10px; min-height: 48px;
+    }
+    .sheet .nav-item .lbl { white-space: normal; }
+    .sheet .nav-badge { position: static; }
     .topbar { padding: 10px 16px; }
     .topbar .sub { display: none; }
     .search { width: 100%; margin-left: 0; order: 3; }
@@ -601,10 +663,61 @@
     .ev-date { margin-left: 0; width: 100%; }
     .map-layout { flex-direction: column; }
     /* Fix (Anm. 34): in Spaltenrichtung kollabiert flex:1 (basis 0) die Höhe
-       auf 0 — Karte war auf dem Handy unsichtbar. Feste Höhe statt flex. */
-    .map-layout #map { flex: 0 0 auto; height: 55vh; width: 100%; }
+       auf 0 — Karte war auf dem Handy unsichtbar. Feste Höhe statt flex.
+       A38: vh -> dvh, aus demselben Grund wie beim Dialog. */
+    .map-layout #map { flex: 0 0 auto; height: 55dvh; width: 100%; }
     #mp-stops { width: 100%; max-height: none; }
+    /* A38: Karte groß, Filter weggeklappt (Versprechen aus Kap. 5.7) */
+    #mp-filter-toggle {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      width: 100%; min-height: 44px; margin-bottom: 12px; text-align: left;
+    }
+    #view-map.filters-open .mp-caret { transform: rotate(180deg); }
+    .mp-caret { transition: transform .15s; }
+    #view-map:not(.filters-open) .map-filters { display: none; }
+    #view-map:not(.filters-open) .map-layout #map { height: calc(100dvh - 200px); min-height: 320px; }
     .field-key { width: 96px; }
+
+    /* A38: Der Bearbeiten-Dialog ist auf dem Handy die Detailansicht (Kap. 5.7
+       versprach dafür ein Bottom Sheet). Er kommt von unten, misst in dvh und
+       hält seine Knopfleiste sichtbar — bei 90vh lag „Speichern“ hinter der
+       Adressleiste des Browsers. */
+    .modal-overlay { align-items: flex-end; padding: 0; }
+    .modal-box {
+      width: 100%; max-height: 92dvh; border-radius: 18px 18px 0 0;
+      padding: 18px 16px calc(12px + env(safe-area-inset-bottom));
+      animation: sheet-up .22s ease-out;
+      display: flex; flex-direction: column;
+    }
+    .modal-box > .btn-row:last-child {
+      position: sticky; bottom: 0; margin-top: auto;
+      background: var(--bg-panel); border-top: 1px solid var(--border);
+      padding: 12px 0 4px; gap: 8px;
+    }
+    .modal-box > .btn-row:last-child .btn { flex: 1; min-height: 44px; }
+    .modal-box > .btn-row:last-child .btn.ghost { flex: 0 0 100%; order: 3; }
+
+    /* A38: Die Beschriftungsspalte der Einstellungen stand als Inline-Stil an
+       dreizehn Stellen und war deshalb aus dem Stylesheet nicht erreichbar —
+       die Zeilen quetschten sich oder liefen seitlich hinaus. Jetzt eine
+       Klasse, die hier aufgehoben wird. */
+    .action-key { min-width: 0; width: 100%; }
+    .action-row .btn { min-height: 44px; }
+    /* Dieselbe Klasse Fehler an drei weiteren Stellen — erst das Prüfskript
+       hat sie gefunden, die Audit-Liste kannte nur die Einstellungsspalten. */
+    .time-range-label { min-width: 0; flex: 1; }
+    .db-table input { min-width: 0; }
+    .job-name { min-width: 0; }
+
+    /* A38: Rohdaten-Tabellen. `nowrap` im Seitwärts-Scroller ist ehrlich, aber
+       auf dem Handy kaum benutzbar; umbrechen lassen und die Spalten begrenzen
+       ist lesbar, ohne die Tabelle zu einer Kartenliste umzubauen (was den
+       Zweck „Rohdaten sehen“ verfehlen würde). */
+    .db-table { font-size: 11px; }
+    .db-table th, .db-table td {
+      white-space: normal; word-break: break-word;
+      max-width: 46vw; overflow: visible; text-overflow: clip; padding: 5px 7px;
+    }
   }
 </style>
 </head>
@@ -747,23 +860,46 @@
   </div>
 
   <!-- SIDEBAR / BOTTOM-NAV -->
+  <!-- A38: `nav-primary` = die vier Ziele, die auf dem Handy in der unteren
+       Leiste bleiben (plus „Mehr"). Am Schreibtisch ändert die Klasse nichts —
+       dort stehen weiterhin alle neun untereinander. -->
   <nav class="sidebar">
     <div class="logo"><span class="dot"></span> Life-Dash</div>
-    <div class="nav-item active" data-view="today"><span class="ico">🕰️</span> <span class="lbl" data-i18n="nav.today">Heute</span></div>
-    <div class="nav-item" data-view="timeline"><span class="ico">📅</span> <span class="lbl" data-i18n="nav.timeline">Zeitstrahl</span></div>
-    <div class="nav-item" data-view="map"><span class="ico">🗺️</span> <span class="lbl" data-i18n="nav.map">Karte</span></div>
-    <div class="nav-item" data-view="input"><span class="ico">✍️</span> <span class="lbl" data-i18n="nav.input">Eingabe</span></div>
+    <div class="nav-item nav-primary active" data-view="today"><span class="ico">🕰️</span> <span class="lbl" data-i18n="nav.today">Heute</span></div>
+    <div class="nav-item nav-primary" data-view="timeline"><span class="ico">📅</span> <span class="lbl" data-i18n="nav.timeline">Zeitstrahl</span></div>
+    <div class="nav-item nav-primary" data-view="map"><span class="ico">🗺️</span> <span class="lbl" data-i18n="nav.map">Karte</span></div>
+    <div class="nav-item nav-primary" data-view="input"><span class="ico">✍️</span> <span class="lbl" data-i18n="nav.input">Eingabe</span></div>
     <div class="nav-item" data-view="stats"><span class="ico">📊</span> <span class="lbl" data-i18n="nav.stats">Statistik</span></div>
     <div class="nav-item" data-view="compendium"><span class="ico">📚</span> <span class="lbl" data-i18n="nav.compendium">Kompendium</span></div>
     <div class="nav-item" data-view="world"><span class="ico">🌍</span> <span class="lbl" data-i18n="nav.world">Welt</span></div>
     <div class="nav-item" data-view="achievements"><span class="ico">🏆</span> <span class="lbl" data-i18n="nav.achievements">Erfolge</span></div>
     <div class="nav-item" data-view="admin"><span class="ico">⚙️</span> <span class="lbl" data-i18n="nav.admin">Verwaltung</span> <span class="nav-badge" style="display:none">0</span></div>
+    <!-- Nur mobil sichtbar (CSS); öffnet die restlichen fünf als Sheet. -->
+    <div class="nav-item nav-more" id="nav-more" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false">
+      <span class="ico">☰</span> <span class="lbl" data-i18n="nav.more">Mehr</span>
+      <span class="nav-badge" id="nav-more-badge" style="display:none">0</span>
+    </div>
     <div class="sidebar-foot" id="sidebar-foot">
       <b>Life-Dash</b> <span id="foot-version"></span><br>
       <span id="foot-user">…</span><br>
       <a href="#" id="logout-link" style="display:none" data-i18n="logout">Abmelden</a>
     </div>
   </nav>
+
+  <!-- A38: „Mehr" — die fünf Ziele, die nicht in die untere Leiste passen.
+       Bewusst ein Sheet mit vollen Zeilen statt einer zweiten Leiste: 44 px
+       Höhe je Eintrag statt 40 px Breite, und der Name steht ausgeschrieben. -->
+  <div class="sheet-overlay" id="nav-sheet" aria-hidden="true">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="nav-sheet-title">
+      <div class="sheet-grip"></div>
+      <div class="sheet-head"><b id="nav-sheet-title" data-i18n="nav.more.title">Mehr</b></div>
+      <div class="sheet-body" id="nav-sheet-items"></div>
+      <div class="sheet-foot">
+        <span id="sheet-user" class="hint"></span>
+        <a href="#" id="sheet-logout" style="display:none" data-i18n="logout">Abmelden</a>
+      </div>
+    </div>
+  </div>
 
   <!-- MAIN -->
   <div class="main">
@@ -852,7 +988,13 @@
 
       <!-- ===== MAP ===== -->
       <div class="view" id="view-map">
-        <div class="map-filters">
+        <!-- A38: Auf dem Handy fressen die Filter den halben Schirm. Der Knopf
+             klappt sie weg und zeigt stattdessen den Zeitraum, in dem man
+             gerade steckt — die Karte bekommt den Rest. Nur mobil sichtbar. -->
+        <button class="btn secondary" id="mp-filter-toggle" aria-expanded="false" aria-controls="mp-filters-box">
+          <span id="mp-filter-toggle-label">–</span> <span class="mp-caret">▾</span>
+        </button>
+        <div class="map-filters" id="mp-filters-box">
           <div class="filter-group">
             <label data-i18n="map.view">Ansicht</label>
             <div class="filter-chips">
@@ -868,7 +1010,7 @@
             <label data-i18n="map.range">Zeitraum</label>
             <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap">
               <button class="btn small secondary" id="mp-prev" data-i18n="map.prev">‹ zurück</button>
-              <span class="time-range-label" id="mp-period-label" style="min-width:150px; text-align:center">–</span>
+              <span class="time-range-label" id="mp-period-label">–</span>
               <button class="btn small secondary" id="mp-next" data-i18n="map.next">weiter ›</button>
               <input type="date" id="mp-date" class="mf-select" data-i18n-title="map.pickday" title="Tag im Kalender wählen">
             </div>
@@ -1316,7 +1458,7 @@
               im ZIP. Immich-Bilder sind in keinem von beiden: die liegen in Immich und werden dort gesichert.</span></div>
           </div>
           <div class="action-row">
-            <div style="flex-shrink:0; min-width:215px">
+            <div class="action-key">
               <button class="btn secondary" id="btn-import" style="width:100%; text-align:left" data-i18n="act.import">📥 Daten importieren</button>
               <input type="file" id="import-file" accept=".json,.zip,application/json,application/zip" style="display:none">
             </div>
@@ -1329,7 +1471,7 @@
         <div class="section-title" data-i18n="adm.imports">Importe</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
-            <div style="flex-shrink:0; min-width:215px">
+            <div class="action-key">
               <button class="btn secondary" id="btn-timeline-import" style="width:100%; text-align:left" data-i18n="act.tlimport">🛰️ Google Timeline importieren</button>
               <input type="file" id="timeline-file" accept=".json,application/json" style="display:none">
             </div>
@@ -1351,7 +1493,7 @@
         <div class="section-title" data-i18n="adm.placenames">Ortsnamen</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
-            <div style="flex-shrink:0; min-width:215px; display:flex; flex-direction:column; gap:8px">
+            <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
               <button class="btn secondary" id="btn-resolve-run" style="text-align:left" data-i18n="act.namerun">📍 Lauf starten</button>
             </div>
             <div class="action-desc" data-i18n="act.namerun.desc"><b>Ein Lauf für alle Ortsnamen</b> (Reverse-Geocoding
@@ -1367,7 +1509,7 @@
               zur lateinischen Umschrift neu aufgelöst.</div>
           </div>
           <div class="action-row">
-            <div style="flex-shrink:0; min-width:215px"><b style="font-size:13px" data-i18n="adm.format">📐 Anzeige-Format</b></div>
+            <div class="action-key"><b style="font-size:13px" data-i18n="adm.format">📐 Anzeige-Format</b></div>
             <div class="action-desc"><span data-i18n="adm.format.desc"><b>Bausteine für aufgelöste Adressen</b> — statt der langen
               Adresskette mit Verwaltungsregionen und Postleitzahl:</span><br>
               <span id="fmt-parts" style="display:inline-flex; gap:14px; flex-wrap:wrap; margin:8px 0">
@@ -1386,7 +1528,7 @@
         <div class="section-title local-only" style="display:none" data-i18n="adm.password">Passwort</div>
         <div class="panel local-only" style="padding:0; display:none">
           <div class="action-row">
-            <div style="flex-shrink:0; min-width:215px; display:flex; flex-direction:column; gap:8px">
+            <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
               <input type="password" id="pw-current" autocomplete="current-password"
                      data-i18n-ph="pw.current" placeholder="Aktuelles Passwort" class="mf-select">
               <input type="password" id="pw-new" autocomplete="new-password"
@@ -1402,7 +1544,7 @@
         <div class="section-title" data-i18n="adm.wipemine">Meine Daten löschen</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
-            <div style="flex-shrink:0; min-width:215px">
+            <div class="action-key">
               <button class="btn ghost" id="btn-wipe-mine" style="width:100%; text-align:left; color:var(--danger)"
                       data-i18n="act.wipemine">🗑️ Alle meine Daten löschen</button>
             </div>
@@ -1417,7 +1559,7 @@
         <div class="section-title" data-i18n="adm.immich">Immich (Fotos)</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
-            <div style="flex-shrink:0; min-width:215px; display:flex; flex-direction:column; gap:8px">
+            <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
               <button class="btn secondary" id="im-test" style="text-align:left" data-i18n="im.test">🔌 Verbindung testen</button>
               <button class="btn secondary" id="im-run" style="text-align:left" data-i18n="im.run">🖼️ Fotos verknüpfen</button>
               <button class="btn ghost" id="im-reset" style="text-align:left" data-i18n="im.reset">↺ Verknüpfungen verwerfen</button>
@@ -1450,7 +1592,7 @@
         <div class="section-title" data-i18n="adm.basemap">Hintergrundkarte</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
-            <div style="flex-shrink:0; min-width:215px"><b style="font-size:13px" data-i18n="adm.basemap.own">🔧 Eigene Karte</b></div>
+            <div class="action-key"><b style="font-size:13px" data-i18n="adm.basemap.own">🔧 Eigene Karte</b></div>
             <div class="action-desc">
               <span data-i18n="adm.basemap.desc">Die Karten oben rechts bieten OpenStreetMap, Topografie und Satellit.
               Wer einen eigenen Kachel-Server betreibt oder einen Anbieter mit Schlüssel nutzt, trägt ihn hier ein —
@@ -1470,7 +1612,7 @@
         <div class="section-title" data-i18n="adm.tracking">Tracking</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
-            <div style="flex-shrink:0; min-width:215px"><b style="font-size:13px">🧩 Was trackst du?</b></div>
+            <div class="action-key"><b style="font-size:13px">🧩 Was trackst du?</b></div>
             <div class="action-desc"><span data-i18n="adm.track.desc"><b>Module für Kompendium, Statistik &amp; KI wählen.</b><br>
               Abgewählte Module verschwinden aus Reitern, Filtern, Formularen und dem
               KI-Prompt — vorhandene Daten bleiben erhalten und tauchen nach dem
@@ -1496,7 +1638,7 @@
           <div class="local-only" id="user-create" style="display:none; margin-top:16px">
             <div class="section-title" data-i18n="adm.newuser">Konto anlegen</div>
             <div class="action-row">
-              <div style="flex-shrink:0; min-width:215px; display:flex; flex-direction:column; gap:8px">
+              <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
                 <input type="email" id="nu-email" data-i18n-ph="login.email" placeholder="E-Mail" class="mf-select" autocomplete="off">
                 <input type="password" id="nu-password" data-i18n-ph="pw.new" placeholder="Passwort (min. 8)" class="mf-select" autocomplete="new-password">
                 <select id="nu-role" class="mf-select">
@@ -1537,7 +1679,7 @@
           <div class="hint" style="margin-bottom:12px" data-i18n="adm.logs.hint">Die letzten App-Log-Zeilen seit Prozessstart
             (max. 500, nur im Speicher — kein Datei-Zugriff). Vollständige Logs weiterhin über
             <code>docker logs</code>; Ausführlichkeit steuert <code>LOG_LEVEL</code> in der .env.</div>
-          <pre id="logs-list" style="background:var(--bg-elev); border:1px solid var(--border); border-radius:10px; padding:12px; max-height:60vh; overflow:auto; font-size:12px; line-height:1.55; white-space:pre-wrap; margin:0"></pre>
+          <pre id="logs-list" style="background:var(--bg-elev); border:1px solid var(--border); border-radius:10px; padding:12px; max-height:60dvh; overflow:auto; font-size:12px; line-height:1.55; white-space:pre-wrap; margin:0"></pre>
         </div>
       </div>
 
@@ -1852,6 +1994,7 @@ const I18N_EN = {
   'nav.timeline': 'Timeline', 'nav.map': 'Map', 'nav.input': 'Capture',
   'nav.stats': 'Statistics', 'nav.compendium': 'Collection', 'nav.world': 'World',
   'nav.achievements': 'Achievements', 'nav.admin': 'Settings',
+  'nav.more': 'More', 'nav.more.title': 'More',
   'search.placeholder': '🔍 Search: “by the sea”, “France” …',
   'theme.tip': 'Appearance: Auto follows your system setting; clicking cycles Auto → Light → Dark (saved per device)',
   'theme.auto': '🌓 Auto', 'theme.light': '☀️ Light', 'theme.dark': '🌙 Dark',
@@ -3849,8 +3992,13 @@ async function loadModQueue() {
   const el = document.getElementById('mod-queue');
   document.getElementById('mod-queue-title').textContent =
     `Moderations-Queue — ${queue.length} unbestätigte Einträge`;
-  const badge = document.querySelector('.nav-item[data-view="admin"] .nav-badge');
-  if (badge) { badge.textContent = queue.length; badge.style.display = queue.length ? '' : 'none'; }
+  // A38: Der Zähler hängt an „Verwaltung“ — die steckt auf dem Handy hinter
+  // „Mehr“, also dorthin spiegeln, sonst ist er dort unsichtbar.
+  const badge = document.querySelector('.sidebar > .nav-item[data-view="admin"] .nav-badge');
+  const moreBadge = document.getElementById('nav-more-badge');
+  [badge, moreBadge].forEach(b => {
+    if (b) { b.textContent = queue.length; b.style.display = queue.length ? '' : 'none'; }
+  });
   document.getElementById('bulk-panel').style.display = queue.length ? '' : 'none';
   if (!queue.length) { el.innerHTML = '<div class="hint">Alles moderiert — keine offenen Einträge. ✓</div>'; return; }
   el.innerHTML = queue.map(e => `
@@ -4689,14 +4837,21 @@ function renderPeriod() {
   mapRoute.clearLayers();
   const label = document.getElementById('mp-period-label');
   const stops = document.getElementById('mp-stops');
+  // A38: Sind die Filter eingeklappt, ist der Knopf die einzige Stelle, die
+  // den Zeitraum noch nennt — Label immer mitschreiben.
+  const setLabel = txt => {
+    label.textContent = txt;
+    const btn = document.getElementById('mp-filter-toggle-label');
+    if (btn) btn.textContent = `🗓️ ${txt}`;
+  };
   if (!mp.periods.length) {
     mapTracks.clearLayers();
-    label.textContent = 'keine verorteten Events';
+    setLabel('keine verorteten Events');
     stops.innerHTML = '<div class="stat-label">Keine Orte in diesem Zeitraum.</div>';
     return;
   }
   const key = mp.periods[mp.index];
-  label.textContent = periodLabel(key);
+  setLabel(periodLabel(key));
   drawTracks(key); // async — zeichnet die Timeline-Routen, sobald geladen
   const all = mpFiltered().filter(e => periodKey(e) === key)
     .sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
@@ -5075,6 +5230,11 @@ const titles = {
 };
 function gotoView(v) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === v));
+  // A38: Steckt die offene Ansicht hinter „Mehr“, wird „Mehr“ markiert —
+  // sonst zeigt die untere Leiste gar keinen aktiven Punkt mehr.
+  const more = document.getElementById('nav-more');
+  if (more) more.classList.toggle('active',
+    !document.querySelector(`.sidebar > .nav-item.nav-primary[data-view="${v}"]`));
   document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
   document.getElementById('view-'+v).classList.add('active');
   document.getElementById('view-title').textContent = t(`view.${v}.title`, titles[v][0]);
@@ -5265,7 +5425,7 @@ function startDbEdit(tr) {
     const cell = tr.children[i + 1];
     if (c === 'id') return;
     const val = row[c] == null ? '' : String(row[c]);
-    cell.innerHTML = `<input value="${esc(val)}" data-col="${esc(c)}" style="width:100%; min-width:120px; background:var(--bg-elev); border:1px solid var(--border); color:var(--text); border-radius:5px; padding:4px 6px; font-size:12px">`;
+    cell.innerHTML = `<input value="${esc(val)}" data-col="${esc(c)}" style="background:var(--bg-elev); border:1px solid var(--border); color:var(--text); border-radius:5px; padding:4px 6px; font-size:12px">`;
   });
   actionCell.querySelector('.db-cancel').addEventListener('click', renderDbTable);
   actionCell.querySelector('.db-save').addEventListener('click', async () => {
@@ -5286,8 +5446,67 @@ function startDbEdit(tr) {
     refreshAll();
   });
 }
-document.querySelectorAll('.nav-item').forEach(item =>
+document.querySelectorAll('.sidebar > .nav-item[data-view]').forEach(item =>
   item.addEventListener('click', () => gotoView(item.dataset.view)));
+
+// A38: Filter der Kartenansicht auf dem Handy ein-/ausklappen. Beim Aufklappen
+// wird Leaflet über die Größenänderung informiert — sonst bleiben graue Kacheln
+// stehen, wo die Karte gerade geschrumpft ist.
+document.getElementById('mp-filter-toggle')?.addEventListener('click', () => {
+  const v = document.getElementById('view-map');
+  const open = v.classList.toggle('filters-open');
+  document.getElementById('mp-filter-toggle').setAttribute('aria-expanded', String(open));
+  setTimeout(() => mapObj && mapObj.invalidateSize(), 60);
+});
+
+// ---------- A38: „Mehr“-Sheet ----------
+// Die fünf Ziele, die nicht in die untere Leiste passen. Die Einträge werden
+// aus der Sidebar geklont statt zweitgeschrieben — sonst wäre jeder neue
+// Navigationspunkt an zwei Stellen zu pflegen und die Übersetzung (data-i18n)
+// müsste doppelt gepflegt werden.
+const navSheet = document.getElementById('nav-sheet');
+function buildNavSheet() {
+  const box = document.getElementById('nav-sheet-items');
+  if (!box) return;
+  box.innerHTML = '';
+  document.querySelectorAll('.sidebar > .nav-item[data-view]:not(.nav-primary)').forEach(src => {
+    const row = src.cloneNode(true);
+    row.classList.remove('active');
+    row.addEventListener('click', () => { closeNavSheet(); gotoView(row.dataset.view); });
+    box.appendChild(row);
+  });
+}
+function openNavSheet() {
+  buildNavSheet();               // bei jedem Öffnen: Zählerstand und aktive Ansicht sind frisch
+  const cur = document.querySelector('.sidebar > .nav-item.active');
+  const view = cur ? cur.dataset.view : null;
+  navSheet.querySelectorAll('.nav-item').forEach(r => r.classList.toggle('active', r.dataset.view === view));
+  const u = document.getElementById('foot-user'), su = document.getElementById('sheet-user');
+  if (u && su) su.textContent = u.textContent;
+  const lo = document.getElementById('logout-link'), slo = document.getElementById('sheet-logout');
+  if (lo && slo) slo.style.display = lo.style.display;
+  navSheet.classList.add('show');
+  navSheet.setAttribute('aria-hidden', 'false');
+  document.getElementById('nav-more').setAttribute('aria-expanded', 'true');
+}
+function closeNavSheet() {
+  navSheet.classList.remove('show');
+  navSheet.setAttribute('aria-hidden', 'true');
+  document.getElementById('nav-more').setAttribute('aria-expanded', 'false');
+}
+const navMore = document.getElementById('nav-more');
+if (navMore) {
+  navMore.addEventListener('click', () => navSheet.classList.contains('show') ? closeNavSheet() : openNavSheet());
+  navMore.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openNavSheet(); }
+  });
+}
+if (navSheet) navSheet.addEventListener('click', e => { if (e.target === navSheet) closeNavSheet(); });
+document.getElementById('sheet-logout')?.addEventListener('click', e => {
+  e.preventDefault();
+  document.getElementById('logout-link')?.click();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && navSheet?.classList.contains('show')) closeNavSheet(); });
 
 // Kompendium-Reiter werden dynamisch aus den Modulen gebaut (rebuildCompTabs, A7)
 
@@ -5410,7 +5629,7 @@ function renderSchedule() {
     const cfg = sched[tp] || {};
     return `<label class="stat-label" style="display:flex; align-items:center; gap:10px">
       <input type="checkbox" data-sched="${tp}" ${cfg.enabled ? 'checked' : ''}>
-      <span style="min-width:230px">${t('job.' + tp, JOB_LABELS[tp] || tp)}</span>
+      <span class="job-name">${t('job.' + tp, JOB_LABELS[tp] || tp)}</span>
       um <input type="number" min="0" max="23" value="${cfg.hour ?? 3}" data-sched-hour="${tp}"
         style="width:56px; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:4px 6px; color:var(--text)"> Uhr
     </label>`;

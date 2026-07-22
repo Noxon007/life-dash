@@ -15,6 +15,43 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.33.0] – 2026-07-22
+
+### Changed
+- **The app is usable on a phone.** The guiding principle said “mobile first”
+  from the beginning; the layout never lived up to it, and this release
+  measures the gap and closes it.
+  - **The bottom bar carries four destinations plus “More”** instead of nine.
+    Nine meant about 40 pixels each on a normal phone — below the size a
+    fingertip can reliably hit — with labels at 10 pixels. Today, Timeline,
+    Map and Capture stay in the bar; Statistics, Collection, World,
+    Achievements and Settings open as a list with full-width rows and readable
+    names. The badge for entries awaiting confirmation is mirrored onto
+    “More”, so nothing is hidden behind it unnoticed.
+  - **The entry dialog opens from the bottom and keeps its buttons visible.**
+    It used to be capped at a height that assumed the browser's address bar
+    was hidden, which put **Save** off the bottom of the screen — the most
+    important button in the app was unreachable on the device most likely to
+    be used. Every other height cap in the app had the same flaw and was
+    corrected with it, including the photo lightbox and the log view.
+  - **The settings rows fit the screen.** Their label column had a fixed
+    width baked into each row, which no phone layout could override, so rows
+    squeezed together or ran off sideways. Four more places carried the same
+    defect and were found while fixing it.
+  - **The map can use the whole screen.** The filters fold away behind a
+    button that shows which period you are looking at, and the map takes the
+    space they leave.
+  - **Raw-data tables wrap** instead of forcing a sideways scroll through
+    unbreakable lines.
+
+### Added
+- **A test build now says it is one.** When the app is not running a published
+  version — a development image built from the main branch, or one you built
+  yourself — the version in the sidebar reads `v0.33.0-dev` in amber instead
+  of claiming to be the release, and its tooltip names the branch and commit
+  it came from. `GET /health` gained `channel` (`release` or `dev`) and
+  `display_version` alongside the unchanged `version` field.
+
 ## [0.32.0] – 2026-07-21
 
 ### Changed
@@ -70,12 +107,6 @@ any `MINOR`.
   builds `X.Y.Z`, `X.Y` and `latest`. `GET /health` now also reports which
   commit an image was built from — with a development track, the version
   number alone no longer answers “what is running here?”.
-- **A test build now says so.** When the app is not running the published
-  version — a development image from the main branch, or one you built
-  yourself — the version in the sidebar reads `v0.32.0-dev` in amber instead
-  of pretending to be the release, and its tooltip names the branch and commit
-  it came from. `GET /health` gained `channel` (`release` or `dev`) alongside
-  the unchanged `version` field.
 - `docker-compose.yml` no longer defaults to a version from thirteen releases
   ago when no `.env` is present; it falls back to `latest`. Pinning a version
   in `.env` remains the recommendation for anything holding real data.

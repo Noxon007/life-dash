@@ -60,11 +60,16 @@ und P5.1/P5.2 (Offline-Capture, Whisper).
 **Releaseplan bis 1.0 steht in KONZEPT Kap. 14.3.** Fertig: 0.21 A28+F14 ·
 0.22 F13 · 0.23 F11+F12 · 0.24 F15 (Fotos) · 0.25 P2.1 (Immich, Stufe 1) ·
 0.26 A29 (ZIP-Backup) · 0.27 Fixes (A31/A32/A30) · 0.28 F16+A33+A34 ·
-0.29 A35 (lokale Konten) · 0.30 P3.1 · 0.31 A36+F17 (schlanke Liste, Alter).
-Offen: **0.32 A37+A38 (serverseitiges Zeitfenster + Mobil-Layout)** ·
-**0.33 A39+F18 (Städte + Fotos am Tag)** · **0.34 Demo-Modus** ·
+0.29 A35 (lokale Konten) · 0.30 P3.1 · 0.31 A36+F17 (schlanke Liste, Alter) ·
+0.32 A37 (serverseitiges Zeitfenster) · 0.33 A38 (Mobil-Layout) + dev-Kennung.
+Offen: **0.34 A39+F18 (Städte + Fotos am Tag)** · **0.35 Demo-Modus** ·
 **1.0 = Veröffentlichung**. Import-Konnektoren erst danach.
 Kein Termindruck (Anmerkung 58). Dort nachsehen statt Reihenfolge raten.
+
+**Achtung Tags (Anmerkung 91):** `v0.32.0` wurde gesetzt, als A38 noch
+fehlte — deshalb ist A38 zu 0.33.0 geworden und der Rest um eins gerutscht.
+Ein Tag ist das einzige Unveränderliche hier: **zuletzt setzen, nicht als
+Startschuss für das letzte Paket.** Zum Testen reicht Push auf `main`.
 
 **Nur noch drei Versionen bis 1.0 (Anmerkung 89).** Härtung,
 Projektoberfläche und Freeze-Pass sind KEINE eigenen Versionen mehr,
@@ -75,7 +80,16 @@ nicht. Der Plan war älter als Anmerkung 86 und wurde nachgezogen.
 **Regel für künftige Einschübe:** eine eigene Version nur bei
 Schema-Folge UND beobachteter Beschwerde — sonst reicht `main`.
 
-**0.33 neu eingeschoben (2026-07-22, Anmerkungen 87/88).** Beides sind
+**A38 fertig (v0.33.0, Anmerkung 82).** Untere Leiste trägt vier Ziele +
+„Mehr"-Sheet (statt neun à 40 px); das Sheet wird aus der Sidebar GEKLONT,
+also nie zweitpflegen. Bearbeiten-Dialog = die Detailansicht (Klick auf
+Karte öffnet ihn) und jetzt Bottom Sheet mit `dvh` + klebender Knopfleiste.
+**Zwei Regeln, die `tools/check-a38-mobile.js` erzwingt:** kein Inline
+`min-width` (Inline schlägt Stylesheet → Media Query kommt nicht dran) und
+kein `max-height` in `vh` (rechnet ohne Adressleiste). Beide Defekte saßen
+an mehr Stellen, als die Audit-Liste kannte.
+
+**0.34 (vormals 0.33) eingeschoben (2026-07-22, Anmerkungen 87/88).** Beides sind
 Schema-Änderungen — und genau deshalb VOR dem Demo-Modus, ab dem Datensatz
 und Upgrade-Pfad das Modell stillhalten. **A39:** `Location.city` als echtes
 Feld (heute steckt die Stadt nur als Textbaustein im zusammengesetzten Namen,

@@ -21,12 +21,12 @@ GitHub, push the code and a SemVer tag:
 ```bash
 git remote add origin https://github.com/<your-account>/life-dash.git
 git push -u origin main
-git push origin v0.32.0
+git push origin v0.33.0
 ```
 
 Pushing the tag starts the **Docker Release** action: it builds the multi-arch
 image (`linux/amd64` + `linux/arm64`) and pushes it as
-`ghcr.io/<your-account>/life-dash:0.32.0`, `:0.32` and `:latest`. Status under
+`ghcr.io/<your-account>/life-dash:0.33.0`, `:0.33` and `:latest`. Status under
 *Repo → Actions*. After the first run, check that the package is public
 (*Profile → Packages → life-dash → Package settings → Visibility*) — then your
 server pulls it without a registry login. Point the `image:` path in
@@ -42,7 +42,7 @@ of which only nine were ever tagged).
 | | what you do | what you get |
 |---|---|---|
 | **Try a change** | push to `main` | image `:main`, rebuilt automatically |
-| **Publish** | update CHANGELOG + `app/version.py`, `git tag v0.32.0`, push the tag | `:0.32.0`, `:0.32`, `:latest` |
+| **Publish** | update CHANGELOG + `app/version.py`, `git tag v0.33.0`, push the tag | `:0.33.0`, `:0.33`, `:latest` |
 
 **Testing a change** — no version, no tag, no changelog entry:
 
@@ -69,8 +69,8 @@ docker compose build && docker compose up -d      # build on the server itself
 **Which build am I running?** `GET /health` answers it:
 
 ```json
-{ "status": "ok", "version": "0.32.0", "channel": "dev",
-  "display_version": "0.32.0-dev", "build": { "ref": "main", "sha": "8411eb4" } }
+{ "status": "ok", "version": "0.33.0", "channel": "dev",
+  "display_version": "0.33.0-dev", "build": { "ref": "main", "sha": "8411eb4" } }
 ```
 
 `version` is what the code *claims* to be — the number in `app/version.py`,
@@ -78,7 +78,7 @@ kept as plain SemVer so scripts can compare it. `channel` says whether this
 build was made from the matching `vX.Y.Z` tag (`release`) or from anything
 else (`dev`): the main branch, a different tag, or a local build with no CI
 metadata at all. `display_version` is the same answer as a string for people,
-and it is what the app shows in the sidebar — **`v0.32.0-dev`, in amber, when
+and it is what the app shows in the sidebar — **`v0.33.0-dev`, in amber, when
 you are on the testing track**. `build` is where the image actually came from
 and appears only for CI images; the app shows it in the tooltip of the version.
 
@@ -87,8 +87,8 @@ what I pushed this afternoon?” — which the version number could not do on it
 own once a second track existed.
 
 **Publishing a new version** (versioning scheme: [CHANGELOG.md](../CHANGELOG.md)):
-commit, update the CHANGELOG and `app/version.py`, `git tag v0.32.1` (fix) or
-`v0.33.0` (feature), push the tag. On the server, raise `LIFEDASH_VERSION` in
+commit, update the CHANGELOG and `app/version.py`, `git tag v0.33.1` (fix) or
+`v0.34.0` (feature), push the tag. On the server, raise `LIFEDASH_VERSION` in
 `.env` and run `docker compose pull && docker compose up -d`.
 
 ## 2. Sign-in: local accounts or OIDC
@@ -156,7 +156,7 @@ cp .env.example .env
 Fill in `.env` — the minimum:
 
 ```ini
-LIFEDASH_VERSION=0.32.0
+LIFEDASH_VERSION=0.33.0
 PUBLIC_BASE_URL=https://life.example.com
 OIDC_ISSUER=https://id.example.com
 OIDC_CLIENT_ID=<client ID from your OIDC provider>
