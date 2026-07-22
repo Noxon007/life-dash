@@ -171,6 +171,9 @@ class EventsIndex(BaseModel):
     dated: int
     undated: int
     unconfirmed: int
+    # Importierte Standort-Besuche — der Zeitstrahl blendet sie aus und nennt
+    # ihre Zahl auf dem Schalter
+    visits: int = 0
     year_min: int | None = None
     year_max: int | None = None
     years: list[YearCount] = []

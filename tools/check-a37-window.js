@@ -56,6 +56,13 @@ setTimeout(async () => {
   ok('Zeitstrahl holt NICHT die ganze Liste',
      eventCalls().every(u => /limit=\d+/.test(u) || /(vague|parent|category|from|to)=/.test(u)));
 
+  // 1b. Der Besuchs-Schalter muss im SERVER filtern. Tat er es im Browser,
+  //     bestand eine Seite nach einem Timeline-Import fast nur aus
+  //     Ausgeblendetem — gemessen an einer 12.000er-Datenbank: sechs
+  //     nachgeladene Seiten für sieben sichtbare Karten.
+  ok('Besuche werden serverseitig ausgeblendet',
+     eventCalls().some(u => /visits=0/.test(u)), eventCalls()[0]);
+
   // 2. Nachladen blättert weiter, statt dieselbe Seite noch einmal zu holen.
   const before = eventCalls().length;
   await w.loadTimeline(true);

@@ -153,6 +153,10 @@ def list_events(
         description="A37/F7: nur die Tages-Kinder dieses Ereignisses")] = None,
     vague: Annotated[bool, Query(
         description="A37: nur undatierte und unscharf datierte Ereignisse")] = False,
+    visits: Annotated[bool | None, Query(
+        description="A37: importierte Standort-Besuche einschließen (Default: "
+                    "alles). visits=0 lässt sie weg — der Zeitstrahl blendet "
+                    "sie standardmäßig aus.")] = None,
 ) -> list[EventRead]:
     """Liste der eigenen Events, optional gefiltert (für Timeline & Karte).
 
@@ -188,6 +192,12 @@ def list_events(
     if vague:
         query = query.filter(Event.date_start.is_(None)
                              | Event.date_precision.in_(_VAGUE_PRECISIONS))
+    # A37: Der Zeitstrahl blendet importierte Besuche standardmäßig aus. Filtert
+    # erst der Browser, besteht eine Seite nach einem Timeline-Import fast nur
+    # aus Unsichtbarem — gemessen an einer 12.000er-Datenbank: sechs Seiten
+    # nachgeladen für ein paar sichtbare Karten. Also hier filtern.
+    if visits is False:
+        query = query.filter(Event.source != Source.google_timeline)
 
     # A37: Die Sortierung MUSS eindeutig sein, sonst blättert man an
     # Datums-Gleichständen an Einträgen vorbei oder sieht sie doppelt — bei
@@ -362,8 +372,15 @@ def events_index(
     unconfirmed = (db.query(func.count(Event.id))
                    .filter(Event.user_id == user.id,
                            Event.confirmed != ConfirmState.confirmed).scalar() or 0)
+    # Der Schalter „🛰️ N Besuche" nannte die Zahl der Besuche in der geladenen
+    # Liste. Mit dem Zeitfenster wäre das eine beliebige Zahl gewesen — hier
+    # steht die echte.
+    visits = (db.query(func.count(Event.id))
+              .filter(Event.user_id == user.id,
+                      Event.source == Source.google_timeline).scalar() or 0)
     return EventsIndex(
         total=total, dated=dated, undated=total - dated, unconfirmed=unconfirmed,
+        visits=visits,
         year_min=years[0].year if years else None,
         year_max=years[-1].year if years else None,
         years=years,

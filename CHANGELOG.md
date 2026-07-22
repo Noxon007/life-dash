@@ -40,6 +40,12 @@ any `MINOR`.
   download for something only visible in the popup you click.
 - The “today” tiles, the vague-dates list, the journal, and the print dialog
   now ask for the entries they need rather than sifting the complete list.
+- **Hiding imported location visits now happens on the server.** After a
+  Google Timeline import most of your database is visits, and the timeline
+  hides them by default — filtering them in the browser meant paging through
+  thousands of invisible entries to fill one screen. Measured on a database of
+  12,000: six requests to show seven cards, now one. The “visits” switch also
+  reports how many there really are, instead of how many happened to be loaded.
 
 ### Fixed
 - Clicking a weather record on the statistics tab opens the entry again. It

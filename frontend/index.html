@@ -1909,6 +1909,7 @@ const I18N_EN = {
   'map.group.tip': "From month view up: merge repeated visits to the same place into one entry",
   'map.fs.tip': "Map in fullscreen (Esc exits)",
   'tl.visits': "🛰️ Visits",
+  'tl.visits.n': "visits",
   'tl.journal': "📖 Write journal",
   'tl.print': "🖨️ Print",
   'map.group': "🔁 Merge places",
@@ -2822,6 +2823,7 @@ async function loadTimeline(more = false) {
     // außerhalb der geladenen Seiten liegt — es kommt aus dem Index.
     fetchIndex().then(idx => {
       BIRTH_DATE = idx.birth ? new Date(idx.birth.date_start) : null;
+      TL_VISIT_COUNT = idx.visits || 0;
     }).catch(() => {});
     if (tl.query) {
       // Suche nutzt den hybriden Such-Endpoint (Volltext + semantisch);
@@ -2838,7 +2840,12 @@ async function loadTimeline(more = false) {
       }
       tl.done = true;
     } else {
-      const page = await fetchEvents({ limit: TL_PAGE, offset: tl.offset });
+      // A37: Der Besuchs-Schalter filtert im SERVER. Täte er es erst hier,
+      // bestünde eine Seite nach einem Timeline-Import fast nur aus
+      // Ausgeblendetem — gemessen an 12.000 Einträgen: sechs nachgeladene
+      // Seiten für eine Handvoll sichtbarer Karten.
+      const page = await fetchEvents({ limit: TL_PAGE, offset: tl.offset,
+                                       visits: tl.showVisits ? 1 : 0 });
       tl.events = more ? tl.events.concat(page) : page;
       tl.offset += page.length;
       tl.done = page.length < TL_PAGE;
@@ -3018,12 +3025,14 @@ function renderTimelineList() {
     list.sort((a, b) => ((a.date_start || '') < (b.date_start || '') ? -1 : 1)));
   if (tl.zoom !== 'day') filtered = filtered.filter(e => !e.parent_event_id);
   // Importierte Google-Besuche standardmäßig ausblenden (Kontext für die
-  // Karte, nicht für den Zeitstrahl) — Toggle „🛰️ Besuche" blendet sie ein
-  const visits = filtered.filter(e => e.source === 'google_timeline').length;
+  // Karte, nicht für den Zeitstrahl) — Toggle „🛰️ Besuche" blendet sie ein.
+  // A37: Ausgeblendet wird im Server; das hier fängt nur noch die Fälle ohne
+  // Server-Filter ab (Suchtreffer). Die Zahl auf dem Schalter kommt aus dem
+  // Index — in der geladenen Liste wäre sie eine beliebige Teilmenge.
   if (!tl.showVisits) filtered = filtered.filter(e => e.source !== 'google_timeline');
   const toggle = document.getElementById('tl-visits-toggle');
-  toggle.style.display = visits ? '' : 'none';
-  toggle.textContent = `🛰️ ${visits} Besuche`;
+  toggle.style.display = TL_VISIT_COUNT ? '' : 'none';
+  toggle.textContent = `🛰️ ${TL_VISIT_COUNT.toLocaleString('de-DE')} ${t('tl.visits.n', 'Besuche')}`;
   if (!filtered.length) {
     // A37: Leer heißt nur dann „nichts da", wenn auch nichts mehr kommt.
     // Sonst: Fuß mit Nachlade-Knopf, damit der Filter keine Sackgasse ist.
@@ -3151,6 +3160,9 @@ const TL_CHILDREN = new Map();  // F7: parent_event_id -> Tages-Kinder (sortiert
 // Geburt außerhalb jeder Seite außer der letzten, und die Alters-Chips wären
 // reihenweise still verschwunden.
 let BIRTH_DATE = null;
+// A37: Zahl der importierten Besuche im GESAMTEN Bestand (aus dem Index) —
+// der Schalter „🛰️ N Besuche" nannte vorher die der geladenen Liste.
+let TL_VISIT_COUNT = 0;
 // F17: Alter beim Ereignis als Ableitung — volle Jahre zwischen Geburt und
 // Ereignis. Nur wenn eine Geburt bekannt ist und das Ereignis danach liegt;
 // bei vager Datierung mit „~", damit die Zahl nicht mehr behauptet als die
@@ -3220,7 +3232,7 @@ document.getElementById('tl-visits-toggle').addEventListener('click', function (
   tl.showVisits = !tl.showVisits;
   this.classList.toggle('active', tl.showVisits);
   this.classList.toggle('off', !tl.showVisits);
-  tlRefilter();   // A37: ohne Besuche kann eine ganze Seite wegfallen
+  loadTimeline();   // A37: der Schalter ändert die Abfrage, nicht die Anzeige
 });
 document.querySelectorAll('#tl-zoom [data-zoom]').forEach(btn => {
   btn.addEventListener('click', () => {

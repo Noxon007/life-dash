@@ -360,3 +360,54 @@ def test_static_routes_win_over_the_single_event_route():
     single = paths.index("/api/events/{event_id}")
     for static in ("/api/events/index", "/api/events/map", "/api/events/on-this-day"):
         assert paths.index(static) < single, f"{static} steht hinter /{{event_id}}"
+
+
+def test_visits_are_filtered_in_the_server(db, user):
+    """Der Zeitstrahl blendet importierte Besuche aus. Täte er das erst im
+    Browser, bestünde eine Seite nach einem Timeline-Import fast nur aus
+    Unsichtbarem — gemessen an 12.000 Einträgen: sechs nachgeladene Seiten
+    für eine Handvoll Karten."""
+    for i in range(20):
+        _event(db, user, f"Besuch {i}", when=datetime(2024, 6, 1, 8 + i % 12),
+               source=Source.google_timeline)
+    _event(db, user, "Konzert", category="concert", when=datetime(2024, 6, 2))
+
+    page = list_events(db=db, user=user, slim=True, limit=10, visits=False)
+    assert [e.title for e in page] == ["Konzert"]
+    # Ohne Angabe bleibt alles drin — Export und Altpfade unberührt
+    assert len(list_events(db=db, user=user, slim=True)) == 21
+    assert len(list_events(db=db, user=user, slim=True, visits=True)) == 21
+
+
+def test_index_counts_the_visits_for_the_toggle(db, user):
+    for i in range(7):
+        _event(db, user, f"Besuch {i}", when=datetime(2024, 6, 1, 8 + i),
+               source=Source.google_timeline)
+    _event(db, user, "Konzert", category="concert", when=datetime(2024, 6, 2))
+
+    assert events_index(db=db, user=user).visits == 7
+
+
+def test_page_boundary_exactly_at_the_limit(db, user):
+    """Genau eine volle Seite: die nächste muss leer sein, nicht die erste
+    wiederholen. Klassischer Ort für einen Off-by-one."""
+    for i in range(10):
+        _event(db, user, f"E{i}", when=datetime(2024, 6, 1, 8, i))
+
+    first = list_events(db=db, user=user, slim=True, limit=10, offset=0)
+    second = list_events(db=db, user=user, slim=True, limit=10, offset=10)
+    assert len(first) == 10 and second == []
+    # Und über die Grenze hinaus fragen tut auch nicht weh
+    assert list_events(db=db, user=user, slim=True, limit=10, offset=999) == []
+
+
+def test_empty_database_answers_everywhere(db, user):
+    """Frische Installation: kein Endpunkt darf stolpern, und der Zeitstrahl
+    muss ein ehrliches „nichts da" bekommen statt einer Ausnahme."""
+    assert list_events(db=db, user=user, slim=True, limit=300) == []
+    idx = events_index(db=db, user=user)
+    assert idx.total == 0 and idx.years == [] and idx.birth is None
+    assert idx.year_min is None and idx.visits == 0
+    assert list_map_events(db=db, user=user) == []
+    ov = compute_overview(db, user.id)
+    assert ov["counts"]["events"] == 0 and ov["per_year"] == []
