@@ -117,7 +117,19 @@ def _stamp(when: datetime) -> str:
     `Z` würde das Fenster um den UTC-Versatz verschieben und an Tagesgrenzen
     die falschen Fotos einsammeln.
     """
-    return (when if when.tzinfo else when.astimezone()).isoformat()
+    if when.tzinfo:
+        return when.isoformat()
+    try:
+        return when.astimezone().isoformat()
+    except (OSError, OverflowError, ValueError):
+        # `astimezone()` fragt das Betriebssystem nach der Zone zu DIESEM
+        # Zeitpunkt — und Windows antwortet für alles vor 1970 mit OSError.
+        # Aufgefallen erst im Smoke-Lauf: die Album-Abfrage von Stufe 2 fragt
+        # bewusst ohne Zeitfenster (ab 1900), und damit sah diese Funktion nach
+        # fünf Releases zum ersten Mal ein Datum vor der Epoche. Ersatz ist der
+        # heutige lokale Versatz — für eine Fenstergrenze, die ein ganzes
+        # Jahrhundert weit offen steht, ist eine Stunde Sommerzeit belanglos.
+        return when.replace(tzinfo=datetime.now().astimezone().tzinfo).isoformat()
 
 
 def search_assets(url: str, key: str, start: datetime, end: datetime) -> list[dict]:
@@ -139,6 +151,193 @@ def search_assets(url: str, key: str, start: datetime, end: datetime) -> list[di
 def thumbnail(url: str, key: str, asset_id: str) -> bytes:
     """Vorschaubild eines Assets — durchgereicht, nie zwischengespeichert."""
     return _request(url, key, f"/assets/{asset_id}/thumbnail?size=preview", raw=True)
+
+
+# --------------------------------------------------------------------------- #
+# P2.1 Stufe 2 — was die API wirklich hergibt
+#
+# Anmerkung 107 ließ eine Frage offen und schrieb dazu, sie sei GEGEN DIE
+# SPEZIFIKATION zu klären, nicht gegen eine Attrappe: Wie unterscheidet man
+# eigene von geteilten Assets und Alben? Antwort aus
+# `open-api/immich-openapi-specs.json` (OpenAPI 3.0.3) — und sie ist für die
+# beiden Zweige **verschieden**, was eine Attrappe nie verraten hätte:
+#
+#   * **Alben:** `GET /albums?isOwned=true|false` gibt es, dokumentiert als
+#     „true = only owned, false = only shared-with-me". Der Server filtert.
+#   * **Assets:** `MetadataSearchDto` hat **kein** Besitz-Feld — kein
+#     `isOwned`, kein `ownerId`, kein `withPartners`. Gefiltert werden muss
+#     also auf der ANTWORT: `AssetResponseDto.ownerId` ist Pflichtfeld, die
+#     eigene Kennung liefert `GET /users/me`.
+#
+# Zwei weitere Funde, die das Paket überhaupt erst tragfähig machen:
+#   * `exifInfo` enthält **city/state/country** — Immich hat schon
+#     rückwärts-geokodiert. Der Ort eines Fotoclusters kostet damit KEINEN
+#     Nominatim-Aufruf, und die Gruppierung nach Ortsnamen ist stabiler als
+#     jedes Koordinatenraster (kein Zellenrand mitten durch eine Stadt).
+#   * `visibility` (archive|timeline|hidden|locked) sagt, was der Nutzer
+#     bewusst aus seinem Zeitstrahl genommen hat. Ein Vorschlag aus dem
+#     gesperrten Ordner wäre ein Vertrauensbruch.
+# --------------------------------------------------------------------------- #
+def own_user_id(url: str, key: str) -> str | None:
+    """Die eigene Immich-Nutzerkennung (`GET /users/me`).
+
+    Ohne sie lässt sich ein fremdes Foto nicht erkennen — dann wird lieber
+    NICHTS geclustert (siehe `is_own`), statt fremde Urlaubsfotos als eigenen
+    Tag vorzuschlagen.
+    """
+    data = _request(url, key, "/users/me")
+    return (data or {}).get("id")
+
+
+def is_own(asset: dict, my_id: str | None) -> bool:
+    """Gehört das Asset mir? Ohne bekannte eigene Kennung: nein.
+
+    Bewusst streng. `ownerId` ist laut Spezifikation Pflichtfeld; fehlt es
+    trotzdem, ist die Lage unklar — und im Unklaren ein fremdes Foto zum
+    eigenen Tagesvorschlag zu machen, ist der teurere Fehler.
+    """
+    return bool(my_id) and asset.get("ownerId") == my_id
+
+
+def is_in_timeline(asset: dict) -> bool:
+    """Nur was im Immich-Zeitstrahl steht, darf ein Ereignis vorschlagen.
+
+    `visibility` ist erst in neueren Immich-Versionen dabei; fehlt das Feld,
+    gilt das Asset als sichtbar (ältere Server kannten nur `isArchived`, das
+    hier ersatzweise gilt). Was fehlt, wird nicht als Verbot gelesen —
+    sonst schlüge der Lauf auf einem älteren Immich gar nichts mehr vor.
+    """
+    vis = asset.get("visibility")
+    if vis is not None:
+        return vis == "timeline"
+    return not asset.get("isArchived", False)
+
+
+def asset_place(asset: dict) -> str | None:
+    """Ortsname aus Immichs eigener Rückwärts-Geokodierung.
+
+    Die Leiter city → state → country ist Absicht: in der Wildnis kennt
+    Immich keine Stadt, aber fast immer eine Region. „34 Fotos in
+    (51.9, 8.8)" wäre keine Erinnerung, „34 Fotos in Lappland" ist eine.
+    """
+    exif = asset.get("exifInfo") or {}
+    for field in ("city", "state", "country"):
+        value = (exif.get(field) or "").strip()
+        if value:
+            return value
+    return None
+
+
+class ScanAborted(RuntimeError):
+    """Der Aufrufer (ein Job) will nicht weiter — sauber abbrechen.
+
+    Bewusst eine Ausnahme statt „gib zurück, was du hast": eine halb geladene
+    Albumspanne sähe aus wie eine vollständige und stünde als Datum in einem
+    Vorschlag. Ein abgebrochener Lauf darf nichts anlegen.
+    """
+
+
+def search_assets_paged(url: str, key: str, start: datetime, end: datetime, *,
+                        album_id: str | None = None,
+                        heartbeat=None,
+                        max_items: int = 20000) -> list[dict]:
+    """Alle Assets eines Zeitraums — über alle Seiten.
+
+    `search_assets` holt bewusst nur die erste Seite: für EIN Ereignis reichen
+    250 Treffer weit. Ein Jahreslauf ist das Gegenteil, da sind 250 die
+    ersten Tage im Januar — und der Rest des Jahres wäre still verschwunden.
+
+    Geblättert wird über `nextPage` (laut Spezifikation ein **String**-Token,
+    kein Zähler); `max_items` ist die Reißleine gegen eine Bibliothek, die
+    größer ist als der Arbeitsspeicher.
+
+    `heartbeat` wird nach JEDER Seite gerufen und darf `False` liefern, um
+    abzubrechen. Das ist kein Beiwerk: ein Job gilt nach drei Minuten ohne
+    Lebenszeichen als verwaist (`STALE_SECONDS`), und genau die Bibliothek,
+    für die dieses Paket gebaut ist, blättert länger als drei Minuten. Ohne
+    den Schlag hier hätte der Lauf die ganze Arbeit gemacht und anschließend
+    „gestoppt" gemeldet.
+    """
+    out: list[dict] = []
+    page = 1
+    while page and len(out) < max_items:
+        if heartbeat is not None and heartbeat() is False:
+            raise ScanAborted("Lauf gestoppt")
+        body = {
+            "takenAfter": _stamp(start),
+            "takenBefore": _stamp(end),
+            "size": PAGE_SIZE,
+            "page": page,
+            "withExif": True,
+        }
+        if album_id:
+            body["albumIds"] = [album_id]
+        data = _request(url, key, "/search/metadata", payload=body)
+        block = ((data or {}).get("assets") or {})
+        out.extend(a for a in (block.get("items") or []) if a.get("id"))
+        nxt = block.get("nextPage")
+        try:
+            page = int(nxt) if nxt else 0
+        except (TypeError, ValueError):
+            # Sollte Immich je ein undurchsichtiges Token liefern, lieber
+            # aufhören als endlos dieselbe Seite zu holen.
+            log.info("Immich: nextPage '%s' ist keine Seitenzahl — Ende", nxt)
+            page = 0
+    if len(out) >= max_items and page:
+        # Stille ist in diesem Projekt der teuerste Defekt: ein Jahr, das an
+        # der Reißleine abgeschnitten wird, sähe sonst aus wie ein Jahr, das
+        # eben nicht mehr hergibt.
+        log.warning("Immich: Grenze von %d Assets erreicht — dieses Fenster "
+                    "wird nur teilweise ausgewertet (%s)", max_items,
+                    f"Album {album_id}" if album_id else f"{start:%Y-%m-%d} bis {end:%Y-%m-%d}")
+    return out
+
+
+def asset_country(asset: dict) -> str | None:
+    """Land aus `exifInfo` — unterscheidet gleichnamige Orte."""
+    return ((asset.get("exifInfo") or {}).get("country") or "").strip() or None
+
+
+def photo_years(url: str, key: str, my_id: str | None) -> dict[int, int]:
+    """Jahr -> Anzahl eigener, georeferenzierter Fotos im Immich-Zeitstrahl.
+
+    `GET /timeline/buckets` liefert Monatszähler statt Assets — die Frage
+    „welche Jahre lohnen einen Lauf?" kostet damit EINEN Aufruf statt eines
+    Bibliotheks-Vollscans.
+
+    Warum das nicht aus den eigenen Daten kommt, obwohl es billiger wäre:
+    Anmerkung 107 nennt ausgerechnet die Jahre **ohne** Timeline-Daten als die
+    wertvollsten („die Erinnerungen von vor dem Smartphone"). Eine Auswahlliste
+    aus den eigenen Ereignissen böte genau die nicht an — sie zeigte 2026 und
+    verstecke 2004.
+
+    Ältere Immich-Versionen kennen den Endpunkt nicht; dann gibt es ein leeres
+    Ergebnis und der Aufrufer fällt auf die eigenen Jahre zurück.
+    """
+    params = ["visibility=timeline", "withCoordinates=true", "withPartners=false"]
+    if my_id:
+        params.append(f"userId={urllib.parse.quote(my_id)}")
+    data = _request(url, key, "/timeline/buckets?" + "&".join(params))
+    years: dict[int, int] = {}
+    for bucket in data or []:
+        stamp = str(bucket.get("timeBucket") or "")[:4]
+        if not stamp.isdigit():
+            continue
+        years[int(stamp)] = years.get(int(stamp), 0) + int(bucket.get("count") or 0)
+    return years
+
+
+def albums(url: str, key: str, *, owned: bool | None = None) -> list[dict]:
+    """Alben. `owned=True` nur eigene, `owned=False` nur mit mir geteilte.
+
+    Hier filtert der Server (`isOwned`), anders als bei den Assets — das ist
+    keine Inkonsequenz von Life-Dash, sondern der Stand der Immich-API.
+    """
+    path = "/albums"
+    if owned is not None:
+        path += f"?isOwned={'true' if owned else 'false'}"
+    data = _request(url, key, path)
+    return [a for a in (data or []) if a.get("id")]
 
 
 # --------------------------------------------------------------------------- #

@@ -1689,6 +1689,28 @@
               unangetastet. Der nächste Lauf baut die Zuordnungen neu auf.</span>
             </div>
           </div>
+
+          <!-- P2.1 Stufe 2: Immich als Ereignis-QUELLE. Bewusst eine eigene
+               Zeile unter dem Verknüpfen: das eine hängt Bilder an vorhandene
+               Einträge, das andere schlägt neue vor. -->
+          <div class="action-row">
+            <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
+              <select id="ims-year" class="mf-select" data-i18n-title="ims.year.tip" title="Ein Jahr je Lauf — eine ganze Bibliothek auf einmal ergäbe tausende Vorschläge"></select>
+              <button class="btn secondary" id="ims-preview" style="text-align:left" data-i18n="ims.preview">🔍 Vorschau für dieses Jahr</button>
+              <button class="btn" id="ims-run" style="text-align:left" disabled data-i18n="ims.run">✚ Vorschläge anlegen</button>
+            </div>
+            <div class="action-desc">
+              <span data-i18n="ims.desc"><b>Aus Fotos werden Vorschläge.</b> Ein Tag mit vielen Bildern an einem Ort
+              („34 Fotos am 12. Juli in Detmold") und jedes Album werden zu einem <b>unbestätigten</b> Eintrag in der
+              Moderation — bestätigt wird nichts von allein. Geclustert werden nur <b>eigene</b> Fotos <b>mit
+              Koordinaten</b>, die in deinem Immich-Zeitstrahl stehen; Archiviertes und Gesperrtes bleibt außen vor.
+              Geteilte Alben sind erlaubt und werden als solche gekennzeichnet.</span>
+              <div id="ims-result" class="hint" style="display:none; margin-top:10px"></div>
+              <span class="hint" style="display:block; margin-top:8px" data-i18n="ims.hint">Erst die Vorschau, dann das
+              Anlegen — der Knopf bleibt bis dahin gesperrt. Ein Jahr kann hunderte Vorschläge ergeben, und
+              die will man vorher gesehen haben.</span>
+            </div>
+          </div>
         </div>
 
         <!-- F13: eigene Hintergrundkarte -->
@@ -2364,6 +2386,21 @@ const I18N_EN = {
   'imp.photos': "photos restored",
   'imp.thumbs': "previews rebuilt",
   'adm.immich': "Immich (photos)",
+  // P2.1 stage 2 (0.37.0) — Immich as an event source
+  'ims.desc': "<b>Photos become proposals.</b> A day with many pictures in one place (“34 photos on 12 July in Detmold”) and every album become an <b>unconfirmed</b> entry in moderation — nothing is confirmed on its own. Only <b>your own</b> photos <b>with coordinates</b> that sit in your Immich timeline are clustered; archived and locked ones stay out. Shared albums are allowed and are marked as such.",
+  'ims.preview': "🔍 Preview this year",
+  'ims.run': "✚ Create proposals",
+  'ims.busy': "🔍 looking …",
+  'ims.year.tip': "One year per run — a whole library at once would mean thousands of proposals",
+  'ims.hint': "Preview first, then create — the button stays locked until then. A year can yield hundreds of proposals, and you want to have seen them.",
+  'ims.head': "{y}: {n} proposals ({d} photo days, {a} albums) from {p} photos",
+  'ims.none': "nothing new to propose.",
+  'ims.none.why': "Either there are no own photos with coordinates in that year, or everything has been proposed already — rejected proposals do not come back either.",
+  'ims.photos': "photos",
+  'ims.shared': "shared album",
+  'ims.more': "more",
+  'ims.noyear': "Please pick a year first.",
+  'ims.needpreview': "Look at the preview first — then create.",
   'im.test': "🔌 Test connection",
   'im.run': "🖼️ Link photos",
   'im.reset': "↺ Discard links",
@@ -6467,6 +6504,7 @@ document.querySelectorAll('.example-chip').forEach(c =>
 const JOB_LABELS = { recompute: '🔄 KI-Vorschläge neu berechnen', weather: '🌤️ Wetter ergänzen',
                      embeddings: '🧠 Embeddings', resolve_names: '📍 Ortsnamen auflösen/formatieren',
                      immich: '🖼️ Fotos aus Immich verknüpfen',
+                     immich_source: '🖼️ Ereignisse aus Immich vorschlagen',
                      timeline_import: '🛰️ Timeline-Import', data_import: '📥 Daten-Import' };
 const JOB_STATUS_DE = { running: '⏳ läuft', done: '✅ fertig', stopped: '⏹ gestoppt', error: '⚠️ Fehler' };
 // F10: Status in der aktiven Sprache
@@ -6508,6 +6546,10 @@ async function loadJobs() {
 }
 document.getElementById('jobs-refresh').addEventListener('click', loadJobs);
 // A22: Nachtplan-Einstellungen (pro Nutzer)
+// `immich_source` steht bewusst NICHT hier: der Lauf braucht ein Jahr und eine
+// gesehene Vorschau. Ein nächtlicher Lauf würde beides überspringen und morgens
+// hunderte Vorschläge in der Moderation ablegen — genau das, wogegen die
+// Jahres-Aufteilung gebaut ist (Anmerkung 107).
 const SCHED_TYPES = ['weather', 'embeddings', 'resolve_names', 'recompute', 'immich'];
 function renderSchedule() {
   const panel = document.getElementById('sched-panel');
@@ -6912,6 +6954,8 @@ function renderImmichState(s) {
   state.textContent = s.immich.has_key
     ? t('im.state.set', 'Schlüssel hinterlegt. Feld leer lassen, um ihn zu behalten.')
     : t('im.state.none', 'Noch kein Schlüssel hinterlegt.');
+  // Stufe 2: Jahresauswahl füllen, sobald klar ist, dass es Immich gibt.
+  loadImmichYears();
 }
 async function saveImmich() {
   const url = document.getElementById('im-url').value.trim();
@@ -7005,6 +7049,91 @@ document.getElementById('im-reset').addEventListener('click', async () => {
     const res = await api('/api/media/immich/reset', { method: 'POST' });
     toast(t('im.reset.done', '✓ {n} Verknüpfung(en) verworfen.').replace('{n}', res.removed));
   } catch (err) { toast(err.message, 'error'); }
+});
+
+// ---------- P2.1 Stufe 2: Immich als Ereignis-Quelle ----------
+// Das P2.5-Muster, und zwar erzwungen statt empfohlen: „Vorschläge anlegen"
+// ist gesperrt, bis für GENAU DIESES Jahr eine Vorschau da war. Ein Lauf über
+// eine zwanzig Jahre alte Bibliothek füllt sonst eine Warteschlange, die für
+// Dutzende gebaut ist — und niemand hätte es vorher wissen können.
+let imsPreviewedYear = null;
+async function loadImmichYears() {
+  const sel = document.getElementById('ims-year');
+  if (!sel) return;
+  try {
+    const r = await api('/api/immich/years');
+    // Die Fotozahl steht dabei: „2004 · 412 Fotos" macht aus einer Jahresliste
+    // eine Empfehlung — und die lohnendsten Jahre sind die alten, für die es
+    // sonst nichts gibt (Anmerkung 107).
+    sel.innerHTML = (r.years || []).map(y => {
+      const n = y.photos == null ? '' : ` · ${y.photos} ${t('ims.photos', 'Fotos')}`;
+      return `<option value="${y.year}">${y.year}${esc(n)}</option>`;
+    }).join('');
+    const has = (r.years || []).some(y => y.year === r.current);
+    if (has) sel.value = String(r.current);
+  } catch (_) { /* kein Immich eingerichtet — die Zeile bleibt leer */ }
+}
+function imsLock() {
+  // Jahr gewechselt = die Vorschau gilt nicht mehr. Ein Knopf, der nach dem
+  // Umschalten noch offen steht, legt Vorschläge für ein Jahr an, das nie
+  // jemand gesehen hat.
+  const sel = document.getElementById('ims-year');
+  const run = document.getElementById('ims-run');
+  const stale = !imsPreviewedYear || String(imsPreviewedYear) !== sel.value;
+  run.disabled = stale;
+  if (stale) document.getElementById('ims-result').style.display = 'none';
+}
+document.getElementById('ims-year')?.addEventListener('change', imsLock);
+document.getElementById('ims-preview')?.addEventListener('click', async ev => {
+  const btn = ev.target, year = document.getElementById('ims-year').value;
+  if (!year) { toast(t('ims.noyear', 'Bitte zuerst ein Jahr wählen.'), 'warn'); return; }
+  btn.disabled = true; btn.textContent = t('ims.busy', '🔍 sehe nach …');
+  const box = document.getElementById('ims-result');
+  try {
+    const r = await api(`/api/immich/preview?year=${year}`, { method: 'POST' });
+    imsPreviewedYear = r.year;
+    box.style.display = '';
+    if (!r.total) {
+      box.innerHTML = `<b>${esc(String(r.year))}: ${esc(t('ims.none', 'nichts Neues vorzuschlagen.'))}</b><br>`
+        + esc(t('ims.none.why', 'Entweder gibt es keine eigenen Fotos mit Koordinaten in diesem Jahr, oder alles wurde schon vorgeschlagen — auch abgelehnte Vorschläge kommen nicht wieder.'));
+    } else {
+      // Die Vorschau NENNT die Vorschläge. Eine Zahl ist keine
+      // Entscheidungsgrundlage (P2.5).
+      const rows = r.proposals.slice(0, 40).map(p => `
+        <div style="padding:3px 0">
+          ${p.kind === 'album' ? '📗' : '📅'} <b>${esc(p.title)}</b>
+          <span class="stat-label">· ${esc(p.start.slice(0, 10))}${p.place ? ' · ' + esc(p.place) : ''} · ${p.photos} ${esc(t('ims.photos', 'Fotos'))}</span>
+          ${p.shared ? `<span class="chip badge-unconfirmed">${esc(t('ims.shared', 'geteiltes Album'))}</span>` : ''}
+        </div>`).join('');
+      box.innerHTML = `<b>${esc(t('ims.head', '{y}: {n} Vorschläge ({d} Fototage, {a} Alben) aus {p} Fotos')
+          .replace('{y}', r.year).replace('{n}', r.total).replace('{d}', r.days)
+          .replace('{a}', r.albums).replace('{p}', r.photos))}</b>
+        <div style="margin-top:6px">${rows}</div>
+        ${r.total > 40 ? `<div class="stat-label">… ${r.total - 40} ${esc(t('ims.more', 'weitere'))}</div>` : ''}`;
+    }
+    imsLock();
+  } catch (err) {
+    box.style.display = '';
+    box.textContent = err.message;
+    imsPreviewedYear = null;
+    imsLock();
+  } finally {
+    btn.disabled = false; btn.textContent = t('ims.preview', '🔍 Vorschau für dieses Jahr');
+  }
+});
+document.getElementById('ims-run')?.addEventListener('click', ev => {
+  const year = parseInt(document.getElementById('ims-year').value, 10);
+  if (String(imsPreviewedYear) !== String(year)) {
+    // Sollte der Knopf je offen stehen, ohne dass eine Vorschau lief, ist hier
+    // Schluss: die Sperre am Knopf ist die Bequemlichkeit, das hier die Regel.
+    toast(t('ims.needpreview', 'Erst die Vorschau ansehen — dann anlegen.'), 'warn');
+    return;
+  }
+  startServerJob(ev.target, 'immich_source', { year });
+  // Die Vorschau ist verbraucht: nach dem Lauf ist der Bestand ein anderer,
+  // und der Knopf darf nicht offen stehen bleiben.
+  imsPreviewedYear = null;
+  imsLock();
 });
 
 // F13: eigene Kachelquelle — bewusst nur lokal (kein Server-Setting), weil die

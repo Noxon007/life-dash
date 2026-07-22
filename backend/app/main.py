@@ -20,6 +20,7 @@ from app.routers import (
     auth,
     data,
     events,
+    immich,
     ingest,
     jobs,
     journal,
@@ -127,6 +128,7 @@ app.include_router(jobs.router)
 app.include_router(world.router)
 app.include_router(achievements.router)
 app.include_router(journal.router)    # F1: Tages-Zusammenfassung (Vorschlag)
+app.include_router(immich.router)     # P2.1 Stufe 2: Immich als Ereignis-Quelle
 app.include_router(admin.router)
 
 

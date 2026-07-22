@@ -42,12 +42,14 @@ JOB_TYPES = {
     "embeddings": "Embeddings berechnen",
     "resolve_names": "Ortsnamen auflösen/formatieren",
     "immich": "Fotos aus Immich verknüpfen",
+    "immich_source": "Ereignisse aus Immich vorschlagen",
     "timeline_import": "Google-Timeline-Import",
     "data_import": "Daten-Import (JSON)",
 }
 # A22: Diese Typen laufen SERVERSEITIG als Background-Thread weiter, auch wenn
 # der Browser zu ist. Importe bleiben client-getrieben (die Datei liegt dort).
-SERVER_JOB_TYPES = ("weather", "embeddings", "resolve_names", "recompute", "immich")
+SERVER_JOB_TYPES = ("weather", "embeddings", "resolve_names", "recompute",
+                    "immich", "immich_source")
 # In Tests abgeschaltet (in-memory-DB verträgt keine fremden Threads)
 WORKERS_ENABLED = True
 
@@ -425,9 +427,72 @@ def _run_immich(db: Session, job: Job) -> tuple[str, str]:
                     f"{n_days} Tage geprüft.")
 
 
+def _run_immich_source(db: Session, job: Job) -> tuple[str, str]:
+    """P2.1 Stufe 2: aus Immich-Fotos Ereignis-VORSCHLÄGE machen — ein Jahr.
+
+    Jahresweise, weil eine zwanzig Jahre alte Bibliothek sonst vierstellig
+    viele Vorschläge in eine Warteschlange kippt, die für Dutzende gebaut ist
+    (Anmerkung 107). Das Jahr steht in `params` — ohne Jahr kein Lauf: „alles"
+    wäre genau der Fall, den die Aufteilung verhindern soll.
+
+    Der Lauf scannt NEU statt die Vorschau zu übernehmen. Zwischen Ansehen und
+    Bestätigen kann sich etwas geändert haben, und `scan_year` ist die eine
+    Stelle, an der die sieben Fälle geprüft werden.
+    """
+    from app.services import immich as immich_api
+    from app.services import immich_source as source
+
+    user = db.get(User, job.user_id)
+    cfg = immich_api.config_for(user)
+    if cfg is None:
+        return "stopped", ("Immich ist für dieses Konto nicht eingerichtet "
+                           "(Verwaltung → Meine Daten → Immich).")
+    year = (job.params or {}).get("year")
+    # Bereich prüfen wie der Vorschau-Endpunkt: `params` kommt vom Client, und
+    # `datetime(99999, 1, 1)` wäre kein Lauf, sondern ein Absturz mit
+    # Stapelspur statt einer Auskunft.
+    if not isinstance(year, int) or not 1900 <= year <= 2200:
+        return "error", "Ohne gültiges Jahr kein Lauf — bitte ein Jahr auswählen."
+    url, key = cfg
+
+    job.unit = "Vorschläge angelegt"
+    db.commit()
+    # Der Scan läuft, BEVOR es etwas zu zählen gibt — bei einer großen
+    # Bibliothek Minuten. Ohne Lebenszeichen dazwischen gilt der Job nach
+    # STALE_SECONDS als verwaist, und der Lauf hätte die ganze Arbeit gemacht,
+    # um danach „gestoppt" zu melden. `_tick(…, 0, None)` schlägt den Puls,
+    # ohne einen Fortschritt zu behaupten, den es noch nicht gibt.
+    try:
+        proposals = source.scan_year(db, user, year, url, key,
+                                     heartbeat=lambda: _tick(db, job.id, 0, None))
+    except immich_api.ScanAborted:
+        return "stopped", f"{year}: Suche abgebrochen — nichts angelegt."
+    except immich_api.ImmichError as exc:
+        return "stopped", f"Immich antwortet nicht: {exc}"
+
+    if not proposals:
+        return "done", f"{year}: nichts Neues vorzuschlagen."
+
+    total = len(proposals)
+    created = 0
+    # In Blöcken anlegen und festschreiben: bricht der Lauf ab, ist das
+    # Angelegte da und der Rest kommt beim nächsten Mal — die Plätze sind
+    # stabil, ein zweiter Lauf schlägt nichts doppelt vor.
+    for i in range(0, total, 20):
+        block = proposals[i:i + 20]
+        created += source.create_proposals(db, user, block)
+        db.commit()
+        if not _tick(db, job.id, len(block), total - (i + len(block))):
+            return "stopped", f"{created} Vorschläge angelegt (gestoppt)."
+    days = sum(1 for p in proposals if p.kind == "day")
+    return "done", (f"{year}: {created} Vorschläge angelegt "
+                    f"({days} Fototage, {total - days} Alben) — alle unbestätigt.")
+
+
 _RUNNERS = {
     "weather": _run_weather,
     "immich": _run_immich,
+    "immich_source": _run_immich_source,
     "embeddings": _run_embeddings,
     "recompute": _run_recompute,
     "resolve_names": _run_resolve_names,

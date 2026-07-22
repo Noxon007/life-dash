@@ -15,6 +15,47 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.37.0] – 2026-07-22
+
+### Added
+- **Immich can now suggest entries, not just deliver pictures.** Pick a year,
+  look at the preview, and Life-Dash turns your photos into **unconfirmed**
+  proposals you can accept or reject like any other:
+  - **A day with many pictures in one place** becomes one entry — “34 photos on
+    12 July in Detmold”. The place comes from Immich's own geocoding, so no
+    external service is asked.
+  - **Every album** becomes a trip proposal — name, span and the places inside.
+  - Nothing is ever confirmed for you, and nothing is created before you have
+    seen the preview: the button stays locked until then.
+- **The year list tells you where the treasure is.** It comes from Immich and
+  shows how many photos each year holds — the years worth running are usually
+  the old ones, where there is no location history at all and the photos are
+  the only record left.
+- **A rejected proposal stays rejected.** Reject “12 July in Detmold” and it
+  will not come back on the next run, this year or in three years — even
+  though rejecting deletes the entry itself.
+- **Adding photos to a day does not duplicate it.** A proposal is identified by
+  its *place in your life* — the date and location, or the album — not by which
+  pictures happened to be in it.
+
+### Changed
+- Only **your own** photos, **with coordinates**, that sit in your **Immich
+  timeline** are turned into day proposals. Screenshots and forwarded images
+  carry no coordinates and cannot invent a place; other people's photos from a
+  shared album cannot invent a day; archived and locked photos stay out
+  entirely.
+- **Shared albums are welcome** — an album is a named, bounded thing, and a
+  shared one is usually a joint holiday. A proposal that comes from one **says
+  so**, so taking over someone else's trip is a decision rather than an
+  accident.
+- A day that already has imported location visits still gets a photo proposal.
+  A photo's coordinates are evidence; a location visit is an inference — the
+  proposal is the more precise line, not a duplicate.
+- This run is deliberately **not schedulable overnight**: it needs a year and a
+  preview, and neither survives being skipped.
+- New endpoints `GET /api/immich/years` and `POST /api/immich/preview`, and a
+  new job type `immich_source`. No schema change.
+
 ## [0.36.0] – 2026-07-22
 
 ### Added

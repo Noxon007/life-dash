@@ -45,10 +45,10 @@ Entscheidungen/Anmerkungen in Kap. 15. Erst dort gezielt nachlesen statt Code ra
   etc. aus Config); `.env.example` ist die Setup-Referenz
 
 ## Stand
-Umgesetzt bis **v0.36.0** (2026-07-22). **Gruppe A ist komplett** (A1–A42),
-Gruppe B bis **F19**; **P5.1 und F1 sind fertig**. Offen ist damit nur noch:
-**P2.1 Stufe 2** (Immich als Ereignisquelle), dann **Demo-Modus** und **R1**
-(Veröffentlichungsreife).
+Umgesetzt bis **v0.37.0** (2026-07-22). **Gruppe A ist komplett** (A1–A42),
+Gruppe B bis **F19**; **P5.1, F1 und P2.1 (beide Stufen) sind fertig**. Offen
+ist damit nur noch: **Demo-Modus (0.38)** und **R1** (1.0, drei Etappen auf
+`main`).
 Hinter 1.0 bleiben
 nur noch neue Import-Konnektoren (P2.8 OwnTracks, P2.9 Automatisierung,
 P2.10 Trakt, P2.11 Dawarich/GPX, P4.1 Health, P4.2 PSN) plus **P5.2**
@@ -60,8 +60,8 @@ P2.10 Trakt, P2.11 Dawarich/GPX, P4.1 Health, P4.2 PSN) plus **P5.2**
 0.29 A35 (lokale Konten) · 0.30 P3.1 · 0.31 A36+F17 (schlanke Liste, Alter) ·
 0.32 A37 (serverseitiges Zeitfenster) · 0.33 A38+A40 (Mobil-Layout,
 Kartenschalter) + dev-Kennung · 0.34 A39+F18+A41 (Städte, Tages-Fotos) · 0.35 F19+A42 (Sammlung) ·
-0.36 P5.1+F1-Rest (Erfassen).
-Offen: **0.37 P2.1 Stufe 2 (Immich als Quelle)** · **0.38 Demo-Modus** ·
+0.36 P5.1+F1-Rest (Erfassen) · 0.37 P2.1 Stufe 2 (Immich als Quelle).
+Offen: **0.38 Demo-Modus** ·
 **1.0 = Veröffentlichung**. Kein Termindruck (Anmerkung 58).
 Dort nachsehen statt Reihenfolge raten.
 
@@ -140,6 +140,41 @@ Kontinente, „nächste Marke: 10" wäre ein Rechenfehler mit Anspruch (Anm. 104
 Schwelle** (Anm. 103): die Wettermetriken zählten Einträge, wo überall „Tage"
 stand — A31/Anm. 64 hatte in dieser Datei überlebt. Frage bei jeder
 Invarianten-Reparatur: *wo gilt derselbe Satz noch?*
+
+**P2.1 Stufe 2 fertig (v0.37.0, Anmerkung 109).** Immich schlägt jetzt
+Ereignisse vor: Fototage (Tag + Ort) und Alben, beide `unconfirmed`, jahresweise
+mit **Pflicht-Vorschau**. `services/immich_source.py`, Endpunkte
+`/api/immich/years|preview`, Job `immich_source`. **Kein Schema.**
+**Identität ist der PLATZ** (`immich:day:<datum>:<ort>`, `immich:album:<id>`),
+nie ein Hash über die Assets — sonst wird ein nachgeladenes Foto zum zweiten
+Vorschlag. **Grabstein = das Fragment**: `discard_event` löscht das Ereignis,
+das Fragment bleibt und trägt den Platz → ein abgelehnter Vorschlag kommt nie
+wieder (vierte Auflage der Endlos-Abruf-Falle nach F12/A39/A42).
+**Die OpenAPI-Spezifikation lesen, nicht die Attrappe fragen** — zehn Minuten,
+drei Entscheidungen gekippt: Alben filtert der Server (`?isOwned=`), **Assets
+NICHT** (`MetadataSearchDto` hat kein Besitzfeld → auf der Antwort über
+`ownerId` + `/users/me`); `exifInfo` liefert **city/state/country** (kein
+Nominatim, und stabiler als ein Koordinatenraster, dessen Zellenrand mitten
+durch eine Stadt läuft); `visibility` hält Archiviertes und **Gesperrtes**
+draußen. Zweites Mal, dass die Spezifikation eine Annahme dieses Konnektors
+umbringt (Stufe 1: `takenAfter` braucht eine Zeitzone).
+**Der Smoke-Lauf gegen ein HTTP-Doppel fand, was Unit-Tests nicht konnten:**
+die Jahresauswahl kam aus dem EIGENEN Bestand und bot damit ausgerechnet die
+Jahre nicht an, für die es das Paket gibt (vor dem Smartphone gibt es keine
+Besuche) → jetzt `/timeline/buckets` mit Fotozahl je Jahr.
+Wächter: `tools/check-p21-preview.js` (Vorschau-Pflicht, Jahreswechsel
+entwertet sie).
+**Selbstkontrolle 0.37.0 — fünf Befunde, vier davon an derselben Grenze:** dort,
+wo die Test-Attrappe aufhört und der echte Client anfängt. Silvester-Album aufs
+Laufjahr beschnitten (das Jahr entscheidet OB, nicht WAS); Scan ohne Herzschlag
+→ Job nach 180 s als verwaist eingesammelt, nachdem er alles getan hat; dann
+riss das weite Album-Fenster `_stamp` auf (`astimezone()` wirft unter Windows
+`OSError` vor 1970 — **das fand nur der Smoke-Lauf**, Unit-Tests ersetzen
+`search_assets_paged` komplett); zwei Springfields wären ein Ort geworden
+(Anm. 105: Schlüssel ist `(Stadt, Land)` — neu vergeben heißt gleich richtig);
+20.000-Grenze schnitt still. **Regel: bei jedem Konnektor zusätzlich ein
+HTTP-Doppel fahren, das sich an die echten DTOs hält** — zwanzig Zeilen, drei
+Befunde, einer davon für Unit-Tests prinzipiell unerreichbar.
 
 **P5.1+F1 fertig (v0.36.0, Anmerkung 108).** Das Loch beim Offline-Erfassen war
 nicht die fehlende Warteschlange, sondern die **Eingangstür**: `init()` hatte
