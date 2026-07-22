@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 from app.models import Event, Source
-from app.schemas import (EntityRead, EventRead, LocationRead, MediaRead,
-                         MetricRead)
+from app.schemas import (EntityRead, EventGroup, EventRead, LocationRead,
+                         MediaRead, MetricRead)
 
 
 def _weather_compact(event: Event) -> dict | None:
@@ -23,7 +23,8 @@ def _weather_compact(event: Event) -> dict | None:
 
 def event_to_read(event: Event, *, slim: bool = False,
                   weather: dict | None = None,
-                  child_count: int | None = None) -> EventRead:
+                  child_count: int | None = None,
+                  group: dict | None = None) -> EventRead:
     """Baut ein EventRead inkl. verknüpfter Entities und Metriken.
 
     slim (A36): Die Metrik-Zeilen entfallen; stattdessen trägt `weather` die
@@ -78,4 +79,7 @@ def event_to_read(event: Event, *, slim: bool = False,
         weather=(weather if weather is not None else _weather_compact(event)) if slim else None,
         # A37/F7: vom Aufrufer je Seite gezählt (None = nicht ermittelt)
         child_count=child_count,
+        # A39: Diese Karte vertritt mehrere Besuche desselben Tages in
+        # derselben Stadt (None = vertritt nur sich selbst)
+        group=EventGroup(**group) if group else None,
     )

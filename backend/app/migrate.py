@@ -13,7 +13,10 @@ from sqlalchemy.engine import Engine
 _MISSING_COLUMNS: dict[str, dict[str, str]] = {
     "fragments": {"user_id": "VARCHAR(36)",
                   "capture_lat": "FLOAT", "capture_lng": "FLOAT"},
-    "locations": {"user_id": "VARCHAR(36)", "country": "VARCHAR(64)"},
+    # A39: `city` neben `country` — bis dahin steckte die Stadt nur als
+    # Textbaustein im zusammengesetzten Namen und war nicht gruppierbar.
+    "locations": {"user_id": "VARCHAR(36)", "country": "VARCHAR(64)",
+                  "city": "VARCHAR(128)"},
     "events": {"user_id": "VARCHAR(36)", "embedding": "JSON", "note": "TEXT",
                "external_id": "VARCHAR(64)",
                "confirmed_at": "TIMESTAMP", "confirmed_by": "VARCHAR(16)",

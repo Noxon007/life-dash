@@ -150,3 +150,23 @@ def test_the_on_this_day_preselection_compiles_for_postgres(db, user):
     sql = _sql(query).lower()
     assert "extract(month from" in sql and "extract(day from" in sql, sql
     assert "strftime" not in sql
+
+
+# --------------------------------------------------------------------------- #
+# A39 — die Verdichtung ist die nächste dialektempfindliche Abfrage
+# --------------------------------------------------------------------------- #
+def test_a39_condensation_translates_to_postgres(db, user):
+    """Die Gruppierung nach (Tag, Stadt) läuft bewusst über `extract`, nicht
+    über `date(...)`: `date(x)` ist SQLite-Syntax, PostgreSQL will `x::date`.
+    Auf SQLite fiele der Unterschied nie auf — genau die Falle, für die es
+    diese Datei gibt."""
+    from app.routers.events import (_condensable_visits, _visit_group_reps)
+
+    reps = _sql(_visit_group_reps(db, user.id)).lower()
+    assert "min(events.id)" in reps
+    assert "group by" in reps and "locations.city" in reps
+    assert "extract(year from" in reps      # nicht date(...)
+    assert "date(" not in reps.replace("date_start", "")
+
+    visits = _sql(_condensable_visits(db, user.id)).lower()
+    assert "google_timeline" in visits and "locations.city" in visits

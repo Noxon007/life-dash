@@ -88,6 +88,10 @@ class LocationRead(BaseModel):
     type: str | None = None
     lat: float | None = None
     lng: float | None = None
+    # A39: Die Stadt reist mit, damit das Frontend eine Gruppe aufklappen und
+    # nach Stadt filtern kann, ohne den Namen zu zerlegen. Leerstring heißt
+    # „nachgesehen, gibt es hier keine" (siehe Location.city).
+    city: str | None = None
 
 
 class MetricRead(BaseModel):
@@ -129,6 +133,22 @@ class EventRead(BaseModel):
     # zählte sie bisher in der geladenen Liste — mit dem Zeitfenster kann ein
     # Kind auf einer anderen Seite liegen, und der Chip zählte still zu wenig.
     child_count: int | None = None
+    # A39: Diese Karte steht stellvertretend für mehrere importierte Besuche
+    # desselben Tages in derselben Stadt. None heißt: sie steht für sich.
+    group: "EventGroup | None" = None
+
+
+class EventGroup(BaseModel):
+    """A39: Was ein zusammengefasster Eintrag vertritt.
+
+    Bewusst mit Zeitspanne statt nur einer Zahl: „12 Besuche" allein wirft die
+    Frage auf, wann eigentlich — „12 Besuche, 08:14–19:30" beantwortet sie und
+    macht das Aufklappen zur Wahl statt zur Notwendigkeit.
+    """
+    city: str
+    count: int
+    first: datetime | None = None
+    last: datetime | None = None
 
 
 # --------------------------------------------------------------------------- #

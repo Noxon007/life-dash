@@ -132,6 +132,23 @@ def parts_for(user) -> list[str]:
     return sanitize_parts(prefs.get("place_name_parts"))
 
 
+def city_of(hit: dict | None) -> str | None:
+    """A39: Die Stadt eines Treffers — dieselbe Fallback-Kette wie im Namen.
+
+    Bewusst hier und nicht bei den Aufrufern: `_PART_KEYS["city"]` entscheidet
+    schon, was im Anzeigenamen als Stadt gilt (city, dann town, village,
+    municipality). Zwei Definitionen von „Stadt" wären genau die Art
+    Doppelwahrheit, die später auseinanderläuft — die Statistik zählte dann
+    andere Orte, als der Name anzeigt.
+
+    Rückgabe ohne Treffer oder ohne passendes Feld: None. Ein Ort mitten im
+    Nirgendwo hat keine Stadt, und das ist eine Antwort, keine Lücke.
+    """
+    addr = (hit or {}).get("address") or {}
+    val = next((addr[k] for k in _PART_KEYS["city"] if addr.get(k)), None)
+    return str(val)[:128] if val else None
+
+
 def _poi_name(namedetails: dict | None, lang: str | None = None) -> str | None:
     """Eigenname des Treffers in der UI-Sprache (z. B. „Adlerwarte Berlebeck"),
     der in keinem Adress-Baustein steckt. Reihenfolge: Wunschsprache -> andere

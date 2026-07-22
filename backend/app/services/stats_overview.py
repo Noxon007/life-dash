@@ -122,6 +122,18 @@ def compute_overview(db: Session, user_id: str, *, today: datetime | None = None
             per_place[short] = per_place.get(short, 0) + n
     top_places = sorted(per_place.items(), key=lambda kv: -kv[1])[:TOP_N]
 
+    # ---------------- A39: Städte ------------------------------------------
+    # Eigenes Feld statt Namens-Textteil: `Location.name` hängt davon ab,
+    # welche Bausteine der Nutzer gewählt hat (`place_name_parts`) — wer
+    # „Stadt" abgewählt hat, hätte hier gar keine. Der Leerstring bedeutet
+    # „nachgesehen, gibt es hier nicht" und zählt darum nicht mit.
+    city_rows = (db.query(Location.city, func.count(Event.id))
+                 .join(Event, Event.location_id == Location.id)
+                 .filter(*mine, Location.city.isnot(None), Location.city != "")
+                 .group_by(Location.city).all())
+    per_city = {c: n for c, n in city_rows}
+    top_cities = sorted(per_city.items(), key=lambda kv: -kv[1])[:TOP_N]
+
     # ---------------- Textregeln: SQL grenzt ein, Python entscheidet ---------
     moves = len(_milestone_matches(db, user_id, _MOVE_WORDS, _MOVE_RE))
     birth = find_birth(db, user_id)
@@ -144,6 +156,7 @@ def compute_overview(db: Session, user_id: str, *, today: datetime | None = None
             "events": total,
             "unconfirmed": unconfirmed,
             "places": len(per_place),
+            "cities": len(per_city),        # A39
             "concerts": per_cat.get("concert", 0),
             "milestones": per_cat.get("milestone", 0),
             "meals": per_cat.get("meal", 0),
@@ -154,6 +167,7 @@ def compute_overview(db: Session, user_id: str, *, today: datetime | None = None
         "per_year": per_year,
         "per_category": sorted(per_cat.items(), key=lambda kv: -kv[1]),
         "top_places": [[name, n] for name, n in top_places],
+        "top_cities": [[name, n] for name, n in top_cities],   # A39
         "top_animals": top_animals,
         **weather,
     }

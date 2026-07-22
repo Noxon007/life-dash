@@ -329,6 +329,20 @@ def _apply_resolved_name(db: Session, loc: Location, user_id: str,
         if (ev.field_overrides or {}).get("title"):
             continue
         ev.title = f"Besuch: {short}"[:255]
+    # A39: Stadt aus denselben addressdetails — trägt Städte-Statistik und
+    # Zeitstrahl-Verdichtung. Nur setzen, wenn etwas da ist: ein bereits
+    # bekannter Wert soll nicht von einem Treffer ohne Stadtfeld gelöscht
+    # werden (Nominatim liefert nicht bei jeder Abfrage alle Bausteine).
+    city = geocode_svc.city_of(hit)
+    if city:
+        loc.city = city
+    elif loc.city is None:
+        # A39: Leerstring = „nachgesehen, hier gibt es keine Stadt" (ein Ort
+        # im Wald hat keine). NULL heißt dagegen „noch nie nachgesehen".
+        # Ohne diese Unterscheidung würde der Rückfüll-Lauf jeden stadtlosen
+        # Ort bei JEDEM Durchgang erneut abfragen — derselbe Dauerläufer, den
+        # F12 mit `weather_rev` abstellen musste.
+        loc.city = ""
     # F4: Land aus den addressdetails mitnehmen -> Länder-Kompendium/-Statistik
     country = (hit.get("address") or {}).get("country")
     if country:
@@ -427,6 +441,13 @@ def _resolve_candidates(db: Session, user_id: str, parts: list[str]) -> list[Loc
     order = {"unnamed": 0, "nonlatin": 1, "verbose": 2}
     scored = [(order[d], l) for l in rows
               if (d := _name_defect(l.name, parts)) is not None]
+    # A39: Orte, deren Name in Ordnung ist, denen aber die Stadt fehlt. Sie
+    # kommen zuletzt — ihr Name stimmt ja, es geht nur um ein Feld, das es vor
+    # 0.34 nicht gab. `city IS NULL` heißt „nie nachgesehen"; der Lauf schreibt
+    # danach entweder die Stadt oder den Leerstring, sodass jeder Ort genau
+    # einmal dafür abgefragt wird.
+    seen = {l.id for _, l in scored}
+    scored += [(3, l) for l in rows if l.city is None and l.id not in seen]
     scored.sort(key=lambda t: t[0])
     return [l for _, l in scored]
 

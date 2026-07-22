@@ -157,6 +157,12 @@ def list_events(
         description="A37: importierte Standort-Besuche einschließen (Default: "
                     "alles). visits=0 lässt sie weg — der Zeitstrahl blendet "
                     "sie standardmäßig aus.")] = None,
+    condense: Annotated[bool, Query(
+        description="A39: importierte Besuche desselben Tages und derselben "
+                    "Stadt zu einem Eintrag zusammenfassen")] = False,
+    city: Annotated[str | None, Query(
+        description="A39: nur Ereignisse in dieser Stadt — löst eine "
+                    "zusammengefasste Gruppe wieder auf")] = None,
 ) -> list[EventRead]:
     """Liste der eigenen Events, optional gefiltert (für Timeline & Karte).
 
@@ -198,6 +204,18 @@ def list_events(
     # nachgeladen für ein paar sichtbare Karten. Also hier filtern.
     if visits is False:
         query = query.filter(Event.source != Source.google_timeline)
+    if city:
+        query = query.filter(Event.location_id.in_(
+            db.query(Location.id).filter(Location.user_id == user.id,
+                                         Location.city == city)))
+    # A39: Verdichtung. Entscheidend ist, dass sie VOR dem Blättern greift —
+    # würde erst die fertige Seite gruppiert, zerschnitte die Seitengrenze eine
+    # Gruppe, und beide Hälften zeigten eine zu kleine Zahl. Deshalb wird die
+    # Menge selbst reduziert: von jeder (Tag, Stadt)-Gruppe bleibt genau ein
+    # Vertreter übrig, und über diese Vertreter wird paginiert.
+    if condense:
+        query = query.filter(Event.id.in_(_visit_group_reps(db, user.id))
+                             | Event.id.notin_(_condensable_visits(db, user.id)))
 
     # A37: Die Sortierung MUSS eindeutig sein, sonst blättert man an
     # Datums-Gleichständen an Einträgen vorbei oder sieht sie doppelt — bei
@@ -212,8 +230,102 @@ def list_events(
         return [event_to_read(e) for e in events]
 
     kids = _child_counts(db, user.id, events)
-    return [event_to_read(e, slim=True, weather=w, child_count=kids.get(e.id))
+    groups = _visit_group_info(db, user.id, events) if condense else {}
+    return [event_to_read(e, slim=True, weather=w, child_count=kids.get(e.id),
+                          group=groups.get(e.id))
             for e, w in zip(events, _weather_for(db, user.id, events))]
+
+
+# --------------------------------------------------------------------------- #
+# A39 — Verdichtung importierter Besuche (Anmerkung 88)
+#
+# Nach einem Timeline-Import hat ein einzelner Tag dutzende Besuche, jeder eine
+# eigene Zeile, jeder bis zur Straße benannt. Zusammengefasst wird nach (Tag,
+# Stadt): der Tag, weil der Zeitstrahl ohnehin nach Tagen gliedert, die Stadt,
+# weil sie seit A39 ein echtes Feld ist und nicht mehr davon abhängt, welche
+# Namensbausteine der Nutzer gewählt hat.
+# --------------------------------------------------------------------------- #
+def _day_parts(col):
+    """Jahr/Monat/Tag eines Zeitstempels — dialektneutral.
+
+    `date(x)` gibt es so nur in SQLite, `x::date` nur in Postgres; `extract`
+    können beide. Der Test-Lauf ist SQLite, die Anlage des Autors Postgres —
+    ein Unterschied, den `test_a37_postgres_dialect.py` schon einmal teuer
+    gemacht hat.
+    """
+    return (func.extract("year", col), func.extract("month", col),
+            func.extract("day", col))
+
+
+def _condensable_base(db: Session, user_id: str):
+    """Die Menge, um die es geht: importierte Besuche mit bekannter Stadt.
+
+    Alles andere bleibt unangetastet — von Hand erfasste Ereignisse werden nie
+    zusammengefasst, auch wenn zwei am selben Tag in derselben Stadt liegen.
+    Sie sind einzeln eingetragen worden, also sind sie einzeln gemeint.
+    """
+    return (db.query(Event)
+            .join(Location, Event.location_id == Location.id)
+            .filter(Event.user_id == user_id,
+                    Event.source == Source.google_timeline,
+                    Event.date_start.isnot(None),
+                    Location.city.isnot(None), Location.city != ""))
+
+
+def _condensable_visits(db: Session, user_id: str):
+    """IDs aller Besuche, die überhaupt zusammengefasst werden können."""
+    return _condensable_base(db, user_id).with_entities(Event.id)
+
+
+def _visit_group_reps(db: Session, user_id: str):
+    """Je (Tag, Stadt) genau eine ID — der Vertreter der Gruppe.
+
+    `min(id)` ist ein willkürlicher, aber stabiler Vertreter. Stabil ist das
+    Entscheidende: derselbe Aufruf muss zweimal dieselbe Zeile liefern, sonst
+    springen beim Blättern Einträge. Dass er nicht unbedingt der zeitlich
+    erste Besuch ist, fällt nicht auf — Zeitspanne und Anzahl der Gruppe kommen
+    aus dem Aggregat, nicht aus dem Vertreter.
+    """
+    y, m, d = _day_parts(Event.date_start)
+    return (_condensable_base(db, user_id)
+            .with_entities(func.min(Event.id))
+            .group_by(y, m, d, Location.city))
+
+
+def _visit_group_info(db: Session, user_id: str,
+                      events: list[Event]) -> dict[str, dict]:
+    """Anzahl und Zeitspanne der Gruppe, die ein Vertreter auf dieser Seite
+    vertritt — eine Abfrage für die ganze Seite, eingegrenzt auf deren
+    Zeitraum, damit nicht über den gesamten Bestand aggregiert wird.
+    """
+    reps = [e for e in events if e.date_start and e.source == Source.google_timeline]
+    if not reps:
+        return {}
+    lo = min(e.date_start for e in reps)
+    hi = max(e.date_start for e in reps)
+    y, m, d = _day_parts(Event.date_start)
+    rows = (_condensable_base(db, user_id)
+            .with_entities(y.label("y"), m.label("m"), d.label("d"),
+                           Location.city.label("city"), func.count(Event.id),
+                           func.min(Event.date_start), func.max(Event.date_start))
+            .filter(Event.date_start >= lo.replace(hour=0, minute=0, second=0),
+                    Event.date_start <= hi.replace(hour=23, minute=59, second=59))
+            .group_by(y, m, d, Location.city).all())
+    by_key = {(int(r[0]), int(r[1]), int(r[2]), r[3]): r for r in rows}
+    out: dict[str, dict] = {}
+    for e in reps:
+        loc = e.location
+        if not loc or not loc.city:
+            continue
+        key = (e.date_start.year, e.date_start.month, e.date_start.day, loc.city)
+        row = by_key.get(key)
+        # Eine Gruppe von genau einem Besuch ist keine Gruppe — dann bleibt es
+        # eine gewöhnliche Karte ohne Chip und ohne Aufklappen.
+        if not row or row[4] < 2:
+            continue
+        out[e.id] = {"city": loc.city, "count": row[4],
+                     "first": row[5], "last": row[6]}
+    return out
 
 
 def _child_counts(db: Session, user_id: str, events: list[Event]) -> dict[str, int]:

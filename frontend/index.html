@@ -429,6 +429,9 @@
      außer Kraft statt stumm wirkungslos. Bewusst anders als `.off` (aus): der
      Nutzer hat ihn nicht ausgeschaltet, die Lage lässt ihn nur nicht zu. */
   .filter-chip.inert { opacity: .45; text-decoration: line-through; cursor: help; }
+  /* A39: zusammengefasste Besuchs-Karte — als Sammeleintrag erkennbar */
+  .event-card.is-group { border-left-style: dashed; }
+  .chip.is-loading { opacity: .5; }
   .section-title { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); margin: 28px 0 14px; font-weight: 600; }
   .hint { background: rgba(91,140,255,.08); border: 1px solid rgba(91,140,255,.3); border-radius: 10px; padding: 12px 16px; font-size: 13px; color: var(--text-dim); margin-bottom: 20px; }
   .hint b { color: var(--accent); }
@@ -1058,6 +1061,7 @@
           <div class="stat-card" data-go="timeline:all"><div class="stat-num" id="stat-events">–</div><div class="stat-label" data-i18n="stat.events">Ereignisse gesamt</div><div class="stat-sub" data-i18n="stat.sub.lifedb" data-i18n="layer.mid.title">Lebensdatenbank</div></div>
           <div class="stat-card" data-go="comp:country" data-req-mod="country"><div class="stat-num" id="stat-countries">–</div><div class="stat-label" data-i18n="stat.countries">Länder besucht</div><div class="stat-sub" data-i18n="stat.sub.collection">Kompendium</div></div>
           <div class="stat-card" data-go="map"><div class="stat-num" id="stat-places">–</div><div class="stat-label" data-i18n="stat.places">Orte besucht</div><div class="stat-sub" data-i18n="stat.sub.located">verortete Events</div></div>
+          <div class="stat-card" data-go="map"><div class="stat-num" id="stat-cities">–</div><div class="stat-label" data-i18n="stat.cities">Städte besucht</div><div class="stat-sub" data-i18n="stat.sub.cities">aus der Ortsauflösung</div></div>
           <div class="stat-card" data-go="comp:animal" data-req-mod="animal"><div class="stat-num" id="stat-animals">–</div><div class="stat-label" data-i18n="stat.animals">Tierarten gesehen</div><div class="stat-sub" data-i18n="stat.sub.collection">Kompendium</div></div>
           <div class="stat-card" data-go="timeline:concert" data-req-mod="artist"><div class="stat-num" id="stat-concerts">–</div><div class="stat-label" data-i18n="stat.concerts">Konzerte besucht</div><div class="stat-sub" data-i18n="stat.sub.catconcert">Kategorie concert</div></div>
           <div class="stat-card" data-go="comp:artist" data-req-mod="artist"><div class="stat-num" id="stat-artists">–</div><div class="stat-label" data-i18n="stat.artists">Künstler live</div><div class="stat-sub" data-i18n="stat.sub.collection">Kompendium</div></div>
@@ -1135,6 +1139,13 @@
           <div class="panel">
             <h3 data-i18n="chart.topplaces">Top-Orte</h3>
             <div id="chart-places"></div>
+          </div>
+          <!-- A39: Städte neben den Orten, nicht statt ihrer. „Kaiserstraße",
+               „Bilker Allee" und „Ratinger Str." sind drei Orte und eine Stadt —
+               beide Zählweisen beantworten verschiedene Fragen. -->
+          <div class="panel" id="panel-cities">
+            <h3 data-i18n="chart.topcities">Meistbesuchte Städte</h3>
+            <div id="chart-cities"></div>
           </div>
           <div class="panel" data-req-mod="animal">
             <h3 data-i18n="chart.topanimals">Meistgesehene Tiere</h3>
@@ -2098,6 +2109,7 @@ const I18N_EN = {
   'stat.events': "Events total",
   'stat.countries': "Countries visited",
   'stat.places': "Places visited",
+  'stat.cities': "Cities visited",
   'stat.animals': "Animal species seen",
   'stat.concerts': "Concerts attended",
   'stat.artists': "Artists seen live",
@@ -2109,6 +2121,7 @@ const I18N_EN = {
   'stat.sub.lifedb': "life database",
   'stat.sub.collection': "collection",
   'stat.sub.located': "events with a place",
+  'stat.sub.cities': "from resolved place names",
   'stat.sub.catconcert': "category concert",
   'stat.sub.milestones': "wedding, birth, moving …",
   'stat.sub.frommilestones': "from milestones",
@@ -2125,6 +2138,10 @@ const I18N_EN = {
   'chart.peryear': "Events per year",
   'chart.categories': "Category distribution",
   'chart.topplaces': "Top places",
+  'chart.topcities': "Most-visited cities",
+  'tl.visits': "visits",
+  'tl.group.tip': "Show the individual visits of this day",
+  'tl.group.fail': "Could not load the individual visits.",
   'chart.topanimals': "Most-seen animals",
   'world.continents': "Continents",
   'world.share': "World explored",
@@ -2926,7 +2943,10 @@ function weatherSummary(e) {
 }
 function eventChips(e) {
   const chips = [];
-  if (e.location && e.location.name) chips.push(`📍 ${e.location.name}`);
+  // A39: Bei einer Sammelkarte gehört der Ort des Vertreters NICHT auf die
+  // Karte — „Kaiserstraße 5" als Ort von zwölf Besuchen quer durch die Stadt
+  // wäre schlicht falsch. Die Stadt steht ohnehin im Titel.
+  if (e.location && e.location.name && !e.group) chips.push(`📍 ${e.location.name}`);
   (e.entities || []).forEach(en => chips.push(`🏷️ ${en.name}`));
   const w = weatherSummary(e);
   if (w) chips.push(`🌤️ ${w}`);
@@ -3024,8 +3044,14 @@ async function loadTimeline(more = false) {
       // bestünde eine Seite nach einem Timeline-Import fast nur aus
       // Ausgeblendetem — gemessen an 12.000 Einträgen: sechs nachgeladene
       // Seiten für eine Handvoll sichtbarer Karten.
+      // A39: Sind die importierten Besuche eingeblendet, kommen sie je Tag und
+      // Stadt zu einem Eintrag zusammengefasst — ein Tag nach einem Timeline-
+      // Import bringt sonst dutzende Zeilen, die alle dasselbe sagen. Der
+      // Server verdichtet VOR dem Blättern, sonst zerschnitte die Seitengrenze
+      // eine Gruppe und beide Hälften zeigten zu kleine Zahlen.
       const page = await fetchEvents({ limit: TL_PAGE, offset: tl.offset,
-                                       visits: tl.showVisits ? 1 : 0 });
+                                       visits: tl.showVisits ? 1 : 0,
+                                       ...(tl.showVisits ? { condense: 1 } : {}) });
       tl.events = more ? tl.events.concat(page) : page;
       tl.offset += page.length;
       tl.done = page.length < TL_PAGE;
@@ -3359,6 +3385,18 @@ function ageChip(e) {
   return `<span class="chip" title="${t('age.tip', 'Dein Alter zu diesem Zeitpunkt')}">🎂 ${
     t('age.at', 'mit')} ${vague ? '~' : ''}${age}</span>`;
 }
+// A39: „5.7.2026 · 08:14–19:30". Die Spanne steht bewusst dort, wo sonst das
+// Datum steht: „12 Besuche" allein wirft die Frage auf, wann eigentlich —
+// beantwortet man sie gleich mit, wird das Aufklappen zur Wahl statt zur
+// Notwendigkeit.
+function groupSpan(g) {
+  if (!g.first) return '';
+  const d = new Date(g.first);
+  const hm = iso => (iso || '').slice(11, 16);
+  const day = d.toLocaleDateString(LANG === 'en' ? 'en-GB' : 'de-DE');
+  const from = hm(g.first), to = hm(g.last);
+  return from && to && from !== to ? `${day} · ${from}–${to}` : day;
+}
 function eventCard(e) {
   EVENT_CACHE[e.id] = e;
   const conf = e.confirmed === 'confirmed';
@@ -3370,17 +3408,23 @@ function eventCard(e) {
   const kids = tl.zoom !== 'day'
     ? (e.child_count != null ? e.child_count : (TL_CHILDREN.get(e.id) || []).length)
     : 0;
+  // A39: Diese Karte vertritt mehrere Besuche desselben Tages in derselben
+  // Stadt. Dann zeigt sie die Stadt statt des Straßennamens eines beliebigen
+  // Einzelbesuchs — der wäre als Titel der Gruppe schlicht falsch.
+  const g = e.group;
+  const title = g ? `${g.city} · ${g.count} ${t('tl.visits', 'Besuche')}` : e.title;
   return `
-    <div class="event-card ${catClass(e.category)}" data-id="${esc(e.id)}" title="Klicken zum Bearbeiten">
+    <div class="event-card ${catClass(e.category)}${g ? ' is-group' : ''}" data-id="${esc(e.id)}" title="Klicken zum Bearbeiten">
       <div class="ev-head">
-        <span class="ev-title">${esc(e.title)}</span>
-        <span class="ev-date">${fmtDate(e)}</span>
+        <span class="ev-title">${g ? '🔁 ' : ''}${esc(title)}</span>
+        <span class="ev-date">${g ? esc(groupSpan(g)) : fmtDate(e)}</span>
       </div>
       <div class="ev-desc">${esc(e.description || '')}</div>
       ${e.note ? `<div class="ev-note md">${mdRender(e.note)}</div>` : ''}
       ${eventPhotos(e)}
       <div class="ev-meta">
         <span class="chip">${catLabel(e.category)}</span>
+        ${g ? `<span class="chip" data-expand-group="${esc(e.id)}" title="${esc(t('tl.group.tip', 'Die einzelnen Besuche dieses Tages zeigen'))}">📍 ${g.count} ${esc(t('tl.visits', 'Besuche'))} ▾</span>` : ''}
         ${e.parent_event_id ? '<span class="chip">📅 Tages-Eintrag</span>' : ''}
         ${kids ? `<span class="chip" data-expand-children="${esc(e.id)}" title="Tages-Einträge ein-/ausklappen">📅 ${kids} Tages-Einträge ▾</span>` : ''}
         ${ageChip(e)}
@@ -3917,6 +3961,7 @@ async function loadStats() {
   num('stat-events', c.events);
   num('stat-countries', countries.length);
   num('stat-places', c.places);
+  num('stat-cities', c.cities ?? 0);      // A39
   num('stat-animals', animals.length);
   num('stat-concerts', c.concerts);
   num('stat-artists', artists.length);
@@ -3962,6 +4007,13 @@ async function loadStats() {
   renderBars('chart-cats', catData.length ? catData : [["—", 0]], cat => tlFilterOnly(cat));
 
   renderBars('chart-places', ov.top_places.length ? ov.top_places : [["—", 0]]);
+  // A39: Solange kein Ort eine Stadt trägt (Bestandsdaten vor dem
+  // Ortsnamen-Lauf), bleibt die Tafel weg statt eine leere Liste zu zeigen —
+  // „keine Städte" wäre hier eine Falschaussage über die Daten.
+  const cities = ov.top_cities || [];
+  const cityPanel = document.getElementById('panel-cities');
+  if (cityPanel) cityPanel.style.display = cities.length ? '' : 'none';
+  if (cities.length) renderBars('chart-cities', cities);
 
   // Meistgesehene Tiere — die Entity-ID kommt mit, der Klick springt ins
   // Kompendium (vorher musste dafür die Kompendium-Liste danebengelegt werden)
@@ -4529,6 +4581,27 @@ document.querySelector('.content').addEventListener('click', ev => {
       .catch(() => render(local));
     return;
   }
+  // A39: Chip „📍 N Besuche" löst eine zusammengefasste Gruppe auf. Die
+  // Einzelbesuche stehen auf keiner geladenen Seite — sie wurden ja im Server
+  // durch den Vertreter ersetzt —, also werden sie gezielt geholt: derselbe
+  // Tag, dieselbe Stadt, ohne Verdichtung.
+  const gtog = ev.target.closest('[data-expand-group]');
+  if (gtog) {
+    const card = gtog.closest('.event-card');
+    const next = card.nextElementSibling;
+    if (next && next.classList.contains('tl-children')) { next.remove(); return; }
+    const e = EVENT_CACHE[gtog.dataset.expandGroup];
+    if (!e || !e.group) return;
+    const day = (e.date_start || '').slice(0, 10);
+    gtog.classList.add('is-loading');
+    fetchEvents({ city: e.group.city, visits: 1,
+                  from: `${day}T00:00:00`, to: `${day}T23:59:59` })
+      .then(rows => card.insertAdjacentHTML('afterend', `<div class="tl-children">${
+        rows.map(r => eventCard(r)).join('')}</div>`))
+      .catch(() => toast(t('tl.group.fail', 'Die einzelnen Besuche konnten nicht geladen werden.'), 'warn'))
+      .finally(() => gtog.classList.remove('is-loading'));
+    return;
+  }
   // F15: Klick auf ein Foto öffnet den Betrachter, NICHT den Bearbeiten-Dialog
   const photo = ev.target.closest('[data-photo]');
   if (photo) {
@@ -4539,6 +4612,14 @@ document.querySelector('.content').addEventListener('click', ev => {
     return;
   }
   const card = ev.target.closest('.event-card');
+  // A39: Eine zusammengefasste Karte gehört keinem einzelnen Ereignis — sie
+  // zu öffnen hieße, einen beliebigen der vertretenen Besuche zu bearbeiten,
+  // ohne dass das jemand merkt. Sie klappt stattdessen auf; bearbeitet wird
+  // dann der Besuch, den man wirklich gemeint hat.
+  if (card && card.classList.contains('is-group')) {
+    card.querySelector('[data-expand-group]')?.click();
+    return;
+  }
   if (card && card.dataset.id) openEventEdit(card.dataset.id);
 });
 document.getElementById('ed-cancel').addEventListener('click', closeEventEdit);

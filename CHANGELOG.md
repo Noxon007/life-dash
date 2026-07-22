@@ -15,6 +15,29 @@ any `MINOR`.
 
 ## [Unreleased]
 
+### Added
+- **Cities are their own thing now.** Until now a city existed only as a piece
+  of text inside a place name — and which pieces a name contains is your
+  setting, so anyone who had switched “City” off had no cities at all. Every
+  place now carries its city as a real field, filled by the existing “resolve
+  place names” run (no new job to start, and each place is asked exactly once —
+  places that genuinely have no city are remembered as such instead of being
+  looked up again forever).
+  - **“Cities visited”** joins the statistics tiles, with a
+    **most-visited cities** chart beside the top places. Three streets in one
+    city are three places and one city — both counts answer real questions, so
+    both are shown.
+  - **The timeline condenses imported visits.** With visits shown, a day after
+    a Google Timeline import was dozens of near-identical lines. They now
+    collapse into one entry per city and day — “Düsseldorf · 12 visits ·
+    08:14–19:30” — which opens to the individual visits on click. Entries you
+    created yourself are never merged, even two on the same day in the same
+    city: they were entered separately, so they are meant separately.
+
+### Changed
+- Place data returned by the API now includes `city`; `GET /api/events` gained
+  `condense` and `city` parameters.
+
 ## [0.33.0] – 2026-07-22
 
 ### Changed

@@ -49,16 +49,27 @@ def test_name_defect_prefers_unnamed_over_others():
 
 def test_candidates_are_deduplicated_and_unnamed_first(db, user):
     """Der Kern von A28: ein Ort mit mehreren Mängeln steht genau EINMAL in
-    der Liste — vorher wurde er pro Scope-Lauf erneut geocodiert."""
+    der Liste — vorher wurde er pro Scope-Lauf erneut geocodiert.
+
+    Angepasst in 0.34 (A39): „fertig" heißt seither Name **und** Stadt. Der
+    Lauf zieht auch Orte nach, deren Name stimmt, denen aber die Stadt fehlt —
+    das Feld gab es vorher nicht. `fine` trägt hier deshalb eine Stadt; ohne
+    sie wäre der Ort zu Recht Kandidat. Dass er dann genau einmal geholt wird
+    und nicht bei jedem Lauf erneut, prüft `test_a39_city.py`.
+    """
     greek_and_long = _loc(db, user, "Οδός Ερμού, Αθήνα, Αττική, Ελλάδα, EU")
     unnamed = _loc(db, user, "Ort (53.4900, 10.0000)")
     fine = _loc(db, user, "Musterstraße 1, Hamburg, Deutschland")
+    fine.city = "Hamburg"
+    greek_and_long.city = "Αθήνα"
+    unnamed.city = ""
+    db.flush()
 
     cands = _resolve_candidates(db, user.id, PARTS)
     ids = [c.id for c in cands]
 
     assert ids.count(greek_and_long.id) == 1     # nicht doppelt
-    assert fine.id not in ids                    # fertige Namen bleiben unangetastet
+    assert fine.id not in ids                    # fertige Orte bleiben unangetastet
     assert ids[0] == unnamed.id                  # „unnamed" zuerst
     assert set(ids) == {unnamed.id, greek_and_long.id}
 

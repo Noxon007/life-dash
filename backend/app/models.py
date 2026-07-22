@@ -140,6 +140,13 @@ class Location(Base):
     lng: Mapped[float | None] = mapped_column(Float, nullable=True)
     # F4: Land aus dem (Reverse-)Geocoding — speist das Länder-Kompendium
     country: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # A39: Stadt aus denselben addressdetails. Bis 0.33 existierte sie nur als
+    # Textbaustein in `name` — und der hängt davon ab, welche Bausteine der
+    # Nutzer gewählt hat (`place_name_parts`), taugt also nicht als Schlüssel.
+    # Als eigenes Feld trägt sie die Städte-Statistik und die Verdichtung des
+    # Zeitstrahls, beide unabhängig vom gewählten Namensformat. Indiziert, weil
+    # genau darüber gruppiert wird.
+    city: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     external_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     events: Mapped[list["Event"]] = relationship(back_populates="location")

@@ -23,7 +23,7 @@ from app.ai.base import ExtractedEvent, ProviderUnavailable
 
 log = logging.getLogger("lifedash.ingestion")
 from app.config import settings
-from app.services.geocode import (geocode, lang_for, parts_for,
+from app.services.geocode import (city_of, geocode, lang_for, parts_for,
                                   reverse_geocode, short_name)
 from app.models import (
     ConfirmState,
@@ -243,7 +243,7 @@ def _location_from_capture(db: Session, fragment: Fragment) -> Location | None:
     ohne Treffer bleibt ein Koordinaten-Name, den „Ortsnamen auflösen" später
     nachzieht)."""
     lat, lng = fragment.capture_lat, fragment.capture_lng
-    name, ltype, country = f"Ort ({lat:.4f}, {lng:.4f})", None, None
+    name, ltype, country, city = f"Ort ({lat:.4f}, {lng:.4f})", None, None, None
     if settings.geocoding_enabled:
         user = db.get(User, fragment.user_id) if fragment.user_id else None
         hit = reverse_geocode(lat, lng, lang_for(user))
@@ -251,6 +251,7 @@ def _location_from_capture(db: Session, fragment: Fragment) -> Location | None:
             name = short_name(hit, parts_for(user)) or name
             ltype = hit.get("type")
             country = (hit.get("address") or {}).get("country")
+            city = city_of(hit)          # A39
     existing = (db.query(Location)
                 .filter(Location.user_id == fragment.user_id,
                         Location.name.ilike(name))
@@ -258,7 +259,7 @@ def _location_from_capture(db: Session, fragment: Fragment) -> Location | None:
     if existing:
         return existing
     location = Location(user_id=fragment.user_id, name=name[:255], lat=lat,
-                        lng=lng, type=ltype, country=country)
+                        lng=lng, type=ltype, country=country, city=city)
     db.add(location)
     db.flush()
     return location
@@ -298,7 +299,7 @@ def _resolve_location(db: Session, ex: ExtractedEvent, user_id: str | None) -> L
 
     country = (geo.get("address") or {}).get("country") if geo else None
     location = Location(user_id=user_id, name=name, lat=lat, lng=lng, type=ltype,
-                        country=country)
+                        country=country, city=city_of(geo))   # A39
     db.add(location)
     db.flush()
     return location
