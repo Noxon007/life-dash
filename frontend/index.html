@@ -2429,7 +2429,7 @@ const I18N_EN = {
   'ims.photos': "photos",
   'ims.shared': "shared album",
   'ims.more': "more",
-  'ims.noyear': "Please pick a year first.",
+  'ims.years.fail': "The year list could not be fetched from Immich ({e}) — the picker shows the last few years. A run still works.",
   'ims.needpreview': "Look at the preview first — then create.",
   'im.test': "🔌 Test connection",
   'im.run': "🖼️ Link photos",
@@ -7098,22 +7098,50 @@ document.getElementById('btn-resolve-run').addEventListener('click', e =>
   startServerJob(e.target, 'resolve_names'));
 
 // Ortsnamen-Format: Bausteine (Straße/Ortsteil/Stadt/Land) pro Nutzer gespeichert
+// Anmerkung 112: Diese Funktion füllt DREI unabhängige Bereiche der
+// Einstellungsseite, und sie lagen alle in EINEM `try` mit einem stummen
+// `catch`. Ein Fehler im ersten — ein Feld, das die Antwort nicht hat, ein
+// Element, das gerade nicht im DOM steht — überspringt lautlos die beiden
+// anderen. So verschwand die Immich-Jahresauswahl, ohne dass irgendwo etwas
+// stand: kein Hinweis im Browser, keine Zeile im Server-Log, weil gar keine
+// Anfrage mehr zustande kam.
+//
+// Jetzt: ein Schritt, ein Schutz — und ein Fehlschlag wird PROTOKOLLIERT
+// statt geschluckt. Dieselbe Bauweise wie `redrawForLang()` (F10), wo dieselbe
+// Überlegung schon einmal aufgeschrieben wurde.
 async function loadPlaceFormat() {
+  const step = (name, fn) => {
+    try { fn(); } catch (err) { console.warn(`Einstellungen (${name}):`, err); }
+  };
+  let s = null;
   try {
-    const s = await api('/api/auth/me/settings');
-    document.querySelectorAll('#fmt-parts [data-part]').forEach(cb =>
-      cb.checked = s.place_name_parts.includes(cb.dataset.part));
+    s = await api('/api/auth/me/settings');
+  } catch (err) {
+    console.warn('Einstellungen konnten nicht geladen werden:', err);
+  }
+  if (s) {
+    step('Ortsnamen-Format', () => {
+      const parts = Array.isArray(s.place_name_parts) ? s.place_name_parts : [];
+      document.querySelectorAll('#fmt-parts [data-part]').forEach(cb =>
+        cb.checked = parts.includes(cb.dataset.part));
+    });
     // A15: Tracking-Auswahl in der Verwaltung
-    const box = document.getElementById('track-settings');
-    box.innerHTML = trackChooserHtml(
-      Array.isArray(s.tracked_modules) ? s.tracked_modules : MODULES.map(m => m.key));
-    box.querySelectorAll('[data-track]').forEach(cb => cb.addEventListener('change', async () => {
-      const keys = [...box.querySelectorAll('[data-track]:checked')].map(c => c.dataset.track);
-      try { await saveTracked(keys); toast(t('toast.tracksaved', '✓ Tracking-Auswahl gespeichert.')); }
-      catch (err) { toast(t('toast.savefail', 'Speichern fehlgeschlagen: ') + err.message, 'error'); loadPlaceFormat(); }
-    }));
-    renderImmichState(s);          // P2.1
-  } catch (_) { /* Standard-Häkchen bleiben */ }
+    step('Tracking-Auswahl', () => {
+      const box = document.getElementById('track-settings');
+      if (!box) return;
+      box.innerHTML = trackChooserHtml(
+        Array.isArray(s.tracked_modules) ? s.tracked_modules : MODULES.map(m => m.key));
+      box.querySelectorAll('[data-track]').forEach(cb => cb.addEventListener('change', async () => {
+        const keys = [...box.querySelectorAll('[data-track]:checked')].map(c => c.dataset.track);
+        try { await saveTracked(keys); toast(t('toast.tracksaved', '✓ Tracking-Auswahl gespeichert.')); }
+        catch (err) { toast(t('toast.savefail', 'Speichern fehlgeschlagen: ') + err.message, 'error'); loadPlaceFormat(); }
+      }));
+    });
+    step('Immich', () => renderImmichState(s));   // P2.1
+  }
+  // Läuft auch ohne Einstellungen: die Jahresauswahl von Stufe 2 hängt an
+  // keiner Antwort, und die Kartenquelle liegt ohnehin nur lokal.
+  step('Immich-Jahre', imsDefaultYears);
   loadTileSettings();
 }
 
@@ -7233,9 +7261,32 @@ document.getElementById('im-reset').addEventListener('click', async () => {
 // eine zwanzig Jahre alte Bibliothek füllt sonst eine Warteschlange, die für
 // Dutzende gebaut ist — und niemand hätte es vorher wissen können.
 let imsPreviewedYear = null;
+// Das Auswahlfeld hat IMMER etwas anzubieten — auch ohne Server, ohne Immich
+// und ohne dass vorher irgendetwas anderes geklappt hat.
+//
+// Anmerkung 112: Die Jahresliste kam ausschließlich vom Server, und der Aufruf
+// hing an `loadPlaceFormat()`, dessen ganzer Rumpf in einem `catch (_) {}`
+// steckt. Ein Fehler IRGENDWO davor — ein fehlendes Feld in den Einstellungen,
+// ein nicht erreichbares Immich — ließ das Feld leer zurück. Der Knopf sagte
+// dann „bitte zuerst ein Jahr wählen" über einer Liste ohne Jahre, schickte
+// nichts los, und im Server-Log stand folgerichtig nichts: eine Sackgasse aus
+// lauter verschluckten Fehlern.
+//
+// Die Jahre aus Immich sind eine EMPFEHLUNG (welches Jahr lohnt sich?), keine
+// Voraussetzung. Also stehen sie hier zuerst ohne Server da.
+function imsDefaultYears() {
+  const sel = document.getElementById('ims-year');
+  if (!sel || sel.options.length) return;
+  const now = new Date().getFullYear();
+  sel.innerHTML = Array.from({ length: 6 }, (_, i) => now - i)
+    .map(y => `<option value="${y}">${y}</option>`).join('');
+  sel.value = String(now);
+}
+
 async function loadImmichYears() {
   const sel = document.getElementById('ims-year');
   if (!sel) return;
+  imsDefaultYears();
   try {
     const r = await api('/api/immich/years');
     // Die Fotozahl steht dabei: „2004 · 412 Fotos" macht aus einer Jahresliste
@@ -7247,7 +7298,22 @@ async function loadImmichYears() {
     }).join('');
     const has = (r.years || []).some(y => y.year === r.current);
     if (has) sel.value = String(r.current);
-  } catch (_) { /* kein Immich eingerichtet — die Zeile bleibt leer */ }
+    imsNote('');
+  } catch (err) {
+    // Nicht mehr verschlucken: Die Auswahl steht (Standardjahre), aber der
+    // Nutzer soll wissen, dass die Empfehlung fehlt — sonst wundert er sich,
+    // warum keine Fotozahlen dabeistehen.
+    imsDefaultYears();
+    imsNote(t('ims.years.fail', 'Die Jahresliste konnte nicht aus Immich geholt werden ({e}) — die Auswahl zeigt die letzten Jahre. Ein Lauf geht trotzdem.')
+      .replace('{e}', err.message));
+  }
+}
+function imsNote(text) {
+  const box = document.getElementById('ims-result');
+  if (!box || !text) { if (box && box.dataset.note) { box.style.display = 'none'; delete box.dataset.note; } return; }
+  box.style.display = '';
+  box.dataset.note = '1';
+  box.textContent = '⚠️ ' + text;
 }
 function imsLock() {
   // Jahr gewechselt = die Vorschau gilt nicht mehr. Ein Knopf, der nach dem
@@ -7261,14 +7327,21 @@ function imsLock() {
 }
 document.getElementById('ims-year')?.addEventListener('change', imsLock);
 document.getElementById('ims-preview')?.addEventListener('click', async ev => {
-  const btn = ev.target, year = document.getElementById('ims-year').value;
-  if (!year) { toast(t('ims.noyear', 'Bitte zuerst ein Jahr wählen.'), 'warn'); return; }
+  const btn = ev.target, sel = document.getElementById('ims-year');
+  // Sollte die Liste je leer sein, ist das ein Fehler DIESER Seite und keine
+  // Aufgabe für den Nutzer: „bitte zuerst ein Jahr wählen" über einem leeren
+  // Feld ist eine Sackgasse (Anmerkung 112). Also auffüllen und weitermachen.
+  if (!sel.options.length) imsDefaultYears();
+  const year = sel.value || String(new Date().getFullYear());
   btn.disabled = true; btn.textContent = t('ims.busy', '🔍 sehe nach …');
   const box = document.getElementById('ims-result');
   try {
     const r = await api(`/api/immich/preview?year=${year}`, { method: 'POST' });
     imsPreviewedYear = r.year;
     box.style.display = '';
+    // Der Kasten trägt sonst noch die Marke des Jahres-Hinweises — und ein
+    // späteres `imsNote('')` würde dann das Vorschau-Ergebnis ausblenden.
+    delete box.dataset.note;
     if (!r.total) {
       box.innerHTML = `<b>${esc(String(r.year))}: ${esc(t('ims.none', 'nichts Neues vorzuschlagen.'))}</b><br>`
         + esc(t('ims.none.why', 'Entweder gibt es keine eigenen Fotos mit Koordinaten in diesem Jahr, oder alles wurde schon vorgeschlagen — auch abgelehnte Vorschläge kommen nicht wieder.'));

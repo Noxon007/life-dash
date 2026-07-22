@@ -53,6 +53,14 @@ const dom = new JSDOM(html, {
       else if (/\/api\/immich\/preview/.test(path)) body = preview;
       else if (/\/api\/jobs\/start/.test(path)) body = { id: 'j1', type: 'immich_source', status: 'running', done: 0, started_at: '2026-07-22T10:00:00', updated_at: '2026-07-22T10:00:00' };
       else if (/\/api\/jobs/.test(path)) body = [];
+      // Der ECHTE Startweg — ohne ihn kommt die Seite nie bis zu der Zeile,
+      // die die Jahre lädt (Anmerkung 112).
+      else if (/auth\/config/.test(path)) body = { mode: 'dev' };
+      else if (/auth\/me\/settings/.test(path)) body = { immich: { url: 'http://immich.local', has_key: true }, tracked_modules: null, place_name_parts: ['road', 'city', 'country'] };
+      else if (/auth\/me$/.test(path)) body = { id: 'u1', display_name: 'T', role: 'admin' };
+      else if (/\/api\/modules/.test(path)) body = [];
+      else if (/\/health/.test(path)) body = { version: '0.38.0', display_version: '0.38.0-dev', channel: 'dev' };
+      else if (/events\/index/.test(path)) body = { total: 0, dated: 0, undated: 0, unconfirmed: 0, fuzzy: 0, years: [] };
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body) });
     };
   },
@@ -78,8 +86,14 @@ setTimeout(async () => {
   ok('Der Anlegen-Knopf ist von Anfang an gesperrt', run.disabled,
      'ein Klick ohne Vorschau legt hunderte Vorschläge an');
 
-  await w.loadImmichYears();
-  await wait(20);
+  // Anmerkung 112: Hier stand `await w.loadImmichYears()` — der Wächter hat
+  // sich die Jahre SELBST geholt und damit genau den Schritt übersprungen, an
+  // dem es im Betrieb scheiterte. Er war grün, während der Knopf beim Nutzer
+  // nichts tat. Also den Weg gehen, den ein Mensch geht: Verwaltung öffnen,
+  // Reiter „Meine Daten" — den Rest muss die Seite selbst tun.
+  w.gotoView('admin');
+  w.showAdminTab('daten');
+  await wait(120);
   ok('Die Jahresauswahl kommt vom Server', sel.options.length === 3,
      `${sel.options.length} Einträge`);
   ok('Das laufende Jahr ist vorgewählt', sel.value === '2024', sel.value);
@@ -148,7 +162,71 @@ setTimeout(async () => {
   ok('…und räumt die alte Vorschau weg', box.style.display === 'none',
      'die Zahlen von 2024 stünden unter dem Jahr 2022');
 
+  // --- 5. Und wenn davor etwas schiefgeht? ------------------------------- //
+  // Anmerkung 112: Genau hier lag der gemeldete Fehler. Die Jahresliste kam
+  // nur vom Server, und ihr Aufruf hing hinter einem stummen `catch`. Ging
+  // irgendetwas davor schief — ein fehlendes Feld in den Einstellungen, ein
+  // nicht erreichbares Immich —, blieb das Auswahlfeld leer, der Knopf sagte
+  // „bitte zuerst ein Jahr wählen" über einer leeren Liste und schickte
+  // NICHTS los. Im Server-Log stand folgerichtig nichts.
+  //
+  // Die Jahre aus Immich sind eine Empfehlung, keine Voraussetzung: der Lauf
+  // muss auch dann möglich sein, wenn sie fehlen.
+  for (const [name, broken] of [['Jahresabruf scheitert', 'years'],
+                                ['Einstellungen unvollständig', 'settings']]) {
+    const sub = await scenario(broken);
+    const sw = sub.window, sd = sw.document;
+    sw.gotoView('admin');
+    sw.showAdminTab('daten');
+    await wait(140);
+    const ssel = sd.getElementById('ims-year');
+    ok(`${name}: das Auswahlfeld hat trotzdem Jahre`, ssel.options.length > 0,
+       'leeres Feld = Sackgasse, genau der gemeldete Fehler');
+    sub.calls.length = 0;
+    sd.getElementById('ims-preview').dispatchEvent(new sw.MouseEvent('click', { bubbles: true }));
+    await wait(60);
+    ok(`${name}: die Vorschau geht trotzdem raus`,
+       sub.calls.some(([m, p]) => m === 'POST' && /immich\/preview\?year=\d{4}/.test(p)),
+       `Anfragen: ${JSON.stringify(sub.calls)}`);
+    sw.close();
+  }
+
   console.log(fail ? `\nP2.1/2: ${fail} Prüfung(en) fehlgeschlagen`
                    : '\nP2.1/2: alles grün');
   process.exit(fail ? 1 : 0);
 }, 80);
+
+// Eine zweite Seite mit gezielt kaputter Vorgeschichte.
+function scenario(broken) {
+  const calls = [];
+  const dom2 = new JSDOM(html, {
+    runScripts: 'dangerously', pretendToBeVisual: true, url: 'http://localhost:8000/',
+    beforeParse(w) {
+      w.matchMedia = () => ({ matches: false, addEventListener() {}, addListener() {} });
+      w.L = new Proxy(function () { return w.L; }, { get: () => w.L, apply: () => w.L });
+      w.fetch = (u, o) => {
+        const p = String(u);
+        calls.push([(o && o.method) || 'GET', p]);
+        let body = [], ok2 = true, status = 200;
+        if (/immich\/years/.test(p)) {
+          if (broken === 'years') { ok2 = false; status = 502; body = { detail: 'Immich nicht erreichbar' }; }
+          else body = { current: 2024, source: 'immich', years: [{ year: 2024, photos: 61 }] };
+        } else if (/immich\/preview/.test(p)) body = { year: 2024, total: 0, days: 0, albums: 0, photos: 0, shared: 0, proposals: [] };
+        else if (/auth\/config/.test(p)) body = { mode: 'dev' };
+        else if (/auth\/me\/settings/.test(p)) {
+          // `place_name_parts` fehlt: der ursprüngliche Auslöser — ein
+          // TypeError vor `renderImmichState`, verschluckt vom catch.
+          body = broken === 'settings'
+            ? { immich: { url: 'http://immich.local', has_key: true } }
+            : { immich: { url: 'http://immich.local', has_key: true }, tracked_modules: null, place_name_parts: ['city'] };
+        } else if (/auth\/me$/.test(p)) body = { id: 'u1', display_name: 'T', role: 'admin' };
+        else if (/\/api\/modules/.test(p)) body = [];
+        else if (/\/health/.test(p)) body = { version: '0.38.0', display_version: '0.38.0-dev', channel: 'dev' };
+        else if (/events\/index/.test(p)) body = { total: 0, dated: 0, undated: 0, unconfirmed: 0, fuzzy: 0, years: [] };
+        return Promise.resolve({ ok: ok2, status, json: () => Promise.resolve(body) });
+      };
+    },
+  });
+  dom2.calls = calls;
+  return new Promise(r => setTimeout(() => r(dom2), 80));
+}

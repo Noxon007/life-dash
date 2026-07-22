@@ -18,6 +18,13 @@ any `MINOR`.
 ## [0.38.0] – 2026-07-22
 
 ### Fixed
+- **The Immich preview button could do nothing at all.** The year picker was
+  filled only from the server, and that call sat behind a chain of swallowed
+  errors — so if anything went wrong beforehand, the picker stayed empty and
+  the button refused with “please pick a year first” over a list with no years,
+  without sending anything. The picker now fills itself with the last few years
+  before any server is involved: the years from Immich are a recommendation, not
+  a precondition. If that lookup fails it now says so instead of leaving a blank.
 - **Photos from late in the evening were filed on the wrong day.** Immich
   reports two timestamps — one in UTC, one in the photographer's local time —
   and Life-Dash read the wrong one, then dropped the timezone. In central
