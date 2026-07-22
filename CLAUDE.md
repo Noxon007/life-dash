@@ -142,6 +142,24 @@ Schwelle** (Anm. 103): die Wettermetriken zählten Einträge, wo überall „Tag
 stand — A31/Anm. 64 hatte in dieser Datei überlebt. Frage bei jeder
 Invarianten-Reparatur: *wo gilt derselbe Satz noch?*
 
+**Immich-Durchsicht (Anmerkung 111, in 0.38.0) — zwei Nähte, zwei Defekte,
+404 Tests haben keinen bemerkt.** **(a)** `asset_time` las `fileCreatedAt`
+(laut Spec **UTC**) und schnitt die Zone ab statt sie anzuwenden → ein Foto vom
+13.5. 01:30 Berlin landete auf dem **12.** Nicht eine Stunde daneben, ein TAG —
+und am Tag hängen der F18-Behälter und der Platz eines Vorschlags. Immich
+liefert `localDateTime` genau dafür („timezone-agnostic … grouping by local
+days"). **Regel: bietet eine API zwei Zeitstempel, beantwortet einer eine
+andere Frage — und „Zone abschneiden" ist nie „in Ortszeit umrechnen".**
+**(b)** Stufe 1 kannte nur `google_timeline` als maschinelle Quelle und hängte
+den Fotovorschlägen aus Stufe 2 deren eigene Bilder an — gegen Anm. 107 Fall 6.
+**Das ist Anmerkung 106 in genau dem Code, der sie zitiert:** dieselbe Regel
+stand zweimal wörtlich da, und die zweite maschinelle Quelle brachte sie zum
+Auseinanderlaufen. Jetzt EINE Liste `MACHINE_SOURCES`, die `candidates()` und
+`day_candidates()` beide lesen. **Gewohnheit daraus: bekommt ein Paket eine
+zweite Stufe, die ältere Hälfte mit den Regeln der neueren lesen** — beide
+Befunde saßen dort, wo die Annahme des einen Teils auf die des anderen trifft,
+und genau dort greift kein Test von selbst.
+
 **Feedback-Runde 0.38.0 (Anmerkung 110) — zwei teure Befunde, beide Stille.**
 **(a)** Der Bild-Endpunkt hielt seine DB-Verbindung, während er bei Immich auf
 das Foto wartete (15 s Zeitlimit). Hinter HTTP/2 feuert der Browser dutzende

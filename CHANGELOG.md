@@ -18,6 +18,23 @@ any `MINOR`.
 ## [0.38.0] – 2026-07-22
 
 ### Fixed
+- **Photos from late in the evening were filed on the wrong day.** Immich
+  reports two timestamps — one in UTC, one in the photographer's local time —
+  and Life-Dash read the wrong one, then dropped the timezone. In central
+  Europe that moved every photo taken after about 22:00 to the previous day,
+  and the day is what a photo hangs on. Found while reviewing the connector
+  against Immich's own API description, which says plainly which field is
+  meant for grouping by local days.
+- **A photo proposal no longer takes possession of its own photos.** The two
+  halves of the Immich connector disagreed: the newer half creates unconfirmed
+  proposals out of a day's pictures, the older half saw an ordinary entry and
+  attached those very pictures to it — so rejecting a proposal had something to
+  undo, which it was never supposed to have. Pictures now stay with the **day**
+  until you confirm; they are visible right there either way. Existing links
+  are released on the next photo run.
+- **A day's twelve pictures are now spread across the day.** Immich answers
+  newest first, so a holiday with 300 photos showed the last twelve — the
+  evening, and nothing of the day.
 - **Scrolling fast through the timeline no longer breaks the whole app.** With
   many photos on screen, image requests could occupy every database connection
   at once — and then *nothing* worked any more, including the timeline itself,

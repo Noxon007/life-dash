@@ -371,7 +371,7 @@ def _run_immich(db: Session, job: Job) -> tuple[str, str]:
 
     from app.services import immich as immich_api
     from app.services.immich_link import (candidates, day_candidates,
-                                          detach_visit_links, link_target,
+                                          detach_machine_links, link_target,
                                           linked_asset_ids, targets)
 
     user = db.get(User, job.user_id)
@@ -384,7 +384,7 @@ def _run_immich(db: Session, job: Job) -> tuple[str, str]:
     # Anmerkung 106: Bestehende Verweise an importierten Besuchen lösen, bevor
     # `seen` gefüllt wird — sonst gälten genau die Fotos, um die es geht, als
     # bereits vergeben, und die Korrektur erreichte die Bestandsdaten nie.
-    detach_visit_links(db, user.id)
+    detach_machine_links(db, user.id)
 
     todo = targets(db, user.id)
     n_events = sum(1 for kind, _ in todo if kind == "event")

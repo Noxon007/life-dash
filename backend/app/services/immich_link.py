@@ -21,6 +21,12 @@ PROVIDER = "immich"
 # Höchstens so viele Fotos je Ziel verknüpfen. Ein Urlaubstag kann 300
 # Bilder haben — die gehören in Immich, nicht als Kachelwand in den Zeitstrahl.
 MAX_PER_EVENT = 12
+# Von einer MASCHINE erzeugte Einträge (Anmerkung 111). Sie bekommen ihre Fotos
+# über den Tag, nicht direkt — der eine Satz, aus dem `candidates` und
+# `day_candidates` beide folgen. Vorher stand `google_timeline` an beiden
+# Stellen einzeln, und als Stufe 2 eine zweite maschinelle Quelle hinzufügte,
+# stimmten die beiden Listen nicht mehr überein.
+MACHINE_SOURCES = (Source.google_timeline, Source.immich)
 
 
 def candidates(db: Session, user_id: str) -> list[Event]:
@@ -36,10 +42,20 @@ def candidates(db: Session, user_id: str) -> list[Event]:
     Woche Urlaub die ersten zwölf Bilder am Reise-Eintrag und nichts an den
     einzelnen Tagen — die Beschwerde, die zu dieser Regel führte.
 
-    **Importierte Besuche sind hier NICHT dabei** (Anmerkung 106): sie bekommen
-    ihre Fotos über den TAG, siehe `day_candidates`. Ein Besuch ist „ich war um
-    14:00 in der Kaiserstraße", und ein Foto von 20:00 gehört nicht dorthin,
-    nur weil dieser Besuch zufällig als erster geprüft wurde.
+    **Maschinell erzeugte Einträge sind hier NICHT dabei** (Anmerkung 106,
+    erweitert in 111): sie bekommen ihre Fotos über den TAG, siehe
+    `day_candidates`. Das sind zwei Quellen:
+
+    * `google_timeline` — ein Besuch ist „ich war um 14:00 in der
+      Kaiserstraße", und ein Foto von 20:00 gehört nicht dorthin, nur weil
+      dieser Besuch zufällig als erster geprüft wurde.
+    * `immich` — die Fotovorschläge aus Stufe 2 (P2.1). Sie sind aus denselben
+      Fotos ENTSTANDEN; ihnen die Bilder anzuhängen hieße, dass ein Vorschlag
+      seinen eigenen Anlass besitzt, bevor ein Mensch ihn bestätigt hat.
+
+    Der gemeinsame Nenner ist nicht „importiert", sondern **von einer Maschine
+    gemacht**. Was ein Mensch selbst erfasst hat, ist eine Aussage über den Tag
+    und bekommt seine Fotos direkt; alles andere sammelt der Tag ein.
     """
     from sqlalchemy.orm import selectinload
 
@@ -49,7 +65,7 @@ def candidates(db: Session, user_id: str) -> list[Event]:
     rows = (db.query(Event)
             .options(selectinload(Event.children), selectinload(Event.media))
             .filter(Event.user_id == user_id, Event.date_start.isnot(None),
-                    Event.source != Source.google_timeline)
+                    Event.source.notin_(MACHINE_SOURCES))
             .all())
     return [e for e in rows
             if api.window_for(e) is not None
@@ -72,16 +88,23 @@ def candidates(db: Session, user_id: str) -> list[Event]:
 # Kalendertag von `captured_at`. Er war nur nie an Immich angeschlossen.
 # --------------------------------------------------------------------------- #
 def day_candidates(db: Session, user_id: str) -> list[date]:
-    """Tage mit importierten Besuchen, an denen noch keine Immich-Fotos hängen.
+    """Tage mit maschinell erzeugten Einträgen, an denen noch keine Fotos hängen.
 
     Bewusst nur solche Tage: Tage ohne jeden Eintrag sind nicht Teil der
     Lebensdatenbank, und Fotos an sie zu hängen hieße, die halbe Immich-
     Bibliothek zu importieren.
+
+    Anmerkung 111: Neben den importierten Besuchen zählen jetzt auch die Tage
+    der **Fotovorschläge** aus Stufe 2 — und zwar aus einem greifbaren Grund:
+    ein Vorschlag „34 Fotos in Detmold" für ein Jahr ohne Timeline-Daten hätte
+    sonst überhaupt kein Bild neben sich, und der Nutzer soll ihn ja gerade
+    ANHAND der Fotos beurteilen. Die Bilder hängen am Tag, nicht am Vorschlag —
+    lehnt er ab, ist nichts rückgängig zu machen.
     """
     y, m, d = day_parts(Event.date_start)
     days = (db.query(y, m, d)
             .filter(Event.user_id == user_id,
-                    Event.source == Source.google_timeline,
+                    Event.source.in_(MACHINE_SOURCES),
                     Event.date_start.isnot(None))
             .group_by(y, m, d).all())
     ym, mm, dm = day_parts(MediaRef.captured_at)
@@ -94,6 +117,26 @@ def day_candidates(db: Session, user_id: str) -> list[date]:
     have = {(int(a), int(b), int(c)) for a, b, c in done}
     return sorted(date(int(a), int(b), int(c)) for a, b, c in days
                   if (int(a), int(b), int(c)) not in have)
+
+
+def _spread_over_day(assets: list[dict], seen: set[str]) -> list[dict]:
+    """Die zwölf Bilder GLEICHMÄSSIG über den Tag greifen, nicht vorne abschneiden.
+
+    Anmerkung 111: Immich liefert neueste zuerst. Ein Urlaubstag mit 300 Fotos
+    bekam damit die zwölf **spätesten** — also den Abend, und vom Tag nichts.
+    Chronologisch sortieren und gleichmäßig greifen zeigt stattdessen den
+    Verlauf. Dieselbe Überlegung wie bei der Fotoleiste im Zeitstrahl
+    (Anmerkung 110), hier auf der Serverseite.
+
+    Deterministisch, nicht zufällig: derselbe Tag soll bei einem zweiten Lauf
+    nicht plötzlich andere Bilder tragen.
+    """
+    usable = [a for a in assets if a.get("id") not in seen]
+    usable.sort(key=lambda a: (api.asset_time(a) or datetime.max, a.get("id") or ""))
+    if len(usable) <= MAX_PER_EVENT:
+        return usable
+    step = len(usable) / MAX_PER_EVENT
+    return [usable[int(i * step)] for i in range(MAX_PER_EVENT)]
 
 
 def link_day(db: Session, user, day: date, url: str, key: str,
@@ -109,11 +152,9 @@ def link_day(db: Session, user, day: date, url: str, key: str,
     start = datetime(day.year, day.month, day.day)
     end = start.replace(hour=23, minute=59, second=59, microsecond=999999)
     added = 0
-    for asset in api.search_assets(url, key, start, end):
+    for asset in _spread_over_day(api.search_assets(url, key, start, end), seen):
         if added >= MAX_PER_EVENT:
             break
-        if asset["id"] in seen:
-            continue
         when = api.asset_time(asset)
         if when is None:          # ohne Zeit kein Tag — der Behälter ist das Datum
             continue
@@ -130,28 +171,34 @@ def link_day(db: Session, user, day: date, url: str, key: str,
     return added
 
 
-def detach_visit_links(db: Session, user_id: str) -> int:
-    """Löst Immich-Verweise von importierten Besuchen (Anmerkung 106).
+def detach_machine_links(db: Session, user_id: str) -> int:
+    """Löst Immich-Verweise von maschinell erzeugten Einträgen (Anm. 106/111).
 
     Einmalig wirksam, danach ein Nulldurchlauf. Erlaubt, weil Verweise eine
     Ableitung sind (Anmerkung 57) — die Bilder liegen in Immich. Ohne das
-    behielten alle bereits verknüpften Fotos ihren willkürlichen Besuch, und
-    der neue Lauf fände sie über `seen` als „schon vergeben": die Korrektur
-    käme nie bei den Bestandsdaten an.
+    behielten bereits verknüpfte Fotos ihr altes Ziel, und der neue Lauf fände
+    sie über `seen` als „schon vergeben": die Korrektur käme nie bei den
+    Bestandsdaten an. Genau diese Falle beschreibt Anmerkung 106, und sie gilt
+    für die zweite maschinelle Quelle unverändert — Instanzen, die 0.37
+    gefahren haben, tragen Fotos an Fotovorschlägen.
     """
     ids = [r[0] for r in
            db.query(MediaRef.id)
            .join(Event, Event.id == MediaRef.event_id)
            .filter(MediaRef.user_id == user_id, MediaRef.provider == PROVIDER,
-                   Event.source == Source.google_timeline).all()]
+                   Event.source.in_(MACHINE_SOURCES)).all()]
     if not ids:
         return 0
     (db.query(MediaRef).filter(MediaRef.id.in_(ids))
      .delete(synchronize_session=False))
     db.commit()
-    log.info("Immich: %d Verknüpfungen von importierten Besuchen gelöst — "
+    log.info("Immich: %d Verknüpfungen von maschinellen Einträgen gelöst — "
              "sie werden an den Tag gehängt (user=%s)", len(ids), user_id)
     return len(ids)
+
+
+# Alter Name, damit nichts still bricht, was ihn noch ruft.
+detach_visit_links = detach_machine_links
 
 
 def linked_asset_ids(db: Session, user_id: str) -> set[str]:

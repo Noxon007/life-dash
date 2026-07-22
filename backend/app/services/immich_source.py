@@ -31,7 +31,7 @@ from __future__ import annotations
 import json
 import logging
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime
 
 from sqlalchemy.orm import Session
@@ -93,7 +93,6 @@ class Proposal:
     shared: bool = False          # aus einem GETEILTEN Album (Fall 7c)
     lat: float | None = None
     lng: float | None = None
-    asset_ids: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict:
         return {
@@ -216,7 +215,6 @@ def cluster_assets(assets: list[dict], my_id: str | None) -> list[Proposal]:
             photos=len(group),
             lat=round(sum(g[0] for g in geos) / len(geos), 6) if geos else None,
             lng=round(sum(g[1] for g in geos) / len(geos), 6) if geos else None,
-            asset_ids=[a["id"] for a in group],
         ))
     return out
 
@@ -263,7 +261,6 @@ def album_proposal(album: dict, assets: list[dict], *, shared: bool) -> Proposal
         photos=len(assets), shared=shared,
         lat=round(sum(g[0] for g in geos) / len(geos), 6) if geos else None,
         lng=round(sum(g[1] for g in geos) / len(geos), 6) if geos else None,
-        asset_ids=[a["id"] for a in assets],
     )
 
 

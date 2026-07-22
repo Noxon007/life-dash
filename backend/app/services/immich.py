@@ -344,11 +344,59 @@ def albums(url: str, key: str, *, owned: bool | None = None) -> list[dict]:
 # Zuordnung Asset -> Ereignis
 # --------------------------------------------------------------------------- #
 def asset_time(asset: dict) -> datetime | None:
-    raw = (asset.get("exifInfo") or {}).get("dateTimeOriginal") or asset.get("fileCreatedAt")
+    """Aufnahmezeit als **Ortszeit des Fotografen** — naiv, wie A13 sie speichert.
+
+    Die Reihenfolge ist keine Geschmacksfrage, sondern steht so in der
+    Spezifikation:
+
+    * `localDateTime` — „the local date and time when the photo was taken …
+      **timezone-agnostic** … used for timeline grouping by *local* days". Also
+      genau das, was Life-Dash braucht, und von Immich schon fertig gerechnet.
+    * `exifInfo.dateTimeOriginal` — trägt in der Regel den ursprünglichen
+      Versatz; ohne Zone gelesen ergibt das ebenfalls Ortszeit.
+    * `fileCreatedAt` — laut Spezifikation **UTC**. Nur als letzter Ausweg, und
+      dann umgerechnet: die Zone einfach abzuschneiden ergäbe UTC-Wanduhrzeit.
+
+    Genau das tat diese Funktion bis 0.38: sie schnitt bei jedem Format die
+    Zone ab. Ein Foto vom 13. Mai, 01:30 Uhr in Berlin kommt als
+    `2024-05-12T23:30:00Z` an und landete damit auf dem **12.** — in Mitteleuropa
+    betrifft das jedes Foto der späten Abendstunden, und es verschiebt nicht nur
+    die Uhrzeit, sondern den TAG. Am Tag hängen aber der Behälter (F18/Anm. 106)
+    und der Platz eines Vorschlags (`immich:day:<datum>:<ort>`).
+    """
+    local = asset.get("localDateTime")
+    if local:
+        parsed = _parse_stamp(local)
+        if parsed is not None:
+            # Bewusst ohne Umrechnung: das Feld IST schon Ortszeit, ein
+            # angehängtes „Z" ist bei einer zonenlosen Angabe Dekoration.
+            return parsed.replace(tzinfo=None)
+
+    exif_raw = (asset.get("exifInfo") or {}).get("dateTimeOriginal")
+    if exif_raw:
+        parsed = _parse_stamp(exif_raw)
+        if parsed is not None:
+            return parsed.replace(tzinfo=None)
+
+    raw = asset.get("fileCreatedAt")
     if not raw:
         return None
+    parsed = _parse_stamp(raw)
+    if parsed is None:
+        return None
+    if parsed.tzinfo is not None:
+        # Echte UTC-Angabe -> in die Zone dieses Servers holen, sonst wandern
+        # die Abendfotos einen Tag zurück.
+        try:
+            return parsed.astimezone().replace(tzinfo=None)
+        except (OSError, OverflowError, ValueError):
+            return parsed.replace(tzinfo=None)
+    return parsed
+
+
+def _parse_stamp(raw) -> datetime | None:
     try:
-        return datetime.fromisoformat(str(raw).replace("Z", "+00:00")).replace(tzinfo=None)
+        return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
     except ValueError:
         return None
 
