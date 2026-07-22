@@ -2597,6 +2597,7 @@ const I18N_EN = {
   'jr.sug.skipped': "{n} unconfirmed skipped",
   'jr.sug.none': "Nothing is recorded for this day that could be summarised.",
   'jr.sug.none.unconfirmed': "This day has only unconfirmed events ({n}). Confirm them first — a journal does not turn guesses into memories.",
+  'jr.sug.none.model': "The AI returned no text for this day — your provider may not be able to. The day's events are there; feel free to write it yourself.",
   'toast.jrtaken': "Taken over — not saved yet. Check it and press Save.",
   'pr.title': "🖨️ Print",
   'pr.hint': "Pick the date range — what gets printed is a dedicated light page with every event in it, grouped by day. Collapsed groups and “show more” play no role. Your browser’s print dialog can also save the result as a PDF.",
@@ -3761,10 +3762,18 @@ function jrShowSuggestion(res) {
   if (!jrSuggestion) {
     box.style.display = 'none';
     // Kein Text ist ein ERGEBNIS und muss begründet werden — sonst sieht ein
-    // Knopf, der nichts tut, aus wie ein Knopf, der kaputt ist.
-    toast(res && res.skipped_unconfirmed
-      ? t('jr.sug.none.unconfirmed', 'Für diesen Tag gibt es nur unbestätigte Ereignisse ({n}). Bestätige sie zuerst — aus Vermutungen macht das Tagebuch keine Erinnerung.').replace('{n}', res.skipped_unconfirmed)
-      : t('jr.sug.none', 'Für diesen Tag ist nichts erfasst, das sich zusammenfassen ließe.'), 'warn', 8000);
+    // Knopf, der nichts tut, aus wie ein Knopf, der kaputt ist. Und der Grund
+    // muss der RICHTIGE sein: „für diesen Tag ist nichts erfasst" zu melden,
+    // während der Tag voller Ereignisse steckt und nur das Modell nichts
+    // geliefert hat, schickt den Nutzer in die falsche Richtung.
+    let why;
+    if (res && res.used_events)
+      why = t('jr.sug.none.model', 'Die KI hat zu diesem Tag keinen Text geliefert — der Anbieter kann das vielleicht nicht. Die Ereignisse des Tages sind da; schreib gern selbst.');
+    else if (res && res.skipped_unconfirmed)
+      why = t('jr.sug.none.unconfirmed', 'Für diesen Tag gibt es nur unbestätigte Ereignisse ({n}). Bestätige sie zuerst — aus Vermutungen macht das Tagebuch keine Erinnerung.').replace('{n}', res.skipped_unconfirmed);
+    else
+      why = t('jr.sug.none', 'Für diesen Tag ist nichts erfasst, das sich zusammenfassen ließe.');
+    toast(why, 'warn', 9000);
     return;
   }
   box.style.display = '';
@@ -4710,7 +4719,11 @@ document.getElementById('mf-geo-btn').addEventListener('click', async ev => {
 //  3. Jeder Eintrag hat eine `client_id`. Bricht die Leitung NACH dem
 //     Speichern und VOR der Antwort ab, erkennt der Server die Wiederholung.
 const OUTBOX_KEY = 'lifedash.outbox';
-let outboxFlushing = false;
+// Nicht nur ein Riegel, sondern der laufende Vorgang selbst: wer während eines
+// Sendelaufs `flushOutbox()` ruft, soll auf DIESEN warten können. Ein bloßes
+// `if (busy) return;` gäbe ein sofort erfülltes Versprechen zurück — und
+// `await flushOutbox(); location.reload()` lüde mitten im Senden neu.
+let outboxFlush = null;
 
 function outboxRead() {
   try { return JSON.parse(localStorage.getItem(OUTBOX_KEY) || '[]'); }
@@ -4763,7 +4776,7 @@ function renderOutbox() {
     ? t('ob.state.failed', '{n} abgelehnt — bitte ansehen').replace('{n}', failed)
     : (navigator.onLine ? t('ob.state.online', 'Verbindung da — wird gesendet')
                         : t('ob.state.offline', 'Kein Netz — Senden sobald wieder Verbindung besteht'));
-  document.getElementById('outbox-send').disabled = !navigator.onLine || outboxFlushing;
+  document.getElementById('outbox-send').disabled = !navigator.onLine || !!outboxFlush;
 
   document.getElementById('outbox-list').innerHTML = items.map(x => `
     <div class="ob-item${x.error ? ' failed' : ''}">
@@ -4784,12 +4797,15 @@ function fmtDateTime(iso) {
 // Sendet die Warteschlange der Reihe nach. Beim ersten NETZ-Fehler wird
 // abgebrochen — die Reihenfolge der Erfassung bleibt so erhalten, und ein
 // totes Netz muss nicht für jeden Eintrag einzeln bewiesen werden.
-async function flushOutbox(manual = false) {
-  if (outboxFlushing) return;
+function flushOutbox(manual = false) {
+  // Läuft schon einer: DIESEN zurückgeben, nicht ein leeres Versprechen.
+  if (outboxFlush) return outboxFlush;
   const items = outboxRead().filter(x => !x.error);
-  if (!items.length) { renderOutbox(); return; }
-  if (!navigator.onLine) { renderOutbox(); return; }
-  outboxFlushing = true;
+  if (!items.length || !navigator.onLine) { renderOutbox(); return Promise.resolve(); }
+  outboxFlush = _flushOutbox(items, manual).finally(() => { outboxFlush = null; });
+  return outboxFlush;
+}
+async function _flushOutbox(items, manual) {
   renderOutbox();
   let sent = 0;
   try {
@@ -4818,7 +4834,6 @@ async function flushOutbox(manual = false) {
       }
     }
   } finally {
-    outboxFlushing = false;
     renderOutbox();
   }
   if (sent) {

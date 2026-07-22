@@ -1,6 +1,7 @@
 """Ingestion-Endpoints: Roh-Text rein -> Stufe-2-Vorschau raus."""
 from __future__ import annotations
 
+import threading
 import time
 from collections import OrderedDict
 
@@ -39,20 +40,31 @@ router = APIRouter(prefix="/api/ingest", tags=["Ingestion"])
 _SEEN_TTL_S = 1800.0
 _seen: "OrderedDict[tuple[str, str], tuple[float, str]]" = OrderedDict()
 _SEEN_MAX = 500
+# Sync-Endpoints laufen bei FastAPI in einem Threadpool, dieses Gedächtnis ist
+# also von mehreren Threads aus erreichbar. Ohne Schloss konnten zwei Threads
+# beide „ist abgelaufen" feststellen und beide `popitem` rufen — der zweite auf
+# ein inzwischen leeres Dict, also `KeyError` und **HTTP 500 auf genau dem
+# Endpunkt, an dem die Warteschlange hängt**. Und ein 500 ist eine ANTWORT: die
+# Warteschlange stempelt den Eintrag nach ihrer eigenen Regel als abgelehnt ab
+# und versucht ihn nie wieder. Ein Wettlauf von Mikrosekunden hätte eine
+# Erfassung dauerhaft aufs Abstellgleis geschoben.
+_seen_lock = threading.Lock()
 
 
 def _seen_get(user_id: str, client_id: str) -> str | None:
     now = time.monotonic()
-    while _seen and next(iter(_seen.values()))[0] < now - _SEEN_TTL_S:
-        _seen.popitem(last=False)
-    hit = _seen.get((user_id, client_id))
+    with _seen_lock:
+        while _seen and next(iter(_seen.values()))[0] < now - _SEEN_TTL_S:
+            _seen.popitem(last=False)
+        hit = _seen.get((user_id, client_id))
     return hit[1] if hit else None
 
 
 def _seen_put(user_id: str, client_id: str, fragment_id: str) -> None:
-    _seen[(user_id, client_id)] = (time.monotonic(), fragment_id)
-    while len(_seen) > _SEEN_MAX:
-        _seen.popitem(last=False)
+    with _seen_lock:
+        _seen[(user_id, client_id)] = (time.monotonic(), fragment_id)
+        while len(_seen) > _SEEN_MAX:
+            _seen.popitem(last=False)
 
 
 @router.post("", response_model=IngestResult)

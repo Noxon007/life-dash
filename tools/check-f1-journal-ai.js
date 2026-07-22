@@ -98,9 +98,21 @@ setTimeout(async () => {
   await wait(40);
   ok('Ohne Material bleibt der Kasten zu', box.style.display === 'none');
   ok('…und der Grund wird gesagt',
-     /unbestätigt|unconfirmed|nichts erfasst|nothing is recorded/i
-       .test(d.getElementById('toast-wrap').textContent),
+     /unbestätigt|unconfirmed/i.test(d.getElementById('toast-wrap').textContent),
      `Meldungen: "${d.getElementById('toast-wrap').textContent}"`);
+
+  // --- 4b. Kein Text TROTZ Ereignissen ist ein ANDERER Grund ------------- //
+  // Sonst meldet die App „für diesen Tag ist nichts erfasst", während der Tag
+  // voll ist und nur das Modell nichts geliefert hat — und schickt den Nutzer
+  // damit in die falsche Richtung.
+  d.getElementById('toast-wrap').innerHTML = '';
+  suggestion = { day: '2026-07-13', text: null, used_events: 4, skipped_unconfirmed: 0 };
+  d.getElementById('jr-suggest').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await wait(40);
+  const said = d.getElementById('toast-wrap').textContent;
+  ok('Liefert die KI nichts, wird DAS gesagt — nicht „nichts erfasst"',
+     /KI|AI/.test(said) && !/nichts erfasst|nothing is recorded/i.test(said),
+     `Meldung: "${said}"`);
 
   // --- 5. Ein Vorschlag gehört zu EINEM Tag ------------------------------ //
   suggestion = { day: '2026-07-14', text: 'Ein Vorschlag für den 14.',

@@ -188,6 +188,115 @@ def test_day_photos_count_as_material(db, user):
     assert any("Foto" in line for line in lines)
 
 
+def test_vague_dates_stay_out_of_a_day_draft(db, user):
+    """Selbstkontrolle-Befund: „Sommer 2002" steht mit `date_start=2002-06-01`
+    in der Datenbank. Ohne Präzisions-Filter landete die Reise im Vorschlag für
+    den **1. Juni**, und das Modell schriebe daraus einen Ich-Satz über genau
+    diesen Tag. F14 hat dieselbe Regel schon einmal aufgeschrieben
+    (`_ON_THIS_DAY_PRECISIONS`) — sie galt hier genauso und fehlte."""
+    from app.services.journal import day_material
+
+    db.add(Event(user_id=user.id, title="Reise nach Frankreich", category="trip",
+                 date_start=datetime(2002, 6, 1), date_end=datetime(2002, 8, 31),
+                 date_precision=DatePrecision.season, source=Source.ai,
+                 confirmed=ConfirmState.confirmed))
+    db.commit()
+
+    lines, used, skipped = day_material(db, user.id, date(2002, 6, 1))
+    assert lines == [] and used == 0
+    # Und nicht etwa als „übergangen, weil unbestätigt" gezählt — es ist
+    # bestätigt, es gehört nur nicht an diesen Tag.
+    assert skipped == 0
+
+
+def test_a_day_precise_event_still_counts(db, user):
+    """Die Gegenprobe zum Filter: `day` muss drin bleiben. Ein Filter, der zu
+    viel wegnimmt, ist von einem fehlenden Filter nicht zu unterscheiden."""
+    from app.services.journal import day_material
+
+    db.add(Event(user_id=user.id, title="Ganztags unterwegs", category="trip",
+                 date_start=datetime(DAY.year, DAY.month, DAY.day),
+                 date_end=datetime(DAY.year, DAY.month, DAY.day),
+                 date_precision=DatePrecision.day, source=Source.manual,
+                 confirmed=ConfirmState.confirmed))
+    db.commit()
+
+    lines, used, _ = day_material(db, user.id, DAY)
+    assert used == 1 and "Ganztags unterwegs" in lines[0]
+    # Ohne Uhrzeit: bei Tagesgenauigkeit wäre „00:00" eine erfundene Angabe.
+    assert "00:00" not in lines[0]
+
+
+def test_seen_memory_survives_parallel_captures(db, user, monkeypatch):
+    """Selbstkontrolle-Befund: die Verfalls-Schleife lief ohne Schloss. Zwei
+    Threads konnten beide „abgelaufen" sehen und beide `popitem` rufen — der
+    zweite auf ein leeres Dict, also KeyError und HTTP 500. Ein 500 ist eine
+    ANTWORT, und die Warteschlange stempelt den Eintrag danach als abgelehnt
+    ab: ein Wettlauf von Mikrosekunden hätte eine Erfassung endgültig
+    aufs Abstellgleis geschoben.
+
+    Die Verschränkung wird ERZWUNGEN und nicht erhofft: acht Threads im
+    Kreis laufen zu lassen bestand auch ohne Schloss, weil das Fenster nur
+    wenige Bytecodes breit ist. Ein Test, der den Fehler nicht auslösen kann,
+    ist grün und wertlos — dieselbe Falle wie bei `check-a41-cities.js`.
+    """
+    import threading
+    from collections import OrderedDict
+
+    # Die Nutzer-ID VOR den Threads herausziehen: eine SQLAlchemy-Session ist
+    # selbst nicht threadsicher, und ein Zugriff auf `user.id` aus zwei Threads
+    # brächte diesen Test zum Scheitern, ohne dass er je das Gedächtnis
+    # erreicht hätte — rot, aber mit einer anderen Aussage.
+    uid = user.id
+
+    a_inside, b_done = threading.Event(), threading.Event()
+    state = {"first": True}
+    guard = threading.Lock()
+
+    class RacyDict(OrderedDict):
+        """Hält den ERSTEN `popitem`-Aufruf an, bis der zweite Thread durch ist.
+        Genau so sieht die Lücke zwischen `while _seen` und `popitem()` aus."""
+
+        def popitem(self, last=True):
+            with guard:
+                mine, state["first"] = state["first"], False
+            if mine:
+                a_inside.set()
+                b_done.wait(0.4)      # mit Schloss läuft der Timeout ab: kein Wettlauf
+            return super().popitem(last=last)
+
+    racy = RacyDict()
+    racy[("u", "abgelaufen")] = (0.0, "irgendwas")   # Zeitstempel 0 = längst fällig
+    monkeypatch.setattr(ingest_router, "_seen", racy)
+
+    errors: list[Exception] = []
+
+    def thread_a():
+        try:
+            ingest_router._seen_get(uid, "a")
+        except Exception as err:      # noqa: BLE001 — genau das ist der Befund
+            errors.append(err)
+
+    def thread_b():
+        a_inside.wait(2)
+        try:
+            ingest_router._seen_get(uid, "b")
+        except Exception as err:      # noqa: BLE001
+            errors.append(err)
+        finally:
+            b_done.set()
+
+    threads = [threading.Thread(target=thread_a), threading.Thread(target=thread_b)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(5)
+
+    assert not errors, (
+        f"Gedächtnis nicht threadsicher: {errors[0]!r} — ein 500 auf /api/ingest, "
+        "und die Warteschlange stempelt die Erfassung als abgelehnt ab")
+
+
 def test_other_users_day_stays_invisible(db, user):
     """A12: in JEDER Abfrage."""
     other = _second_user(db)

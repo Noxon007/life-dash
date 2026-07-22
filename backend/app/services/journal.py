@@ -29,6 +29,17 @@ from app.models import (ConfirmState, DatePrecision, Event, EventEntityLink,
 # Kategorien, die im Tagebuch nichts zu suchen haben: der Eintrag selbst.
 _SKIP_CATEGORIES = {"journal"}
 
+# Nur `exact` und `day` dürfen in einen TAGES-Text. Dieselbe Regel und dieselbe
+# Begründung wie bei F14 („An diesem Tag", `_ON_THIS_DAY_PRECISIONS`): bei
+# gröberer Datierung ist der Tag unbekannt. „Sommer 2002" steht mit
+# `date_start = 2002-06-01` in der Datenbank — ohne diese Einschränkung stünde
+# die Reise nach Frankreich im Tagebuch-Vorschlag für den 1. Juni, und das
+# Sprachmodell schriebe daraus einen Satz in der Ich-Form über *diesen* Tag.
+# Genauigkeit nicht zu überzeichnen ist die Grundregel des Projekts (Kap. 3.1),
+# und ein erfundener Tagebuchsatz ist die teuerste Art, sie zu brechen: er
+# klingt wie eine Erinnerung.
+_DAY_PRECISIONS = (DatePrecision.exact, DatePrecision.day)
+
 
 def _category_labels() -> dict[str, str]:
     """A7: die Beschriftungen stehen in den Modul-YAMLs, nicht hier."""
@@ -72,6 +83,7 @@ def day_material(db: Session, user_id: str, day: date) -> tuple[list[str], int, 
               .filter(Event.user_id == user_id,
                       Event.date_start.isnot(None),
                       Event.date_start >= start, Event.date_start <= end,
+                      Event.date_precision.in_(_DAY_PRECISIONS),
                       Event.category.notin_(_SKIP_CATEGORIES))
               .order_by(Event.date_start.asc(), Event.id.asc())
               .all())
@@ -137,4 +149,8 @@ def suggest(db: Session, user_id: str, day: date) -> tuple[str | None, int, int]
     lines, used, unconfirmed = day_material(db, user_id, day)
     if not lines:
         return None, 0, unconfirmed
-    return get_provider().summarize_day(day, lines), used, unconfirmed
+    text = get_provider().summarize_day(day, lines)
+    # Ein Modell, das Leerzeichen zurückgibt, meint dasselbe wie eines, das
+    # nichts kann. Beides hier auf None ziehen, damit die Oberfläche EINE
+    # Bedingung prüft — und `used_events` ihr sagt, welcher Grund gilt.
+    return (text.strip() or None) if text else None, used, unconfirmed

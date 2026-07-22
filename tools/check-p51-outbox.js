@@ -228,6 +228,25 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
      && net.posts[0].raw_text === 'Erster' && net.posts[1].raw_text === 'Zweiter',
      JSON.stringify(net.posts.map(p => p.raw_text)));
 
+  // --- 5b. Zwei Auslöser auf einmal ------------------------------------- //
+  // Beim „online"-Ereignis feuern zwei Stellen: der allgemeine Zuhörer und
+  // (nach einem Offline-Start) der, der danach neu lädt. Ein blosses
+  // `if (busy) return;` gäbe dem zweiten ein SOFORT erfülltes Versprechen —
+  // `await flushOutbox(); location.reload()` lüde dann mitten im Senden neu.
+  w.localStorage.setItem('lifedash.outbox', JSON.stringify([
+    { id: 'z1', raw_text: 'Nur einmal', at: new Date().toISOString() },
+  ]));
+  net.posts.length = 0;
+  const first = w.flushOutbox();
+  const second = w.flushOutbox();          // parallel, während der erste läuft
+  await second;                            // muss auf den LAUFENDEN warten
+  ok('Ein zweiter Aufruf wartet auf den laufenden Sendelauf',
+     outbox().length === 0,
+     'kehrte sofort zurück — ein Neuladen danach träfe mitten ins Senden');
+  await first;
+  ok('…und sendet nichts doppelt', net.posts.length === 1,
+     `${net.posts.length} Sendungen für einen Eintrag`);
+
   dom.window.close();
 
   // --- 6. Teilen aus einer anderen App ----------------------------------- //

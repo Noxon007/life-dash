@@ -163,8 +163,24 @@ Tagebuchfeld, „Übernehmen" hängt an (überschreibt nie), der Endpunkt ist ei
 GET und speichert nichts — so gilt die Zusage aus 0.15.0 unverändert.
 Unbestätigte fließen nicht ein, werden aber GEZÄHLT und genannt; der
 Tagebuch-Eintrag ist aus seinem eigenen Material ausgeschlossen, sonst frisst
-sich der Text selbst. Wächter: `tools/check-p51-outbox.js` (stellt `onLine`
-und Netzfehler HER) und `tools/check-f1-journal-ai.js`.
+sich der Text selbst. **Nur `exact`/`day` fließen in einen Tagestext** —
+„Sommer 2002" steht mit `date_start=2002-06-01` da und stünde sonst im
+Vorschlag für den 1. Juni (dieselbe Regel wie F14 `_ON_THIS_DAY_PRECISIONS`).
+Wächter: `tools/check-p51-outbox.js` (stellt `onLine`, Netzfehler und vollen
+Speicher HER) und `tools/check-f1-journal-ai.js`.
+
+**Selbstkontrolle 0.36.0 — vier Befunde, drei davon dieselbe Frage.** „Wo gilt
+derselbe Satz noch?" (Anm. 103) fand: unscharfe Daten im Tagestext (F14-Regel),
+die falsche Begründung, wenn die KI nichts liefert (nicht „nichts erfasst"),
+und `_seen` ohne Schloss (KeyError → 500 → die Warteschlange stempelt die
+Erfassung als abgelehnt ab). Der vierte kam vom Lesen eines Kommentars GEGEN
+seinen Code: `await flushOutbox()` wartete nicht. **Und zwei der Tests dazu
+waren im ersten Anlauf wertlos** — der Thread-Test bestand auch ohne Schloss
+(das Fenster ist Bytecodes breit, „acht Threads im Kreis" trifft es nie), der
+Sprach-Test prüfte die Rückrichtung (jsdom meldet `en-US`, die App startet
+englisch). **Neue Regel: jede Prüfung, die einen Fehler festnageln soll, einmal
+gegen den kaputten Stand laufen lassen** — `git show HEAD:datei > /tmp/alt` und
+den Wächter darauf ansetzen.
 
 **Immich hängt Tages-Fotos an den TAG (Anmerkung 106, in 0.35.0).** Vorher ging
 ein Foto an den ersten Besuch, dessen ±6-h-Fenster es traf — bei `exact`-Präzision
