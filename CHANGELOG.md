@@ -70,6 +70,12 @@ any `MINOR`.
   builds `X.Y.Z`, `X.Y` and `latest`. `GET /health` now also reports which
   commit an image was built from — with a development track, the version
   number alone no longer answers “what is running here?”.
+- **A test build now says so.** When the app is not running the published
+  version — a development image from the main branch, or one you built
+  yourself — the version in the sidebar reads `v0.32.0-dev` in amber instead
+  of pretending to be the release, and its tooltip names the branch and commit
+  it came from. `GET /health` gained `channel` (`release` or `dev`) alongside
+  the unchanged `version` field.
 - `docker-compose.yml` no longer defaults to a version from thirteen releases
   ago when no `.env` is present; it falls back to `latest`. Pinning a version
   in `.env` remains the recommendation for anything holding real data.

@@ -119,6 +119,9 @@
     line-height: 1.6;
   }
   .sidebar-foot a { color: var(--accent); text-decoration: none; }
+  /* Anmerkung 90: Testgleis-Stand sichtbar, aber nicht laut — ein Hinweis,
+     keine Warnung; das :main-Image ist ein normaler Betriebszustand. */
+  #foot-version.is-dev { color: var(--warn); font-weight: 600; }
   /* ---------- Main ---------- */
   .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
   .topbar {
@@ -2232,6 +2235,7 @@ const I18N_EN = {
   'login.btn': "🔐 Sign in (SSO)",
   'loading.ai': "🤖 AI is analysing…",
   'logout': "Sign out",
+  'ver.local': "Local build (not from CI)",
   'field.time.tip': "Time (optional)",
   'btn.addobj': "+ Item",
   'layer.in.text': "Immutable fragments (text, voice, import). An evidence archive — never overwritten, never deleted automatically.",
@@ -6051,7 +6055,18 @@ document.getElementById('logout-link').addEventListener('click', async ev => {
   try {
     const h = await api("/health");
     clearBanner();
-    if (h.version) document.getElementById('foot-version').textContent = `v${h.version}`;
+    // Anmerkung 86/90: Auf dem :main-Gleis steht „v0.32.0-dev" statt einer
+    // Version, die es so noch nicht gibt; der Tooltip nennt Branch und Commit,
+    // damit „welcher Stand läuft hier?" ohne /health beantwortbar ist.
+    const fv = document.getElementById('foot-version');
+    if (fv && h.version) {
+      fv.textContent = `v${h.display_version || h.version}`;
+      fv.classList.toggle('is-dev', h.channel === 'dev');
+      const b = h.build || {};
+      fv.title = b.ref || b.sha
+        ? `${b.ref || '?'} @ ${b.sha || '?'}`
+        : t('ver.local', 'Lokaler Stand (kein CI-Build)');
+    }
     const chip = document.getElementById('ki-provider');
     if (chip) chip.textContent = ` ${h.ai_provider}`;
     // A30: Platzhalter zeigen, solange die erste (potenziell große) Antwort

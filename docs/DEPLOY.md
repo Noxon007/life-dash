@@ -69,13 +69,22 @@ docker compose build && docker compose up -d      # build on the server itself
 **Which build am I running?** `GET /health` answers it:
 
 ```json
-{ "status": "ok", "version": "0.32.0", "build": { "ref": "main", "sha": "8411eb4" } }
+{ "status": "ok", "version": "0.32.0", "channel": "dev",
+  "display_version": "0.32.0-dev", "build": { "ref": "main", "sha": "8411eb4" } }
 ```
 
-`version` is what the code *claims* to be — the number in `app/version.py`.
-`build` is where the image actually came from, and appears only for images
-built by CI. On a `:main` image the two disagree on purpose: the version is
-the last one published, the build is what you are testing.
+`version` is what the code *claims* to be — the number in `app/version.py`,
+kept as plain SemVer so scripts can compare it. `channel` says whether this
+build was made from the matching `vX.Y.Z` tag (`release`) or from anything
+else (`dev`): the main branch, a different tag, or a local build with no CI
+metadata at all. `display_version` is the same answer as a string for people,
+and it is what the app shows in the sidebar — **`v0.32.0-dev`, in amber, when
+you are on the testing track**. `build` is where the image actually came from
+and appears only for CI images; the app shows it in the tooltip of the version.
+
+So the sidebar alone now answers “am I looking at the published version or at
+what I pushed this afternoon?” — which the version number could not do on its
+own once a second track existed.
 
 **Publishing a new version** (versioning scheme: [CHANGELOG.md](../CHANGELOG.md)):
 commit, update the CHANGELOG and `app/version.py`, `git tag v0.32.1` (fix) or

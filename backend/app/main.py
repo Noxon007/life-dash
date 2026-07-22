@@ -31,7 +31,7 @@ from app.routers import (
     world,
 )
 from app.seed import seed_demo
-from app.version import APP_VERSION
+from app.version import APP_VERSION, display_version, release_channel
 
 # Zentrales Logging (A9): ein Format für alle lifedash.*-Logger, Level per
 # LOG_LEVEL steuerbar. uvicorn behält seine eigenen Handler (Access-Log).
@@ -132,7 +132,12 @@ app.include_router(admin.router)
 def health() -> dict:
     out = {
         "status": "ok",
+        # `version` bleibt reines SemVer (Skripte, Vergleiche); ob das der
+        # veröffentlichte Stand ist, sagt `channel`, und `display_version`
+        # ist die Zeichenkette für Menschen („0.32.0-dev").
         "version": APP_VERSION,
+        "channel": release_channel(),
+        "display_version": display_version(),
         "ai_provider": settings.ai_provider,
         "auth_mode": settings.auth_mode,
         "database": settings.database_url.split("://")[0],
