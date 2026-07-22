@@ -15,6 +15,51 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.35.0] – 2026-07-22
+
+### Added
+- **Cities open into a page of their own.** A city was the one entry in the
+  collection that led *out* of it: clicking it jumped straight into a filtered
+  timeline, while every animal and country opens a page. Now a city does too —
+  a short description from Wikipedia, a map of the places you have been to
+  there, the most recent entries, and how many there are in total. The timeline
+  is still one button away, which is the right place for “all 342 of them”.
+  - Descriptions are looked up **with the country**, so “Frankfurt” is the one
+    on the Main and “Springfield” is a real town rather than a list of them.
+  - A city that genuinely has no article is remembered as such and not asked
+    about again every time you open it. After a month it is tried once more —
+    an article can come into existence.
+- **Badges no longer stop at platinum.** Platinum was the end of the road, and
+  a database that covers a whole life reaches any fixed end eventually. Beyond
+  it a badge keeps counting toward a next mark — “1,240 · next mark 2,500” — so
+  the number never stops saying something. Where a collection genuinely *can*
+  be finished — seven continents, the countries of the world — platinum stays
+  the end, because there it is the truth.
+
+### Changed
+- **Wikipedia descriptions follow the app language.** They were always fetched
+  from the German Wikipedia, so an English interface showed a German paragraph.
+  Existing descriptions are refreshed the next time you open them after
+  switching language.
+- Weather badge thresholds were raised. “Frozen once” was never an achievement,
+  and the numbers were set in the days when entries were typed by hand.
+- The collection now offers `GET /api/cities/detail` and
+  `POST /api/cities/describe`; achievements carry `beyond_top` and
+  `marks_passed` beside the existing tier fields.
+
+### Fixed
+- **Weather badges counted entries, not days.** “Days with at least 10 hours of
+  sunshine” counted every *visit* on such a day, so after a Google Timeline
+  import a single sunny day could count thirty times — and collected sunshine
+  hours were multiplied by the number of entries per day. This is the same
+  mistake the weather statistics had to shed in 0.27.0; it had survived in the
+  badges, which is why they arrived nearly complete after an import. The
+  descriptions said “days” all along; now the counting does too.
+- **The Cities tab was invisible.** It existed in the page but was written by
+  hand next to a list that the app rebuilds from the modules as soon as they
+  load — which happens a moment after every start. The tab was therefore gone
+  in every real session, and the statistics tile pointing at it led nowhere.
+
 ## [0.34.0] – 2026-07-22
 
 ### Added

@@ -1200,8 +1200,11 @@
           <div class="zoom-btn" data-type="game" data-i18n="module.game.tab">🎮 Spiele</div>
           <div class="zoom-btn" data-type="book" data-i18n="module.book.tab">📖 Bücher</div>
           <!-- A41: Städte stehen hier, Orte nicht (Anmerkung 95) — ein
-               Kompendium setzt eine Menge mit Horizont voraus. -->
-          <div class="zoom-btn" data-type="city" data-i18n="module.city.tab">🏙️ Städte</div>
+               Kompendium setzt eine Menge mit Horizont voraus. Der Reiter wird
+               von rebuildCompTabs() angehängt und steht deshalb NICHT hier:
+               diese Leiste wird beim Laden der Module komplett ersetzt, und
+               ein zweiter Ort für denselben Reiter hieß bis 0.34, dass er
+               genau so lange existierte, bis jemand hinsah (A42). -->
         </div>
         <div class="grid cols-4" id="compendium-grid"></div>
         <div id="compendium-detail" style="display:none"></div>
@@ -1237,7 +1240,7 @@
         <div class="grid cols-4" style="margin-bottom:20px">
           <div class="stat-card"><div class="stat-num" id="ach-earned">–</div><div class="stat-label" data-i18n="ach.earned">Erfolge erreicht</div><div class="stat-sub" id="ach-earned-sub" data-i18n="of.dash">von –</div></div>
           <div class="stat-card"><div class="stat-num" id="ach-points">–</div><div class="stat-label" data-i18n="ach.points">Punkte</div><div class="stat-sub" data-i18n="ach.points.sub">Bronze 1 · Silber 2 · Gold 3 · Platin 4</div></div>
-          <div class="stat-card"><div class="stat-num" id="ach-platin">–</div><div class="stat-label" data-i18n="ach.platinum">Platin</div><div class="stat-sub" data-i18n="ach.platinum.sub">voll ausgereizt</div></div>
+          <div class="stat-card"><div class="stat-num" id="ach-platin">–</div><div class="stat-label" data-i18n="ach.platinum">Platin</div><div class="stat-sub" data-i18n="ach.platinum.sub">höchste Stufe — zählt weiter</div></div>
           <div class="stat-card"><div class="stat-num" id="ach-close">–</div><div class="stat-label" data-i18n="ach.close">Kurz davor</div><div class="stat-sub" data-i18n="ach.close.sub">über 75 % zur nächsten Stufe</div></div>
         </div>
         <div id="ach-list"></div>
@@ -2203,8 +2206,12 @@ const I18N_EN = {
   'ach.platinum': "Platinum",
   'ach.close': "Almost there",
   'ach.points.sub': "Bronze 1 · Silver 2 · Gold 3 · Platinum 4",
-  'ach.platinum.sub': "maxed out",
+  'ach.platinum.sub': "top tier — keeps counting",
   'ach.close.sub': "over 75 % toward the next tier",
+  // F19: above platinum the goal is a generated mark, not a tier
+  'ach.togo': "Another", 'ach.until': "to", 'ach.untilmark': "to the next mark",
+  'ach.done': "Top tier reached", 'ach.marks': "marks",
+  'ach.marks.title': "Marks passed above platinum",
   'world.of7': "of 7",
 
   // --- Eingabe & Verwaltung ---
@@ -2562,6 +2569,12 @@ const I18N_EN = {
   'module.game.tab': "🎮 Games",
   'module.book.tab': "📖 Books",
   'module.city.tab': "🏙️ Cities",   // A41
+  'module.city.tab.plain': "Cities",  // A42: Emoji steht im Code davor
+  'comp.city.place': "place", 'comp.city.places': "places",
+  'comp.city.timeline': "In the timeline",
+  'comp.city.gone': "This city is no longer among your places.",
+  'comp.city.more.a': "Another", 'comp.city.more.b': "entries — see the timeline.",
+  'back': "back", 'loading': "loading…",
 };
 
 function langSetting() {
@@ -2855,12 +2868,20 @@ function applyModules() {
 function rebuildCompTabs() {
   const tabs = document.getElementById('comp-tabs');
   const mods = MODULES.filter(m => m.compendium && moduleTracked(m.key));
+  // A42: Der Städte-Reiter (A41) steht im HTML, gehört aber zu keinem Modul —
+  // und diese Funktion ersetzt den ganzen Inhalt der Leiste, sobald die Module
+  // geladen sind. Er verschwand damit Sekundenbruchteile nach dem Start, also
+  // immer. Er wird jetzt hier angehängt statt dort geschrieben: eine Leiste,
+  // eine Quelle.
+  const cityTab = `<div class="zoom-btn ${mods.length ? '' : 'active'}" data-type="city">🏙️ ${
+    esc(t('module.city.tab.plain', 'Städte'))}</div>`;
   if (!mods.length) {
-    tabs.innerHTML = '<div class="hint">Keine Sammel-Module gewählt — unter Verwaltung → Meine Daten auswählen.</div>';
-    return;
+    tabs.innerHTML = cityTab;
+  } else {
+    tabs.innerHTML = mods.map((m, i) =>
+      `<div class="zoom-btn ${i === 0 ? 'active' : ''}" data-type="${esc(m.key)}">${m.emoji || ''} ${esc(t('module.' + m.key, m.label))}</div>`).join('')
+      + cityTab;
   }
-  tabs.innerHTML = mods.map((m, i) =>
-    `<div class="zoom-btn ${i === 0 ? 'active' : ''}" data-type="${esc(m.key)}">${m.emoji || ''} ${esc(t('module.' + m.key, m.label))}</div>`).join('');
   tabs.querySelectorAll('.zoom-btn').forEach(tab => tab.addEventListener('click', () => {
     tabs.querySelectorAll('.zoom-btn').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
@@ -3909,7 +3930,91 @@ async function loadCities() {
     </div>`;
   }).join('');
   grid.querySelectorAll('.comp-card').forEach(card =>
-    card.addEventListener('click', () => tlFilterCity(card.dataset.city)));
+    card.addEventListener('click', () => openCityDetail(card.dataset.city)));
+}
+
+// A42: Die Stadt als Sammlungs-EINTRAG. Bis 0.34 sprang der Klick in den
+// gefilterten Zeitstrahl — die Sammlung war damit der einzige Reiter, dessen
+// Kacheln aus ihm hinausführten statt hinein. Jetzt öffnet sich eine Seite wie
+// bei Tieren und Ländern (Beschreibung, Karte, Ereignisse); der Zeitstrahl
+// bleibt als Knopf erhalten, denn für „alle 342 Besuche" ist er der richtige
+// Ort und diese Seite zeigt bewusst nur die jüngsten.
+async function openCityDetail(name) {
+  const grid = document.getElementById('compendium-grid');
+  const detail = document.getElementById('compendium-detail');
+  grid.style.display = 'none';
+  detail.style.display = '';
+  detail.innerHTML = `<div class="hint">${t('loading', 'lade…')}</div>`;
+
+  let city;
+  try { city = await api(`/api/cities/detail?name=${encodeURIComponent(name)}`); }
+  catch { detail.innerHTML = `<div class="hint">${t('comp.city.gone',
+    'Diese Stadt gibt es nicht mehr in deinen Orten.')}</div>`; return; }
+
+  // Beschreibung: kommt aus dem Server-Cache — fehlt sie, einmal holen lassen.
+  // Ein Fehlschlag wird dort vermerkt, dieser Aufruf wiederholt sich also nicht
+  // bei jedem Öffnen.
+  let info = city.info;
+  if (!info || (!info.description && !info.wiki_url)) {
+    try { info = await api(`/api/cities/describe?name=${encodeURIComponent(name)}`,
+      { method: 'POST' }); } catch (_) {}
+  }
+  const yr = s => s ? String(s).slice(0, 4) : null;
+  const span = [yr(city.first_visit), yr(city.last_visit)].filter(Boolean);
+  const sub = [
+    `${city.event_count.toLocaleString('de-DE')} ${t('comp.cities.entries', 'Einträge')}`,
+    `${city.place_count} ${city.place_count === 1 ? t('comp.city.place', 'Ort') : t('comp.city.places', 'Orte')}`,
+    span.length ? (span[0] === span[1] ? span[0] : `${span[0]}–${span[1]}`) : null,
+    city.country,
+  ].filter(Boolean).join(' · ');
+
+  const desc = (info && info.description) ? `
+    <div class="panel" style="display:flex; gap:16px; margin-bottom:18px; align-items:flex-start">
+      ${info.thumbnail ? `<img src="${esc(info.thumbnail)}" alt="" style="width:90px; border-radius:10px; flex-shrink:0">` : ''}
+      <div style="min-width:0">
+        <div class="ev-desc" style="font-size:13.5px">${esc(info.description)}</div>
+        ${info.wiki_url ? `<a href="${esc(info.wiki_url)}" target="_blank" rel="noopener" style="color:var(--accent); font-size:12px">Wikipedia ↗</a>` : ''}
+      </div>
+    </div>` : '';
+
+  const located = city.places.filter(p => p.lat != null && p.lng != null);
+  const rest = city.event_count - city.events_shown;
+  detail.innerHTML = `
+    <div style="display:flex; align-items:center; gap:14px; margin-bottom:18px; flex-wrap:wrap">
+      <button class="btn small secondary" id="comp-back">‹ ${t('back', 'zurück')}</button>
+      <span style="font-size:28px">🏙️</span>
+      <div style="flex:1; min-width:0">
+        <div style="font-size:18px; font-weight:700">${esc(city.name)}</div>
+        <div class="stat-label">${esc(sub)}</div>
+      </div>
+      <button class="btn small" id="city-timeline">${t('comp.city.timeline', 'Im Zeitstrahl')}</button>
+    </div>
+    ${desc}
+    ${located.length ? '<div id="comp-map"></div>' : ''}
+    ${city.events.map(eventCard).join('')}
+    ${rest > 0 ? `<div class="hint">${t('comp.city.more.a', 'Weitere')} ${rest.toLocaleString('de-DE')} `
+      + `${t('comp.city.more.b', 'Einträge — im Zeitstrahl zu sehen.')}</div>` : ''}`;
+  document.getElementById('comp-back').addEventListener('click', () => loadCities());
+  document.getElementById('city-timeline').addEventListener('click', () => tlFilterCity(city.name));
+
+  // Karte: die ORTE der Stadt, nicht ihre Ereignisse — bei tausend Besuchen an
+  // fünf Orten sind fünf Punkte die Aussage, tausend wären dieselbe fünfmal.
+  if (compMapObj) { compMapObj.remove(); compMapObj = null; }
+  if (located.length) {
+    compMapObj = L.map('comp-map');
+    addTiles(compMapObj, 19);
+    const latlngs = located.map(p => [p.lat, p.lng]);
+    // Leaflet malt SVG-Attribute, keine CSS-Variablen — die Themefarbe muss
+    // hier ausgelesen werden, sonst bleibt der Punkt schwarz.
+    const accent = getComputedStyle(document.body)
+      .getPropertyValue('--accent').trim() || '#5b8cff';
+    located.forEach(p => L.circleMarker([p.lat, p.lng],
+      { radius: 8, fillColor: accent, color: '#fff', weight: 2, fillOpacity: .9 })
+      .addTo(compMapObj)
+      .bindPopup(`<b>${esc(p.name)}</b><br>${p.event_count} ${t('comp.cities.entries', 'Einträge')}`));
+    compMapObj.fitBounds(L.latLngBounds(latlngs).pad(0.4));
+    setTimeout(() => compMapObj && compMapObj.invalidateSize(), 60);
+  }
 }
 async function loadCompendium(type) {
   if (type === 'city') return loadCities();
@@ -5544,19 +5649,34 @@ async function loadAchievements() {
   }
   list.innerHTML = data.achievements.map(a => {
     const medal = a.tier ? TIER_MEDALS[a.tier] : (a.emoji || '🔒');
-    const next = a.next_tier
-      ? `Noch ${a.next_threshold - a.value} bis ${a.next_tier.charAt(0).toUpperCase() + a.next_tier.slice(1)} (${a.next_threshold})`
-      : 'Höchste Stufe erreicht';
+    const num = n => n.toLocaleString('de-DE');
+    // F19: Oberhalb von Platin ist das Ziel keine Stufe mehr, sondern eine
+    // erzeugte Marke — die Karte sagt beides in derselben Zeile, damit eine
+    // seit Jahren volle Leiste nicht wieder „fertig" behauptet.
+    let next;
+    if (a.next_tier) {
+      next = `${t('ach.togo', 'Noch')} ${num(a.next_threshold - a.value)} `
+        + `${t('ach.until', 'bis')} ${a.next_tier.charAt(0).toUpperCase() + a.next_tier.slice(1)} `
+        + `(${num(a.next_threshold)})`;
+    } else if (a.beyond_top) {
+      next = `${t('ach.togo', 'Noch')} ${num(a.next_threshold - a.value)} `
+        + `${t('ach.untilmark', 'bis zur nächsten Marke')} (${num(a.next_threshold)})`;
+    } else {
+      next = t('ach.done', 'Höchste Stufe erreicht');
+    }
+    const marks = a.marks_passed
+      ? `<span class="ach-tier" title="${esc(t('ach.marks.title', 'Marken oberhalb von Platin'))}">`
+        + `+${a.marks_passed} ${t('ach.marks', 'Marken')}</span>` : '';
     return `<div class="ach-card${a.tier ? '' : ' locked'}" data-tier="${esc(a.tier || '')}">
       <div class="ach-medal">${medal}</div>
       <div class="ach-body">
         <div class="ach-title">${esc(a.label)}
-          ${a.tier ? `<span class="ach-tier">${esc(a.tier)}</span>` : ''}</div>
+          ${a.tier ? `<span class="ach-tier">${esc(a.tier)}</span>` : ''}${marks}</div>
         ${a.description ? `<div class="ach-desc">${esc(a.description)}</div>` : ''}
         <div class="ach-track"><i style="width:${Math.round(a.progress * 100)}%"></i></div>
         <div class="ach-next">${esc(next)}</div>
       </div>
-      <div class="ach-value">${a.value}</div>
+      <div class="ach-value">${num(a.value)}</div>
     </div>`;
   }).join('');
 }

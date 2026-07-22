@@ -15,6 +15,11 @@ Ein Achievement im Modul-YAML sieht so aus:
         tiers: { bronze: 5, silber: 25, gold: 100, platin: 500 }
 
 Neue Metrik = eine Funktion in `_METRICS`; neuer Erfolg = drei Zeilen YAML.
+
+F19 (0.35.0): Die vier Stufen behalten ihre Namen — aber **Platin ist keine
+Endstation mehr**. Oberhalb zählt der Erfolg gegen eine erzeugte nächste Marke
+weiter (`_next_mark`), damit eine Zahl, die ein ganzes Leben umfasst, nicht
+irgendwann stehenbleibt und nichts mehr sagt.
 """
 from __future__ import annotations
 
@@ -26,6 +31,7 @@ from app.models import ConfirmState, Entity, Event, EventEntityLink, Metric, Sou
 from app.modules.registry import Module, registry
 from app.schemas import AchievementRead, AchievementsRead
 from app.services.ingestion import tracked_modules
+from app.sqlutil import day_parts
 
 # Reihenfolge = Wertigkeit; der Index ist zugleich die Punktzahl (Bronze 1 … Platin 4)
 TIERS: tuple[str, ...] = ("bronze", "silber", "gold", "platin")
@@ -85,23 +91,37 @@ def _continent_count(db: Session, user_id: str, module: Module, spec: dict) -> i
     return len({c.continent for c in _visited_countries(db, user_id)})
 
 
-def _weather_query(db: Session, user_id: str, spec: dict):
-    """Basis für die F11-Wettermetriken: bestätigte Events des Nutzers, die
-    eine bestimmte Wetter-Metrik tragen, gefiltert über `min`/`max`.
+def _weather_days(db: Session, user_id: str, spec: dict):
+    """Basis für die F11-Wettermetriken — **ein Wert je Kalendertag**.
 
     Deklaration im YAML:
 
         metric: weather_event_count
         weather: { key: sunshine_h, min: 10 }
+
+    F19/Anmerkung 103: Bis 0.34 zählte das hier **Einträge**. Wetter ist aber
+    eine Eigenschaft des TAGES, und nach einem Timeline-Import trägt ein Tag
+    dutzende Besuche mit demselben Wetter — „Tage mit mindestens 10
+    Sonnenstunden" zählte also Besuche, und die gesammelten Sonnenstunden
+    wurden mit der Zahl der Einträge je Tag multipliziert. Genau der Defekt,
+    den A31 (Anmerkung 64) für die Statistik-Bilanz beseitigt hat; hier hat er
+    überlebt, weil die Erfolge in einer anderen Datei stehen. Die Beschreibungen
+    im YAML sagten die ganze Zeit „Tage" — jetzt tut es der Code auch.
+
+    Alle Einträge eines Tages tragen denselben Wetterwert (eine Anreicherung je
+    Tag), deshalb ist `min` ein beliebiger, aber **stabiler** Vertreter — dieselbe
+    Überlegung wie beim `min(id)`-Vertreter der A39-Verdichtung.
     """
     cfg = spec.get("weather") or {}
     key = cfg.get("key")
     if not key:
         return None
-    q = (db.query(Metric.value)
+    day = day_parts(Event.date_start)
+    q = (db.query(*day, func.min(Metric.value).label("value"))
          .join(Event, Event.id == Metric.event_id)
          .filter(Event.user_id == user_id,
                  Event.confirmed == ConfirmState.confirmed,
+                 Event.date_start.isnot(None),
                  Metric.source == Source.weather,
                  Metric.key == key,
                  Metric.value.isnot(None)))
@@ -109,23 +129,26 @@ def _weather_query(db: Session, user_id: str, spec: dict):
         q = q.filter(Metric.value >= float(cfg["min"]))
     if cfg.get("max") is not None:
         q = q.filter(Metric.value <= float(cfg["max"]))
-    return q
+    return q.group_by(*day)
 
 
 def _weather_event_count(db: Session, user_id: str, module: Module, spec: dict) -> int:
     """Wie viele bestätigte Tage erfüllen die Wetterbedingung?
     („Sonnenanbeter": Tage mit ≥ 10 Sonnenstunden.)"""
-    q = _weather_query(db, user_id, spec)
-    return q.count() if q is not None else 0
+    q = _weather_days(db, user_id, spec)
+    if q is None:
+        return 0
+    return db.query(func.count()).select_from(q.subquery()).scalar() or 0
 
 
 def _weather_sum(db: Session, user_id: str, module: Module, spec: dict) -> int:
-    """Summe einer Wetter-Metrik über alle bestätigten Events — z. B.
-    gesammelte Sonnenstunden. Gerundet, weil Erfolge in ganzen Zahlen zählen."""
-    q = _weather_query(db, user_id, spec)
+    """Summe einer Wetter-Metrik über alle bestätigten TAGE — z. B. gesammelte
+    Sonnenstunden. Gerundet, weil Erfolge in ganzen Zahlen zählen."""
+    q = _weather_days(db, user_id, spec)
     if q is None:
         return 0
-    return int(round(sum(v for (v,) in q.all())))
+    total = db.query(func.sum(q.subquery().c.value)).scalar()
+    return int(round(total)) if total is not None else 0
 
 
 _METRICS = {
@@ -140,9 +163,56 @@ _METRICS = {
 }
 
 
+# F19: Marken oberhalb der letzten Stufe — 1 · 2,5 · 5 je Zehnerpotenz.
+# Bewusst eine REGEL statt einer Liste: eine Liste hätte wieder ein Ende, und
+# das Ende ist ja gerade das Problem (Anmerkung 99). Die Schrittweite ist so
+# gewählt, dass die nächste Marke immer erreichbar aussieht (Faktor 2 bis 2,5)
+# und trotzdem runde Zahlen liefert, die man sich merken kann.
+_MARK_STEPS = (1.0, 2.5, 5.0)
+
+# ... aber NUR für Metriken, die überhaupt weiterzählen können. Es gibt sieben
+# Kontinente und knapp 200 Länder; „nächste Marke: 10 Kontinente" wäre kein
+# Ansporn, sondern ein Rechenfehler mit Anspruch — und ausgerechnet für den,
+# der die Sammlung vollständig hat. Die Grenze ist eine Eigenschaft der METRIK,
+# nicht des einzelnen Erfolgs; ein YAML darf sie mit `open_ended` überstimmen,
+# falls jemand eine gebundene Metrik anders meint.
+_BOUNDED_METRICS = {"continent_count", "country_count"}
+
+
+def _open_ended(spec: dict) -> bool:
+    if "open_ended" in spec:
+        return bool(spec["open_ended"])
+    return spec.get("metric") not in _BOUNDED_METRICS
+
+
+def _marks_from(start: int):
+    """Aufsteigende Marken ab der Zehnerpotenz von `start` — endloser Strom."""
+    exponent = max(0, len(str(max(1, start))) - 2)
+    while True:
+        for step in _MARK_STEPS:
+            yield int(round(step * 10 ** exponent))
+        exponent += 1
+
+
+def _beyond(value: int, top: int) -> tuple[int, int, int]:
+    """Nach der höchsten Stufe: (bereits passierte Marken, letzte, nächste).
+
+    Der Boden ist die höchste Stufe selbst — wer Platin gerade eben erreicht
+    hat, startet bei 0 % zur nächsten Marke und nicht bei „fast geschafft".
+    """
+    passed, floor = 0, top
+    for mark in _marks_from(top):
+        if mark <= top:
+            continue
+        if mark > value:
+            return passed, floor, mark
+        passed, floor = passed + 1, mark
+
+
 def _evaluate(spec: dict, module: Module, value: int) -> AchievementRead:
     """Ordnet einen Metrik-Wert der erreichten Stufe zu und rechnet den
-    Fortschritt bis zur nächsten aus."""
+    Fortschritt bis zur nächsten aus — oder, oberhalb der letzten Stufe, bis
+    zur nächsten erzeugten Marke (F19)."""
     thresholds = {t: int(spec["tiers"][t]) for t in TIERS if t in (spec.get("tiers") or {})}
 
     reached_index = 0
@@ -153,15 +223,35 @@ def _evaluate(spec: dict, module: Module, value: int) -> AchievementRead:
     remaining = [t for t in TIERS if t in thresholds and thresholds[t] > value]
     next_tier = remaining[0] if remaining else None
     next_threshold = thresholds[next_tier] if next_tier else None
+    beyond_top, marks_passed = False, 0
 
-    if next_threshold is None:
-        progress = 1.0
-    else:
+    if next_threshold is not None:
         # Fortschritt innerhalb der aktuellen Stufe, nicht ab null — sonst sieht
         # der Balken zwischen Gold und Platin fast immer voll aus.
         floor = thresholds[TIERS[reached_index - 1]] if reached_index else 0
-        span = next_threshold - floor
-        progress = (value - floor) / span if span > 0 else 0.0
+    elif thresholds and _open_ended(spec):
+        # F19: alle Stufen erreicht — ab hier zählt die Marke weiter. Ohne das
+        # bliebe die Karte für den Rest des Lebens bei „höchste Stufe erreicht"
+        # stehen, und die Zahl daneben sagte nichts mehr.
+        beyond_top = True
+        marks_passed, floor, next_threshold = _beyond(value, max(thresholds.values()))
+    elif thresholds:
+        # Begrenzte Metrik: hier IST Platin das Ende, und das ist keine
+        # Schwäche der Leiter, sondern die Wahrheit über die Menge.
+        return AchievementRead(
+            id=spec["id"], module=module.key, label=spec.get("label", spec["id"]),
+            description=spec.get("description"),
+            emoji=spec.get("emoji") or module.emoji, value=value,
+            tier=TIERS[reached_index - 1] if reached_index else None,
+            tier_index=reached_index, progress=1.0, thresholds=thresholds)
+    else:
+        return AchievementRead(  # keine Stufen deklariert: nichts zu messen
+            id=spec["id"], module=module.key, label=spec.get("label", spec["id"]),
+            description=spec.get("description"),
+            emoji=spec.get("emoji") or module.emoji, value=value, progress=0.0)
+
+    span = next_threshold - floor
+    progress = (value - floor) / span if span > 0 else 0.0
 
     return AchievementRead(
         id=spec["id"],
@@ -174,6 +264,8 @@ def _evaluate(spec: dict, module: Module, value: int) -> AchievementRead:
         tier_index=reached_index,
         next_tier=next_tier,
         next_threshold=next_threshold,
+        beyond_top=beyond_top,
+        marks_passed=marks_passed,
         progress=max(0.0, min(1.0, progress)),
         thresholds=thresholds,
     )

@@ -93,6 +93,42 @@ class CityRead(BaseModel):
     last_visit: datetime | None = None
 
 
+class CityInfoRead(BaseModel):
+    """A42: die zwischengespeicherte Wikipedia-Beschreibung einer Stadt.
+    `description = None` heißt „nachgesehen, kein Artikel" — nicht „noch nie
+    versucht"; die Unterscheidung verhindert einen Abruf bei jedem Öffnen."""
+    model_config = ConfigDict(from_attributes=True)
+    name: str
+    country: str | None = None
+    lang: str = "de"
+    description: str | None = None
+    wiki_title: str | None = None
+    wiki_url: str | None = None
+    thumbnail: str | None = None
+
+
+class CityPlaceRead(BaseModel):
+    """Ein Ort innerhalb einer Stadt — trägt die Karte der Stadtseite."""
+    id: str
+    name: str
+    lat: float | None = None
+    lng: float | None = None
+    event_count: int = 0
+
+
+class CityDetailRead(CityRead):
+    """A42: die Stadt als Sammlungs-Eintrag statt als Kachel mit Sprungziel.
+
+    `events` ist eine VORSCHAU (die jüngsten), `event_count` die Wahrheit —
+    eine Stadt kann nach einem Import tausende Besuche tragen, und der
+    Zeitstrahl mit Stadtfilter zeigt sie vollständig.
+    """
+    places: list[CityPlaceRead] = []
+    events: list["EventRead"] = []
+    events_shown: int = 0
+    info: CityInfoRead | None = None
+
+
 class LocationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
@@ -441,9 +477,14 @@ class AchievementRead(BaseModel):
     value: int                      # aktueller Metrik-Wert
     tier: str | None = None         # erreichte Stufe: bronze|silber|gold|platin
     tier_index: int = 0             # 0 = noch keine Stufe, 4 = platin
-    next_tier: str | None = None    # nächste Stufe (None = alles erreicht)
+    next_tier: str | None = None    # nächste Stufe (None = alle Stufen erreicht)
+    # F19: Ziel — solange es Stufen gibt deren Schwelle, danach die erzeugte
+    # Marke. EIN Feld für beides, damit die Anzeige nicht zwei Fälle rechnen
+    # muss; `beyond_top` sagt, wie es zu benennen ist ("Gold" vs. "Marke").
     next_threshold: int | None = None
-    progress: float = 0.0           # 0..1 bis zur nächsten Stufe
+    beyond_top: bool = False        # über der höchsten Stufe, zählt weiter
+    marks_passed: int = 0           # bereits passierte Marken oberhalb
+    progress: float = 0.0           # 0..1 bis zum nächsten Ziel
     thresholds: dict[str, int] = {}
 
 

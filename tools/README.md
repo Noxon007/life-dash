@@ -18,9 +18,20 @@ node tools/check-basemaps.js        # background map selection and its guard rai
 node tools/check-i18n-containers.js # no translation wipes out a control — note 71
 node tools/check-weather-line.js    # slim and full lists render the same weather — A36
 node tools/check-a37-window.js      # no view loads the whole database — A37, note 81
+node tools/check-a38-mobile.js      # no inline min-width, no max-height in vh — A38
+node tools/check-a39-condense.js    # the timeline condenses before it pages — A39
+node tools/check-a40-map-controls.js # no map control is silently inoperative — A40
+node tools/check-a41-cities.js      # every city number can be opened — A41, note 94
+node tools/check-a42-city-page.js   # a city opens a page, not an exit — A42, note 102
 
 Each exits non-zero on failure, so they can be chained in CI later (package R1).
-`npm run check` runs all of them.
+`npm run check` runs all of them — including the last four, which until 0.35.0
+had to be remembered by hand and therefore were not run.
+
+**A guard checks a state; make sure it is one that occurs.** `check-a41-cities.js`
+asserted the cities tab existed in the markup and passed for a whole release
+while the tab was destroyed by `applyModules()` a moment after every real page
+load (note 102). It now drives that function first and asserts afterwards.
 
 ## Against a running server
 

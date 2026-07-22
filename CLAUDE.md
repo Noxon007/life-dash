@@ -45,11 +45,11 @@ Entscheidungen/Anmerkungen in Kap. 15. Erst dort gezielt nachlesen statt Code ra
   etc. aus Config); `.env.example` ist die Setup-Referenz
 
 ## Stand
-Umgesetzt bis **v0.34.0** (2026-07-22). Gruppe A ist bis **A41** fertig,
-Gruppe B bis **F18**. Offen ist damit nur noch: **A42** (Städte-Detailseite),
-**F19** (Abzeichen ohne Ende), **P5.1** (Offline-Erfassung), **F1-Rest**
-(KI-Tageszusammenfassung), **P2.1 Stufe 2** (Immich als Ereignisquelle),
-dann **Demo-Modus** und **R1** (Veröffentlichungsreife). Hinter 1.0 bleiben
+Umgesetzt bis **v0.35.0** (2026-07-22). **Gruppe A ist komplett** (A1–A42),
+Gruppe B bis **F19**. Offen ist damit nur noch: **P5.1** (Offline-Erfassung),
+**F1-Rest** (KI-Tageszusammenfassung), **P2.1 Stufe 2** (Immich als
+Ereignisquelle), dann **Demo-Modus** und **R1** (Veröffentlichungsreife).
+Hinter 1.0 bleiben
 nur noch neue Import-Konnektoren (P2.8 OwnTracks, P2.9 Automatisierung,
 P2.10 Trakt, P2.11 Dawarich/GPX, P4.1 Health, P4.2 PSN) plus **P5.2**
 (Whisper — einzige Ausnahme, schwere neue Laufzeit-Abhängigkeit).
@@ -59,8 +59,8 @@ P2.10 Trakt, P2.11 Dawarich/GPX, P4.1 Health, P4.2 PSN) plus **P5.2**
 0.26 A29 (ZIP-Backup) · 0.27 Fixes (A31/A32/A30) · 0.28 F16+A33+A34 ·
 0.29 A35 (lokale Konten) · 0.30 P3.1 · 0.31 A36+F17 (schlanke Liste, Alter) ·
 0.32 A37 (serverseitiges Zeitfenster) · 0.33 A38+A40 (Mobil-Layout,
-Kartenschalter) + dev-Kennung · 0.34 A39+F18+A41 (Städte, Tages-Fotos).
-Offen: **0.35 F19+A42 (Sammlung)** · **0.36 P5.1+F1-Rest (Erfassen)** ·
+Kartenschalter) + dev-Kennung · 0.34 A39+F18+A41 (Städte, Tages-Fotos) · 0.35 F19+A42 (Sammlung).
+Offen: **0.36 P5.1+F1-Rest (Erfassen)** ·
 **0.37 P2.1 Stufe 2 (Immich als Quelle)** · **0.38 Demo-Modus** ·
 **1.0 = Veröffentlichung**. Kein Termindruck (Anmerkung 58).
 Dort nachsehen statt Reihenfolge raten.
@@ -121,20 +121,33 @@ bekommen: Bestandszeilen haben dort NULL, weil die Spalte per ADD COLUMN kam.
 **Wer Medien sucht, sucht sie über `user_id`, nicht über Events** — sonst
 fehlen Tages-Fotos beim Löschen, Aufräumen und im Export.
 
-**Als Nächstes: 0.35 = F19 + A42 (Sammlung).** **A42** (Anmerkung 102): Städte
-haben seit A41 einen Tab, aber keine **Seite** — der Klick verlässt die
-Sammlung (`tlFilterCity`), während jeder andere Typ `openEntityDetail` öffnet
-(Wikipedia-Text, Karte, Ereignisse). Ursache ist die richtige Entscheidung
-darunter: Städte sind bewusst **keine `Entity`** (Anm. 95), und der ganze
-Detail-Pfad hängt an einer Entity-ID. Also eigener Ereignis-Endpunkt je Stadt
-plus **`city_info`-Cache** (Ableitung, wegwerfbar — aber eine Schema-Ergänzung,
-und die ist VOR dem Demo-Datensatz billig). Zwei Fallen: **Namensgleichheit**
-(Springfield, Frankfurt) → Land muss in die Wikidata-Suche, sonst beschreibt
-die App selbstbewusst die falsche Stadt; und `services/wikipedia.py` fragt fest
-`de.wikipedia.org` — seit F10 deutscher Text unter englischer Oberfläche, gilt
-auch für Tiere und Länder und wird hier für alle mitrepariert. **F19**
-(Anm. 99): Platin hört auf, Endstation zu sein — darüber zählt das Abzeichen
-gegen eine erzeugte nächste Marke weiter; zu billige Schwellen einmalig hoch.
+**A42+F19 fertig (v0.35.0, Anmerkungen 102–104).** **A42:** Städte haben jetzt
+eine Seite wie jeder andere Sammlungstyp — `/api/cities/detail` (Orte,
+Ereignis-VORSCHAU mit Gesamtzahl, A37) und `/api/cities/describe` mit
+`city_info` als Cache. Städte bleiben bewusst **keine `Entity`** (Anm. 95),
+deshalb eigene Endpunkte statt `openEntityDetail`. Drei Regeln daraus:
+**(a)** Das Land geht in die Wikidata-Suche, sonst ist „Frankfurt" eine
+Begriffsklärung; **(b)** ein Fehlversuch wird GESPEICHERT (Zeile ohne
+`description` = „nachgesehen, kein Artikel", Neuversuch nach 30 Tagen) — dieselbe
+Endlos-Abruf-Falle wie F12 `weather_rev` und A39-Leerstring, jetzt zum dritten
+Mal; **(c)** `city_info` hat bewusst KEINE `user_id` (Wikipedia gehört
+niemandem), der Zugriffsschutz sitzt an den eigenen Orten.
+`services/wikipedia.py` ist nicht mehr fest deutsch, `Entity.attributes` trägt
+`desc_lang`. **F19:** Über Platin zählt eine erzeugte Marke weiter (1 · 2,5 · 5
+je Zehnerpotenz) — **aber nur bei unbegrenzten Metriken**: es gibt sieben
+Kontinente, „nächste Marke: 10" wäre ein Rechenfehler mit Anspruch (Anm. 104).
+**Der eigentliche Grund für vorverdiente Abzeichen war ein Zählfehler, keine
+Schwelle** (Anm. 103): die Wettermetriken zählten Einträge, wo überall „Tage"
+stand — A31/Anm. 64 hatte in dieser Datei überlebt. Frage bei jeder
+Invarianten-Reparatur: *wo gilt derselbe Satz noch?*
+
+**Wächter prüfen Zustände, die es geben muss.** `check-a41-cities.js` prüfte ein
+Jahr lang, dass der Städte-Reiter im Markup steht — im Betrieb ersetzt
+`applyModules()` die Leiste Sekundenbruchteile nach dem Start, der Reiter war
+also nie zu sehen und die Prüfung trotzdem grün. Wer eine UI-Eigenschaft
+absichert, muss den Zustand HERSTELLEN (`w.eval('MODULES = …; applyModules()')`),
+nicht den Auslieferungszustand lesen. `npm run check` in `tools/` fährt jetzt
+alle Wächter, auch die vier, die man vorher von Hand starten musste.
 
 **Verworfen: ein automatisches Tages-Objekt je Tag** (Anmerkung 87) — das hieße
 `parent_event_id` auf Bestätigtem setzen und Tausende leere Container, die jede

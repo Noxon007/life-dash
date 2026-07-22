@@ -20,6 +20,14 @@ compendium: false
 
 # --- F11: Erfolge aus bereits gespeicherten Wetterdaten ---
 # Alle Metriken lesen NUR vorhandene Werte — kein einziger API-Aufruf.
+#
+# F19 (0.35.0), Schwellen einmalig angehoben: Sie stammten aus der Zeit, als
+# Einträge von Hand entstanden. Zwei Dinge haben sie entwertet — der
+# Timeline-Import, der tausende Tage auf einmal mit Wetter füllt, und ein
+# Zählfehler: bis 0.34 zählten die Metriken EINTRÄGE, obwohl hier überall
+# „Tage" steht (Anmerkung 103). Beides ist behoben, die Bronze-Stufen bei 1
+# („einmal gefroren") sind trotzdem keine Leistung und wandern nach oben.
+# Nach oben ist ohnehin offen: oberhalb von Platin zählt die Marke weiter.
 achievements:
   - id: sun_worshipper
     label: "Sonnenanbeter"
@@ -51,7 +59,7 @@ achievements:
     description: "Tage, an denen es nicht über den Gefrierpunkt kam"
     metric: weather_event_count
     weather: { key: temp_max_c, max: 0 }
-    tiers: { bronze: 1, silber: 10, gold: 30, platin: 100 }
+    tiers: { bronze: 5, silber: 25, gold: 75, platin: 200 }
 
   - id: heat_seeker
     label: "Hitzesucher"
@@ -59,7 +67,7 @@ achievements:
     description: "Tage mit 30 °C oder mehr"
     metric: weather_event_count
     weather: { key: temp_max_c, min: 30 }
-    tiers: { bronze: 1, silber: 10, gold: 40, platin: 120 }
+    tiers: { bronze: 5, silber: 25, gold: 75, platin: 200 }
 
   - id: storm_chaser
     label: "Sturmerprobt"
@@ -67,4 +75,4 @@ achievements:
     description: "Tage mit Böen ab 70 km/h (kommt mit neueren Wetterdaten)"
     metric: weather_event_count
     weather: { key: gust_max_kmh, min: 70 }
-    tiers: { bronze: 1, silber: 5, gold: 20, platin: 60 }
+    tiers: { bronze: 3, silber: 15, gold: 40, platin: 100 }

@@ -122,9 +122,14 @@ def _achievement(db, user, aid):
     return next((a for a in compute(db, user.id).achievements if a.id == aid), None)
 
 
+# F19/Anmerkung 103: Die beiden Tests hießen von Anfang an „days" und legten
+# alle Ereignisse auf DENSELBEN Tag (der Vorgabewert von `_event`) — sie haben
+# also Einträge gezählt und Tage behauptet, genau wie der Code darunter. Seit
+# die Metriken je Kalendertag rechnen, tragen sie verschiedene Daten.
 def test_weather_achievements_count_matching_days(db, user):
     for i, sun in enumerate([12.0, 11.0, 3.0]):     # zwei Tage über der Schwelle
-        _weather(db, _event(db, user, title=f"Tag {i}"), sunshine_h=sun)
+        _weather(db, _event(db, user, title=f"Tag {i}",
+                            when=datetime(2024, 5, 1 + i)), sunshine_h=sun)
 
     a = _achievement(db, user, "sun_worshipper")
     assert a is not None
@@ -132,8 +137,8 @@ def test_weather_achievements_count_matching_days(db, user):
 
 
 def test_weather_achievements_sum_values(db, user):
-    _weather(db, _event(db, user, title="A"), sunshine_h=10.4)
-    _weather(db, _event(db, user, title="B"), sunshine_h=5.2)
+    _weather(db, _event(db, user, title="A", when=datetime(2024, 5, 1)), sunshine_h=10.4)
+    _weather(db, _event(db, user, title="B", when=datetime(2024, 5, 2)), sunshine_h=5.2)
 
     assert _achievement(db, user, "sun_collector").value == 16   # gerundet
 

@@ -19,6 +19,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -382,6 +383,48 @@ class Job(Base):
     started_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class CityInfo(Base):
+    """A42 — Kurzbeschreibung einer Stadt aus Wikipedia. Reiner CACHE.
+
+    Schicht 4 (Kap. 3.1): nichts hiervon ist eine Tatsache über das Leben des
+    Nutzers, alles ist jederzeit wegwerfbar und neu holbar. Deshalb steht der
+    Text NICHT im Export und wird beim Löschen eigener Daten nicht angefasst —
+    er gehört Wikipedia, nicht dem Nutzer.
+
+    Bewusst **ohne `user_id`**: „Was ist Düsseldorf?" hat für alle dieselbe
+    Antwort, und ein zweiter Nutzer soll denselben Abruf nicht wiederholen. Der
+    Zugriffsschutz sitzt eine Ebene höher — beschrieben wird nur eine Stadt, die
+    in den EIGENEN Orten vorkommt (siehe `routers/modules.py`); sonst ließe sich
+    über diesen Weg erfragen, wo andere waren.
+
+    Schlüssel ist (Name, Land, Sprache): Städtenamen sind mehrdeutig, wie
+    Tier- und Ländernamen es nie waren — ohne das Land beschriebe „Springfield"
+    mit voller Überzeugung die falsche Stadt. `country` ist deshalb ein
+    Leerstring statt NULL, wenn das Land unbekannt ist: NULL vergleicht sich in
+    SQL mit nichts, also würde der Unique-Index den Fall nicht abdecken (und
+    derselbe Leerstring bedeutet auch bei `Location.city` „nachgesehen,
+    nichts gefunden", A39).
+
+    Eine Zeile OHNE `description` heißt „nachgesehen, kein Artikel" — sonst
+    fragte jeder Aufruf der Seite Wikipedia erneut. Nach `RETRY_AFTER_DAYS`
+    wird es noch einmal versucht, denn ein Artikel kann entstehen.
+    """
+
+    __tablename__ = "city_info"
+    __table_args__ = (UniqueConstraint("name", "country", "lang",
+                                       name="ux_city_info_key"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    name: Mapped[str] = mapped_column(String(128), index=True)
+    country: Mapped[str] = mapped_column(String(64), default="")
+    lang: Mapped[str] = mapped_column(String(8), default="de")
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    wiki_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    wiki_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    thumbnail: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
 
 class Metric(Base):

@@ -18,6 +18,7 @@ from app.schemas import (EventGeo, EventManualCreate, EventRead, EventsIndex,
                          LocationGeo, OnThisDayGroup, YearCount)
 from app.services.ingestion import create_manual_event
 from app.services.stats_overview import find_birth
+from app.sqlutil import day_parts
 
 router = APIRouter(prefix="/api/events", tags=["Events"])
 
@@ -245,16 +246,10 @@ def list_events(
 # weil sie seit A39 ein echtes Feld ist und nicht mehr davon abhängt, welche
 # Namensbausteine der Nutzer gewählt hat.
 # --------------------------------------------------------------------------- #
-def _day_parts(col):
-    """Jahr/Monat/Tag eines Zeitstempels — dialektneutral.
-
-    `date(x)` gibt es so nur in SQLite, `x::date` nur in Postgres; `extract`
-    können beide. Der Test-Lauf ist SQLite, die Anlage des Autors Postgres —
-    ein Unterschied, den `test_a37_postgres_dialect.py` schon einmal teuer
-    gemacht hat.
-    """
-    return (func.extract("year", col), func.extract("month", col),
-            func.extract("day", col))
+# Seit 0.35.0 in `app/sqlutil.py`, weil die Erfolge dieselbe Frage stellen
+# (welche Einträge liegen am selben Kalendertag?) und zwei Antworten darauf
+# genau die Sorte Abweichung wären, die `test_a37_postgres_dialect.py` prüft.
+_day_parts = day_parts
 
 
 def _condensable_base(db: Session, user_id: str):

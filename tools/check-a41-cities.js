@@ -49,9 +49,27 @@ setTimeout(() => {
   check('Städte-Kachel führt zu den Städten',
         !!card && card.dataset.go === 'comp:city',
         `führt nach "${card && card.dataset.go}" — dort stehen keine Städte`);
-  check('Städte-Reiter existiert im Kompendium',
+  // A42: Diese Prüfung stand hier von Anfang an — und sah am Defekt vorbei.
+  // Sie las die Reiterleiste, WIE SIE IM HTML STEHT; im Betrieb ersetzt
+  // applyModules() sie aber vollständig, sobald /api/modules geantwortet hat,
+  // und der Städte-Reiter gehört zu keinem Modul. Er existierte also genau bis
+  // zur ersten Antwort, was in einer echten Sitzung „nie" heißt. Geprüft wird
+  // deshalb jetzt der Zustand NACH dem Laden der Module — der einzige, den
+  // jemand zu sehen bekommt.
+  const drive = code => { try { return w.eval(code); } catch (e) { return `FEHLER: ${e.message}`; } };
+  drive(`MODULES = [{ key: 'animal', label: 'Tiere', emoji: '🦅', compendium: true, event_categories: ['animal'] },
+                    { key: 'country', label: 'Länder', emoji: '🌍', compendium: true, event_categories: [] }];
+         TRACKED = null; applyModules();`);
+  check('Städte-Reiter existiert nach dem Laden der Module',
         !!d.querySelector('#comp-tabs [data-type="city"]'),
-        'die Kachel führt auf einen Reiter, den es nicht gibt');
+        'applyModules() ersetzt die Leiste und lässt die Städte weg');
+  check('Städte-Reiter überlebt auch ohne Sammel-Module',
+        (() => { drive('MODULES = []; TRACKED = null; applyModules();');
+                 const has = !!d.querySelector('#comp-tabs [data-type="city"]');
+                 drive(`MODULES = [{ key: 'animal', label: 'Tiere', emoji: '🦅', compendium: true, event_categories: ['animal'] }];
+                        applyModules();`);
+                 return has; })(),
+        'ohne getrackte Module verschwinden auch die Städte');
 
   // Orte bekommen bewusst KEINEN Reiter (Anmerkung 95) — eine Menge ohne
   // Horizont ist eine Karte, keine Sammlung.
