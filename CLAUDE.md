@@ -62,9 +62,32 @@ und P5.1/P5.2 (Offline-Capture, Whisper).
 0.26 A29 (ZIP-Backup) · 0.27 Fixes (A31/A32/A30) · 0.28 F16+A33+A34 ·
 0.29 A35 (lokale Konten) · 0.30 P3.1 · 0.31 A36+F17 (schlanke Liste, Alter).
 Offen: **0.32 A37+A38 (serverseitiges Zeitfenster + Mobil-Layout)** ·
-0.33 Demo-Modus · 0.34 Härtung · 0.35 Projektoberfläche · 0.36 Freeze ·
+**0.33 A39+F18 (Städte + Fotos am Tag)** · **0.34 Demo-Modus** ·
 **1.0 = Veröffentlichung**. Import-Konnektoren erst danach.
 Kein Termindruck (Anmerkung 58). Dort nachsehen statt Reihenfolge raten.
+
+**Nur noch drei Versionen bis 1.0 (Anmerkung 89).** Härtung,
+Projektoberfläche und Freeze-Pass sind KEINE eigenen Versionen mehr,
+sondern drei Etappen von 1.0.0 — sie laufen auf `main` (`:main`-Image)
+und bekommen einen einzigen Tag. Grund: bis zur Veröffentlichung gibt es
+genau einen Betreiber (den User), und der merkt ein gepinntes Base-Image
+nicht. Der Plan war älter als Anmerkung 86 und wurde nachgezogen.
+**Regel für künftige Einschübe:** eine eigene Version nur bei
+Schema-Folge UND beobachteter Beschwerde — sonst reicht `main`.
+
+**0.33 neu eingeschoben (2026-07-22, Anmerkungen 87/88).** Beides sind
+Schema-Änderungen — und genau deshalb VOR dem Demo-Modus, ab dem Datensatz
+und Upgrade-Pfad das Modell stillhalten. **A39:** `Location.city` als echtes
+Feld (heute steckt die Stadt nur als Textbaustein im zusammengesetzten Namen,
+`addressdetails` werden nicht gespeichert → Rückfüllung läuft im vorhandenen
+Ortsnamen-Lauf A28 mit); darauf Zeitstrahl-Verdichtung gleicher Städte
+(serverseitig, wegen A37-Paginierung) und „besuchte Städte" als Statistik.
+Karte bleibt unberührt — Bewegungen sind `Track`, nicht Event. **F18:**
+`MediaRef.event_id` wird nullable, Fotos hängen wahlweise am Datum
+(`captured_at` gibt es schon), Tageskopf rendert sie. **Verworfen wurde ein
+automatisches Tages-Objekt je Tag** (Anmerkung 87): das hieße `parent_event_id`
+auf Bestätigtem setzen und Tausende leere Container, die jede Aggregation
+wieder ausfiltern müsste. Der Container ist das Datum, kein Objekt.
 
 **A36 fertig (v0.31.0):** `/api/events?slim=1` lässt die Roh-Metriken weg
 (67 % der Nutzlast) und ersetzt sie durch ein kompaktes `weather`-Objekt;
