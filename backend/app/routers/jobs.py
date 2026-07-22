@@ -368,8 +368,9 @@ def _run_immich(db: Session, job: Job) -> tuple[str, str]:
     from sqlalchemy.exc import IntegrityError
 
     from app.services import immich as immich_api
-    from app.services.immich_link import (candidates, link_event,
-                                          linked_asset_ids)
+    from app.services.immich_link import (candidates, day_candidates,
+                                          detach_visit_links, link_target,
+                                          linked_asset_ids, targets)
 
     user = db.get(User, job.user_id)
     cfg = immich_api.config_for(user)
@@ -378,23 +379,31 @@ def _run_immich(db: Session, job: Job) -> tuple[str, str]:
                            "(Verwaltung → Meine Daten → Immich).")
     url, key = cfg
 
-    pending = candidates(db, user.id)
-    total = len(pending)
-    job.unit = "Ereignisse geprüft"
+    # Anmerkung 106: Bestehende Verweise an importierten Besuchen lösen, bevor
+    # `seen` gefüllt wird — sonst gälten genau die Fotos, um die es geht, als
+    # bereits vergeben, und die Korrektur erreichte die Bestandsdaten nie.
+    detach_visit_links(db, user.id)
+
+    todo = targets(db, user.id)
+    n_events = sum(1 for kind, _ in todo if kind == "event")
+    n_days = len(todo) - n_events
+    total = len(todo)
+    job.unit = "Ereignisse und Tage geprüft"
     db.commit()
     # Entduplizierung über den ganzen Lauf: jedes Foto genau einmal, am ersten
     # passenden Ereignis. Vorbelegt mit dem, was schon hängt — so verdoppelt
     # auch ein erneuter Lauf nichts.
     seen = linked_asset_ids(db, user.id)
-    log.info("Immich-Lauf: %d Ereignisse zu prüfen, %d Fotos bereits verknüpft "
-             "(user=%s)", total, len(seen), user.email or user.id)
+    log.info("Immich-Lauf: %d Ereignisse und %d Tage zu prüfen, %d Fotos "
+             "bereits verknüpft (user=%s)", n_events, n_days, len(seen),
+             user.email or user.id)
     if not total:
         return "done", "Keine neuen Ereignisse zum Verknüpfen — alles aktuell."
 
     linked = ticked = 0
-    for i, event in enumerate(pending, 1):
+    for i, (kind, item) in enumerate(todo, 1):
         try:
-            linked += link_event(db, user, event, url, key, seen=seen)
+            linked += link_target(db, user, kind, item, url, key, seen)
             db.commit()
         except IntegrityError:
             db.rollback()      # paralleler Lauf war schneller — kein Schaden
@@ -402,9 +411,9 @@ def _run_immich(db: Session, job: Job) -> tuple[str, str]:
             db.rollback()
             log.warning("Immich-Lauf gestoppt bei %d/%d: %s", i, total, exc)
             return "stopped", f"{linked} Fotos verknüpft, dann Abbruch: {exc}"
-        # Alle 10 Ereignisse Fortschritt schreiben (Balken) und ins Log —
-        # ohne Spur ist ein langsamer Lauf von einem hängenden nicht zu
-        # unterscheiden. done = geprüfte Ereignisse, remaining = die restlichen.
+        # Alle 10 Einheiten Fortschritt schreiben (Balken) und ins Log — ohne
+        # Spur ist ein langsamer Lauf von einem hängenden nicht zu
+        # unterscheiden. done = geprüfte Einheiten, remaining = die restlichen.
         if i % 10 == 0 or i == total:
             log.info("Immich-Lauf: %d/%d geprüft, %d Fotos verknüpft",
                      i, total, linked)
@@ -412,7 +421,8 @@ def _run_immich(db: Session, job: Job) -> tuple[str, str]:
                 return "stopped", f"{linked} Fotos verknüpft (gestoppt bei {i}/{total})."
             ticked = i
 
-    return "done", f"{linked} Fotos an {total} geprüften Ereignissen verknüpft."
+    return "done", (f"{linked} Fotos verknüpft — {n_events} Ereignisse und "
+                    f"{n_days} Tage geprüft.")
 
 
 _RUNNERS = {

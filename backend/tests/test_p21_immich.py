@@ -454,3 +454,138 @@ def test_clear_removes_the_access(db, immich_user):
     update_my_settings(payload={"immich": {"clear": True}}, db=db, user=immich_user)
     assert immich_user.settings["immich"] == {}
     assert api.config_for(immich_user) is None
+
+
+# --------------------------------------------------------------------------- #
+# Anmerkung 106 — importierte Besuche bekommen ihre Fotos über den TAG
+#
+# Gemessen an einem nachgebauten Tag (25.05., zehn Besuche, drei Orte): Ein
+# Foto landete beim ERSTEN Besuch, dessen ±6-Stunden-Fenster es erwischte, und
+# „erster" war die Reihenfolge einer Abfrage ohne ORDER BY. Der Ort unterschied
+# nichts — drei Orte einer Stadt liegen alle im 25-km-Umkreis. Dazu zeigt der
+# verdichtete Zeitstrahl den Vertreter `min(id)`, bei UUIDs also fast nie
+# denselben: vier Fotos verknüpft, null sichtbar.
+# --------------------------------------------------------------------------- #
+def _visit(db, user, *, hour, loc, day=25) -> Event:
+    e = Event(user_id=user.id, title=f"Besuch: {loc.name}",
+              date_start=datetime(2024, 5, day, hour, 0),
+              date_end=datetime(2024, 5, day, hour, 45),
+              date_precision=DatePrecision.exact, category="event",
+              confirmed=ConfirmState.confirmed, source=Source.google_timeline,
+              location=loc)
+    db.add(e)
+    db.commit()
+    return e
+
+
+@pytest.fixture()
+def besuchstag(db, immich_user):
+    """Zehn importierte Besuche an drei Orten, alle am 25.05."""
+    orte = [_loc(db, immich_user, n, lat, lng) for n, lat, lng in
+            [("Kaiserstraße", 51.22, 6.77), ("Hofgarten", 51.24, 6.78),
+             ("Medienhafen", 51.21, 6.75)]]
+    return [_visit(db, immich_user, hour=h, loc=orte[i % 3])
+            for i, h in enumerate([8, 9, 10, 11, 13, 14, 15, 17, 19, 21])]
+
+
+def test_importierte_besuche_sind_keine_ereignis_kandidaten(db, immich_user, besuchstag):
+    assert candidates(db, immich_user.id) == []
+
+
+def test_der_tag_ist_das_ziel(db, immich_user, besuchstag, fake_search):
+    from app.services.immich_link import link_batch
+
+    fake_search["assets"] = [_asset(f"a{i}", f"2024-05-25T{h:02d}:30:00", 51.23, 6.78)
+                             for i, h in enumerate([9, 12, 16, 20])]
+
+    processed, linked, remaining = link_batch(db, immich_user)
+
+    assert (processed, linked, remaining) == (1, 4, 0), "ein Ziel: der Tag"
+    refs = db.query(MediaRef).filter(MediaRef.provider == "immich").all()
+    assert len(refs) == 4
+    assert all(r.event_id is None for r in refs), "hängt an keinem Besuch mehr"
+    assert {r.captured_at.date() for r in refs} == {datetime(2024, 5, 25).date()}
+    assert all(r.user_id == immich_user.id for r in refs)
+
+
+def test_ein_echtes_ereignis_desselben_tages_geht_vor(db, immich_user, besuchstag,
+                                                      fake_search):
+    """Ein selbst erfasstes Ereignis ist eine Aussage darüber, was der Tag war —
+    sein engeres Fenster bekommt seine Fotos, der Tag sammelt den Rest auf."""
+    from app.services.immich_link import link_batch
+
+    konzert = _event(db, immich_user, when=datetime(2024, 5, 25, 20, 0),
+                     precision=DatePrecision.exact,
+                     loc=_loc(db, immich_user, "Halle", 51.22, 6.78))
+    fake_search["assets"] = [
+        _asset("morgens", "2024-05-25T09:30:00", 51.23, 6.78),
+        _asset("konzert", "2024-05-25T20:30:00", 51.22, 6.78),
+    ]
+
+    link_batch(db, immich_user)
+
+    am_konzert = [m.external_id for m in konzert.media]
+    am_tag = [m.external_id for m in db.query(MediaRef)
+              .filter(MediaRef.event_id.is_(None)).all()]
+    assert am_konzert == ["konzert"]
+    assert am_tag == ["morgens"]
+
+
+def test_zweiter_lauf_verdoppelt_nichts(db, immich_user, besuchstag, fake_search):
+    from app.services.immich_link import link_batch
+
+    fake_search["assets"] = [_asset("a0", "2024-05-25T12:00:00")]
+    link_batch(db, immich_user)
+    processed, linked, _ = link_batch(db, immich_user)
+
+    assert (processed, linked) == (0, 0), "der Tag ist erledigt und kein Ziel mehr"
+    assert db.query(MediaRef).count() == 1
+
+
+def test_der_tag_filtert_nicht_nach_ort(db, immich_user, besuchstag, fake_search):
+    """Bewusst kein Orts-Abgleich: der Tag ist ein Behälter der ZEITachse
+    (Anmerkung 87). Wer abends 500 km weiter fotografiert, hat trotzdem ein
+    Foto von diesem Tag — und sonst hätte es gar keinen Platz."""
+    from app.services.immich_link import link_batch
+
+    fake_search["assets"] = [_asset("weit_weg", "2024-05-25T21:00:00", 48.13, 11.58)]
+    _, linked, _ = link_batch(db, immich_user)
+
+    assert linked == 1
+
+
+def test_foto_ohne_zeitstempel_bekommt_keinen_tag(db, immich_user, besuchstag,
+                                                  fake_search):
+    """Ohne Aufnahmezeit gibt es keinen Kalendertag — und der Behälter IST das
+    Datum. Ein Bild ohne Zeit hätte dort nur ein erfundenes."""
+    from app.services.immich_link import link_day, linked_asset_ids
+
+    ohne_zeit = {"id": "x", "originalMimeType": "image/jpeg", "exifInfo": {}}
+    fake_search["assets"] = [ohne_zeit]
+    n = link_day(db, immich_user, datetime(2024, 5, 25).date(), "u", "k",
+                 linked_asset_ids(db, immich_user.id))
+
+    assert n == 0
+
+
+def test_bestandsverknuepfungen_an_besuchen_werden_geloest(db, immich_user,
+                                                           besuchstag):
+    """Ohne das behielten schon verknüpfte Fotos ihren willkürlichen Besuch,
+    und `seen` erklärte sie als vergeben: die Korrektur käme nie an."""
+    from app.services.immich_link import detach_visit_links
+
+    besuch = besuchstag[0]
+    db.add(MediaRef(user_id=immich_user.id, event_id=besuch.id,
+                    provider="immich", external_id="alt"))
+    eigenes = _event(db, immich_user, when=datetime(2024, 5, 25, 20, 0))
+    db.add(MediaRef(user_id=immich_user.id, event_id=eigenes.id,
+                    provider="immich", external_id="am-ereignis"))
+    db.add(MediaRef(user_id=immich_user.id, event_id=besuch.id,
+                    provider="local", external_id="hochgeladen.jpg"))
+    db.commit()
+
+    assert detach_visit_links(db, immich_user.id) == 1
+    bleibt = {m.external_id for m in db.query(MediaRef).all()}
+    assert bleibt == {"am-ereignis", "hochgeladen.jpg"}, \
+        "Uploads und Ereignis-Verweise bleiben unangetastet"
+    assert detach_visit_links(db, immich_user.id) == 0, "zweiter Lauf: Nulldurchlauf"

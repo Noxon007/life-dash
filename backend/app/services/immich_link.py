@@ -6,17 +6,19 @@ testbar bleibt und die Zuordnungsregeln an einer Stelle stehen.
 from __future__ import annotations
 
 import logging
+from datetime import date, datetime
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import Event, MediaRef
+from app.models import Event, MediaRef, Source
 from app.services import immich as api
+from app.sqlutil import day_parts
 
 log = logging.getLogger("lifedash.immich")
 
 PROVIDER = "immich"
-# Höchstens so viele Fotos je Ereignis verknüpfen. Ein Urlaubstag kann 300
+# Höchstens so viele Fotos je Ziel verknüpfen. Ein Urlaubstag kann 300
 # Bilder haben — die gehören in Immich, nicht als Kachelwand in den Zeitstrahl.
 MAX_PER_EVENT = 12
 
@@ -33,6 +35,11 @@ def candidates(db: Session, user_id: str) -> list[Event]:
     Reise-Eintrag zeigt die Fotos seiner Tage aggregiert. Sonst lägen an einer
     Woche Urlaub die ersten zwölf Bilder am Reise-Eintrag und nichts an den
     einzelnen Tagen — die Beschwerde, die zu dieser Regel führte.
+
+    **Importierte Besuche sind hier NICHT dabei** (Anmerkung 106): sie bekommen
+    ihre Fotos über den TAG, siehe `day_candidates`. Ein Besuch ist „ich war um
+    14:00 in der Kaiserstraße", und ein Foto von 20:00 gehört nicht dorthin,
+    nur weil dieser Besuch zufällig als erster geprüft wurde.
     """
     from sqlalchemy.orm import selectinload
 
@@ -41,12 +48,110 @@ def candidates(db: Session, user_id: str) -> list[Event]:
     # der Kandidaten-Aufbau sonst zur eigentlichen Bremse (N+1).
     rows = (db.query(Event)
             .options(selectinload(Event.children), selectinload(Event.media))
-            .filter(Event.user_id == user_id, Event.date_start.isnot(None))
+            .filter(Event.user_id == user_id, Event.date_start.isnot(None),
+                    Event.source != Source.google_timeline)
             .all())
     return [e for e in rows
             if api.window_for(e) is not None
             and not e.children
             and not any(m.provider == PROVIDER for m in e.media)]
+
+
+# --------------------------------------------------------------------------- #
+# Anmerkung 106 — der Tag als Ziel, nicht ein beliebiger Besuch
+#
+# Nach einem Timeline-Import trägt ein Tag dutzende Besuche. Jeder hatte ein
+# Fenster von ±6 Stunden (`exact`-Präzision), und drei Orte einer Stadt liegen
+# alle im 25-km-Umkreis — der Ort unterschied also nichts. Ein Foto landete
+# beim ERSTEN Besuch, dessen Fenster es erwischte, und „erster" war die
+# Reihenfolge einer Abfrage ohne ORDER BY. Dazu zeigt der verdichtete
+# Zeitstrahl (A39) den Vertreter `min(id)` — bei UUIDs praktisch zufällig, also
+# fast nie derselbe. Gemessen: vier Fotos verknüpft, null sichtbar.
+#
+# F18 hat den richtigen Behälter schon gebaut: `MediaRef` ohne `event_id`, am
+# Kalendertag von `captured_at`. Er war nur nie an Immich angeschlossen.
+# --------------------------------------------------------------------------- #
+def day_candidates(db: Session, user_id: str) -> list[date]:
+    """Tage mit importierten Besuchen, an denen noch keine Immich-Fotos hängen.
+
+    Bewusst nur solche Tage: Tage ohne jeden Eintrag sind nicht Teil der
+    Lebensdatenbank, und Fotos an sie zu hängen hieße, die halbe Immich-
+    Bibliothek zu importieren.
+    """
+    y, m, d = day_parts(Event.date_start)
+    days = (db.query(y, m, d)
+            .filter(Event.user_id == user_id,
+                    Event.source == Source.google_timeline,
+                    Event.date_start.isnot(None))
+            .group_by(y, m, d).all())
+    ym, mm, dm = day_parts(MediaRef.captured_at)
+    done = (db.query(ym, mm, dm)
+            .filter(MediaRef.user_id == user_id,
+                    MediaRef.provider == PROVIDER,
+                    MediaRef.event_id.is_(None),
+                    MediaRef.captured_at.isnot(None))
+            .group_by(ym, mm, dm).all())
+    have = {(int(a), int(b), int(c)) for a, b, c in done}
+    return sorted(date(int(a), int(b), int(c)) for a, b, c in days
+                  if (int(a), int(b), int(c)) not in have)
+
+
+def link_day(db: Session, user, day: date, url: str, key: str,
+             seen: set[str]) -> int:
+    """Sucht Fotos für EINEN Tag und hängt sie an das Datum. Ohne Commit.
+
+    Kein Orts-Abgleich, anders als beim Ereignis: der Tag ist ein Behälter der
+    ZEITachse (Anmerkung 87), und ein Ortsfilter auf einen Behälter, der
+    ausdrücklich nicht vom Ort handelt, wäre in sich widersprüchlich. Wer
+    vormittags Besuche in Düsseldorf hat und abends in München fotografiert,
+    hat ein Foto von diesem Tag — und sonst hätte es gar keinen Platz.
+    """
+    start = datetime(day.year, day.month, day.day)
+    end = start.replace(hour=23, minute=59, second=59, microsecond=999999)
+    added = 0
+    for asset in api.search_assets(url, key, start, end):
+        if added >= MAX_PER_EVENT:
+            break
+        if asset["id"] in seen:
+            continue
+        when = api.asset_time(asset)
+        if when is None:          # ohne Zeit kein Tag — der Behälter ist das Datum
+            continue
+        db.add(MediaRef(
+            user_id=user.id, event_id=None, provider=PROVIDER,
+            external_id=asset["id"], captured_at=when,
+            mime=asset.get("originalMimeType"),
+            width=(asset.get("exifInfo") or {}).get("exifImageWidth"),
+            height=(asset.get("exifInfo") or {}).get("exifImageHeight"),
+            sort_order=1000 + added,
+        ))
+        seen.add(asset["id"])
+        added += 1
+    return added
+
+
+def detach_visit_links(db: Session, user_id: str) -> int:
+    """Löst Immich-Verweise von importierten Besuchen (Anmerkung 106).
+
+    Einmalig wirksam, danach ein Nulldurchlauf. Erlaubt, weil Verweise eine
+    Ableitung sind (Anmerkung 57) — die Bilder liegen in Immich. Ohne das
+    behielten alle bereits verknüpften Fotos ihren willkürlichen Besuch, und
+    der neue Lauf fände sie über `seen` als „schon vergeben": die Korrektur
+    käme nie bei den Bestandsdaten an.
+    """
+    ids = [r[0] for r in
+           db.query(MediaRef.id)
+           .join(Event, Event.id == MediaRef.event_id)
+           .filter(MediaRef.user_id == user_id, MediaRef.provider == PROVIDER,
+                   Event.source == Source.google_timeline).all()]
+    if not ids:
+        return 0
+    (db.query(MediaRef).filter(MediaRef.id.in_(ids))
+     .delete(synchronize_session=False))
+    db.commit()
+    log.info("Immich: %d Verknüpfungen von importierten Besuchen gelöst — "
+             "sie werden an den Tag gehängt (user=%s)", len(ids), user_id)
+    return len(ids)
 
 
 def linked_asset_ids(db: Session, user_id: str) -> set[str]:
@@ -97,26 +202,54 @@ def link_event(db: Session, user, event: Event, url: str, key: str,
     return added
 
 
-def link_batch(db: Session, user, limit: int = 25) -> tuple[int, int, int]:
-    """Verknüpft einen Stapel Ereignisse.
+def targets(db: Session, user_id: str) -> list[tuple[str, object]]:
+    """Was in dieser Runde Fotos bekommen kann — **die Regel, an einer Stelle.**
 
-    Gibt (Ereignisse bearbeitet, Fotos verknüpft, noch offen) zurück.
-    **Wichtig:** Ein Ereignis gilt auch dann als bearbeitet, wenn Immich nichts
+    Reihenfolge ist Absicht: erst die Ereignisse, dann die Tage. Ein selbst
+    erfasstes Ereignis ist eine Aussage darüber, was dieser Tag war, und sein
+    Zeitfenster ist enger; der Tag sammelt danach auf, was übrig bleibt.
+
+    Steht hier und nicht im Job-Runner, weil es vorher zwei Schleifen mit zwei
+    leicht verschiedenen Regeln gab — die eine reichte `seen` durch, die andere
+    nicht. Zwei Antworten auf „wohin gehört dieses Foto?" sind eine zu viel.
+    """
+    return ([("event", e) for e in candidates(db, user_id)]
+            + [("day", d) for d in day_candidates(db, user_id)])
+
+
+def link_target(db: Session, user, kind: str, item, url: str, key: str,
+                seen: set[str]) -> int:
+    """Ein Ziel aus `targets` verknüpfen — Ereignis oder Tag."""
+    if kind == "event":
+        return link_event(db, user, item, url, key, seen=seen)
+    return link_day(db, user, item, url, key, seen)
+
+
+def link_batch(db: Session, user, limit: int = 25) -> tuple[int, int, int]:
+    """Verknüpft einen Stapel Ziele (Ereignisse und Tage).
+
+    Gibt (Ziele bearbeitet, Fotos verknüpft, noch offen) zurück.
+    **Wichtig:** Ein Ziel gilt auch dann als bearbeitet, wenn Immich nichts
     liefert — sonst liefe der Batch-Lauf ewig über dieselben fotolosen Tage.
     Dafür merkt sich ein leerer Treffer nichts; erkannt wird er daran, dass
-    der Aufrufer nach `limit` Ereignissen weiterrückt.
+    der Aufrufer nach `limit` Zielen weiterrückt.
     """
     cfg = api.config_for(user)
     if cfg is None:
         raise api.ImmichError("Immich ist für dieses Konto nicht eingerichtet "
                               "(Verwaltung → Meine Daten → Immich)")
     url, key = cfg
-    pending = candidates(db, user.id)
+    pending = targets(db, user.id)
     batch = pending[:limit]
+    # Über den ganzen Stapel entduplizieren: jedes Foto genau einmal, beim
+    # ersten passenden Ziel. Ohne diese Menge bekäme jedes Ziel dieselben Fotos
+    # noch einmal — der Defekt, den der Job-Runner längst vermied und diese
+    # Funktion nicht.
+    seen = linked_asset_ids(db, user.id)
     linked = 0
-    for event in batch:
+    for kind, item in batch:
         try:
-            n = link_event(db, user, event, url, key)
+            n = link_target(db, user, kind, item, url, key, seen)
             if n:
                 db.commit()
                 linked += n

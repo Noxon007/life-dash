@@ -141,6 +141,21 @@ Schwelle** (Anm. 103): die Wettermetriken zählten Einträge, wo überall „Tag
 stand — A31/Anm. 64 hatte in dieser Datei überlebt. Frage bei jeder
 Invarianten-Reparatur: *wo gilt derselbe Satz noch?*
 
+**Immich hängt Tages-Fotos an den TAG (Anmerkung 106, in 0.35.0).** Vorher ging
+ein Foto an den ersten Besuch, dessen ±6-h-Fenster es traf — bei `exact`-Präzision
+der importierten Besuche und 25 km Ortstoleranz entschied faktisch die
+Reihenfolge einer Abfrage **ohne ORDER BY**. Und die A39-Sammelkarte zeigt
+`min(id)` (UUIDs!), also einen ANDEREN zufälligen Besuch: gemessen vier Fotos
+verknüpft, null sichtbar. Jetzt: `targets()` liefert erst Ereignisse (engeres
+Fenster, selbst erfasst = Aussage über den Tag), dann Tage aus importierten
+Besuchen → `MediaRef` ohne `event_id` (F18-Behälter). **Der Tag filtert bewusst
+NICHT nach Ort** — ein Zeit-Behälter mit Ortsfilter wäre in sich widersprüchlich.
+Bestandsverknüpfungen an Besuchen werden zu Lauf-Beginn gelöst, sonst gälten sie
+über `seen` als vergeben. **Regel:** „wohin gehört das?" hatte drei Antworten in
+zwei Dateien (`candidates`, Job-Schleife, `link_batch`) — eine davon hatte die
+Entduplizierung verloren. Eine Regel an mehreren Orten widerspricht sich, und
+zwar still.
+
 **Wächter prüfen Zustände, die es geben muss.** `check-a41-cities.js` prüfte ein
 Jahr lang, dass der Städte-Reiter im Markup steht — im Betrieb ersetzt
 `applyModules()` die Leiste Sekundenbruchteile nach dem Start, der Reiter war

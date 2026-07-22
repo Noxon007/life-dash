@@ -59,6 +59,18 @@ any `MINOR`.
   hand next to a list that the app rebuilds from the modules as soon as they
   load — which happens a moment after every start. The tab was therefore gone
   in every real session, and the statistics tile pointing at it led nowhere.
+- **Immich photos now belong to the day, not to a random visit of it.** After a
+  Google Timeline import a day holds dozens of visits, each with a window of
+  six hours either side, and three places in one city are all within the 25 km
+  the place check allows — so a photo simply went to whichever visit happened to
+  be looked at first. Worse, the timeline shows one condensed card per day and
+  city, and that card is a different arbitrary visit: measured on a day with ten
+  visits, four photos were attached and **none** of them were visible. Photos of
+  such a day now hang on the date itself and appear in the day's photo strip,
+  the place ceases to be part of the question, and entries you created yourself
+  still get their own photos first. Existing links on imported visits are moved
+  the next time the Immich run goes through — they are references, so nothing is
+  lost.
 
 ## [0.34.0] – 2026-07-22
 
