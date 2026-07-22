@@ -46,6 +46,13 @@ any `MINOR`.
 - Place data returned by the API now includes `city`; `GET /api/events` gained
   `condense` and `city` parameters.
 
+### Fixed
+- **The running version is readable on a phone again.** It lives in the sidebar
+  footer, which the phone layout hides — so “which build am I looking at?” had
+  no answer on the device where it is asked most. Version, account and sign-out
+  now sit at the bottom of the “More” sheet, including the orange `-dev` mark
+  and the build tooltip.
+
 ## [0.33.0] – 2026-07-22
 
 ### Changed

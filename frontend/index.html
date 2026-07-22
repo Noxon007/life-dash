@@ -121,7 +121,7 @@
   .sidebar-foot a { color: var(--accent); text-decoration: none; }
   /* Anmerkung 90: Testgleis-Stand sichtbar, aber nicht laut — ein Hinweis,
      keine Warnung; das :main-Image ist ein normaler Betriebszustand. */
-  #foot-version.is-dev { color: var(--warn); font-weight: 600; }
+  #foot-version.is-dev, #sheet-version.is-dev { color: var(--warn); font-weight: 600; }
   /* ---------- Main ---------- */
   .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
   .topbar {
@@ -504,6 +504,10 @@
     font-size: 12px; color: var(--text-dim);
   }
   .sheet-foot a { color: var(--accent); text-decoration: none; }
+  /* Der Fußzeilen-Text der Sidebar ist auf dem Handy ausgeblendet — Konto UND
+     laufende Version stehen deshalb hier, sonst ist „welcher Stand läuft?“
+     mobil nirgends beantwortbar. */
+  .sheet-foot .foot-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   /* Nav-Zeilen im Sheet: volle Breite, 48 px hoch — klar über dem 44-px-Ziel */
   .sheet .nav-item {
     width: 100%; min-height: 48px; font-size: 15px; border-radius: 10px;
@@ -922,7 +926,10 @@
       <div class="sheet-head"><b id="nav-sheet-title" data-i18n="nav.more.title">Mehr</b></div>
       <div class="sheet-body" id="nav-sheet-items"></div>
       <div class="sheet-foot">
-        <span id="sheet-user" class="hint"></span>
+        <span class="foot-meta">
+          <span id="sheet-user" class="hint"></span>
+          <span><b>Life-Dash</b> <span id="sheet-version"></span></span>
+        </span>
         <a href="#" id="sheet-logout" style="display:none" data-i18n="logout">Abmelden</a>
       </div>
     </div>
@@ -5722,6 +5729,14 @@ function openNavSheet() {
   if (u && su) su.textContent = u.textContent;
   const lo = document.getElementById('logout-link'), slo = document.getElementById('sheet-logout');
   if (lo && slo) slo.style.display = lo.style.display;
+  // Version gespiegelt statt zweitgeholt: /health ist beim Start schon gelesen,
+  // und die Sidebar-Fußzeile ist mobil ausgeblendet (display:none), nicht leer.
+  const v = document.getElementById('foot-version'), sv = document.getElementById('sheet-version');
+  if (v && sv) {
+    sv.textContent = v.textContent;
+    sv.title = v.title;
+    sv.classList.toggle('is-dev', v.classList.contains('is-dev'));
+  }
   navSheet.classList.add('show');
   navSheet.setAttribute('aria-hidden', 'false');
   document.getElementById('nav-more').setAttribute('aria-expanded', 'true');

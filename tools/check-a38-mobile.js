@@ -91,6 +91,29 @@ setTimeout(() => {
   // Der Zähler der Verwaltung muss auf „Mehr“ gespiegelt werden.
   check('Zähler auch auf „Mehr“', !!d.getElementById('nav-more-badge'));
 
+  // Die Sidebar-Fußzeile ist mobil ausgeblendet — ohne Spiegelung ins Sheet
+  // ist auf dem Handy nirgends ablesbar, welcher Stand läuft.
+  if (typeof w.openNavSheet === 'function') {
+    const fv = d.getElementById('foot-version');
+    fv.textContent = 'v9.9.9-dev';
+    fv.classList.add('is-dev');
+    fv.title = 'main @ abc1234';
+    try {
+      w.openNavSheet();
+      const sv = d.getElementById('sheet-version');
+      check('Version im „Mehr“-Sheet', !!sv && sv.textContent === 'v9.9.9-dev',
+            sv ? `steht dort „${sv.textContent}“` : 'kein #sheet-version');
+      check('Testgleis auch im Sheet erkennbar',
+            !!sv && sv.classList.contains('is-dev') && sv.title === 'main @ abc1234',
+            'is-dev/Tooltip nicht gespiegelt');
+      w.closeNavSheet();
+    } catch (e) {
+      check('openNavSheet läuft durch', false, e.message);
+    }
+  } else {
+    check('openNavSheet existiert', false, 'Funktion nicht gefunden');
+  }
+
   // Karte: Filter wegklappbar, Zeitraum bleibt am Knopf ablesbar.
   check('Karten-Filter klappbar', !!d.getElementById('mp-filter-toggle'));
   check('Zeitraum am Klapp-Knopf', !!d.getElementById('mp-filter-toggle-label'));
