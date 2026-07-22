@@ -1736,7 +1736,8 @@
             <button class="btn small secondary" id="logs-refresh">↻ Aktualisieren</button>
           </div>
           <div class="hint" style="margin-bottom:12px" data-i18n="adm.logs.hint">Die letzten App-Log-Zeilen seit Prozessstart
-            (max. 500, nur im Speicher — kein Datei-Zugriff). Vollständige Logs weiterhin über
+            (max. 2000, nur im Speicher — kein Datei-Zugriff), aktualisiert sich alle paar Sekunden,
+            solange dieser Reiter offen ist. Vollständige Logs weiterhin über
             <code>docker logs</code>; Ausführlichkeit steuert <code>LOG_LEVEL</code> in der .env.</div>
           <pre id="logs-list" style="background:var(--bg-elev); border:1px solid var(--border); border-radius:10px; padding:12px; max-height:60dvh; overflow:auto; font-size:12px; line-height:1.55; white-space:pre-wrap; margin:0"></pre>
         </div>
@@ -2525,7 +2526,9 @@ const I18N_EN = {
   'stats.hint': "💡 Statistics are <b>computed views</b> — rebuildable at any time. Every module (trips, animals …) brings its own widgets.",
   'adm.db.title': "Database — raw view",
   'adm.db.hint': "🗄️ A direct look at the tables (admin). Raw inbox = <code>fragments</code>, life database = <code>events</code>/<code>entities</code>/<code>locations</code>, enrichments = <code>media_refs</code>/<code>metrics</code>.",
-  'adm.logs.hint': "The most recent app log lines since the process started (max. 500, in memory only — no file access). Full logs remain available via <code>docker logs</code>; the level is controlled by <code>LOG_LEVEL</code> in the .env.",
+  'adm.logs.hint': "The most recent app log lines since the process started (max. 2000, in memory only — no file access), refreshed every few seconds while this tab is open. Full logs remain available via <code>docker logs</code>; the level is controlled by <code>LOG_LEVEL</code> in the .env.",
+  'adm.logs.empty': "No log entries at this level yet (since app start).",
+  'adm.logs.fail': "Logs unavailable: ",
   'track.modal.hint': "Pick the areas that interest you — they decide the collection, the statistics and what the AI recognises. Changeable at any time under Settings → My data.",
 
   // --- Nachtrag: Kopfzeile & fehlende Attribute ---
@@ -5500,7 +5503,7 @@ function loadAdminTab(t) {
   if (t === 'jobs') { loadJobs(); renderSchedule(); }
   if (t === 'nutzer') loadUsers();
   if (t === 'db') loadDbTables();
-  if (t === 'logs') loadLogs();
+  if (t === 'logs') { loadLogs(); followLogs(); }
 }
 function showAdminTab(t) {
   adminTab = t;
@@ -5514,19 +5517,37 @@ document.querySelectorAll('#admin-tabs [data-atab]').forEach(b =>
   b.addEventListener('click', () => showAdminTab(b.dataset.atab)));
 
 // ---------- LOGS (A17, nur Admin) ----------
+// Die Läufe schreiben jetzt fortlaufend mit (Ortsnamen: eine Zeile je Ort).
+// Eine Ansicht, die man dafür alle paar Sekunden von Hand nachlädt, ist genau
+// so nutzlos wie das stille Log vorher — deshalb folgt sie von selbst,
+// solange der Reiter offen ist.
+const LOGS_REFRESH_MS = 5000;
+let logsTimer = null;
 async function loadLogs() {
   const el = document.getElementById('logs-list');
   if (!el || !isAdmin()) return;
   const lvl = document.getElementById('logs-level').value;
+  // Wer nach oben gescrollt hat, liest etwas — dann nicht ans Ende springen.
+  const following = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
   try {
-    const rows = await api(`/api/admin/logs?level=${lvl}&limit=400`);
+    const rows = await api(`/api/admin/logs?level=${lvl}&limit=800`);
     el.textContent = rows.length
       ? rows.map(r => `${r.ts} ${r.level.padEnd(7)} ${r.logger}: ${r.message}`).join('\n')
-      : 'Noch keine Log-Einträge auf dieser Stufe (seit App-Start).';
-    el.scrollTop = el.scrollHeight;  // Neuestes unten im Blick
+      : t('adm.logs.empty', 'Noch keine Log-Einträge auf dieser Stufe (seit App-Start).');
+    if (following) el.scrollTop = el.scrollHeight;  // Neuestes unten im Blick
   } catch (err) {
-    el.textContent = 'Logs nicht verfügbar: ' + err.message;
+    el.textContent = t('adm.logs.fail', 'Logs nicht verfügbar: ') + err.message;
   }
+}
+function followLogs() {
+  clearInterval(logsTimer);
+  logsTimer = setInterval(() => {
+    // Selbst abschalten statt an jedem Ansichtswechsel daran zu denken:
+    // offsetParent ist null, sobald irgendein Elternteil ausgeblendet ist.
+    const el = document.getElementById('logs-list');
+    if (!el || el.offsetParent === null) { clearInterval(logsTimer); return; }
+    loadLogs();
+  }, LOGS_REFRESH_MS);
 }
 document.getElementById('logs-level').addEventListener('change', loadLogs);
 document.getElementById('logs-refresh').addEventListener('click', loadLogs);

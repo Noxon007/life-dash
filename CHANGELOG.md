@@ -46,6 +46,25 @@ any `MINOR`.
 - Place data returned by the API now includes `city`; `GET /api/events` gained
   `condense` and `city` parameters.
 
+### Changed
+- **Long-running jobs now say what they are doing while they do it.** Only the
+  Immich run reported progress; resolving place names, adding weather, imports
+  and exports wrote one line when they started and one when they finished, and
+  in between a slow run looked exactly like a hung one.
+  - Every job writes a progress line with **speed and remaining time** — “340
+    of 1,200 places (48/min, ~18 min left)”. The line appears at most every ten
+    seconds, so a fast job cannot flood the log.
+  - **Resolving place names reports every place**, old name to new one,
+    including the city that was found and whether the result still has a
+    defect. The geocoder is limited to about one request per second, so this
+    can never be more than a line per second.
+  - **Export and import report each section** (“Export: events — 12,013 rows”),
+    and weather names the entries it could not get data for — the reason a run
+    stops with “nothing to enrich” was previously nowhere to be found.
+  - The **log view holds 2,000 lines** instead of 500, and follows along on its
+    own while the tab is open. A single run of place names used to push
+    everything else out of the buffer within minutes.
+
 ### Fixed
 - **The running version is readable on a phone again.** It lives in the sidebar
   footer, which the phone layout hides — so “which build am I looking at?” had

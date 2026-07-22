@@ -653,11 +653,16 @@ def resolve_place_names(
                     .all())
         return _resolve_candidates(db, user.id, parts)
 
-    locs = _candidates()[:limit]
+    all_candidates = _candidates()
+    locs = all_candidates[:limit]
+    log.info("Ortsnamen-Batch (%s): %d von %d Orten, ~%d s bei %.1f s Wartezeit",
+             scope or "alle", len(locs), len(all_candidates), len(locs) * _geo_delay(),
+             _geo_delay())
     resolved = failed = 0
     for i, loc in enumerate(locs):
         if i:
             time.sleep(_geo_delay())
+        before = loc.name
         ok = _apply_resolved_name(db, loc, user.id, parts, lang)
         if ok:
             db.commit()
@@ -666,8 +671,24 @@ def resolve_place_names(
         # endlos über dieselben Orte. Deckt beides ab, was vorher zwei
         # scope-spezifische Prüfungen waren: OSM kennt keinen de/en-Namen,
         # oder addressdetails fehlen und der Name bleibt zu lang.
-        if ok and _name_defect(loc.name, parts) is not None:
+        defect = _name_defect(loc.name, parts) if ok else None
+        if ok and defect is not None:
             ok = False
+        # Je Ort eine Zeile: der Geocoder ist auf eine Anfrage pro Sekunde
+        # gedrosselt, mehr als 60 Zeilen je Minute können hier gar nicht
+        # entstehen — und ohne sie ist ein Lauf über tausend Orte eine
+        # Viertelstunde Stille. Protokolliert wird NACH der Mängelprüfung: ein
+        # Name, der zurückkam und trotzdem nicht taugt, ist der Fall, den man
+        # später sucht — als „aufgelöst" gemeldet wäre er unauffindbar.
+        if defect is not None:
+            outcome = f"→ {loc.name!r}, aber weiterhin mangelhaft ({defect})"
+        elif ok:
+            outcome = f"→ {loc.name!r}"
+            if loc.city:
+                outcome += f" (Stadt: {loc.city})"
+        else:
+            outcome = "unverändert (kein Treffer)"
+        log.info("Ortsname %d/%d: %r %s", i + 1, len(locs), before, outcome)
         if ok:
             resolved += 1
         else:

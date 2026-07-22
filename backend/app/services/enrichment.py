@@ -6,6 +6,7 @@ ohne Stufe 2 zu verändern.
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime, timezone
 
 from sqlalchemy.exc import IntegrityError
@@ -63,7 +64,15 @@ def _needs_weather(event: Event) -> bool:
 
 def _weather_candidates(db: Session) -> list[Event]:
     """Verortete, datierte, nicht-zukünftige Events ohne Wetter-Metrik."""
-    return [e for e in db.query(Event).all() if _needs_weather(e)]
+    t0 = time.monotonic()
+    rows = db.query(Event).all()
+    hits = [e for e in rows if _needs_weather(e)]
+    # Diese Suche läuft VOR JEDEM Batch über den ganzen Bestand. Bei kleinen
+    # Datenmengen ist das egal, bei 12 000 Ereignissen ist es der teuerste Teil
+    # des Laufs — sichtbar gemacht statt vermutet (Anmerkung 85: messen).
+    log.debug("Wetter-Kandidaten: %d von %d Ereignissen (%.1f s)",
+              len(hits), len(rows), time.monotonic() - t0)
+    return hits
 
 
 # F3: gespeicherte Tageswerte -> Metrik-Schlüssel + Einheit
@@ -167,11 +176,22 @@ def enrich_weather(db: Session, limit: int | None = None) -> tuple[int, int]:
     # Dubletten aus parallelen Läufen ab — dann verliert nur DIESES Event
     # (bereits angereichert), nicht der ganze Batch.
     enriched = 0
+    blank: list[str] = []
     for event in batch:
         try:
             if _add_weather(db, event):
                 db.commit()
                 enriched += 1
+                log.debug("Wetter: %s (%s) angereichert",
+                          event.title, event.date_start.date())
+            else:
+                blank.append(f"{event.title} ({event.date_start.date()})")
         except IntegrityError:
             db.rollback()  # parallele Instanz war schneller — kein Schaden
+    # Ereignisse, für die es nichts gab, sind der Grund, aus dem ein Lauf mit
+    # „nicht anreicherbar" stehen bleibt. Ohne Beispiel im Log ist diese
+    # Meldung nicht nachvollziehbar — welches Datum, welcher Ort?
+    if blank:
+        log.info("Wetter: %d von %d ohne Daten (z. B. %s)",
+                 len(blank), len(batch), "; ".join(blank[:3]))
     return enriched, len(candidates) - enriched

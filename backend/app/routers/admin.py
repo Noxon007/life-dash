@@ -15,6 +15,7 @@ from sqlalchemy import Integer as SAInteger
 from sqlalchemy import Table, func, select, text
 from sqlalchemy.orm import Session
 
+from app import logbuffer
 from app.auth import require_admin
 from app.database import Base, SessionLocal, engine, get_db
 from app.models import (
@@ -378,14 +379,15 @@ def reindex_embeddings(limit: int = Query(25, ge=1, le=200)) -> dict:
 @router.get("/logs")
 def read_logs(
     level: str = "INFO",
-    limit: int = Query(300, ge=1, le=500),
+    limit: int = Query(300, ge=1, le=logbuffer.CAPACITY),
 ) -> list[dict]:
-    """Letzte App-Log-Zeilen (seit Prozessstart, max. 500). `level` filtert
-    auf Mindest-Schwere. Nur Admin — Logs sind nutzerübergreifend."""
-    from app.logbuffer import ring
+    """Letzte App-Log-Zeilen (seit Prozessstart). `level` filtert auf
+    Mindest-Schwere. Nur Admin — Logs sind nutzerübergreifend.
 
+    Die Obergrenze ist die Puffergröße selbst: mehr kann es nicht geben, und
+    eine zweite Zahl daneben wäre bei der nächsten Änderung wieder falsch."""
     min_no = getattr(logging, level.upper(), logging.INFO)
-    rows = [r for r in ring.buffer if r["levelno"] >= min_no]
+    rows = [r for r in logbuffer.ring.buffer if r["levelno"] >= min_no]
     return rows[-limit:]
 
 

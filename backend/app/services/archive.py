@@ -26,6 +26,8 @@ import logging
 import zipfile
 from pathlib import Path
 
+from app.joblog import Progress
+
 log = logging.getLogger("lifedash.archive")
 
 JSON_NAME = "export.json"
@@ -34,9 +36,9 @@ MEDIA_PREFIX = "media/"
 # neu erzeugbar (Ableitung) und würden das Backup ohne Gewinn aufblähen.
 # Der Import legt sie beim Zurückspielen neu an.
 CHUNK = 1024 * 1024
-# A34: alle N Dateien eine Zeile ins Log — genug, um Fortschritt zu sehen,
-# wenig genug, um das Log nicht zu fluten
-PROGRESS_EVERY = 250
+# Fortschritt im Log: A34 zählte Dateien (alle 250 eine Zeile), jetzt zählt
+# `app.joblog.Progress` die Zeit — bei ungleich großen Dateien ist nur die Uhr
+# ein verlässliches Lebenszeichen.
 
 
 class ArchiveError(ValueError):
@@ -93,7 +95,8 @@ def stream(payload: dict, files: list[tuple[str, Path]]):
     total = len(files)
     # A34: Ein Archiv über zehntausend Fotos läuft minutenlang. Ohne Spur im
     # Log ist ein langsamer Export von einem hängenden nicht zu unterscheiden.
-    log.info("Archiv-Export beginnt: %d Bilddateien", total)
+    progress = Progress(log, "Archiv-Export", unit="Bilddateien")
+    progress.start(total)
     # Die JSON-Daten komprimieren sich gut; JPEG/PNG sind bereits komprimiert
     # und würden nur CPU kosten -> je Eintrag passend gewählt.
     with zipfile.ZipFile(sink, "w", allowZip64=True) as zf:
@@ -104,8 +107,7 @@ def stream(payload: dict, files: list[tuple[str, Path]]):
 
         for name, path in files:
             done += 1
-            if total > PROGRESS_EVERY and done % PROGRESS_EVERY == 0:
-                log.info("Archiv-Export: %d/%d Bilddateien", done, total)
+            progress.beat(done, total - done)
             if not path.is_file():
                 missing += 1
                 continue
@@ -118,9 +120,8 @@ def stream(payload: dict, files: list[tuple[str, Path]]):
             if data := sink.drain():
                 yield data
     yield sink.drain()      # Zentralverzeichnis am Schluss
-    log.info("Archiv-Export fertig: %d/%d Bilddateien geschrieben%s",
-             total - missing, total,
-             f", {missing} fehlten auf der Platte" if missing else "")
+    progress.finish(f"{total - missing}/{total} Bilddateien geschrieben" +
+                    (f", {missing} fehlten auf der Platte" if missing else ""))
 
 
 # --------------------------------------------------------------------------- #
@@ -175,12 +176,11 @@ def extract_media(zf: zipfile.ZipFile, target_dir: Path, *,
     target_dir.mkdir(parents=True, exist_ok=True)
     restored = skipped = seen = 0
     members = [i for i in zf.infolist() if not i.is_dir()]
-    log.info("Archiv-Import beginnt: %d Einträge im Archiv", len(members))
+    progress = Progress(log, "Archiv-Import", unit="Einträge")
+    progress.start(len(members))
     for info in members:
         seen += 1
-        if len(members) > PROGRESS_EVERY and seen % PROGRESS_EVERY == 0:
-            log.info("Archiv-Import: %d/%d Einträge, %d wiederhergestellt",
-                     seen, len(members), restored)
+        progress.beat(seen, len(members) - seen, note=f"{restored} wiederhergestellt")
         name = safe_member(info.filename)
         if name is None:
             if info.filename != JSON_NAME:
@@ -202,4 +202,5 @@ def extract_media(zf: zipfile.ZipFile, target_dir: Path, *,
             continue
         dest.write_bytes(data)
         restored += 1
+    progress.finish(f"{restored} wiederhergestellt, {skipped} übersprungen")
     return restored, skipped

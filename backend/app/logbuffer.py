@@ -11,7 +11,12 @@ import logging
 import time
 from collections import deque
 
-CAPACITY = 500
+# Seit die Läufe je Schritt sprechen (Ortsnamen: eine Zeile je Ort), füllt ein
+# einziger Lauf die alten 500 Zeilen in gut acht Minuten — und schob damit
+# genau das aus dem Puffer, wofür man ihn aufmacht (Fehler von vorhin).
+# 2000 Zeilen sind im Speicher ein paar hundert Kilobyte und decken einen
+# kompletten Lauf ab. `docker logs` bleibt die vollständige Quelle.
+CAPACITY = 2000
 
 
 class RingBufferHandler(logging.Handler):

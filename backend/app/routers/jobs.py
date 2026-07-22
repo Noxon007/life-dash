@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import SessionLocal, get_db
+from app.joblog import Progress
 from app.models import Job, User, UserRole
 
 log = logging.getLogger("lifedash.jobs")
@@ -49,6 +50,22 @@ JOB_TYPES = {
 SERVER_JOB_TYPES = ("weather", "embeddings", "resolve_names", "recompute", "immich")
 # In Tests abgeschaltet (in-memory-DB verträgt keine fremden Threads)
 WORKERS_ENABLED = True
+
+# Lebenszeichen je laufendem Job. Bewusst hier und nicht in jedem Runner: durch
+# `_tick` läuft JEDER Fortschritt — der der Server-Worker wie der, den ein
+# client-getriebener Import (Timeline, JSON) über /progress meldet. Ein Eintrag
+# lebt so lange wie der Lauf; aufgeräumt wird beim Abschluss und beim Einsammeln
+# verwaister Jobs.
+_BEATS: dict[str, Progress] = {}
+
+
+def _beat(job: Job) -> Progress:
+    """Fortschrittsprotokoll dieses Jobs — bei Bedarf angelegt."""
+    p = _BEATS.get(job.id)
+    if p is None:
+        label = f"{JOB_TYPES.get(job.type, job.type)} ({job.id[:8]})"
+        p = _BEATS[job.id] = Progress(log, label, unit=job.unit or "Einträge")
+    return p
 
 
 class JobRead(BaseModel):
@@ -101,6 +118,7 @@ def _reap_stale(db: Session) -> None:
         job.status = "stopped"
         job.finished_at = job.updated_at
         job.result = (job.result or "") or "abgebrochen (kein Heartbeat)"
+        _BEATS.pop(job.id, None)
     if stale:
         db.commit()
         log.info("Jobs: %d verwaiste Läufe als gestoppt markiert", len(stale))
@@ -181,6 +199,9 @@ def job_progress(
     job.remaining = payload.remaining
     job.updated_at = _now().replace(tzinfo=None)  # expliziter Heartbeat
     db.commit()
+    # Auch der Import spricht: er läuft im Browser, aber sein Fortschritt gehört
+    # ins Server-Log — dort steht der Rest des Laufs (Ortsnamen, Wetter) auch.
+    _beat(job).beat(job.done, payload.remaining)
     return _to_read(db, job)
 
 
@@ -216,6 +237,7 @@ def job_finish(
         job.result = payload.result
         job.finished_at = _now().replace(tzinfo=None)
         db.commit()
+        _BEATS.pop(job.id, None)
         log.info("Job beendet: %s (%s) — %s, %d verarbeitet",
                  job.type, job.id[:8], payload.status, job.done)
     return _to_read(db, job)
@@ -237,6 +259,7 @@ def _tick(db: Session, job_id: str, done_add: int, remaining: int | None) -> boo
     job.remaining = remaining
     job.updated_at = _naive_now()
     db.commit()
+    _beat(job).beat(job.done, remaining)
     return job.status == "running"
 
 
@@ -395,6 +418,7 @@ def _worker_main(job_id: str) -> None:
     db = SessionLocal()
     try:
         job = db.get(Job, job_id)
+        _beat(job).start(note=f"Typ {job.type}")
         status, result = _RUNNERS[job.type](db, job)
     except Exception as err:  # noqa: BLE001 — Fehler landet im Job-Ergebnis
         log.exception("Job-Worker-Fehler (%s)", job_id[:8])
@@ -408,9 +432,11 @@ def _worker_main(job_id: str) -> None:
             job.result = result
             job.finished_at = _naive_now()
             db.commit()
-            log.info("Job fertig: %s (%s) — %s: %s",
-                     job.type, job_id[:8], status, result)
+            # Eine Schlusszeile, nicht zwei: `finish` trägt Typ, Kennung, Dauer,
+            # Status und Ergebnis — das alte „Job fertig" sagte dasselbe ohne Dauer.
+            _beat(job).finish(f"{status} — {result}")
     finally:
+        _BEATS.pop(job_id, None)
         db.close()
 
 

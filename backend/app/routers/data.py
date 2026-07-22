@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.config import settings
 from app.database import get_db
+from app.joblog import Progress
 from app.services import archive
 from app.services import media as media_svc
 from app.models import (
@@ -82,17 +83,30 @@ def export_data(
     Lebensdatenbank). Metriken/Verknüpfungen folgen ihren Events."""
     excluded = {s.strip() for s in exclude_source.split(",") if s.strip()}
 
+    # A34/Anmerkung 92: Ein Export über 12 000 Ereignisse läuft eine Weile, und
+    # bis 0.34.0 stand die einzige Zeile dazu ganz am Ende — wer währenddessen
+    # ins Log sah, sah nichts. Jetzt meldet sich jeder Abschnitt einzeln; das
+    # zeigt nebenbei, welcher Teil die Zeit kostet.
+    log.info("Export beginnt (user=%s%s)", user.email or user.id,
+             f", ohne {', '.join(sorted(excluded))}" if excluded else "")
+
+    def _loaded(name: str, rows: list) -> list:
+        log.info("Export: %s — %d Zeilen", name, len(rows))
+        return rows
+
     def _kept(query, model):
         rows = query.filter(model.user_id == user.id).all()
         if not excluded:
             return rows
         return [r for r in rows if getattr(r.source, "value", r.source) not in excluded]
 
-    fragments = _kept(db.query(Fragment), Fragment)
-    locations = db.query(Location).filter(Location.user_id == user.id).all()
-    entities = db.query(Entity).filter(Entity.user_id == user.id).all()
-    events = _kept(db.query(Event), Event)
-    tracks = _kept(db.query(Track), Track)
+    fragments = _loaded("Fragmente", _kept(db.query(Fragment), Fragment))
+    locations = _loaded("Orte", db.query(Location)
+                        .filter(Location.user_id == user.id).all())
+    entities = _loaded("Entitäten", db.query(Entity)
+                       .filter(Entity.user_id == user.id).all())
+    events = _loaded("Ereignisse", _kept(db.query(Event), Event))
+    tracks = _loaded("Wege", _kept(db.query(Track), Track))
     event_ids = {e.id for e in events}
     links = [
         l for l in db.query(EventEntityLink).all() if l.event_id in event_ids
@@ -101,19 +115,22 @@ def export_data(
     # allein über `event_id` ließe alle Tages-Bilder aus dem Backup fallen —
     # lautlos, denn die Datei sähe vollständig aus. Bilder an Ereignissen, die
     # der Export bewusst weglässt (A21), bleiben weiterhin draußen.
-    media = [m for m in db.query(MediaRef).filter(MediaRef.user_id == user.id).all()
-             if m.event_id is None or m.event_id in event_ids]
-    metrics = [m for m in db.query(Metric).all() if m.event_id in event_ids]
-
-    log.info("Export: %d Fragmente, %d Orte, %d Entities, %d Events, %d Tracks "
-             "(user=%s)", len(fragments), len(locations), len(entities),
-             len(events), len(tracks), user.email or user.id)
+    media = _loaded("Bilder", [m for m in db.query(MediaRef)
+                               .filter(MediaRef.user_id == user.id).all()
+                               if m.event_id is None or m.event_id in event_ids])
+    metrics = _loaded("Messwerte", [m for m in db.query(Metric).all()
+                                    if m.event_id in event_ids])
+    _loaded("Verknüpfungen", links)
     # F15/Anmerkung 57: Ab hier ist der JSON-Export KEIN vollständiges Backup
     # mehr. Bilddateien passen nicht hinein; ihre Metadaten schon. Wer das
     # nicht weiß, verliert seine Fotos im Vertrauen auf eine Datei, die
     # vollständig aussieht — deshalb steht es im Export selbst, nicht nur in
     # der Doku. Das schließt A29 (ZIP-Export mit Dateien) später sauber ab.
     uploads = sum(1 for m in media if m.provider == "local")
+    total = sum(len(x) for x in (fragments, locations, entities, events,
+                                 links, media, metrics, tracks))
+    log.info("Export fertig: %d Zeilen, davon %d Bilder als Verweis "
+             "(Dateien liegen nicht im JSON)", total, uploads)
     return {
         "format": "lifedash-export",
         "version": EXPORT_VERSION,
@@ -165,7 +182,7 @@ def export_archive(
         "Zurückspielen über Verwaltung → Meine Daten → Import.")
 
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    log.info("Archiv-Export: %d Bilddateien (user=%s)", len(files),
+    log.info("Archiv-Export angefordert: %d Bilddateien (user=%s)", len(files),
              user.email or user.id)
     return StreamingResponse(
         archive.stream(payload, files),
@@ -297,9 +314,18 @@ def import_data(
     ]
     imported: dict[str, int] = {}
     skipped = 0
+    # Der Import prüft jede Zeile einzeln gegen die Datenbank (Idempotenz) —
+    # bei einem vollen Backup sind das zehntausende Abfragen. Ohne Zwischenstand
+    # ist der Unterschied zwischen „arbeitet" und „hängt" nicht zu sehen.
+    rows_total = sum(len(payload.get(key, [])) for key, _, _ in plan)
+    progress = Progress(log, "Daten-Import", unit="Zeilen")
+    progress.start(rows_total, note=f"user={user.email or user.id}")
+    seen = 0
     for key, model, has_user in plan:
         count = 0
         for row in payload.get(key, []):
+            seen += 1
+            progress.beat(seen, rows_total - seen, note=key)
             if not row.get("id") or db.get(model, row["id"]) is not None:
                 skipped += 1
                 continue
@@ -310,10 +336,10 @@ def import_data(
             count += 1
         db.flush()
         imported[key] = count
+        if payload.get(key):
+            log.info("Import: %s — %d neu, %d schon vorhanden",
+                     key, count, len(payload[key]) - count)
     db.commit()
-    log.info("Import: %d Zeilen neu (%s), %d übersprungen (user=%s)",
-             sum(imported.values()),
-             ", ".join(f"{k}={v}" for k, v in imported.items() if v) or "nichts",
-             skipped, user.email or user.id)
+    progress.finish(f"{sum(imported.values())} neu, {skipped} übersprungen")
     return {"imported": imported, "skipped_existing": skipped,
             "total": sum(imported.values())}
