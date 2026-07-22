@@ -9,6 +9,7 @@ Zwei Dinge müssen bewiesen werden, und das zweite ist das wichtigere:
 """
 from __future__ import annotations
 
+from datetime import date as date_type
 from datetime import datetime
 
 import pytest
@@ -411,3 +412,94 @@ def test_empty_database_answers_everywhere(db, user):
     assert list_map_events(db=db, user=user) == []
     ov = compute_overview(db, user.id)
     assert ov["counts"]["events"] == 0 and ov["per_year"] == []
+
+
+# --------------------------------------------------------------------------- #
+# „An diesem Tag" — Vorauswahl in SQL (zweite Testrunde)
+# --------------------------------------------------------------------------- #
+def _brute_force_on_this_day(db, user, today, max_years=50):
+    """Die ALTE Auswahl: alles laden, in Python entscheiden. Referenz für den
+    Beweis, dass die SQL-Vorauswahl nichts wegnimmt."""
+    from datetime import timedelta
+
+    from app.routers.events import _ON_THIS_DAY_PRECISIONS
+    hits = set()
+    events = (db.query(Event)
+              .filter(Event.user_id == user.id, Event.date_start.isnot(None),
+                      Event.date_precision.in_(_ON_THIS_DAY_PRECISIONS),
+                      Event.source != Source.google_timeline).all())
+    for e in events:
+        start, end = e.date_start.date(), (e.date_end or e.date_start).date()
+        if end < start:
+            start, end = end, start
+        if (end - start).days > 366:
+            continue
+        d = start
+        while d <= end:
+            if (d.month, d.day) == (today.month, today.day) \
+                    and 1 <= today.year - d.year <= max_years:
+                hits.add(e.id)
+                break
+            d += timedelta(days=1)
+    return hits
+
+
+def test_on_this_day_preselection_loses_nothing(db, user):
+    """Die Vorauswahl darf schneller sein, aber nichts anderes finden."""
+    from app.routers.events import on_this_day
+
+    today = date_type(2026, 7, 22)
+    # Treffer: exakt derselbe Kalendertag in früheren Jahren
+    _event(db, user, "vor 5 Jahren", when=datetime(2021, 7, 22, 10))
+    _event(db, user, "vor 20 Jahren", when=datetime(2006, 7, 22, 9))
+    # Treffer: mehrtägig, überspannt den Tag (Startdatum passt NICHT)
+    trip = Event(user_id=user.id, title="Mallorca", category="trip",
+                 date_start=datetime(2019, 7, 18), date_end=datetime(2019, 7, 25),
+                 date_precision=DatePrecision.day, source=Source.manual,
+                 confirmed=ConfirmState.confirmed)
+    db.add(trip)
+    # Kein Treffer: anderer Tag, gleiches Jahr, zu lange Spanne
+    _event(db, user, "anderer Tag", when=datetime(2021, 7, 23))
+    _event(db, user, "heute", when=datetime(2026, 7, 22))
+    lang = Event(user_id=user.id, title="Sehr lange Reise", category="trip",
+                 date_start=datetime(2015, 1, 1), date_end=datetime(2017, 1, 1),
+                 date_precision=DatePrecision.day, source=Source.manual,
+                 confirmed=ConfirmState.confirmed)
+    db.add(lang)
+    # Kein Treffer: importierter Besuch am richtigen Tag
+    _event(db, user, "Besuch", when=datetime(2021, 7, 22, 12),
+           source=Source.google_timeline)
+    db.commit()
+
+    groups = on_this_day(db=db, user=user, date=today)
+    found = {e.id for g in groups for e in g.events}
+    assert found == _brute_force_on_this_day(db, user, today)
+    assert {e.title for g in groups for e in g.events} == {
+        "vor 5 Jahren", "vor 20 Jahren", "Mallorca"}
+
+
+def test_on_this_day_does_not_load_the_whole_database(db, user):
+    """Der Kern der Änderung: die Zahl der geladenen Zeilen darf nicht mit dem
+    Bestand wachsen. Gezählt wird, was die Abfrage zurückgibt."""
+    from sqlalchemy import event as sa_event
+
+    today = date_type(2026, 7, 22)
+    _event(db, user, "Treffer", when=datetime(2020, 7, 22))
+    for i in range(200):                       # Rauschen an anderen Tagen
+        _event(db, user, f"anderes {i}", when=datetime(2020, 3, 1 + i % 28))
+
+    seen: list[str] = []
+
+    def _record(conn, cursor, statement, *rest):
+        seen.append(statement)
+
+    sa_event.listen(db.bind, "before_cursor_execute", _record)
+    try:
+        from app.routers.events import on_this_day
+        on_this_day(db=db, user=user, date=today)
+    finally:
+        sa_event.remove(db.bind, "before_cursor_execute", _record)
+
+    main = next(s for s in seen if "FROM events" in s and "WHERE" in s)
+    assert "extract" in main.lower() or "strftime" in main.lower(), \
+        "Der Kalendertag muss in SQL eingegrenzt werden, nicht erst in Python"

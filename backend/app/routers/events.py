@@ -312,6 +312,21 @@ def on_this_day(
                      Event.date_precision.in_(_ON_THIS_DAY_PRECISIONS)))
     if not include_imported:
         query = query.filter(Event.source != Source.google_timeline)
+    # A37 (zweite Runde): Vorauswahl in SQL statt „alles laden und in Python
+    # aussieben". Gemessen bei 3.000 eigenen Einträgen: 660 ms — auf der
+    # STARTANSICHT, und mit dem Bestand wachsend. Ursache war dieselbe wie in
+    # Anmerkung 80: jedes Ereignis samt seiner vierzehn Metrik-Zeilen als
+    # ORM-Objekt, nur um am Ende ein Dutzend davon zu zeigen.
+    #
+    # Die Auswahl ist EXAKT dieselbe wie vorher, nur früher: Eintägiges kann
+    # den Kalendertag nur treffen, wenn Tag und Monat passen; alles mit einem
+    # Enddatum kann ihn überspannen und wird weiterhin vollständig geprüft
+    # (die Python-Schleife unten entscheidet unverändert).
+    query = query.filter(
+        Event.date_end.isnot(None)
+        | ((func.extract("month", Event.date_start) == today.month)
+           & (func.extract("day", Event.date_start) == today.day))
+    )
     events = query.all()
 
     by_year: dict[int, list[Event]] = {}

@@ -26,6 +26,12 @@ any `MINOR`.
   0.3 MB and 0.08 seconds**. Whether your database holds twelve thousand entries
   or two hundred thousand no longer decides how long the app takes to open — on
   a phone or a small home server most of all.
+- **“On this day” no longer reads your whole history to find one date.** It
+  used to load every dated entry — with all its weather readings — and pick the
+  matching days in code. Since it sits on the opening view, that quietly became
+  the slowest part of starting the app: measured at 3,000 hand-made entries,
+  660 milliseconds, growing with your database. The calendar day is now
+  selected in the database itself: **12 milliseconds**, same result.
 - **The statistics are calculated where the data is.** Every number on the
   statistics tab — places, categories, milestones, moves, weather records,
   charts — used to be computed in your browser from that same complete list.
