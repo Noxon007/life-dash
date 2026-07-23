@@ -45,16 +45,27 @@ confirmed record — and it makes the imports below much easier to judge.
    entries and movements become routes, and everything after this step feeds on
    the dates and coordinates it brings. Export from the phone (Android:
    *Settings → Location → Location services → Timeline → Export timeline data*);
-   old Takeout exports work too. Importing twice creates no duplicates.
+   old Takeout exports work too. Importing twice creates no duplicates. Stays
+   from before 0.39 that crossed midnight became two-day entries — the button
+   right below the import cuts them into days, and says beforehand how many
+   entries become how many rows.
 3. **Resolve place names.** Imported visits arrive as `Place (53.49, 10.00)`.
    The run turns them into addresses via OpenStreetMap, and it is deliberately
    throttled — start it early, let it work in the background. Manually renamed
    places are never touched.
-4. **Connect Immich**, if you have it. Three things, in this order: *test the
+4. **Connect Immich**, if you have it. Four things, in this order: *test the
    connection*, then **propose entries from photos** (one year at a time, with a
    mandatory preview) and confirm what you want in *Moderation*, then **link
-   photos**, which attaches pictures to the entries that now exist. Photos stay
-   in Immich; Life-Dash stores references, and the API key it needs is read-only.
+   photos**, which attaches pictures to the entries that now exist, and finally
+   **locate photos** — that one puts every geotagged picture on the map as its
+   own point and creates no entries at all. Photos stay in Immich; Life-Dash
+   stores references, and the API key it needs is read-only.
+
+   Albums are *not* proposed automatically. An album would become one multi-day
+   entry with a single point on the map, and the twin of the trip you enter
+   yourself — better the other way round: you create the trip, and the photos
+   attach themselves to it. If you want to look at your albums anyway, there is
+   a tick box next to the run.
 5. **Split multi-day entries into days**, if trips and albums have produced
    them. Each day becomes its own entry, so each day can carry its own weather
    and its own photos.
@@ -67,6 +78,12 @@ confirmed record — and it makes the imports below much easier to judge.
 
 Steps 3, 4 and 6 also run unattended: the **Jobs** tab has a nightly schedule
 per run type, which is the sensible setting once the first pass is done.
+
+Once there is something to look at, two switches are worth knowing. On the map
+and in the timeline, **📷 Photos** turns the located pictures on — off by
+default, because twenty years of library is tens of thousands of markers. And
+the timeline's **Condense by** picker decides how coarsely a day is summarised:
+country, city, district, or every entry on its own.
 
 ## How this was built
 

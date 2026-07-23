@@ -45,9 +45,9 @@ Entscheidungen/Anmerkungen in Kap. 15. Erst dort gezielt nachlesen statt Code ra
   etc. aus Config); `.env.example` ist die Setup-Referenz
 
 ## Stand
-Umgesetzt bis **v0.38.0** (2026-07-22). **Gruppe A ist komplett** (A1–A42),
-Gruppe B bis **F19**; **P5.1, F1 und P2.1 (beide Stufen) sind fertig**. Offen
-ist damit nur noch: **Demo-Modus (0.39)** und **R1** (1.0, drei Etappen auf
+Umgesetzt bis **v0.39.0** (2026-07-23). **Gruppe A ist komplett** (A1–A48),
+Gruppe B bis **F19**; **P5.1, F1 und P2.1 (alle drei Stufen) sind fertig**. Offen
+ist damit nur noch: **Demo-Modus (0.40)** und **R1** (1.0, drei Etappen auf
 `main`).
 Hinter 1.0 bleiben
 nur noch neue Import-Konnektoren (P2.8 OwnTracks, P2.9 Automatisierung,
@@ -61,8 +61,8 @@ P2.10 Trakt, P2.11 Dawarich/GPX, P4.1 Health, P4.2 PSN) plus **P5.2**
 0.32 A37 (serverseitiges Zeitfenster) · 0.33 A38+A40 (Mobil-Layout,
 Kartenschalter) + dev-Kennung · 0.34 A39+F18+A41 (Städte, Tages-Fotos) · 0.35 F19+A42 (Sammlung) ·
 0.36 P5.1+F1-Rest (Erfassen) · 0.37 P2.1 Stufe 2 (Immich als Quelle) ·
-0.38 Feedback-Runde (Anm. 110).
-Offen: **0.39 Demo-Modus** ·
+0.38 Feedback-Runde (Anm. 110) · 0.39 A45–A48 + P2.1 Stufe 3 (Anm. 116).
+Offen: **0.40 Demo-Modus** ·
 **1.0 = Veröffentlichung**. Kein Termindruck (Anmerkung 58).
 Dort nachsehen statt Reihenfolge raten.
 
@@ -159,6 +159,67 @@ Auseinanderlaufen. Jetzt EINE Liste `MACHINE_SOURCES`, die `candidates()` und
 zweite Stufe, die ältere Hälfte mit den Regeln der neueren lesen** — beide
 Befunde saßen dort, wo die Annahme des einen Teils auf die des anderen trifft,
 und genau dort greift kein Test von selbst.
+
+**0.39.0 fertig (Anmerkung 116) — A45–A48 + P2.1 Stufe 3.** Drei Beobachtungen
+aus der Nutzung, und jede war eine Frage ans MODELL, nicht an die Anzeige.
+**A45 (Fotopunkte):** Der geplante Weg — Spalten an `MediaRef` — hätte nicht
+getragen, denn `MediaRef` ist auf **zwölf Bilder je Tag** gedeckelt
+(`immich_link.MAX_PER_EVENT`), und das ist richtig: es beantwortet „welche
+Bilder stehen neben diesem Eintrag?". Die Karte hätte zwölf Punkte je Tag
+gezeigt und ausgesehen, als ginge sie. **Zwei Fragen mit zwei Deckelungen
+teilen sich keine Tabelle** — in einer Zeile wären es zwei Bedeutungen in
+derselben Spalte (Anm. 106 in seiner teuersten Form). Deshalb `photo_points`,
+Schicht 4, verwerfbar. **Ein Foto wird trotzdem kein Ereignis** (Anm. 87): die
+Punkte sind eine ausblendbare EBENE, im Zeitstrahl je (Tag, Ort) verdichtet.
+**A46 (Besuchstage):** eine Zeile Ursache, viel Folge — `date_end` roh aus dem
+Google-Besuch übernommen, also war jede Nacht im eigenen Bett ein zweitägiges
+Ereignis. Mehrtägig entsteht ab jetzt nur noch von Hand. Der Aufräum-Lauf für
+den Bestand fasst BESTÄTIGTES an; daraus folgt jede seiner Grenzen (nur auf
+Knopfdruck, nie im Nachtplan, nur `google_timeline`, Vorschau nennt die Zeilen
+DANACH). Teuer war die Idempotenz: Bestandszeilen tragen den nackten Hash, und
+wer nur die neuen Teil-Schlüssel kennt, legt beim Re-Import alles ein zweites
+Mal DANEBEN an. **A47 (Granularität):** Land → Stadt → Ortsteil → Punkt,
+serverseitig verdichtet (A39/A37: verdichtet wird VOR dem Blättern). Ortsteil
+aus `Location.address` über eine Fallback-Kette — Nominatim nennt die Ebene je
+nach Land `suburb`, `city_district`, `neighbourhood` oder `quarter`.
+**A48 (Vektorkarte):** Immichs Stil ist `"type": "vector"` (Spezifikation 8) und
+gar kein API-Endpunkt, sondern eine Admin-Einstellung — Leaflet kann ihn nicht
+zeichnen, es braucht MapLibre plus Brücke. **P2.1 Stufe 3:** Alben nur noch auf
+Nachfrage; ein Album war EIN mehrtägiger Vorschlag mit einem Kartenpunkt und der
+Zwilling der handerfassten Reise.
+
+**Drei Fallen, die 0.39 ein weiteres Mal gestellt hat:**
+**(a) Die Endlos-Abruf-Falle, siebte und achte Auflage** (nach F12
+`weather_rev`, A39-Leerstring, A42 „kein Artikel", P2.1-Grabstein, Anm. 114
+`_name_defect`): die durchsuchten Foto-Jahre müssen gemerkt werden, und
+`Location.address` braucht eine Marke im FEHLSCHLAG. Die zweite ist die
+schwierigere, weil die Marke an den **frühen Ausstiegen** sitzt — den Pfaden,
+die man nicht als schreibend denkt. **Und sie hat zugeschlagen:** nachdem der
+Adress-Nachzug am Ortsnamen-Lauf hing, lief die Testsuite endlos. Sichtbar
+gemacht hat es ein Test-Doppel, das das alte Verhalten treu nachbaute — **ein
+Doppel, das ein Feld auslässt, ist keine Vereinfachung, sondern eine andere
+Funktion.** **(b) JSON-Spalten speichern Python-`None` als JSON-`null`, nicht
+als SQL-NULL.** `address IS NULL` traf die Zeilen nicht; ohne
+`JSON(none_as_null=True)` hätte der Rückfüll-Lauf sie für immer übersehen und
+der Index behauptet, es sei nichts offen. **(c) `= Query(False)` als Default
+kommt beim Direktaufruf als Query-OBJEKT an und ist damit wahr** — der
+Alben-Schalter stand überall auf AN, wo niemand ihn gesetzt hatte. Die Falle
+stand seit A37 in `events.py` aufgeschrieben (`Annotated` statt Query-Default)
+und ist hier zum zweiten Mal aufgetreten.
+
+**Wächter gegen den kaputten Stand — und zwei, die im ersten Anlauf wertlos
+waren.** Anm. 108 verlangt, jede Prüfung einmal gegen den Defekt zu fahren, den
+sie festnageln soll. Dabei fiel auf: eine prüfte auf die Ziffer `4`, die auch im
+Datum `2026-07-04` steckt; eine andere injizierte den Defekt in den DEUTSCHEN
+Quelltext, während die Seite unter jsdom **englisch** startet — der Defekt
+erreichte die Zusicherung nie. Neu: `check-a46-visit-split.js`,
+`check-photo-layer.js`, `check-tl-granularity.js`, `check-vector-basemap.js`.
+Dazu ein HTTP-Doppel für Immich (`tools/immich_double.py` +
+`tools/smoke_a45.py`, Anm. 109): 1200 Assets in den echten DTOs prüfen
+Blättern, Besitzfilter, den Mitternachts-Fall aus Anm. 111 und die
+Ortsteil-Ableitung in einem Lauf — nichts davon erreichen Unit-Tests, weil sie
+den Client komplett ersetzen. **Aus dem Repo-Wurzelverzeichnis starten:**
+`<python> tools/immich_double.py &` und `<python> tools/smoke_a45.py`.
 
 **Feedback-Runde nach 0.38.0 (Anmerkung 114) — sechs Punkte, drei davon ein
 zweites Mal derselbe Defekt.** Liegt auf `main`, **ohne Versionssprung**

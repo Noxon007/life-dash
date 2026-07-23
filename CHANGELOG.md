@@ -15,7 +15,63 @@ any `MINOR`.
 
 ## [Unreleased]
 
+## [0.39.0] – 2026-07-23
+
 ### Added
+- **Every geotagged photo becomes its own point on the map.** Until now an album
+  of 1200 pictures from London was a single entry and therefore a single dot,
+  although each of those pictures knows for itself where it was taken. A new run
+  under *My data → Immich → “Locate photos”* reads the position, the time and
+  the place name Immich already knows, and stores one row per picture. It
+  creates **no entries** and changes nothing you have written; one button
+  discards the lot again. The result is a separate, switchable layer — “📷
+  Photos” on the map and in the timeline, off by default, because twenty years
+  of library are tens of thousands of markers and that is not what you open the
+  map for. In the timeline the pictures arrive condensed per day and place (“34
+  photos in Aarhus”) rather than as thousands of rows. The map's period picker
+  now knows about photo days as well: the years before the smartphone have
+  photos and no visits, and until now there was no way to steer to them.
+- **The timeline lets you choose how coarsely a day is condensed.** Country,
+  city, district or the exact point — one setting for imported visits and for
+  photos alike. Condensing by city was a good default and a poor rule: “which
+  countries was I in during 2019?” and “which parts of Berlin?” are both fair
+  questions. The district comes from the address parts of your own places; where
+  they are missing, entries stay separate and the timeline says how many places
+  are affected and where to catch up, instead of quietly falling back to the
+  city. The place-name run picks those places up on its own from now on — once
+  each, at the very end of its queue.
+- **Vector maps as a background map.** Immich and most modern map services no
+  longer serve image tiles but a *style* that the browser draws itself: sharp at
+  every zoom level, readable labels. Enter a style URL under *Administration →
+  Map* and “🧭 Vector map” appears on every map. No provider is preset — the
+  help text only says where to look up the one your own Immich uses. If the
+  browser cannot do it (no WebGL), the map falls back to the default and the
+  settings page says why, rather than showing a grey rectangle.
+
+### Changed
+- **Immich no longer proposes albums on its own.** An album became *one*
+  proposal spanning several days with a single point on the map, and it became
+  the twin of the trip you had entered yourself. The better way round: you
+  create the trip, and the photos attach themselves to it. Albums are still
+  available — there is a tick box next to the run, and the preview is still
+  mandatory. Album proposals already sitting in the queue can be discarded in
+  one go; confirmed entries and the photo days are left alone, and a discarded
+  album never comes back.
+
+### Fixed
+- **The Google timeline import no longer creates two-day events.** Google
+  reports the start and the end of a stay, and both were taken over as they
+  came — so every night in your own bed became a two-day entry. At a home
+  address that adds up: over two thousand of them were reported. New imports are
+  cut at the day boundary, with the times kept to the second; a button under *My
+  data → Imports* catches up with what is already there and says beforehand how
+  many entries become how many rows. Only imported visits are affected — trips
+  you entered by hand and Immich proposals stay multi-day, because there the
+  span is a statement.
+- Places whose address could not be resolved are now marked as *asked* rather
+  than staying indistinguishable from *never asked* — without that, the
+  place-name run would have come back to them on every single pass.
+
 - **Six new weather records.** Strongest sun (UV index), strongest gust, hottest
   and coldest day by *feel* rather than by thermometer, and the longest and
   shortest day by daylight hours. All six are calculated from values that every
@@ -26,7 +82,6 @@ any `MINOR`.
   day, because that is a measurement; a day without rain still does not count as
   the wettest.
 
-### Changed
 - **“My data” now reads as a first run, top to bottom.** The sections were in
   the order they had been built in; they are now in the order in which they feed
   each other, numbered, with a short guide at the top: pick your modules →
@@ -69,7 +124,6 @@ any `MINOR`.
 - Speech input dictates in the language the app is set to, instead of always
   German.
 
-### Fixed
 - **The map was invisible on phones.** A frame added for the map's own “points
   are hidden” notice collapsed to zero height in the mobile layout — the exact
   same failure the map had years ago, one level higher up. A check now watches

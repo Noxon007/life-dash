@@ -23,6 +23,10 @@ node tools/check-a39-condense.js    # the timeline condenses before it pages —
 node tools/check-a40-map-controls.js # no map control is silently inoperative — A40
 node tools/check-a41-cities.js      # every city number can be opened — A41, note 94
 node tools/check-a42-city-page.js   # a city opens a page, not an exit — A42, note 102
+node tools/check-a46-visit-split.js # cutting confirmed visits needs a preview first — A46, note 116
+node tools/check-photo-layer.js     # the photo layer says what it hides, and doubles nothing — A45
+node tools/check-tl-granularity.js  # the condensation level goes to the server — A47
+node tools/check-vector-basemap.js  # a vector map never fails silently — A48
 
 Each exits non-zero on failure, so they can be chained in CI later (package R1).
 `npm run check` runs all of them — including the last four, which until 0.35.0
@@ -50,3 +54,27 @@ It asserts the promises of A37 that must hold at any size — no unbounded list
 fetch, totals from the server, the map on its own endpoint, no unhandled
 errors — so it passes against an empty database and against a large one. It is
 deliberately **not** part of `npm run check`, which must run without a server.
+
+## Against an Immich stand-in
+
+`immich_double.py` is a small HTTP server that answers the way the real Immich
+does — the DTOs from its OpenAPI spec, `nextPage` as a *string* token, an
+`exifInfo` block with and without coordinates, foreign and archived assets mixed
+in, and a rejection of timestamps that arrive without a timezone. `smoke_a45.py`
+drives the connector against it.
+
+```bash
+python tools/immich_double.py &          # from the repository root
+python tools/smoke_a45.py
+```
+
+This exists because of note 109: unit tests replace `search_assets_paged`
+wholesale, so the entire client edge — URL building, headers, paging, timestamp
+format, the exif block — is unreachable for them, and that edge is where three
+of the five findings in 0.37.0 sat. The double covers paging past the first
+page, the ownership and visibility filters, the midnight case from note 111
+(`localDateTime` must win over `fileCreatedAt`), the district derivation from
+the user's own places, and the four condensation levels over real HTTP.
+
+Rule for every future connector: **run one HTTP double that keeps to the real
+DTOs.** Twenty lines, and it reaches what a mock by construction cannot.
