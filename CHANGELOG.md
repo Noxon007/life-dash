@@ -16,6 +16,19 @@ any `MINOR`.
 ## [Unreleased]
 
 ### Added
+- **“All years” for both Immich runs.** Locating photos and suggesting entries
+  could only be done one year at a time, which for a twenty-year library meant
+  twenty rounds of the same handful of clicks. Both now offer *All years* as an
+  entry in the year picker. Locating photos simply works through them in the
+  background, ticking off each year as it goes, and can be stopped at any point
+  — everything already done stays done. Suggesting entries keeps its rule that
+  nothing is created before you have seen it: the preview walks the years one by
+  one, shows a running total while it does, and can be cancelled — and the run
+  is then given exactly the years the preview covered.
+- **“My data” now shows what is running, right where you started it.** A strip
+  at the top of the page names the current run, its progress and a stop button,
+  and the last finished run stays there with its result. Starting a run no
+  longer jumps to the Jobs tab.
 - **The timeline's day heading now carries the weather of that day.** Until now
   the weather only ever sat on individual cards, so a day with several imported
   visits showed whichever of them the condensation happened to pick — and a
@@ -24,6 +37,23 @@ any `MINOR`.
   instead of passing one of the values off as “the” weather.
 
 ### Fixed
+- **The “check” buttons looked like they did nothing.** Their result was written
+  to the end of the description column beside the button — on a wide screen, the
+  other half of the display — and nothing at all happened while the check was
+  running. The result now appears directly underneath the button that produced
+  it, the button says it is working, and a short summary also arrives as a
+  notification.
+- **Running jobs could be pushed out of the Jobs tab by finished ones.** The list
+  was sorted by start time and cut off after a dozen rows, so a long run sank
+  below everything that had finished since — and eventually disappeared, taking
+  its progress and its stop button with it. Running jobs are now listed first,
+  in full, under their own heading; only the history is shortened.
+- **A job showed up under its internal name (`photo_points`) instead of “Place
+  photos on the map”.** It now has a proper name in both languages.
+- **Photo dots on the map were easy to miss.** They were the same small size at
+  every zoom level and disappeared between event pins and cluster bubbles. They
+  are now larger, grow as you zoom in and have a clearer outline. Event pins
+  deliberately still sit on top of them.
 - **“What was the weather that day?” had four different answers.** Timeline,
   bundled card, statistics and achievements each worked it out their own way,
   so the same day could contribute one number to your sun-hours total and a

@@ -62,6 +62,8 @@ SERVER_JOB_TYPES = ("weather", "embeddings", "resolve_names", "recompute",
 # bei Open-Meteo/Nominatim/Immich, und das hängt an der Instanz, nicht am Konto.
 USER_SCOPED_TYPES = ("weather", "resolve_names", "immich", "immich_source",
                      "photo_points")
+# „Läuft gerade" — eine Liste statt derselben Aufzählung an vier Stellen.
+_ACTIVE_STATES = ("running", "stopping")
 # In Tests abgeschaltet (in-memory-DB verträgt keine fremden Threads)
 WORKERS_ENABLED = True
 
@@ -152,11 +154,24 @@ def list_jobs(
     user: User = Depends(get_current_user),
 ) -> list[JobRead]:
     """Laufende und letzte Jobs (alle Nutzer — der Lock ist global, also soll
-    auch sichtbar sein, WER gerade etwas laufen hat)."""
+    auch sichtbar sein, WER gerade etwas laufen hat).
+
+    **Laufende zuerst, und zwar ALLE** (Anmerkung 120). Die Liste war nach
+    Startzeit sortiert und auf `limit` beschnitten — was zusammen heißt: ein
+    Lauf, der eine Stunde arbeitet, rutscht unter alles, was seitdem fertig
+    wurde, und fällt irgendwann ganz heraus. Ausgerechnet der Job, für den es
+    diesen Reiter gibt (Fortschritt sehen, stoppen können), war der erste, der
+    verschwand. Die Grenze gilt jetzt nur noch für den Verlauf: Abgeschlossenes
+    ist eine Chronik, Laufendes ist ein Zustand — und ein Zustand wird nicht
+    abgeschnitten.
+    """
     _reap_stale(db)
-    rows = (db.query(Job).order_by(Job.started_at.desc())
+    active = (db.query(Job).filter(Job.status.in_(_ACTIVE_STATES))
+              .order_by(Job.started_at.desc()).all())
+    past = (db.query(Job).filter(Job.status.notin_(_ACTIVE_STATES))
+            .order_by(Job.started_at.desc())
             .limit(max(1, min(limit, 100))).all())
-    return [_to_read(db, j) for j in rows]
+    return [_to_read(db, j) for j in active + past]
 
 
 @router.post("/start", response_model=JobRead)
@@ -171,7 +186,7 @@ def start_job(
     _reap_stale(db)
     running = (db.query(Job)
                .filter(Job.type == payload.type,
-                       Job.status.in_(("running", "stopping")))
+                       Job.status.in_(_ACTIVE_STATES))
                .first())
     if running:
         starter = db.get(User, running.user_id) if running.user_id else None
@@ -275,6 +290,49 @@ def _tick(db: Session, job_id: str, done_add: int, remaining: int | None) -> boo
     db.commit()
     _beat(job).beat(job.done, remaining)
     return job.status == "running"
+
+
+def _job_years(job: Job) -> tuple[list[int], str | None]:
+    """Die Jahre dieses Laufs — eines oder alle (Anmerkung 120).
+
+    `year` (Einzahl) und `years` (Liste) sind dieselbe Frage in zwei
+    Schreibweisen, und sie wird an EINER Stelle beantwortet: die beiden
+    Immich-Läufe hatten diese Prüfung wortgleich doppelt stehen, und genau so
+    laufen zwei Kopien einer Regel auseinander (Anmerkung 106).
+
+    Geprüft wird streng, weil `params` vom Client kommt: `datetime(99999, 1, 1)`
+    wäre kein Lauf, sondern ein Absturz mit Stapelspur statt einer Auskunft.
+    `bool` ist in Python ein `int` — ohne den Ausschluss wäre `years: [true]`
+    das Jahr 1.
+    """
+    params = job.params or {}
+    raw = params.get("years")
+    if raw is None:
+        raw = [params.get("year")]
+    if not isinstance(raw, list) or not raw:
+        return [], "Ohne gültiges Jahr kein Lauf — bitte ein Jahr auswählen."
+    seen: list[int] = []
+    for y in raw:
+        if isinstance(y, bool) or not isinstance(y, int) or not 1900 <= y <= 2200:
+            return [], "Ohne gültiges Jahr kein Lauf — bitte ein Jahr auswählen."
+        if y not in seen:
+            seen.append(y)
+    # Jüngstes zuerst — dieselbe Reihenfolge, in der die Auswahl sie anbietet.
+    return sorted(seen, reverse=True), None
+
+
+def _year_span(years: list[int]) -> str:
+    """„2024" bzw. „2003–2024 (14 Jahre)" — die Überschrift einer Meldung.
+
+    Bei einem Lauf über alles ist die Spanne die Auskunft; eine Aufzählung von
+    zwanzig Jahreszahlen ist keine, und die ersten 250 Zeichen wären ohnehin
+    voll, bevor das Ergebnis drankommt.
+    """
+    if not years:
+        return "—"
+    if len(years) == 1:
+        return str(years[0])
+    return f"{min(years)}–{max(years)} ({len(years)} Jahre)"
 
 
 def _run_weather(db: Session, job: Job) -> tuple[str, str]:
@@ -440,12 +498,18 @@ def _run_immich(db: Session, job: Job) -> tuple[str, str]:
 
 
 def _run_immich_source(db: Session, job: Job) -> tuple[str, str]:
-    """P2.1 Stufe 2: aus Immich-Fotos Ereignis-VORSCHLÄGE machen — ein Jahr.
+    """P2.1 Stufe 2: aus Immich-Fotos Ereignis-VORSCHLÄGE machen.
 
     Jahresweise, weil eine zwanzig Jahre alte Bibliothek sonst vierstellig
     viele Vorschläge in eine Warteschlange kippt, die für Dutzende gebaut ist
-    (Anmerkung 107). Das Jahr steht in `params` — ohne Jahr kein Lauf: „alles"
-    wäre genau der Fall, den die Aufteilung verhindern soll.
+    (Anmerkung 107). Die Jahre stehen in `params` — ohne Jahr kein Lauf.
+
+    **„Alle Jahre" ist erlaubt, seit die Vorschau sie alle abdeckt**
+    (Anmerkung 120). Der Riegel war nie „ein Jahr", sondern „nichts anlegen,
+    was niemand gesehen hat"; ein Lauf über zwanzig Jahre nach einer Vorschau
+    über zwanzig Jahre verletzt ihn nicht. Was er verletzen WÜRDE: dieselbe
+    Liste über den Nachtplan — deshalb steht `immich_source` dort weiterhin
+    nicht (`SCHED_TYPES` im Frontend).
 
     Der Lauf scannt NEU statt die Vorschau zu übernehmen. Zwischen Ansehen und
     Bestätigen kann sich etwas geändert haben, und `scan_year` ist die eine
@@ -459,59 +523,85 @@ def _run_immich_source(db: Session, job: Job) -> tuple[str, str]:
     if cfg is None:
         return "stopped", ("Immich ist für dieses Konto nicht eingerichtet "
                            "(Verwaltung → Meine Daten → Immich).")
-    year = (job.params or {}).get("year")
-    # Bereich prüfen wie der Vorschau-Endpunkt: `params` kommt vom Client, und
-    # `datetime(99999, 1, 1)` wäre kein Lauf, sondern ein Absturz mit
-    # Stapelspur statt einer Auskunft.
-    if not isinstance(year, int) or not 1900 <= year <= 2200:
-        return "error", "Ohne gültiges Jahr kein Lauf — bitte ein Jahr auswählen."
+    years, bad = _job_years(job)
+    if bad:
+        return "error", bad
     url, key = cfg
+    multi = len(years) > 1
 
     job.unit = "Vorschläge angelegt"
     db.commit()
-    # Der Scan läuft, BEVOR es etwas zu zählen gibt — bei einer großen
-    # Bibliothek Minuten. Ohne Lebenszeichen dazwischen gilt der Job nach
-    # STALE_SECONDS als verwaist, und der Lauf hätte die ganze Arbeit gemacht,
-    # um danach „gestoppt" zu melden. `_tick(…, 0, None)` schlägt den Puls,
-    # ohne einen Fortschritt zu behaupten, den es noch nicht gibt.
-    try:
-        # P2.1 Stufe 3: Alben nur, wenn ausdrücklich angefordert. Der
-        # Nachtplan fragt damit NIE danach — und das ist der Punkt: ein Album
-        # ist ein von Hand benannter Behälter, sein Gegenstück in Life-Dash
-        # ist die von Hand erfasste Reise. Beide automatisch entstehen zu
-        # lassen erzeugt Zwillinge (Anmerkung 116).
-        proposals = source.scan_year(db, user, year, url, key,
-                                     albums=bool((job.params or {}).get("albums")),
-                                     heartbeat=lambda: _tick(db, job.id, 0, None))
-    except immich_api.ScanAborted:
-        return "stopped", f"{year}: Suche abgebrochen — nichts angelegt."
-    except immich_api.ImmichError as exc:
-        return "stopped", f"Immich antwortet nicht: {exc}"
+    created = total = days = 0
+    scanned: list[int] = []
+    stopped = False
+    fail: str | None = None
+    for year in years:
+        # Der Scan läuft, BEVOR es etwas zu zählen gibt — bei einer großen
+        # Bibliothek Minuten. Ohne Lebenszeichen dazwischen gilt der Job nach
+        # STALE_SECONDS als verwaist, und der Lauf hätte die ganze Arbeit
+        # gemacht, um danach „gestoppt" zu melden. `_tick(…, 0, None)` schlägt
+        # den Puls, ohne einen Fortschritt zu behaupten, den es noch nicht gibt.
+        try:
+            # P2.1 Stufe 3: Alben nur, wenn ausdrücklich angefordert. Der
+            # Nachtplan fragt damit NIE danach — und das ist der Punkt: ein
+            # Album ist ein von Hand benannter Behälter, sein Gegenstück in
+            # Life-Dash ist die von Hand erfasste Reise. Beide automatisch
+            # entstehen zu lassen erzeugt Zwillinge (Anmerkung 116).
+            proposals = source.scan_year(db, user, year, url, key,
+                                         albums=bool((job.params or {}).get("albums")),
+                                         heartbeat=lambda: _tick(db, job.id, 0, None))
+        except immich_api.ScanAborted:
+            stopped = True
+            break
+        except immich_api.ImmichError as exc:
+            fail = str(exc)
+            break
 
-    if not proposals:
-        return "done", f"{year}: nichts Neues vorzuschlagen."
+        n = len(proposals)
+        # In Blöcken anlegen und festschreiben: bricht der Lauf ab, ist das
+        # Angelegte da und der Rest kommt beim nächsten Mal — die Plätze sind
+        # stabil, ein zweiter Lauf schlägt nichts doppelt vor. Über mehrere
+        # Jahre gilt dasselbe je Jahr: ein Abbruch in 2011 lässt 2024 bis 2012
+        # angelegt stehen.
+        for i in range(0, n, 20):
+            block = proposals[i:i + 20]
+            created += source.create_proposals(db, user, block)
+            db.commit()
+            # **Über mehrere Jahre gibt es kein „noch ~N"**, und eine Zahl, die
+            # nur das laufende Jahr meint, wäre schlimmer als keine: „noch ~5"
+            # liest sich als Ende des Laufs, während zwölf Jahre offen sind.
+            left = None if multi else n - (i + len(block))
+            if not _tick(db, job.id, len(block), left):
+                stopped = True
+                break
+        total += n
+        days += sum(1 for p in proposals if p.kind == "day")
+        if stopped:
+            break
+        scanned.append(year)
 
-    total = len(proposals)
-    created = 0
-    # In Blöcken anlegen und festschreiben: bricht der Lauf ab, ist das
-    # Angelegte da und der Rest kommt beim nächsten Mal — die Plätze sind
-    # stabil, ein zweiter Lauf schlägt nichts doppelt vor.
-    for i in range(0, total, 20):
-        block = proposals[i:i + 20]
-        created += source.create_proposals(db, user, block)
-        db.commit()
-        if not _tick(db, job.id, len(block), total - (i + len(block))):
-            return "stopped", f"{created} Vorschläge angelegt (gestoppt)."
-    days = sum(1 for p in proposals if p.kind == "day")
-    return "done", (f"{year}: {created} Vorschläge angelegt "
+    span = _year_span(scanned or years[:1])
+    if fail:
+        done_note = f" {created} Vorschläge aus {span} sind angelegt." if created else ""
+        return "stopped", f"Immich antwortet nicht: {fail}.{done_note}"
+    if stopped:
+        return "stopped", (f"{span}: Suche abgebrochen — {created} Vorschläge "
+                           f"angelegt.")
+    if not total:
+        return "done", f"{_year_span(scanned)}: nichts Neues vorzuschlagen."
+    return "done", (f"{_year_span(scanned)}: {created} Vorschläge angelegt "
                     f"({days} Fototage, {total - days} Alben) — alle unbestätigt.")
 
 
 def _run_photo_points(db: Session, job: Job) -> tuple[str, str]:
-    """A45: ein Jahr Immich → ein Punkt je verortetem Foto.
+    """A45: Immich → ein Punkt je verortetem Foto, ein Jahr oder alle.
 
-    Jahresweise wie `immich_source`, und aus demselben Grund: eine zwanzig
+    Jahresweise wie `immich_source`, und der Grund war derselbe: eine zwanzig
     Jahre alte Bibliothek in einem Zug ist kein Lauf, sondern ein Zeitlimit.
+    **Das gilt für eine ANFRAGE, nicht für einen Job** (Anmerkung 120) — ein
+    Hintergrund-Lauf wartet auf niemanden, hakt jedes Jahr einzeln ab und ist
+    jederzeit stoppbar. Die Auswahl bietet „Alle Jahre" deshalb an; die
+    Aufteilung bleibt, sie wird nur nicht mehr von Hand bedient.
 
     Der Lauf legt **keine Ereignisse** an — er beantwortet nur „wo wurde
     fotografiert?". Deshalb braucht er auch keine Vorschau: er schreibt nichts
@@ -526,46 +616,77 @@ def _run_photo_points(db: Session, job: Job) -> tuple[str, str]:
     if cfg is None:
         return "stopped", ("Immich ist für dieses Konto nicht eingerichtet "
                            "(Verwaltung → Meine Daten → Immich).")
-    year = (job.params or {}).get("year")
-    if not isinstance(year, int) or not 1900 <= year <= 2200:
-        return "error", "Ohne gültiges Jahr kein Lauf — bitte ein Jahr auswählen."
+    years, bad = _job_years(job)
+    if bad:
+        return "error", bad
     url, key = cfg
 
     job.unit = "Fotos verortet"
     db.commit()
-    report: dict = {}
-    try:
-        seen, added, changed = pp.scan_year(
-            db, user, year, url, key,
-            heartbeat=lambda: _tick(db, job.id, 0, None), report=report)
-    except immich_api.ScanAborted:
-        return "stopped", f"{year}: Suche abgebrochen — nichts geändert."
-    except immich_api.ImmichError as exc:
-        return "stopped", f"Immich antwortet nicht: {exc}"
+    seen = added = changed = unchanged = 0
+    # Die Ausschlussgründe über alle Jahre aufaddiert — `drop_reasons` liest
+    # genau diese Form, also wird sie zusammengeführt statt neu erfunden.
+    total_report: dict = {"dropped": {}}
+    scanned: list[int] = []
+    stopped = False
+    fail: str | None = None
+    for year in years:
+        report: dict = {}
+        try:
+            y_seen, y_added, y_changed = pp.scan_year(
+                db, user, year, url, key,
+                heartbeat=lambda: _tick(db, job.id, 0, None), report=report)
+        except immich_api.ScanAborted:
+            stopped = True
+            break
+        except immich_api.ImmichError as exc:
+            fail = str(exc)
+            break
 
-    # **Erst festschreiben, dann abhaken.** Andersherum stünde das Jahr als
-    # durchsucht da, während die Punkte noch nicht in der Datenbank sind —
-    # und ein Absturz dazwischen ließe ein leeres Jahr für immer als
-    # „nachgesehen" gelten (dieselbe Falle wie beim F12-Wettermarker, nur in
-    # der Reihenfolge statt im Wert).
-    db.commit()
-    pp.mark_scanned(db, user, year)
-    db.commit()
-    _tick(db, job.id, added, 0)
+        # **Erst festschreiben, dann abhaken.** Andersherum stünde das Jahr als
+        # durchsucht da, während die Punkte noch nicht in der Datenbank sind —
+        # und ein Absturz dazwischen ließe ein leeres Jahr für immer als
+        # „nachgesehen" gelten (dieselbe Falle wie beim F12-Wettermarker, nur in
+        # der Reihenfolge statt im Wert). Über mehrere Jahre wird deshalb JEDES
+        # Jahr einzeln abgehakt: ein Abbruch in 2011 darf 2024 bis 2012 nicht
+        # wieder zu „nie nachgesehen" machen.
+        db.commit()
+        pp.mark_scanned(db, user, year)
+        db.commit()
+        seen += y_seen
+        added += y_added
+        changed += y_changed
+        unchanged += report.get("unchanged", 0)
+        for reason, n in (report.get("dropped") or {}).items():
+            total_report["dropped"][reason] = total_report["dropped"].get(reason, 0) + n
+        scanned.append(year)
+        if not _tick(db, job.id, y_added, None):
+            stopped = True
+            break
+    _tick(db, job.id, 0, 0)
+
+    span = _year_span(scanned)
+    if fail:
+        done_note = f" {added} Fotos aus {span} sind verortet." if added else ""
+        return "stopped", f"Immich antwortet nicht: {fail}.{done_note}"
+    if stopped and not scanned:
+        return "stopped", f"{_year_span(years[:1])}: Suche abgebrochen — nichts geändert."
     if not seen:
-        return "done", f"{year}: keine Fotos in Immich."
+        return "done", f"{span}: keine Fotos in Immich."
     # **Die Meldung muss die Differenz erklären, nicht nur die Summe nennen.**
     # „2016 gelesen, 17 neu verortet" ließ genau die Frage offen, die man beim
     # Lesen stellt — und die beiden möglichen Antworten („meine Bibliothek hat
     # kein GPS" / „der Schlüssel zeigt auf ein fremdes Konto") verlangen völlig
     # verschiedene Schritte. Dazu „unverändert": ohne die Zahl liest sich ein
     # zweiter Lauf wie ein gescheiterter erster (Anmerkung 110).
-    msg = (f"{year}: {seen} Fotos gelesen, {added} neu verortet, "
-           f"{changed} aktualisiert, {report.get('unchanged', 0)} unverändert.")
-    reasons = pp.drop_reasons(report)
+    msg = (f"{span}: {seen} Fotos gelesen, {added} neu verortet, "
+           f"{changed} aktualisiert, {unchanged} unverändert.")
+    reasons = pp.drop_reasons(total_report)
     if reasons:
         msg += " Ohne Punkt: " + ", ".join(reasons) + "."
-    return "done", msg
+    if stopped:
+        msg += " Gestoppt — die restlichen Jahre sind offen."
+    return "done" if not stopped else "stopped", msg
 
 
 _RUNNERS = {

@@ -16,7 +16,7 @@ const dom = new JSDOM(html, {
   beforeParse(w) {
     w.fetch = () => Promise.reject(new Error('x'));
     w.matchMedia = () => ({ matches: false, addEventListener() {}, addListener() {} });
-    w.L = new Proxy(function () { return w.L; }, { get: () => w.L, apply: () => w.L });
+    w.L = new Proxy(function () { return w.L; }, { get: (_t, k) => (k === 'getZoom' ? () => 6 : w.L), apply: () => w.L });
   }
 });
 setTimeout(() => {

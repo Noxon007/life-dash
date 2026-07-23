@@ -32,7 +32,7 @@ function makeDom(url) {
     runScripts: 'dangerously', pretendToBeVisual: true, url,
     beforeParse(w) {
       w.matchMedia = () => ({ matches: false, addEventListener() {}, addListener() {} });
-      w.L = new Proxy(function () { return w.L; }, { get: () => w.L, apply: () => w.L });
+      w.L = new Proxy(function () { return w.L; }, { get: (_t, k) => (k === 'getZoom' ? () => 6 : w.L), apply: () => w.L });
       Object.defineProperty(w.navigator, 'onLine', { get: () => net.online, configurable: true });
       w.fetch = (u, opt) => {
         const path = String(u);

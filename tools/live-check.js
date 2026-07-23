@@ -27,7 +27,7 @@ const dom = new JSDOM(html, {
   beforeParse(w) {
     w.matchMedia = () => ({ matches: false, addEventListener() {}, addListener() {} });
     // Leaflet kommt sonst vom CDN — hier eine Attrappe, die alles schluckt
-    w.L = new Proxy(function () { return w.L; }, { get: () => w.L, apply: () => w.L });
+    w.L = new Proxy(function () { return w.L; }, { get: (_t, k) => (k === 'getZoom' ? () => 6 : w.L), apply: () => w.L });
     w.fetch = (url, opts) => {
       const abs = String(url).startsWith('http') ? String(url) : ORIGIN + String(url);
       requests.push(abs.replace(ORIGIN, ''));

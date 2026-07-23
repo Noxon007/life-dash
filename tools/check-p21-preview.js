@@ -37,7 +37,7 @@ const dom = new JSDOM(html, {
   runScripts: 'dangerously', pretendToBeVisual: true, url: 'http://localhost:8000/',
   beforeParse(w) {
     w.matchMedia = () => ({ matches: false, addEventListener() {}, addListener() {} });
-    w.L = new Proxy(function () { return w.L; }, { get: () => w.L, apply: () => w.L });
+    w.L = new Proxy(function () { return w.L; }, { get: (_t, k) => (k === 'getZoom' ? () => 6 : w.L), apply: () => w.L });
     w.fetch = (u, opt) => {
       const path = String(u);
       calls.push([(opt && opt.method) || 'GET', path, opt && opt.body]);
@@ -94,8 +94,12 @@ setTimeout(async () => {
   w.gotoView('admin');
   w.showAdminTab('daten');
   await wait(120);
-  ok('Die Jahresauswahl kommt vom Server', sel.options.length === 3,
+  // Drei Jahre vom Server plus der Sammeleintrag „Alle Jahre" (Anmerkung 120).
+  ok('Die Jahresauswahl kommt vom Server', sel.options.length === 4,
      `${sel.options.length} Einträge`);
+  ok('…und bietet „Alle Jahre" an',
+     [...sel.options].some(o => o.value === 'all'),
+     [...sel.options].map(o => o.value).join(','));
   ok('Das laufende Jahr ist vorgewählt', sel.value === '2024', sel.value);
   // Ein Jahr ohne eigene Daten muss wählbar sein — das ist der Fall, für den
   // das Paket überhaupt existiert („die Erinnerungen von vor dem Smartphone").
@@ -141,7 +145,11 @@ setTimeout(async () => {
   ok('Der Lauf startet als Job', started().length === 1, `${started().length} Starts`);
   const body = JSON.parse(started()[0][2] || '{}');
   ok('…vom Typ immich_source', body.type === 'immich_source', JSON.stringify(body));
-  ok('…und mit dem Jahr im Gepäck', body.params && body.params.year === 2024,
+  // Anmerkung 120: Der Lauf bekommt die Jahre der VORSCHAU, nicht die der
+  // Auswahl — bei einem Jahr ist das dasselbe, bei „Alle Jahre" nicht.
+  ok('…und mit dem Jahr im Gepäck',
+     body.params && Array.isArray(body.params.years)
+       && body.params.years.length === 1 && body.params.years[0] === 2024,
      JSON.stringify(body.params));
 
   // --- 4. Jahreswechsel entwertet die Vorschau --------------------------- //
@@ -242,6 +250,50 @@ setTimeout(async () => {
   ok('…und der Anlegen-Knopf bleibt gesperrt', run.disabled,
      'ohne echte Vorschau darf nichts angelegt werden');
 
+  // --- 5b. „Alle Jahre" hebt den Riegel NICHT auf (Anmerkung 120) -------- //
+  // Der Riegel war nie „ein Jahr", sondern „nichts anlegen, was niemand
+  // gesehen hat". Ein Sammellauf darf deshalb existieren — aber nur, wenn die
+  // Vorschau wirklich JEDES Jahr einzeln ansieht und der Lauf genau diese
+  // Jahre bekommt. Die naheliegende Abkürzung (eine Anfrage ohne Jahr, der
+  // Server nimmt sich 25 Sekunden und antwortet mit einem Ausschnitt) wäre
+  // „ein Zwanzigstel sehen, alles anlegen".
+  albumBox.checked = false;
+  preview = { year: 2024, total: 1, days: 1, albums: 0, photos: 9, shared: 0,
+              albums_asked: false, partial: false, albums_open: 0, seconds: 0.4,
+              proposals: [{ slot: 'immich:day:2024-05-01:Kiel', kind: 'day',
+                            title: '9 Fotos in Kiel', start: '2024-05-01T00:00:00',
+                            end: '2024-05-01T23:59:59', precision: 'day',
+                            place: 'Kiel', photos: 9, shared: false }] };
+  sel.value = 'all';
+  sel.dispatchEvent(new w.Event('change', { bubbles: true }));
+  await wait(20);
+  ok('„Alle Jahre" gewählt sperrt den Knopf zuerst', run.disabled,
+     'die Vorschau des Einzeljahres gilt nicht für alle');
+  calls.length = 0;
+  d.getElementById('ims-preview').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await wait(200);
+  const asked = calls.filter(([m, p]) => m === 'POST' && /immich\/preview\?year=/.test(p))
+                     .map(([, p]) => p.match(/year=(\d{4})/)[1]).sort();
+  ok('Die Vorschau fragt JEDES Jahr einzeln',
+     asked.join(',') === '2004,2023,2024', asked.join(',') || 'keine Anfrage');
+  ok('…und keine Sammel-Anfrage ohne Jahr',
+     !calls.some(([m, p]) => m === 'POST' && /immich\/preview(\?albums)?(?!.*year=)/.test(p)),
+     JSON.stringify(calls.map(c => c[1])));
+  ok('Nach der Vorschau über alle Jahre ist der Knopf offen', !run.disabled);
+  ok('Die Überschrift nennt die Spanne, nicht ein Jahr',
+     /2004/.test(box.textContent) && /2024/.test(box.textContent),
+     box.textContent.slice(0, 120));
+  calls.length = 0;
+  run.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await wait(30);
+  ok('Der Sammellauf startet überhaupt', started().length === 1,
+     `${started().length} Starts — ohne Start gibt es auch keine Jahre zu prüfen`);
+  const allRun = JSON.parse((started().slice(-1)[0] || [])[2] || '{}');
+  ok('Der Lauf bekommt ALLE gesehenen Jahre',
+     allRun.params && Array.isArray(allRun.params.years)
+       && allRun.params.years.slice().sort().join(',') === '2004,2023,2024',
+     JSON.stringify(allRun.params));
+
   // --- 6. Und wenn davor etwas schiefgeht? ------------------------------- //
   // Anmerkung 112: Genau hier lag der gemeldete Fehler. Die Jahresliste kam
   // nur vom Server, und ihr Aufruf hing hinter einem stummen `catch`. Ging
@@ -283,7 +335,7 @@ function scenario(broken) {
     runScripts: 'dangerously', pretendToBeVisual: true, url: 'http://localhost:8000/',
     beforeParse(w) {
       w.matchMedia = () => ({ matches: false, addEventListener() {}, addListener() {} });
-      w.L = new Proxy(function () { return w.L; }, { get: () => w.L, apply: () => w.L });
+      w.L = new Proxy(function () { return w.L; }, { get: (_t, k) => (k === 'getZoom' ? () => 6 : w.L), apply: () => w.L });
       w.fetch = (u, o) => {
         const p = String(u);
         calls.push([(o && o.method) || 'GET', p]);

@@ -253,6 +253,23 @@
   .action-key { flex-shrink: 0; min-width: 215px; }
   .action-desc { font-size: 12.5px; color: var(--text-dim); line-height: 1.55; }
   .action-desc b { color: var(--text); font-size: 13px; }
+  /* Anmerkung 120: Das Ergebnis einer Vorschau gehört UNTER den Knopf, der sie
+     ausgelöst hat. Es stand am Ende der Beschreibungsspalte daneben — auf einem
+     breiten Bildschirm die andere Hälfte, hinter zehn Zeilen Erklärung. Wer
+     „Nachsehen" drückt und dort nichts sieht, hat einen Knopf ohne Wirkung vor
+     sich, und das ist wieder die Stille (A40, Anmerkung 110).
+     Der Umbruch steht bewusst nur auf den Zeilen MIT Ergebnis: `flex-wrap`
+     allgemein einzuschalten würde jede andere Zeile derselben Seite neu
+     umbrechen lassen, sobald es eng wird. */
+  .action-row.has-result { flex-wrap: wrap; }
+  .action-result { flex: 0 0 100%; margin: 2px 0 0; }
+  /* Was gerade läuft, steht dort, wo man es gestartet hat (Anmerkung 120) —
+     statt eines Reiterwechsels bei jedem Knopfdruck. */
+  .job-live { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+              padding: 8px 10px; border-radius: 8px; margin-bottom: 8px;
+              background: var(--bg-elev); border: 1px solid var(--border); }
+  .job-live:last-child { margin-bottom: 0; }
+  .job-live .job-name { font-size: 13px; color: var(--text); font-weight: 600; }
   @media (max-width: 860px) {
     .action-row { flex-direction: column; gap: 8px; }
     .action-row .btn { min-width: 0; width: 100%; }
@@ -1632,6 +1649,12 @@
         </div>
 
         <div class="admin-tabpane" data-tabpane="daten" style="display:none">
+        <!-- Anmerkung 120: EIN Ort für „was läuft gerade?", statt bei jedem
+             Start in den Jobs-Reiter zu springen. Der Sprung war die einzige
+             Rückmeldung, die ein gestarteter Lauf gab — und bei zwanzig Jahren
+             hintereinander sprang die Seite zwanzigmal weg von dem Knopf, den
+             man gerade wieder braucht. Leer bleibt der Streifen unsichtbar. -->
+        <div id="data-jobs" style="display:none; margin-bottom:16px"></div>
         <!-- A26: klare Blöcke. Anmerkung 115: die Blöcke stehen jetzt in der
              Reihenfolge, in der man sie beim ersten Mal braucht — jeder Schritt
              füttert den nächsten (Import liefert Orte und Daten, die Ortsnamen
@@ -1684,7 +1707,7 @@
                weil sie genau dessen Hinterlassenschaft aufräumt — neue
                Importe schneiden schon selbst. Erst sehen, dann schreiben
                (P2.5-Muster): die Aktion fasst Bestätigtes an. -->
-          <div class="action-row">
+          <div class="action-row has-result">
             <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
               <button class="btn secondary" id="btn-md-preview" style="text-align:left" data-i18n="md.preview">🔍 Nachsehen</button>
               <button class="btn" id="btn-md-run" style="text-align:left" disabled data-i18n="md.run">✂️ In Tage schneiden</button>
@@ -1698,8 +1721,8 @@
               Tagesgrenze. <b>Nur importierte Besuche</b> — von Hand erfasste Reisen und Immich-Vorschläge
               bleiben mehrtägig, denn dort ist die Spanne eine Aussage. Ereignisse mit eigenen
               Tages-Einträgen und Spannen über einer Woche lässt der Lauf aus und sagt es.</span>
-              <div id="md-result" class="hint" style="display:none; margin-top:10px"></div>
             </div>
+            <div id="md-result" class="hint action-result" style="display:none"></div>
           </div>
         </div>
 
@@ -1780,9 +1803,9 @@
           <!-- P2.1 Stufe 2: Immich als Ereignis-QUELLE. Bewusst eine eigene
                Zeile unter dem Verknüpfen: das eine hängt Bilder an vorhandene
                Einträge, das andere schlägt neue vor. -->
-          <div class="action-row">
+          <div class="action-row has-result">
             <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
-              <select id="ims-year" class="mf-select" data-i18n-title="ims.year.tip" title="Ein Jahr je Lauf — eine ganze Bibliothek auf einmal ergäbe tausende Vorschläge"></select>
+              <select id="ims-year" class="mf-select" data-i18n-title="ims.year.tip" title="Ein Jahr je Lauf — oder „Alle Jahre“: die Vorschau geht sie dann einzeln durch, damit jedes Jahr wirklich angesehen wird"></select>
               <button class="btn secondary" id="ims-preview" style="text-align:left" data-i18n="ims.preview">🔍 Vorschau für dieses Jahr</button>
               <button class="btn" id="ims-run" style="text-align:left" disabled data-i18n="ims.run">✚ Vorschläge anlegen</button>
               <!-- P2.1 Stufe 3: Alben sind eine ausdrückliche Frage. Der
@@ -1798,7 +1821,6 @@
               („34 Fotos am 12. Juli in Detmold") wird zu einem <b>unbestätigten</b> Eintrag in der
               Moderation — bestätigt wird nichts von allein. Geclustert werden nur <b>eigene</b> Fotos <b>mit
               Koordinaten</b>, die in deinem Immich-Zeitstrahl stehen; Archiviertes und Gesperrtes bleibt außen vor.</span>
-              <div id="ims-result" class="hint" style="display:none; margin-top:10px"></div>
               <span class="hint" style="display:block; margin-top:8px" data-i18n="ims.hint">Erst die Vorschau, dann das
               Anlegen — der Knopf bleibt bis dahin gesperrt. Ein Jahr kann hunderte Vorschläge ergeben, und
               die will man vorher gesehen haben.</span>
@@ -1809,14 +1831,15 @@
               die Fotos hängen sich daran</b> („Fotos verknüpfen" oben). Wer trotzdem nachsehen will, setzt den Haken —
               geteilte Alben sind dann erlaubt und werden als solche gekennzeichnet.</span>
             </div>
+            <div id="ims-result" class="hint action-result" style="display:none"></div>
           </div>
           <!-- A45: Fotos verorten. Eigene Zeile unter dem Vorschlagen, weil
                es etwas anderes tut: keine Ereignisse, nur Punkte auf der
                Karte — und deshalb auch ohne Vorschau (es landet nichts in der
                Lebensdatenbank, und ein Knopf räumt alles wieder weg). -->
-          <div class="action-row">
+          <div class="action-row has-result">
             <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
-              <select id="pp-year" class="mf-select" data-i18n-title="pp.year.tip" title="Ein Jahr je Lauf — eine ganze Bibliothek auf einmal ist kein Lauf, sondern ein Zeitlimit"></select>
+              <select id="pp-year" class="mf-select" data-i18n-title="pp.year.tip" title="Ein Jahr je Lauf — oder „Alle Jahre“: der Lauf arbeitet sie im Hintergrund nacheinander ab und hakt jedes einzeln ab"></select>
               <button class="btn" id="pp-run" style="text-align:left" data-i18n="pp.run">📍 Fotos verorten</button>
               <button class="btn secondary" id="pp-reset" style="text-align:left" data-i18n="pp.reset">🗑️ Punkte verwerfen</button>
             </div>
@@ -1827,13 +1850,13 @@
               Zeitpunkt, Koordinate und den Ortsnamen, den Immich selbst schon kennt. Genommen werden dieselben
               Fotos wie oben: <b>eigene</b>, <b>mit Koordinaten</b>, <b>im Immich-Zeitstrahl</b>. Sichtbar wird
               das Ergebnis über den Schalter <b>„📷 Fotos"</b> auf der Karte und im Zeitstrahl.</span>
-              <div id="pp-result" class="hint" style="display:none; margin-top:10px"></div>
             </div>
+            <div id="pp-result" class="hint action-result" style="display:none"></div>
           </div>
 
           <!-- Wer den Alben-Zweig abschaltet, hat die Alben von gestern noch
                in der Warteschlange stehen. -->
-          <div class="action-row" id="ims-cleanup-row">
+          <div class="action-row has-result" id="ims-cleanup-row">
             <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
               <button class="btn secondary" id="ims-drop" style="text-align:left" data-i18n="ims.drop">🗑️ Album-Vorschläge verwerfen</button>
             </div>
@@ -1842,8 +1865,8 @@
               Betrifft nur <b>unbestätigte</b> Vorschläge, die aus einem Album entstanden sind — bestätigte Einträge
               und die Fototage bleiben unangetastet. Verworfene Alben kommen nicht wieder, auch wenn du später erneut
               nachsiehst.</span>
-              <div id="ims-drop-result" class="hint" style="display:none; margin-top:10px"></div>
             </div>
+            <div id="ims-drop-result" class="hint action-result" style="display:none"></div>
           </div>
         </div>
 
@@ -1854,7 +1877,7 @@
              vervielfacht in die Lebensdatenbank. -->
         <div class="section-title" data-i18n="adm.daysplit">5 · Tages-Einträge</div>
         <div class="panel" style="padding:0">
-          <div class="action-row">
+          <div class="action-row has-result">
             <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
               <button class="btn secondary" id="btn-days-preview" style="text-align:left" data-i18n="ds.preview">🔍 Nachsehen</button>
               <button class="btn" id="btn-days-run" style="text-align:left" disabled data-i18n="ds.run">📅 Alle aufteilen</button>
@@ -1873,8 +1896,8 @@
               eine Genauigkeit, die die Angabe selbst dementiert. Vorhandene Tage bleiben, es werden nur
               Lücken gefüllt — zweimal drücken legt nichts doppelt an. Das <b>Wetter</b> holt der
               Wetterlauf nach, nicht dieser Knopf.</span>
-              <div id="days-result" class="hint" style="display:none; margin-top:10px"></div>
             </div>
+            <div id="days-result" class="hint action-result" style="display:none"></div>
           </div>
         </div>
 
@@ -2931,8 +2954,27 @@ const I18N_EN = {
   'job.weather': "🌤️ Add weather",
   'job.embeddings': "🧠 Embeddings",
   'job.resolve_names': "📍 Resolve/format place names",
+  'job.photo_points': "📍 Place photos on the map",
   'job.timeline_import': "🛰️ Timeline import",
   'job.data_import': "📥 Data import",
+  // Anmerkung 120 — laufende Läufe, Vorschauen, „Alle Jahre"
+  'jobs.active': "Running now ({n})",
+  'jobs.past': "History",
+  'jobs.justnow': "just now",
+  'jobs.since': "for {n} min",
+  'adm.jobstarted.here': "✓ Started — progress and stop are at the top of this page. The run continues in the background, even if you close the page.",
+  'prev.busy': "looking …",
+  'prev.below': "the list is below the button.",
+  'year.all': "All years",
+  'year.n': "{n} years",
+  'pp.open': "{n} left",
+  'ims.busy.all': "Cancel — {y} ({i}/{n})",
+  'ims.running': "{i} of {n} years checked ({y})",
+  'ims.running.sum': "so far {n} proposals from {p} photos",
+  'ims.seenonly': "Only {y} was checked — that is why “Create proposals” stays locked.",
+  'ims.stopped': "Preview cancelled.",
+  'ims.stopped.why': "{i} of {n} years had been checked ({y}) — a run needs a complete preview.",
+  'ims.head.short': "{y}: {n} proposals — the list is below the button.",
   'nodate': "no date",
   'track.walk': "🚶 Walking",
   'track.run': "🏃 Running",
@@ -6791,6 +6833,10 @@ async function openMapView() {
     mapRoute = L.layerGroup().addTo(mapObj);
     mapTracks = L.layerGroup().addTo(mapObj);
     mapPhotos = L.layerGroup().addTo(mapObj);   // A45
+    // Fotopunkte wachsen mit dem Zoom (Anmerkung 120) — beim Hineinzoomen ist
+    // ein Punkt sonst genauso groß wie in der Weltansicht, und dort ist er zu
+    // klein, um neben einem Pin noch aufzufallen.
+    mapObj.on('zoomend', mpPhotoResize);
     // Auf Mobil ändert sich die Höhe beim Drehen / Ein-/Ausblenden der Adressleiste
     window.addEventListener('resize', () => mapObj && mapObj.invalidateSize());
     window.addEventListener('orientationchange', () => mapObj && mapObj.invalidateSize());
@@ -7013,17 +7059,44 @@ async function mpLoadPhotos(key, from, to) {
     return null;
   }
 }
+// Anmerkung 120: Ein Punkt von 4 px mit 1 px Rand ging neben den Ereignis-Pins
+// und den Cluster-Blasen unter — und zwar gerade dort, wo viel passiert ist.
+// Er wächst deshalb mit dem Zoom: in der Weltansicht ist ein großer Punkt ein
+// Fleck, im Stadtplan ist ein kleiner unsichtbar. Die REIHENFOLGE bleibt, wie
+// sie war (Fotos unter den Pins): Ereignisse sind die Lebensdatenbank, Punkte
+// eine Ableitung — und was oben liegt, ist eine Aussage darüber, was zählt.
+function mpPhotoRadius() {
+  const z = mapObj ? mapObj.getZoom() : 6;
+  return z >= 14 ? 8 : z >= 11 ? 7 : z >= 8 ? 6 : 5;
+}
+const MP_PHOTO_DOTS = [];
+function mpPhotoResize() {
+  if (!MP_PHOTO_DOTS.length) return;
+  const r = mpPhotoRadius();
+  // Nur bei echter Änderung durch die Liste: bei zehntausend Punkten ist jeder
+  // Zoomschritt sonst zehntausend Neuberechnungen für dasselbe Bild.
+  if (r === MP_PHOTO_DOTS.radius) return;
+  MP_PHOTO_DOTS.radius = r;
+  MP_PHOTO_DOTS.forEach(dot => dot.setRadius(r));
+}
 function mpDrawPhotos(key, all) {
   if (!mapPhotos) return;
   mapPhotos.clearLayers();
+  MP_PHOTO_DOTS.length = 0;
+  MP_PHOTO_DOTS.radius = null;
   if (!mp.showPhotos || !mp.photoTotal) { mpPhotoNote(null); return; }
   // Zeitfenster = der angezeigte Zeitraum, und sonst nichts.
   const span = mpPeriodSpan(key);
   mpLoadPhotos(key, span && span[0], span && span[1]).then(r => {
     if (!r || !mp.showPhotos) { mpPhotoNote(null); return; }
+    const radius = mpPhotoRadius();
+    MP_PHOTO_DOTS.radius = radius;
     r.points.forEach(p => {
-      L.circleMarker([p.lat, p.lng], {
-        radius: 4, fillColor: '#f0a23b', color: '#fff', weight: 1, fillOpacity: .9,
+      MP_PHOTO_DOTS.push(L.circleMarker([p.lat, p.lng], {
+        // Kräftiger Rand und volle Deckkraft: der Punkt muss sich gegen eine
+        // helle Kachel UND gegen eine dunkle behaupten, und der weiße Ring
+        // trennt ihn von seinen Nachbarn, wo viele dicht beieinanderliegen.
+        radius, fillColor: '#f5921b', color: '#fff', weight: 2, fillOpacity: 1,
         // Auf die Leinwand statt in den DOM: Leaflet zeichnet Kreise sonst als
         // je ein SVG-Element, und zehntausend davon sind zehntausend Knoten,
         // die der Browser bei jedem Verschieben neu anfassen muss. Genau diese
@@ -7034,7 +7107,7 @@ function mpDrawPhotos(key, all) {
         `<img src="/api/photos/${encodeURIComponent(p.id)}/thumb" alt="" `
         + `style="max-width:180px; border-radius:6px; display:block; margin-bottom:6px" loading="lazy">`
         + `<b>${esc(p.place || t('map.photos.nowhere', 'ohne Ortsangabe'))}</b><br>`
-        + esc(new Date(p.at).toLocaleString(LOC())));
+        + esc(new Date(p.at).toLocaleString(LOC()))));
     });
     mpPhotoNote(r);
   });
@@ -7470,7 +7543,7 @@ function gotoView(v) {
 let adminTab = 'moderation';
 function loadAdminTab(t) {
   if (t === 'moderation') { loadModQueue(); loadFuzzyDates(); }
-  if (t === 'daten') loadPlaceFormat();
+  if (t === 'daten') { loadPlaceFormat(); pollDataJobs(); }
   if (t === 'jobs') { loadJobs(); renderSchedule(); }
   if (t === 'nutzer') loadUsers();
   if (t === 'db') loadDbTables();
@@ -7832,10 +7905,16 @@ document.querySelectorAll('.example-chip').forEach(c =>
   c.addEventListener('click', () => { document.getElementById('input-text').value = c.textContent; }));
 
 // ---------- JOBS (A11) ----------
+// Jeder Typ aus `JOB_TYPES` (backend/app/routers/jobs.py) gehört hierher.
+// `photo_points` fehlte und stand deshalb als nackter Schlüssel in der Tabelle:
+// das Backend kannte sein Label längst, die Oberfläche fiel auf `esc(j.type)`
+// zurück. **Ein Fallback, der wie eine Anzeige aussieht, versteckt die Lücke** —
+// `tools/check-job-labels.js` vergleicht die beiden Listen jetzt.
 const JOB_LABELS = { recompute: '🔄 KI-Vorschläge neu berechnen', weather: '🌤️ Wetter ergänzen',
                      embeddings: '🧠 Embeddings', resolve_names: '📍 Ortsnamen auflösen/formatieren',
                      immich: '🖼️ Fotos aus Immich verknüpfen',
                      immich_source: '🖼️ Ereignisse aus Immich vorschlagen',
+                     photo_points: '📍 Fotos auf der Karte verorten',
                      timeline_import: '🛰️ Timeline-Import', data_import: '📥 Daten-Import' };
 const JOB_STATUS_DE = { running: '⏳ läuft', done: '✅ fertig', stopped: '⏹ gestoppt', error: '⚠️ Fehler' };
 // F10: Status in der aktiven Sprache
@@ -7851,14 +7930,7 @@ async function loadJobs() {
   // Zeiten sind UTC gespeichert -> lokal anzeigen
   const fmt = iso => iso ? new Date(iso.endsWith('Z') ? iso : iso + 'Z')
     .toLocaleString(LOC(), { dateStyle: 'short', timeStyle: 'short' }) : '—';
-  tbl.innerHTML = !jobs.length
-    ? `<tbody><tr><td class="stat-label" style="padding:10px">${
-        esc(t('jobs.none', 'Noch keine Jobs gelaufen.'))}</td></tr></tbody>`
-    : `<thead><tr><th>Job</th><th>${esc(t('jobs.col.status', 'Status'))}</th>`
-      + `<th>${esc(t('jobs.col.progress', 'Fortschritt'))}</th>`
-      + `<th>${esc(t('jobs.col.started', 'Gestartet'))}</th>`
-      + `<th>${esc(t('jobs.col.result', 'Ergebnis'))}</th><th></th></tr></thead><tbody>`
-    + jobs.map(j => `<tr>
+  const row = j => `<tr>
         <td><b>${t('job.' + j.type, JOB_LABELS[j.type] || esc(j.type))}</b></td>
         <td style="white-space:nowrap">${JOB_STATUS[j.status] || esc(j.status)}</td>
         <td class="stat-label">${j.done}${j.unit ? ' ' + esc(j.unit) : ''}${
@@ -7867,7 +7939,32 @@ async function loadJobs() {
         <td class="stat-label" style="white-space:nowrap">${fmt(j.started_at)}${j.started_by ? `<br>${t('by', 'von')} ${esc(j.started_by)}` : ''}</td>
         <td class="stat-label">${esc(j.result || '')}</td>
         <td>${j.status === 'running' ? `<button class="btn small danger" data-job-stop="${esc(j.id)}">⏹ ${esc(t('jobs.stop', 'Stopp'))}</button>` : ''}</td>
-      </tr>`).join('') + '</tbody>';
+      </tr>`;
+  // Anmerkung 120: Laufendes und Abgeschlossenes sind zwei Fragen — „was tut
+  // die Anwendung gerade?" und „was ist passiert?". In EINER nach Startzeit
+  // sortierten Liste beantwortet die zweite die erste mit: ein Lauf, der eine
+  // Stunde arbeitet, steht nach zwölf kurzen Läufen unten und irgendwann gar
+  // nicht mehr da. Der Server liefert Laufendes jetzt vollständig und zuerst;
+  // hier bekommt es eine eigene Überschrift, damit man es auch sieht.
+  const sep = (icon, text) => `<tr><td colspan="6" class="stat-label"
+        style="padding:12px 10px 4px; border-bottom:1px solid var(--border)">${icon} ${esc(text)}</td></tr>`;
+  const live = jobs.filter(j => j.status === 'running' || j.status === 'stopping');
+  const past = jobs.filter(j => !(j.status === 'running' || j.status === 'stopping'));
+  tbl.innerHTML = !jobs.length
+    ? `<tbody><tr><td class="stat-label" style="padding:10px">${
+        esc(t('jobs.none', 'Noch keine Jobs gelaufen.'))}</td></tr></tbody>`
+    : `<thead><tr><th>Job</th><th>${esc(t('jobs.col.status', 'Status'))}</th>`
+      + `<th>${esc(t('jobs.col.progress', 'Fortschritt'))}</th>`
+      + `<th>${esc(t('jobs.col.started', 'Gestartet'))}</th>`
+      + `<th>${esc(t('jobs.col.result', 'Ergebnis'))}</th><th></th></tr></thead><tbody>`
+      + (live.length
+          ? sep('⏳', t('jobs.active', 'Läuft gerade ({n})').replace('{n}', live.length))
+            + live.map(row).join('')
+          : '')
+      + (past.length
+          ? (live.length ? sep('🗃️', t('jobs.past', 'Verlauf')) : '') + past.map(row).join('')
+          : '')
+      + '</tbody>';
   tbl.querySelectorAll('[data-job-stop]').forEach(btn => btn.addEventListener('click', async () => {
     btn.disabled = true;
     try { await api(`/api/jobs/${btn.dataset.jobStop}/stop`, { method: 'POST' }); toast(t('toast.stopreq', 'Stopp angefordert — der Lauf endet nach dem aktuellen Batch.'), 'warn'); }
@@ -8031,25 +8128,86 @@ async function runBatchedAdmin(btn, { reset, step, unit, doneMsg, jobType }) {
 
 // A22: Diese Läufe starten SERVERSEITIG (Background-Thread) — sie laufen
 // weiter, wenn die Seite zu ist. Fortschritt & Stopp im Jobs-Reiter.
-async function startServerJob(btn, type, params) {
+// `stay` = auf dieser Seite bleiben (Anmerkung 120). Jeder Start hat bisher in
+// den Jobs-Reiter gesprungen — der Sprung WAR die Rückmeldung, und genau
+// deshalb war er lästig: wer in „Meine Daten" mehrere Läufe hintereinander
+// anstößt, wird jedes Mal von dem Knopf weggetragen, den er als Nächstes
+// braucht. Die Rückmeldung steht jetzt oben auf derselben Seite (`#data-jobs`),
+// samt Stopp-Knopf — und weil sie dort steht, darf der Sprung weg.
+async function startServerJob(btn, type, params, stay) {
   btn.disabled = true;
   try {
     await api('/api/jobs/start', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type, params: params || null }),
     });
-    toast(t('adm.jobstarted', '✓ Gestartet — läuft jetzt im Hintergrund weiter, auch wenn du die Seite schließt.\nFortschritt & Stopp: Reiter „Jobs".'));
-    showAdminTab('jobs');
+    if (stay) {
+      toast(t('adm.jobstarted.here', '✓ Gestartet — Fortschritt und Stopp stehen oben auf dieser Seite. Der Lauf läuft im Hintergrund weiter, auch wenn du die Seite schließt.'), 'ok', 8000);
+      pollDataJobs();
+    } else {
+      toast(t('adm.jobstarted', '✓ Gestartet — läuft jetzt im Hintergrund weiter, auch wenn du die Seite schließt.\nFortschritt & Stopp: Reiter „Jobs".'));
+      showAdminTab('jobs');
+    }
   } catch (err) {
     toast(err.message, err.status === 409 ? 'warn' : 'error', 9000);
   } finally {
     btn.disabled = false;
   }
 }
+
+// „Was läuft gerade?" — oben in „Meine Daten", solange etwas läuft.
+//
+// **Und der zuletzt beendete Lauf bleibt stehen.** Verschwände der Streifen
+// beim Fertigwerden, wäre das Ergebnis genau die Auskunft, die niemand zu sehen
+// bekommt — „12.400 Fotos gelesen, 3.100 ohne Koordinaten" ist der ganze Sinn
+// des Laufs, und sie stünde nur im Reiter, in den man nicht mehr springt
+// (Anmerkung 110: der wiederkehrende Defekt ist die Stille).
+const DATA_JOB_SEEN = new Set();
+let dataJobsTimer = null;
+async function pollDataJobs() {
+  const box = document.getElementById('data-jobs');
+  if (!box) return;
+  clearTimeout(dataJobsTimer);
+  let jobs = [];
+  try { jobs = await api('/api/jobs?limit=10'); } catch (_) { return; }
+  const isActive = j => j.status === 'running' || j.status === 'stopping';
+  const active = jobs.filter(isActive);
+  active.forEach(j => DATA_JOB_SEEN.add(j.id));
+  const finished = jobs.filter(j => !isActive(j) && DATA_JOB_SEEN.has(j.id));
+  const rows = active.concat(finished);
+  box.style.display = rows.length ? '' : 'none';
+  const since = iso => {
+    const ms = Date.now() - new Date(iso.endsWith('Z') ? iso : iso + 'Z').getTime();
+    const min = Math.floor(ms / 60000);
+    return min < 1 ? t('jobs.justnow', 'gerade eben')
+      : t('jobs.since', 'seit {n} min').replace('{n}', min);
+  };
+  box.innerHTML = rows.map(j => `<div class="job-live">
+      <span class="job-name">${t('job.' + j.type, JOB_LABELS[j.type] || esc(j.type))}</span>
+      <span class="stat-label">${JOB_STATUS[j.status] || esc(j.status)}${
+        isActive(j) ? ` · ${j.done}${j.unit ? ' ' + esc(j.unit) : ''} · ${esc(since(j.started_at))}` : ''}</span>
+      ${j.result ? `<span class="stat-label" style="flex:1 1 100%">${esc(j.result)}</span>` : ''}
+      ${j.status === 'running'
+        ? `<button class="btn small danger" data-job-stop="${esc(j.id)}" style="margin-left:auto">⏹ ${esc(t('jobs.stop', 'Stopp'))}</button>`
+        : ''}
+    </div>`).join('');
+  box.querySelectorAll('[data-job-stop]').forEach(btn => btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    try { await api(`/api/jobs/${btn.dataset.jobStop}/stop`, { method: 'POST' }); toast(t('toast.stopreq', 'Stopp angefordert — der Lauf endet nach dem aktuellen Batch.'), 'warn'); }
+    catch (err) { toast(err.message, 'error'); }
+    pollDataJobs();
+  }));
+  // Weiterschauen nur, solange etwas läuft UND jemand hinsieht.
+  if (active.length && document.getElementById('view-admin').classList.contains('active')
+      && adminTab === 'daten') {
+    dataJobsTimer = setTimeout(pollDataJobs, 4000);
+  }
+}
 document.getElementById('btn-recompute-2').addEventListener('click', e =>
   startServerJob(e.target, 'recompute'));
+// Wetter steht in „Meine Daten" (Anmerkung 115) — also bleibt der Reiter stehen.
 document.getElementById('btn-enrich').addEventListener('click', e =>
-  startServerJob(e.target, 'weather'));
+  startServerJob(e.target, 'weather', null, true));
 document.getElementById('btn-embed').addEventListener('click', e =>
   startServerJob(e.target, 'embeddings'));
 
@@ -8288,7 +8446,7 @@ document.getElementById('timeline-file').addEventListener('change', async ev => 
 // entduplizierte Vereinigung aller Mängel ab (jeder Ort höchstens einmal
 // geocodiert). Der Server kennt `scope` weiterhin, die UI bietet ihn nicht an.
 document.getElementById('btn-resolve-run').addEventListener('click', e =>
-  startServerJob(e.target, 'resolve_names'));
+  startServerJob(e.target, 'resolve_names', null, true));
 
 // --------------------------------------------------------------------------- //
 // Tages-Einträge in Serie (Anmerkung 113)
@@ -8297,6 +8455,18 @@ document.getElementById('btn-resolve-run').addEventListener('click', e =>
 // bis jemand gesehen hat, was dabei entsteht. Diese Aktion schreibt
 // VERVIELFACHT in die Lebensdatenbank — 12 Ereignisse können 200 Zeilen sein,
 // und die müsste man einzeln wieder löschen.
+// Anmerkung 120: Ein Knopf, der gerade arbeitet, muss es SAGEN. „Nachsehen"
+// hat den Knopf nur stumm gesperrt und danach einen Kasten gefüllt, der am
+// Ende der Beschreibungsspalte daneben stand — auf einem breiten Bildschirm
+// die andere Hälfte. Zwischen „lädt" und „tut nichts" lagen damit null Pixel.
+// Gibt die Wiederherstellungs-Funktion zurück; der Text kommt zurück, wie er
+// war (also auch in der richtigen Sprache, ohne ihn hier zu kennen).
+function btnBusy(btn, label) {
+  const before = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ ' + label;
+  return () => { btn.textContent = before; btn.disabled = false; };
+}
 let daysSeen = null;               // die Spanne, für die die Vorschau galt
 function daysSpan() {
   const el = document.getElementById('days-max-span');
@@ -8310,7 +8480,7 @@ function daysLock() {
 document.getElementById('days-max-span')?.addEventListener('input', daysLock);
 document.getElementById('btn-days-preview')?.addEventListener('click', async ev => {
   const btn = ev.target, box = document.getElementById('days-result');
-  btn.disabled = true;
+  const restore = btnBusy(btn, t('prev.busy', 'sehe nach …'));
   try {
     const r = await api(`/api/events/days/pending?max_span=${daysSpan()}`);
     daysSeen = r.max_span;
@@ -8344,10 +8514,16 @@ document.getElementById('btn-days-preview')?.addEventListener('click', async ev 
           .replace('{n}', r.vague))}</div>`;
     }
     daysLock();
+    toast(r.events
+      ? `🔍 ${t('ds.head', '{n} Ereignisse → {d} neue Tages-Einträge')
+            .replace('{n}', r.events).replace('{d}', r.days)} — ${
+            t('prev.below', 'die Liste steht unter dem Knopf.')}`
+      : `🔍 ${t('ds.none', 'Nichts aufzuteilen.')}`, 'ok', 7000);
   } catch (err) {
     box.style.display = ''; box.textContent = err.message;
     daysSeen = null; daysLock();
-  } finally { btn.disabled = false; }
+    toast(err.message, 'error', 8000);
+  } finally { restore(); }
 });
 document.getElementById('btn-days-run')?.addEventListener('click', async ev => {
   const btn = ev.target, span = daysSpan();
@@ -8389,7 +8565,7 @@ function mdLock() {
 }
 document.getElementById('btn-md-preview')?.addEventListener('click', async ev => {
   const btn = ev.target, box = document.getElementById('md-result');
-  btn.disabled = true;
+  const restore = btnBusy(btn, t('prev.busy', 'sehe nach …'));
   try {
     const r = await api('/api/events/visits/multiday');
     mdSeen = r.events > 0;
@@ -8419,10 +8595,16 @@ document.getElementById('btn-md-preview')?.addEventListener('click', async ev =>
           .replace('{n}', r.with_children))}</div>`;
     }
     mdLock();
+    toast(r.events
+      ? `🔍 ${t('md.head', '{n} Besuche → {r} Zeilen danach')
+            .replace('{n}', r.events).replace('{r}', r.rows_after)} — ${
+            t('prev.below', 'die Liste steht unter dem Knopf.')}`
+      : `🔍 ${t('md.none', 'Nichts zu schneiden.')}`, 'ok', 7000);
   } catch (err) {
     box.style.display = ''; box.textContent = err.message;
     mdSeen = false; mdLock();
-  } finally { btn.disabled = false; }
+    toast(err.message, 'error', 8000);
+  } finally { restore(); }
 });
 document.getElementById('btn-md-run')?.addEventListener('click', async ev => {
   const btn = ev.target;
@@ -8614,7 +8796,7 @@ document.getElementById('im-test').addEventListener('click', async ev => {
   finally { btn.disabled = false; }
 });
 document.getElementById('im-run').addEventListener('click', e =>
-  startServerJob(e.target, 'immich'));
+  startServerJob(e.target, 'immich', null, true));
 document.getElementById('im-reset').addEventListener('click', async () => {
   if (!(await uiConfirm(t('im.reset.ask',
       'Nur die Zuordnungen werden gelöscht. Deine Bilder in Immich und deine selbst hochgeladenen Fotos bleiben unangetastet.'),
@@ -8631,6 +8813,10 @@ document.getElementById('im-reset').addEventListener('click', async () => {
 // eine zwanzig Jahre alte Bibliothek füllt sonst eine Warteschlange, die für
 // Dutzende gebaut ist — und niemand hätte es vorher wissen können.
 let imsPreviewedYear = null;
+// Anmerkung 120: die Jahre, die die Vorschau WIRKLICH gesehen hat. Bei einem
+// Jahr ist das eine Wiederholung von `imsPreviewedYear`; bei „Alle Jahre" ist
+// es die einzige ehrliche Angabe, und der Lauf bekommt sie statt der Auswahl.
+let imsPreviewedYears = [];
 // P2.1 Stufe 3: unter WELCHER Alben-Einstellung die Vorschau entstanden ist.
 // Das Jahr allein reicht nicht mehr — siehe `imsLock()`.
 let imsPreviewedAlbums = false;
@@ -8653,7 +8839,24 @@ function imsDefaultYears() {
   const now = new Date().getFullYear();
   sel.innerHTML = Array.from({ length: 6 }, (_, i) => now - i)
     .map(y => `<option value="${y}">${y}</option>`).join('');
+  imsAddAllOption(sel);
   sel.value = String(now);
+}
+
+// Anmerkung 120: „Alle Jahre" — aber als Eintrag der Liste, nicht als eigener
+// Knopf. Es ist dieselbe Frage („welcher Zeitraum?"), und zwei Bedienelemente
+// für eine Frage laufen auseinander (Anmerkung 106).
+const YEAR_ALL = 'all';
+function imsAddAllOption(sel) {
+  if (!sel || [...sel.options].some(o => o.value === YEAR_ALL)) return;
+  sel.insertAdjacentHTML('afterbegin',
+    `<option value="${YEAR_ALL}">${esc(t('year.all', 'Alle Jahre'))}</option>`);
+}
+// Die echten Jahre der Auswahl, jüngstes zuerst — ohne den Sammeleintrag.
+function yearsOf(sel) {
+  return [...(sel?.options || [])].map(o => o.value)
+    .filter(v => v !== YEAR_ALL).map(Number).filter(Number.isFinite)
+    .sort((a, b) => b - a);
 }
 
 async function loadImmichYears() {
@@ -8669,6 +8872,7 @@ async function loadImmichYears() {
       const n = y.photos == null ? '' : ` · ${y.photos} ${t('ims.photos', 'Fotos')}`;
       return `<option value="${y.year}">${y.year}${esc(n)}</option>`;
     }).join('');
+    imsAddAllOption(sel);
     const has = (r.years || []).some(y => y.year === r.current);
     if (has) sel.value = String(r.current);
     // Anmerkung 113: Der Server antwortet auch dann mit 200, wenn er die
@@ -8715,6 +8919,16 @@ function ppFillYears(source) {
   [...sel.options].forEach(o => {
     if (done.has(+o.value)) o.textContent += ' ✓';
   });
+  // Beim Sammeleintrag steht dran, wie viel er noch zu tun hat — sonst ist
+  // „Alle Jahre" nach dem zehnten Lauf dieselbe Beschriftung wie vor dem
+  // ersten und sagt nicht, ob überhaupt noch etwas offen ist (A40).
+  const all = [...sel.options].find(o => o.value === YEAR_ALL);
+  if (all) {
+    const open = yearsOf(sel).filter(y => !done.has(y)).length;
+    all.textContent = t('year.all', 'Alle Jahre')
+      + (open ? ` (${t('pp.open', '{n} offen').replace('{n}', open)})`
+              : ` ✓`);
+  }
   if (keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
   else sel.value = source.value;
 }
@@ -8741,12 +8955,17 @@ async function ppLoadIndex() {
   } catch (_) { /* ohne Immich gibt es hier schlicht nichts zu zeigen */ }
 }
 document.getElementById('pp-run')?.addEventListener('click', ev => {
-  const year = parseInt(document.getElementById('pp-year').value, 10);
-  if (!Number.isFinite(year)) {
+  const sel = document.getElementById('pp-year');
+  // „Alle Jahre" braucht hier keine Vorschau und keine Warnung: der Lauf legt
+  // keine Ereignisse an, hakt jedes Jahr einzeln ab und ist mit „Punkte
+  // verwerfen" vollständig zurückzunehmen. Er ist lang, nicht folgenreich.
+  const years = sel.value === YEAR_ALL ? yearsOf(sel)
+    : [parseInt(sel.value, 10)].filter(Number.isFinite);
+  if (!years.length) {
     toast(t('pp.needyear', 'Bitte ein Jahr wählen.'), 'warn');
     return;
   }
-  startServerJob(ev.target, 'photo_points', { year });
+  startServerJob(ev.target, 'photo_points', { years }, true);
 });
 document.getElementById('pp-reset')?.addEventListener('click', async ev => {
   const btn = ev.target;
@@ -8782,52 +9001,155 @@ function imsLock() {
   // unter der sie entstanden ist.
   const sel = document.getElementById('ims-year');
   const run = document.getElementById('ims-run');
-  const stale = !imsPreviewedYear || String(imsPreviewedYear) !== sel.value
+  // `imsPreviewedYears` ist der eigentliche Riegel (Anmerkung 120): der Lauf
+  // bekommt GENAU die Jahre, die die Vorschau abgedeckt hat — nicht die, die
+  // gerade im Feld stehen. Die beiden waren dasselbe, solange es nur ein Jahr
+  // gab; bei „Alle Jahre" sind es zwei Angaben über dieselbe Sache, und die
+  // laufen auseinander (Anmerkung 106).
+  const stale = !imsPreviewedYear || !imsPreviewedYears.length
+    || String(imsPreviewedYear) !== sel.value
     || imsPreviewedAlbums !== imsAlbums();
   run.disabled = stale;
   if (stale) document.getElementById('ims-result').style.display = 'none';
 }
 document.getElementById('ims-year')?.addEventListener('change', imsLock);
 document.getElementById('ims-albums')?.addEventListener('change', imsLock);
+// --------------------------------------------------------------------------- //
+// Vorschau über EIN Jahr oder über ALLE (Anmerkung 120)
+// --------------------------------------------------------------------------- //
+// „Alle Jahre" ist EINE Vorschau aus VIELEN Anfragen — nicht eine Anfrage über
+// alles. Der Grund ist das Zeitbudget der Vorschau (`PREVIEW_BUDGET_S` = 25 s,
+// abgeleitet aus der Geduld umgekehrter Vertreter): über zwanzig Jahre wäre
+// jede Antwort ein Ausschnitt, und ein Ausschnitt hebt den Riegel nicht auf —
+// „erst sehen, dann anlegen" hieße dann „ein Zwanzigstel sehen, alles anlegen".
+// Jahr für Jahr bekommt dagegen JEDES Jahr das volle Budget, und was am Ende
+// dasteht, ist wirklich angesehen worden.
+let imsBusy = false, imsCancel = false;
+function imsBlank() {
+  return { total: 0, days: 0, albums: 0, photos: 0, proposals: [], covered: [],
+           partial: false, albums_open: 0, seconds: 0, albums_denied: null,
+           albums_asked: false };
+}
+function imsMerge(acc, r) {
+  acc.total += r.total; acc.days += r.days; acc.albums += r.albums;
+  acc.photos += r.photos;
+  acc.proposals.push(...(r.proposals || []));
+  acc.covered.push(...(r.covered || []));
+  if (r.partial) { acc.partial = true; acc.albums_open += r.albums_open || 0; }
+  acc.seconds += r.seconds || 0;
+  if (r.albums_denied) acc.albums_denied = r.albums_denied;
+  acc.albums_asked = acc.albums_asked || !!r.albums_asked;
+  return acc;
+}
+// „2024" bzw. „2003–2024 (14 Jahre)" — dieselbe Form wie `_year_span` im
+// Backend, damit Vorschau und Ergebnis dieselbe Überschrift tragen.
+function yearSpan(years) {
+  if (!years.length) return '—';
+  if (years.length === 1) return String(years[0]);
+  return `${Math.min(...years)}–${Math.max(...years)} (${
+    t('year.n', '{n} Jahre').replace('{n}', years.length)})`;
+}
 document.getElementById('ims-preview')?.addEventListener('click', async ev => {
   const btn = ev.target, sel = document.getElementById('ims-year');
+  // Zweiter Klick während eines Laufs über alle Jahre = abbrechen. Ein Lauf,
+  // der zwanzig Minuten dauern kann, braucht einen Ausstieg, der nicht
+  // „Seite neu laden" heißt.
+  if (imsBusy) { imsCancel = true; return; }
   // Sollte die Liste je leer sein, ist das ein Fehler DIESER Seite und keine
   // Aufgabe für den Nutzer: „bitte zuerst ein Jahr wählen" über einem leeren
   // Feld ist eine Sackgasse (Anmerkung 112). Also auffüllen und weitermachen.
   if (!sel.options.length) imsDefaultYears();
-  const year = sel.value || String(new Date().getFullYear());
-  btn.disabled = true;
+  const all = sel.value === YEAR_ALL;
+  const years = all ? yearsOf(sel)
+    : [parseInt(sel.value, 10) || new Date().getFullYear()];
   const box = document.getElementById('ims-result');
+  const wantAlbums = imsAlbums();
+  imsBusy = true; imsCancel = false;
+  // Bei einem Jahr ist der Knopf gesperrt — es gibt nichts abzubrechen, die
+  // eine Anfrage läuft schon. Über alle Jahre IST er der Abbruch.
+  btn.disabled = !all;
   // Anmerkung 113: Eine große Bibliothek braucht Minuten — Immich wird je
   // Album einmal gefragt. Ein Knopf, auf dem unverändert „sehe nach …" steht,
   // ist von einem hängenden Knopf nicht zu unterscheiden, und im Server-Log
   // steht bis zur Antwort nichts. Also eine laufende Uhr: sie beantwortet die
   // einzige Frage, die man in dieser Minute hat.
   const began = Date.now();
+  const acc = imsBlank();
+  const seen = [];
+  let at = 0, failed = null;
   const tick = () => {
     const s = Math.round((Date.now() - began) / 1000);
-    btn.textContent = t('ims.busy', '🔍 sehe nach …') + (s >= 3 ? ` (${s}s)` : '');
+    btn.textContent = all
+      ? `⏹ ${t('ims.busy.all', 'Abbrechen — {y} ({i}/{n})')
+            .replace('{y}', years[Math.min(at, years.length - 1)])
+            .replace('{i}', at + 1).replace('{n}', years.length)}`
+      : t('ims.busy', '🔍 sehe nach …') + (s >= 3 ? ` (${s}s)` : '');
   };
   tick();
   const timer = setInterval(tick, 1000);
   try {
-    const wantAlbums = imsAlbums();
-    const r = await api(`/api/immich/preview?year=${year}${wantAlbums ? '&albums=1' : ''}`,
-                        { method: 'POST' });
-    box.style.display = '';
-    // Der Kasten trägt sonst noch die Marke des Jahres-Hinweises — und ein
-    // späteres `imsNote('')` würde dann das Vorschau-Ergebnis ausblenden.
-    delete box.dataset.note;
-    // Anmerkung 113: Immich-Ausfälle kommen jetzt mit 200 und `error` im
-    // Rumpf. Ein 502 wäre unterwegs von Cloudflare durch eine HTML-Seite
-    // ersetzt worden — die Auskunft, warum es klemmt, kam nie an.
-    if (r.error) {
-      box.innerHTML = `<b>${esc(t('ims.failed', 'Immich hat nicht geantwortet.'))}</b><br>${esc(r.error)}`;
-      imsPreviewedYear = null;
-      imsLock();
-      return;
+    for (; at < years.length; at++) {
+      if (imsCancel) break;
+      const r = await api(`/api/immich/preview?year=${years[at]}${wantAlbums ? '&albums=1' : ''}`,
+                          { method: 'POST' });
+      // Anmerkung 113: Immich-Ausfälle kommen jetzt mit 200 und `error` im
+      // Rumpf. Ein 502 wäre unterwegs von Cloudflare durch eine HTML-Seite
+      // ersetzt worden — die Auskunft, warum es klemmt, kam nie an.
+      if (r.error) { failed = { year: years[at], error: r.error }; break; }
+      imsMerge(acc, r);
+      seen.push(years[at]);
+      // Ein Lauf über zwanzig Jahre, der erst am Ende etwas zeigt, ist
+      // zwanzig Minuten Stille. Der Zwischenstand steht deshalb sofort da.
+      if (all) {
+        box.style.display = '';
+        delete box.dataset.note;
+        box.innerHTML = `<b>🔍 ${esc(t('ims.running', '{i} von {n} Jahren angesehen ({y})')
+            .replace('{i}', seen.length).replace('{n}', years.length)
+            .replace('{y}', years[at]))}</b><br>`
+          + esc(t('ims.running.sum', 'bisher {n} Vorschläge aus {p} Fotos')
+              .replace('{n}', acc.total).replace('{p}', acc.photos));
+      }
     }
-    imsPreviewedYear = r.year;
+  } catch (err) {
+    failed = { year: years[Math.min(at, years.length - 1)], error: err.message };
+  } finally {
+    clearInterval(timer);
+    imsBusy = false;
+    btn.disabled = false;
+    btn.textContent = t('ims.preview', '🔍 Vorschau für dieses Jahr');
+  }
+  box.style.display = '';
+  // Der Kasten trägt sonst noch die Marke des Jahres-Hinweises — und ein
+  // späteres `imsNote('')` würde dann das Vorschau-Ergebnis ausblenden.
+  delete box.dataset.note;
+  if (failed) {
+    box.innerHTML = `<b>${esc(t('ims.failed', 'Immich hat nicht geantwortet.'))}</b><br>`
+      + `${esc(String(failed.year))}: ${esc(failed.error)}`
+      + (seen.length ? `<div class="stat-label" style="margin-top:8px">⏹ ${
+          esc(t('ims.seenonly', 'Angesehen wurden nur {y} — deshalb bleibt „Vorschläge anlegen" gesperrt.')
+            .replace('{y}', yearSpan(seen)))}</div>` : '');
+    imsPreviewedYear = null; imsPreviewedYears = [];
+    imsLock();
+    toast(t('ims.failed', 'Immich hat nicht geantwortet.'), 'error', 8000);
+    return;
+  }
+  // **Abgebrochen heißt nicht gesehen.** Die halbe Vorschau für die halben
+  // Jahre freizugeben wäre verlockend und falsch: im Feld stünde weiter „Alle
+  // Jahre", der Lauf nähme zehn von vierundzwanzig, und der Unterschied stünde
+  // in keiner Zeile, die jemand liest.
+  if (imsCancel) {
+    box.innerHTML = `<b>⏹ ${esc(t('ims.stopped', 'Vorschau abgebrochen.'))}</b><br>`
+      + esc(t('ims.stopped.why', '{i} von {n} Jahren waren angesehen ({y}) — für einen Lauf muss die Vorschau vollständig sein.')
+          .replace('{i}', seen.length).replace('{n}', years.length).replace('{y}', yearSpan(seen)));
+    imsPreviewedYear = null; imsPreviewedYears = [];
+    imsLock();
+    return;
+  }
+  const r = acc;
+  const label = yearSpan(seen);
+  imsPreviewedYear = all ? YEAR_ALL : seen[0];
+  imsPreviewedYears = seen;
+  {
     // Was der SERVER gemacht hat, nicht was das Häkchen gerade sagt: hakt
     // jemand während der Vorschau um, gilt trotzdem der Lauf, den er gesehen
     // hat.
@@ -8850,7 +9172,7 @@ document.getElementById('ims-preview')?.addEventListener('click', async ev => {
           .replace('{s}', r.seconds).replace('{n}', r.albums_open))}</div>`
       : '';
     if (!r.total) {
-      box.innerHTML = `<b>${esc(String(r.year))}: ${esc(t('ims.none', 'nichts Neues vorzuschlagen.'))}</b><br>`
+      box.innerHTML = `<b>${esc(label)}: ${esc(t('ims.none', 'nichts Neues vorzuschlagen.'))}</b><br>`
         + esc(t('ims.none.why', 'Entweder gibt es keine eigenen Fotos mit Koordinaten in diesem Jahr, oder alles wurde schon vorgeschlagen — auch abgelehnte Vorschläge kommen nicht wieder.'))
         + dup + denied + cut;
     } else {
@@ -8868,26 +9190,26 @@ document.getElementById('ims-preview')?.addEventListener('click', async ev => {
           ${p.shared ? `<span class="chip badge-unconfirmed">${esc(t('ims.shared', 'geteiltes Album'))}</span>` : ''}
         </div>`).join('');
       box.innerHTML = `<b>${esc(t('ims.head', '{y}: {n} Vorschläge ({d} Fototage, {a} Alben) aus {p} Fotos')
-          .replace('{y}', r.year).replace('{n}', r.total).replace('{d}', r.days)
+          .replace('{y}', label).replace('{n}', r.total).replace('{d}', r.days)
           .replace('{a}', r.albums).replace('{p}', r.photos))}</b>
         <div style="margin-top:6px">${rows}</div>
         ${r.total > 40 ? `<div class="stat-label">… ${r.total - 40} ${esc(t('ims.more', 'weitere'))}</div>` : ''}
         ${dup}${denied}${cut}`;
     }
     imsLock();
-  } catch (err) {
-    box.style.display = '';
-    box.textContent = err.message;
-    imsPreviewedYear = null;
-    imsLock();
-  } finally {
-    clearInterval(timer);
-    btn.disabled = false; btn.textContent = t('ims.preview', '🔍 Vorschau für dieses Jahr');
+    // Anmerkung 120: Auch die Vorschau meldet sich unten rechts. Sie schreibt
+    // ihr Ergebnis zwar jetzt direkt unter den Knopf, aber wer während der
+    // Minuten weitergescrollt hat, sieht davon nichts — und ein Lauf ohne
+    // erkennbares Ende ist von einem hängenden nicht zu unterscheiden.
+    toast(r.total
+      ? `🔍 ${t('ims.head.short', '{y}: {n} Vorschläge — die Liste steht unter dem Knopf.')
+          .replace('{y}', label).replace('{n}', r.total)}`
+      : `🔍 ${label}: ${t('ims.none', 'nichts Neues vorzuschlagen.')}`, 'ok', 7000);
   }
 });
 document.getElementById('ims-run')?.addEventListener('click', ev => {
-  const year = parseInt(document.getElementById('ims-year').value, 10);
-  if (String(imsPreviewedYear) !== String(year)) {
+  const chosen = document.getElementById('ims-year').value;
+  if (String(imsPreviewedYear) !== String(chosen) || !imsPreviewedYears.length) {
     // Sollte der Knopf je offen stehen, ohne dass eine Vorschau lief, ist hier
     // Schluss: die Sperre am Knopf ist die Bequemlichkeit, das hier die Regel.
     toast(t('ims.needpreview', 'Erst die Vorschau ansehen — dann anlegen.'), 'warn');
@@ -8897,10 +9219,17 @@ document.getElementById('ims-run')?.addEventListener('click', ev => {
   // entstanden ist — nicht die, die das Häkchen JETZT zeigt. `imsLock()`
   // hält beide zwar zusammen, aber der Wert, der hier rausgeht, darf nicht
   // von einem zweiten Ort abhängen.
-  startServerJob(ev.target, 'immich_source', { year, albums: imsPreviewedAlbums });
+  //
+  // Und er bekommt die Jahre der VORSCHAU, nicht die der Auswahl: das ist
+  // derselbe Satz eine Ebene tiefer (Anmerkung 120). Steht im Feld „Alle
+  // Jahre", während die Vorschau vier Jahre gesehen hat, sind vier Jahre die
+  // Wahrheit — die Sperre sorgt dafür, dass beides ohnehin zusammenpasst.
+  startServerJob(ev.target, 'immich_source',
+                 { years: imsPreviewedYears, albums: imsPreviewedAlbums }, true);
   // Die Vorschau ist verbraucht: nach dem Lauf ist der Bestand ein anderer,
   // und der Knopf darf nicht offen stehen bleiben.
   imsPreviewedYear = null;
+  imsPreviewedYears = [];
   imsLock();
 });
 

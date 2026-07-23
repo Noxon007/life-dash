@@ -26,7 +26,7 @@ const dom = new JSDOM(html, {
   runScripts: 'dangerously', pretendToBeVisual: true, url: 'http://localhost:8000/',
   beforeParse(w) {
     w.matchMedia = () => ({ matches: false, addEventListener() {}, addListener() {} });
-    w.L = new Proxy(function () { return w.L; }, { get: () => w.L, apply: () => w.L });
+    w.L = new Proxy(function () { return w.L; }, { get: (_t, k) => (k === 'getZoom' ? () => 6 : w.L), apply: () => w.L });
     w.fetch = (url) => {
       calls.push(String(url));
       let body = [];

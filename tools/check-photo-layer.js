@@ -59,7 +59,12 @@ function makeDom(withPhotos) {
     runScripts: 'dangerously', pretendToBeVisual: true, url: 'http://localhost:8000/',
     beforeParse(w) {
       w.matchMedia = () => ({ matches: false, addEventListener() {}, addListener() {} });
-      w.L = new Proxy(function () { return w.L; }, { get: () => w.L, apply: () => w.L });
+      // `getZoom` liefert eine ZAHL, und zwar eine steuerbare: die Punktgröße
+      // hängt daran (Anmerkung 120). Ein Doppel, das hier den Alles-Proxy
+      // zurückgibt, beantwortet eine andere Frage als Leaflet — und jeder
+      // Vergleich `z >= 14` stürzt darüber ab.
+      w.__zoom = 6;
+      w.L = new Proxy(function () { return w.L; }, { get: (_t, k) => (k === 'getZoom' ? () => w.__zoom : w.L), apply: () => w.L });
       w.fetch = (u, opt) => {
         const p = String(u);
         calls.push([(opt && opt.method) || 'GET', p]);
@@ -181,6 +186,22 @@ setTimeout(async () => {
      `„from=undefined" wäre ein Datum, das der Server zu lesen versucht: ${allQs}`);
   w.eval("mp.mode = 'day'; rebuildPeriods(); renderPeriod();");
   await wait(60);
+
+  // --- 3c. Ein Punkt muss zu sehen sein (Anmerkung 120) ------------------- //
+  // Gemeldet aus dem Betrieb: „Fotopunkte zu unauffällig und klein, gehen im
+  // Cluster und unter den Pins unter." Sie lagen bei festen 4 px mit 1 px
+  // Rand — in der Weltansicht ein Staubkorn, im Stadtplan genauso groß. Die
+  // REIHENFOLGE bleibt bewusst (Fotos unter den Pins, Ereignisse sind die
+  // Lebensdatenbank); sichtbar wird der Punkt über Größe und Rand.
+  // Fehlt die Funktion ganz, ist das ein FEHLSCHLAG, kein Absturz: ein
+  // Wächter, der stirbt, sagt nicht, WAS fehlt (Anmerkung 108).
+  const rAt = z => { try { return w.eval(`__zoom = ${z}; mpPhotoRadius()`); } catch (_) { return 0; } };
+  ok('Ein Fotopunkt ist größer als die alten 4 px', rAt(6) > 4, `${rAt(6)} px`);
+  ok('…und wächst beim Hineinzoomen', rAt(15) > rAt(6),
+     `Zoom 6: ${rAt(6)} px, Zoom 15: ${rAt(15)} px — sonst ist er im Stadtplan derselbe Fleck`);
+  ok('…in Stufen, nicht sprunghaft', rAt(9) >= rAt(6) && rAt(12) >= rAt(9),
+     `${rAt(6)}/${rAt(9)}/${rAt(12)}/${rAt(15)}`);
+  w.eval('__zoom = 6');
 
   // --- 4. Zeitstrahl: Gruppen statt doppelter Leisten --------------------- //
   calls.length = 0;
