@@ -72,23 +72,28 @@ _ACTIVITY_MAP = {
     "in tram": "transit", "in ferry": "transit", "flying": "transit",
 }
 
-# semanticType -> deutscher Ortsname (Geräte-Export kennt keine Ortsnamen).
-# A19: "searched address" bekommt bewusst KEIN Label mehr — es beschreibt nur,
-# wie Google den Aufenthalt erkannt hat, und stiftet keinen Mehrwert. Solche
-# Besuche laufen als unbenannte Orte ("Ort (lat, lng)") in die normale
-# Adress-Auflösung und enden als reine Adresse.
-_SEMANTIC_NAMES = {
-    "home": "Zuhause", "inferred home": "Zuhause (vermutet)",
-    "work": "Arbeit", "inferred work": "Arbeit (vermutet)",
-    "aliased location": "Gespeicherter Ort",
+# semanticType -> Location.type. Anmerkung 114: Bis 0.38 wurde daraus ein
+# deutscher ORTSNAME ("Zuhause", "Arbeit — Musterstraße 1"). Das war eine
+# Beschreibung, wie Google den Aufenthalt erkannt hat, kein Name des Ortes —
+# und es stand danach in jedem Besuchs-Titel, in der Karte, im Kompendium.
+# A19 hatte "searched address" aus genau diesem Grund schon gestrichen; jetzt
+# gilt derselbe Satz für die übrigen. Die TATSACHE dahinter geht nicht
+# verloren, sie steht ab jetzt nur dort, wo sie hingehört: im Typ des Ortes.
+_SEMANTIC_TYPES = {
+    "home": "home", "inferred home": "home",
+    "work": "work", "inferred work": "work",
+    "aliased location": "poi",
 }
-# A12: Semantische Labels sind KEINE echten Ortsnamen — sie zählen wie
-# Koordinaten-Namen als "unaufgelöst" und werden reverse-geocodet; das Label
-# bleibt dabei als Präfix erhalten ("Zuhause — Musterstraße 1, Detmold").
-SEMANTIC_LABELS = frozenset(_SEMANTIC_NAMES.values())
-# A19: Alt-Label aus früheren Importen — bleibt Auflösungs-Kandidat, wird beim
-# Auflösen aber ERSETZT statt als Präfix behalten (Migration räumt Rest auf).
-DROP_LABELS = frozenset({"Gesuchte Adresse"})
+# Alt-Labels aus früheren Importen. Sie zählen wie Koordinaten-Namen als
+# "unaufgelöst" und werden beim Auflösen ERSETZT statt als Präfix behalten;
+# steht schon eine Adresse dahinter ("Zuhause — Musterstraße 1"), fällt das
+# Präfix ohne jeden Abruf weg (siehe `_drop_label`).
+DROP_LABELS = frozenset({
+    "Gesuchte Adresse",
+    "Zuhause", "Zuhause (vermutet)",
+    "Arbeit", "Arbeit (vermutet)",
+    "Gespeicherter Ort",
+})
 
 _LATLNG_RE = re.compile(r"(-?\d+(?:\.\d+)?)\s*°?\s*,\s*(-?\d+(?:\.\d+)?)")
 
@@ -173,7 +178,6 @@ def _normalize(payload: dict) -> tuple[list[dict], list[dict]]:
             if not ll:
                 continue
             sem = str(top.get("semanticType") or "").replace("_", " ").strip().lower()
-            name = _SEMANTIC_NAMES.get(sem)
             try:
                 prob = float(v.get("probability") or 1.0)
             except (TypeError, ValueError):
@@ -181,7 +185,11 @@ def _normalize(payload: dict) -> tuple[list[dict], list[dict]]:
             visits.append({
                 "start": start, "end": end, "latlng": ll,
                 "place_id": top.get("placeId") or top.get("placeID"),
-                "name": name, "probability": prob,
+                # Der Geräte-Export kennt keine Ortsnamen — der Ort bleibt
+                # unbenannt und bekommt seinen Namen aus der Adress-Auflösung.
+                "name": None,
+                "type": _SEMANTIC_TYPES.get(sem),
+                "probability": prob,
                 "hash": _seg_hash("visit", *base, ll),
             })
         elif "timelinePath" in seg:
@@ -282,16 +290,35 @@ def _annotate_paths(moves: list[dict]) -> list[dict]:
     return paths + remaining
 
 
-def _semantic_label(name: str | None) -> str | None:
-    """Semantisches Label eines Ortsnamens ("Zuhause", "Arbeit — Musterstr. 1"
-    -> "Arbeit"), sonst None. Erkennt auch bereits aufgelöste Namen mit
-    Label-Präfix, damit z. B. die Fremdschrift-Auflösung das Label behält."""
-    if not name:
+def _drop_label(name: str | None) -> str | None:
+    """Alt-Label vom Anzeigenamen abtrennen ("Zuhause — Musterstr. 1, Detmold"
+    -> "Musterstr. 1, Detmold"); ohne Label None.
+
+    Anmerkung 114: Das ist die billigste Reparatur im ganzen Lauf — kein Netz,
+    keine gespeicherten Bausteine, reines Abschneiden. Sie muss deshalb VOR
+    allen anderen Wegen kommen: ein Ort mit Adresse hinter dem Label hat keinen
+    Mangel, den ein Geocoder beheben könnte."""
+    if not name or " — " not in name:
         return None
-    first = name.split(" — ", 1)[0].strip()
-    if first in DROP_LABELS:  # A19: Label fällt bei der Auflösung weg
-        return None
-    return first if first in SEMANTIC_LABELS else None
+    first, rest = name.split(" — ", 1)
+    return (rest.strip() or None) if first.strip() in DROP_LABELS else None
+
+
+def _set_name(db: Session, loc: Location, user_id: str, name: str) -> None:
+    """Ortsname setzen und die Besuchs-Titel („Besuch: …") mitziehen.
+
+    Anmerkung 106 sagt es allgemein: eine Regel an mehreren Orten widerspricht
+    sich, und zwar still. Diese hier stand dreimal da (aus den Bausteinen, aus
+    dem Geocoder, und jetzt beim Abschneiden eines Labels) — beim dritten Mal
+    ist es eine Funktion. Manuell umbenannte Events (title in
+    `field_overrides`) bleiben unangetastet."""
+    loc.name = name[:255]
+    for ev in (db.query(Event)
+               .filter(Event.user_id == user_id, Event.location_id == loc.id,
+                       Event.title.like("Besuch:%")).all()):
+        if (ev.field_overrides or {}).get("title"):
+            continue
+        ev.title = f"Besuch: {loc.name}"[:255]
 
 
 def _rename_from_stored(db: Session, loc: Location, user_id: str,
@@ -311,23 +338,9 @@ def _rename_from_stored(db: Session, loc: Location, user_id: str,
         return False
     short = geocode_svc.short_name({"address": loc.address,
                                     "poi": loc.address.get("poi")}, parts)
-    if not short:
+    if not short or short[:255] == loc.name:
         return False
-    label = _semantic_label(loc.name)
-    if label:
-        short = f"{label} — {short}"
-    short = short[:255]
-    if short == loc.name:
-        return False
-    loc.name = short
-    # Die Besuchs-Titel hängen am Ortsnamen und müssen mitwandern — dieselbe
-    # Regel wie im Geocoder-Weg, nur ohne den Abruf.
-    for ev in (db.query(Event)
-               .filter(Event.user_id == user_id, Event.location_id == loc.id,
-                       Event.title.like("Besuch:%")).all()):
-        if (ev.field_overrides or {}).get("title"):
-            continue
-        ev.title = f"Besuch: {short}"[:255]
+    _set_name(db, loc, user_id, short)
     return True
 
 
@@ -336,51 +349,30 @@ def _apply_resolved_name(db: Session, loc: Location, user_id: str,
                          lang: str | None = None) -> bool:
     """Reverse-geocodet eine Location und zieht die Titel der verknüpften
     Besuchs-Events („Besuch: …") nach — deckt Koordinaten-Namen („Ort (lat,
-    lng)"), semantische Labels („Zuhause", A12) und Fremdschrift-Namen (A10)
-    ab. Gespeichert wird der kompakte Anzeige-Name aus den gewählten
+    lng)"), Alt-Labels („Zuhause", A12/Anmerkung 114) und Fremdschrift-Namen
+    (A10) ab. Gespeichert wird der kompakte Anzeige-Name aus den gewählten
     Bausteinen (`parts`, z. B. Straße/Ortsteil/Stadt/Land) statt der langen
-    Nominatim-Adresse. Semantische Labels bleiben als Präfix erhalten
-    („Zuhause — Adresse"); der Location-Typ (z. B. home) bleibt dabei
-    unverändert, und getrennte place_ids (z. B. mehrere Wohnorte im
+    Nominatim-Adresse. Getrennte place_ids (z. B. mehrere Wohnorte im
     Lebenslauf) bleiben getrennte Orte. Manuell umbenannte Events (title in
     field_overrides) bleiben unangetastet."""
-    label = _semantic_label(loc.name)
     hit = geocode_svc.reverse_geocode(loc.lat, loc.lng, lang)
     if not hit:
         return False
     short = geocode_svc.short_name(hit, parts)
     if not short:
         return False
-    if label:
-        short = f"{label} — {short}"
-    loc.name = short[:255]
-    # Anmerkung 110: die ROHEN Bausteine aufbewahren, nicht nur das Ergebnis.
-    # `name` ist eine Zusammenfassung; wer später ein anderes Format wählt,
-    # will dieselben Daten anders geschrieben — und musste dafür bis 0.37
-    # jeden Ort erneut bei Nominatim abfragen (1,2 s je Ort). Mit den
-    # Bausteinen ist das Umformatieren eine Rechnung ohne Netz.
-    if hit.get("address"):
-        raw = dict(hit["address"])
-        # Der Eigenname eines POI („Café Central") steht NICHT in den
-        # Adress-Bausteinen, `short_name` stellt ihn aber voran. Ohne ihn
-        # verlöre das spätere Umformatieren genau die Information, die den
-        # Namen ausmacht. Nominatims Bausteine kennen keinen Schlüssel `poi`,
-        # die Ablage daneben kollidiert also mit nichts.
-        if hit.get("poi"):
-            raw["poi"] = hit["poi"]
-        loc.address = raw
-    if not label and hit.get("type"):
+    # Anmerkung 110/114: die ROHEN Bausteine aufbewahren, nicht nur das
+    # Ergebnis — jetzt an EINER Stelle, die alle drei Entstehungswege eines
+    # Ortes teilen (siehe `geocode_svc.raw_address`).
+    loc.address = geocode_svc.raw_address(hit) or loc.address
+    # Anmerkung 114: `home`/`work` kommen aus Googles semanticType und sind eine
+    # Aussage über DICH; OSMs `type` beschreibt das Gebäude („house", „yes").
+    # Bis 0.38 schützte das Label diesen Typ mit — fällt es weg, muss der
+    # Schutz ausdrücklich dastehen, sonst nimmt der erste Ortsnamen-Lauf dem
+    # Zuhause seine einzige verbliebene Kennzeichnung.
+    if hit.get("type") and loc.type not in ("home", "work"):
         loc.type = hit["type"]
-    linked = (
-        db.query(Event)
-        .filter(Event.user_id == user_id, Event.location_id == loc.id,
-                Event.title.like("Besuch:%"))
-        .all()
-    )
-    for ev in linked:
-        if (ev.field_overrides or {}).get("title"):
-            continue
-        ev.title = f"Besuch: {short}"[:255]
+    _set_name(db, loc, user_id, short)
     # A39: Stadt aus denselben addressdetails — trägt Städte-Statistik und
     # Zeitstrahl-Verdichtung. Nur setzen, wenn etwas da ist: ein bereits
     # bekannter Wert soll nicht von einem Treffer ohne Stadtfeld gelöscht
@@ -435,10 +427,9 @@ def _link_country(db: Session, user_id: str, country: str,
 
 def _unresolved_name_filter():
     """SQL-Filter für Orte ohne echten Namen: Koordinaten-Platzhalter
-    („Ort (lat, lng)"), semantische Labels ohne Adresse (A12) und
-    Alt-Labels aus früheren Importen (A19)."""
+    („Ort (lat, lng)") und Alt-Labels aus früheren Importen (A19/Anm. 114)."""
     return or_(Location.name.like("Ort (%"),
-               Location.name.in_(SEMANTIC_LABELS | DROP_LABELS))
+               Location.name.in_(DROP_LABELS))
 
 
 def _nonlatin_locations(db: Session, user_id: str) -> list[Location]:
@@ -461,19 +452,40 @@ def _verbose_locations(db: Session, user_id: str, parts: list[str]) -> list[Loca
     return [l for l in rows if (l.name or "").count(",") > max_commas]
 
 
-def _name_defect(name: str | None, parts: list[str]) -> str | None:
+def _name_defect(name: str | None, parts: list[str],
+                 address: dict | None = None) -> str | None:
     """A28: Welchen Mangel hat dieser Ortsname — oder keinen (None)?
 
     Die eine Bedingung, die die drei früheren Scopes ersetzt. Reihenfolge ist
     bedeutsam: „unnamed" zuerst, denn ein frisch geholter Name kommt bereits
     im gewählten Format und in der gewählten Sprache — er kann danach weder
     zu lang noch fremdschriftlich sein. Wer hier nichts zurückgibt, ist fertig
-    und wird vom Lauf nicht noch einmal angefasst."""
+    und wird vom Lauf nicht noch einmal angefasst.
+
+    Anmerkung 114: `address` (die gespeicherten Roh-Bausteine) macht aus dem
+    Komma-Zählen eine Rechnung. Das Zählen war eine Schätzung mit einem festen
+    Fehler: `short_name` stellt den Eigennamen eines POI VOR die Bausteine
+    („Café Central, Kaiserstr. 1, Mitte, Detmold, Deutschland" — vier Kommas
+    bei vier Bausteinen), also galt jeder benannte Ort für immer als zu lang.
+    Er wurde bei jedem Lauf neu geocodet, kam unverändert zurück, zählte als
+    Fehlschlag und blieb in der offenen Menge stehen: dieselbe
+    Endlos-Abruf-Falle wie F12 `weather_rev`, A39-Leerstring, A42-Fehlversuch
+    und der P2.1-Grabstein. Fünftes Mal. Liegen die Bausteine vor, ist die
+    Frage nicht mehr „wie viele Kommas sind erlaubt?", sondern „steht da, was
+    das Format ergibt?" — und darauf gibt es eine exakte Antwort."""
     n = name or ""
-    if n.startswith("Ort (") or n in SEMANTIC_LABELS or n in DROP_LABELS:
+    if n.startswith("Ort (") or n in DROP_LABELS:
         return "unnamed"
+    # Alt-Label mit Adresse dahinter: nur abschneiden, kein Abruf nötig.
+    if _drop_label(n):
+        return "labeled"
     if geocode_svc.NON_LATIN_RE.search(n):
         return "nonlatin"
+    if address:
+        want = geocode_svc.short_name({"address": address,
+                                       "poi": address.get("poi")}, parts)
+        if want:
+            return None if want[:255] == n else "verbose"
     if n.count(",") > len(parts) - 1:
         return "verbose"
     return None
@@ -490,9 +502,11 @@ def _resolve_candidates(db: Session, user_id: str, parts: list[str]) -> list[Loc
     rows = (db.query(Location)
             .filter(Location.user_id == user_id, Location.lat.isnot(None))
             .all())
-    order = {"unnamed": 0, "nonlatin": 1, "verbose": 2}
+    # „labeled" kostet keinen Abruf — deshalb ganz nach vorn: der Lauf hat
+    # sofort etwas vorzuweisen, statt eine Minute lang zu schweigen.
+    order = {"labeled": 0, "unnamed": 1, "nonlatin": 2, "verbose": 3}
     scored = [(order[d], l) for l in rows
-              if (d := _name_defect(l.name, parts)) is not None]
+              if (d := _name_defect(l.name, parts, l.address)) is not None]
     # A39: Orte, deren Name in Ordnung ist, denen aber die Stadt fehlt. Sie
     # kommen zuletzt — ihr Name stimmt ja, es geht nur um ein Feld, das es vor
     # 0.34 nicht gab. `city IS NULL` heißt „nie nachgesehen"; der Lauf schreibt
@@ -571,7 +585,11 @@ def import_timeline(
             loc_cache[key] = existing
             return existing
         name = v["name"] or f"Ort ({lat:.4f}, {lng:.4f})"
-        ltype = "home" if v["name"] in ("Zuhause", "Zuhause (vermutet)") else "poi"
+        # Anmerkung 114: Der Typ kam bis 0.38 aus dem NAMEN zurück („heißt der
+        # Ort Zuhause, ist er ein Zuhause"). Damit hing eine Tatsache an einem
+        # Anzeigetext — und fiel weg, sobald der Text sich ändert. Jetzt kommt
+        # er direkt aus Googles semanticType, wo er herkommt.
+        ltype = v.get("type") or "poi"
         loc = Location(user_id=user.id, name=name, lat=lat, lng=lng,
                        type=ltype, external_ref=key)
         db.add(loc)
@@ -624,12 +642,11 @@ def import_timeline(
         ))
         created_tracks += 1
 
-    # Vorschlag 2: kleine Mengen NEUER Orte direkt reverse-geocoden — Namen
-    # statt „Ort (lat, lng)" bzw. echte Adressen hinter semantischen Labels
-    # (A12). Große Erstimporte laufen über den Button.
+    # Vorschlag 2: kleine Mengen NEUER Orte direkt reverse-geocoden — echte
+    # Adressen statt „Ort (lat, lng)". Große Erstimporte laufen über den Button.
     names_resolved = 0
     unnamed_new = [l for l in new_locations
-                   if l.name.startswith("Ort (") or l.name in SEMANTIC_LABELS]
+                   if l.name.startswith("Ort (") or l.name in DROP_LABELS]
     if auto_resolve and settings.geocoding_enabled and 0 < len(unnamed_new) <= AUTO_RESOLVE_MAX:
         # Neue Events erst in die DB schreiben (autoflush ist aus), sonst
         # findet die Titel-Nachführung in _apply_resolved_name sie nicht
@@ -744,7 +761,19 @@ def resolve_names_batch(
     asked = False          # wurde in diesem Batch schon einmal gefragt?
     for i, loc in enumerate(locs):
         before = loc.name
-        # Anmerkung 110: Erst der Schnellweg. Liegen die Bausteine vor, ist ein
+        # Anmerkung 114: Der billigste Weg zuerst. Steht hinter einem Alt-Label
+        # bereits eine Adresse („Zuhause — Kaiserstr. 1, Detmold"), ist die
+        # Reparatur ein Schnitt — kein Netz, keine gespeicherten Bausteine,
+        # keine Drossel. Ein Abruf dafür wäre 1,2 Sekunden für nichts.
+        bare = _drop_label(loc.name)
+        if bare:
+            _set_name(db, loc, user.id, bare)
+            db.commit()
+            log.info("Ortsname %d/%d: %r → %r (Alt-Label entfernt)",
+                     i + 1, len(locs), before, loc.name)
+            resolved += 1
+            continue
+        # Anmerkung 110: Dann der Schnellweg. Liegen die Bausteine vor, ist ein
         # neues Format reine Rechnerei — und die Drossel gilt nur für Abrufe,
         # nicht für Rechnungen. Deshalb wird hier auch NICHT geschlafen: bei
         # gespeicherten Orten läuft der Lauf mit voller Geschwindigkeit durch,
@@ -766,7 +795,7 @@ def resolve_names_batch(
         # endlos über dieselben Orte. Deckt beides ab, was vorher zwei
         # scope-spezifische Prüfungen waren: OSM kennt keinen de/en-Namen,
         # oder addressdetails fehlen und der Name bleibt zu lang.
-        defect = _name_defect(loc.name, parts) if ok else None
+        defect = _name_defect(loc.name, parts, loc.address) if ok else None
         if ok and defect is not None:
             ok = False
         # Je Ort eine Zeile: der Geocoder ist auf eine Anfrage pro Sekunde

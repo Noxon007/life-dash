@@ -715,7 +715,13 @@
     .map-layout { flex-direction: column; }
     /* Fix (Anm. 34): in Spaltenrichtung kollabiert flex:1 (basis 0) die Höhe
        auf 0 — Karte war auf dem Handy unsichtbar. Feste Höhe statt flex.
-       A38: vh -> dvh, aus demselben Grund wie beim Dialog. */
+       A38: vh -> dvh, aus demselben Grund wie beim Dialog.
+       Anmerkung 114: Derselbe Kollaps ein zweites Mal, eine Ebene höher. Der
+       Kartenhinweis (Anm. 110) brauchte einen positionierten Rahmen, und
+       `.map-layout .map-wrap { flex: 1 }` trägt genau die Eigenschaft, gegen
+       die dieser Block seit A38 aufgehoben wird. Die Höhe steht am #map, also
+       muss der Rahmen sie DURCHLASSEN — nicht selbst welche mitbringen. */
+    .map-layout .map-wrap { flex: 0 0 auto; width: 100%; }
     .map-layout #map { flex: 0 0 auto; height: 55dvh; width: 100%; }
     #mp-stops { width: 100%; max-height: none; }
     /* A38: Karte groß, Filter weggeklappt (Versprechen aus Kap. 5.7) */
@@ -1178,6 +1184,40 @@
             <div class="stat-num" id="stat-snowy">–</div>
             <div class="stat-label" data-i18n="stat.snow">❄️ Schneereichster Tag</div>
             <div class="stat-sub" id="stat-snowy-sub">–</div>
+          </div>
+          <!-- Anmerkung 114: Diese sechs rechnen aus Werten, die seit F12 bei
+               jeder Anreicherung mitkommen (UV, Böen, gefühlte Temperatur,
+               Tageslicht) und bisher nur an einem einzelnen Ereignis standen.
+               Kein neuer Abruf, keine neue Spalte — nur die Frage gestellt. -->
+          <div class="stat-card" data-event-slot="uv">
+            <div class="stat-num" id="stat-uv">–</div>
+            <div class="stat-label" data-i18n="stat.uv">🕶️ Stärkste Sonne</div>
+            <div class="stat-sub" id="stat-uv-sub">–</div>
+          </div>
+          <div class="stat-card" data-event-slot="gust">
+            <div class="stat-num" id="stat-gust">–</div>
+            <div class="stat-label" data-i18n="stat.gust">🌪️ Stärkste Böe</div>
+            <div class="stat-sub" id="stat-gust-sub">–</div>
+          </div>
+          <div class="stat-card" data-event-slot="felt_hot">
+            <div class="stat-num" id="stat-felt-hot">–</div>
+            <div class="stat-label" data-i18n="stat.felthot">🥵 Gefühlt heißester Tag</div>
+            <div class="stat-sub" id="stat-felt-hot-sub">–</div>
+          </div>
+          <div class="stat-card" data-event-slot="felt_cold">
+            <div class="stat-num" id="stat-felt-cold">–</div>
+            <div class="stat-label" data-i18n="stat.feltcold">🥶 Gefühlt kältester Tag</div>
+            <div class="stat-sub" id="stat-felt-cold-sub">–</div>
+          </div>
+          <div class="stat-card" data-event-slot="longest_day">
+            <div class="stat-num" id="stat-longest-day">–</div>
+            <div class="stat-label" data-i18n="stat.longestday">🌅 Längster Tag</div>
+            <div class="stat-sub" id="stat-longest-day-sub">–</div>
+          </div>
+          <div class="stat-card" data-event-slot="shortest_day">
+            <div class="stat-num" id="stat-shortest-day">–</div>
+            <div class="stat-label" data-i18n="stat.shortestday">🌆 Kürzester Tag</div>
+            <div class="stat-sub" id="stat-shortest-day-sub">–</div>
           </div>
         </div>
 
@@ -2156,7 +2196,8 @@ function uiDialog(text, opts = {}) {
     const input = document.getElementById('cf-input');
     const ok = document.getElementById('cf-ok');
     const cancel = document.getElementById('cf-cancel');
-    document.getElementById('cf-title').textContent = opts.title || 'Bestätigen';
+    document.getElementById('cf-title').textContent =
+      opts.title || t('dlg.confirm', 'Bestätigen');
     document.getElementById('cf-text').textContent = text;
     const wantsInput = !!opts.input;
     input.style.display = wantsInput ? '' : 'none';
@@ -2306,7 +2347,6 @@ const I18N_EN = {
   'stat.sub.lifedb': "life database",
   'stat.sub.collection': "collection",
   'stat.sub.located': "events with a place",
-  'stat.sub.cities': "from resolved place names",
   'stat.sub.catconcert': "category concert",
   'stat.sub.milestones': "wedding, birth, moving …",
   'stat.sub.frommilestones': "from milestones",
@@ -2771,11 +2811,9 @@ const I18N_EN = {
   'track.modal.hint': "Pick the areas that interest you — they decide the collection, the statistics and what the AI recognises. Changeable at any time under Settings → My data.",
 
   // --- Nachtrag: Kopfzeile & fehlende Attribute ---
-  'map.cluster.tip': "If the range holds at most this many points, you get individual markers plus a numbered route. Above that the map switches to cluster mode — nearby points are bundled depending on zoom (click/zoom splits the bubbles). The 10–300 range protects performance.",
   'map.cap': "{h} of {n} points are hidden.",
   'map.cap.fix': "🔁 Merge points",
   'jr.ph': "How was your day? Just write freely …",
-  'adm.tracking.title': "Tracking",
   'of.dash': "of –",
   'by': "by",
   'module.animal.tab': "🦅 Animals",
@@ -2791,7 +2829,165 @@ const I18N_EN = {
   'comp.city.timeline': "In the timeline",
   'comp.city.gone': "This city is no longer among your places.",
   'comp.city.more.a': "Another", 'comp.city.more.b': "entries — see the timeline.",
-  'back': "back", 'loading': "loading…",
+  'back': "back", 'loading': "loading…", 'in.clear': "Clear fields",
+  // ---- Anmerkung 114: Nachzug. Diese Bereiche waren im JS gebaut und damit
+  // für `data-i18n` unerreichbar — sie standen seit jeher auf Deutsch, egal
+  // was oben rechts eingestellt war: Zeitstrahl-Karten, Moderation, Sammel-
+  // Bestätigung, Kompendium-Detail, Welt-Checkliste, Abzeichen, Jobs,
+  // Import/Export, Nutzerverwaltung, Datenbank-Ansicht. Der Wächter
+  // `check-i18n-coverage.js` hält die Liste ab jetzt vollständig. ----
+  // Allgemeine Wörter (mehrfach benutzt)
+  'confirm': "Confirm", 'dlg.confirm': "Confirm", 'discard': "Discard",
+  'cancel': "Cancel", 'save': "Save", 'delete': "Delete",
+  'delete.final': "Delete permanently", 'next': "Next …",
+  'edit': "edit", 'edit.cap': "Edit", 'remove': "remove", 'name': "Name",
+  'error': "Error", 'to': "to",
+  'n.event': "event", 'n.events': "events",
+  'state.confirmed': "confirmed", 'state.unconfirmed': "unconfirmed",
+  // Datum, Monate, Jahreszeiten
+  'date.unknown': "unknown", 'date.decade.suffix': "s",
+  'season.spring': "Spring", 'season.summer': "Summer",
+  'season.autumn': "Autumn", 'season.winter': "Winter",
+  'mon.s.0': "Jan", 'mon.s.1': "Feb", 'mon.s.2': "Mar", 'mon.s.3': "Apr",
+  'mon.s.4': "May", 'mon.s.5': "Jun", 'mon.s.6': "Jul", 'mon.s.7': "Aug",
+  'mon.s.8': "Sep", 'mon.s.9': "Oct", 'mon.s.10': "Nov", 'mon.s.11': "Dec",
+  'mon.l.0': "January", 'mon.l.1': "February", 'mon.l.2': "March",
+  'mon.l.3': "April", 'mon.l.4': "May", 'mon.l.5': "June", 'mon.l.6': "July",
+  'mon.l.7': "August", 'mon.l.8': "September", 'mon.l.9': "October",
+  'mon.l.10': "November", 'mon.l.11': "December",
+  // Zeitstrahl
+  'tl.empty': "No events. Add one under „Input“ — or reset search and filters.",
+  'tl.showmore': "show {n} more",
+  'tl.edit.tip': "Click to edit", 'tl.expand.tip': "Click to expand",
+  'tl.visits.bundled': "visits bundled", 'tl.show.single': "show individually",
+  'tl.daychild': "Day entry", 'tl.daychildren': "day entries",
+  'tl.kids.tip': "Expand/collapse day entries",
+  // Tagebuch
+  'jr.notext': "no text yet", 'jr.back': "back to the text",
+  // Drucken
+  'pr.from': "from", 'pr.to': "until", 'pr.all': "entire period",
+  'pr.printedon': "printed on", 'pr.empty': "No events in the selected period.",
+  'pr.count.in': "in the selected period.",
+  'pr.count.none': "No events in the selected period — adjust the period or the options.",
+  'pr.count.fail': "The number could not be determined.",
+  'pr.unconfirmed': "unconfirmed proposal",
+  // Kompendium
+  'comp.empty': "There are no entries in this category yet.",
+  'comp.linked': "linked", 'comp.located': "located",
+  'comp.nolinks': "No events are linked to this entry yet.",
+  'ent.type.animal': "🐾 Animal", 'ent.type.country': "🌍 Country",
+  'ent.type.artist': "🎤 Artist", 'ent.type.food': "🍽️ Dish",
+  'ent.type.movie': "🎬 Film", 'ent.type.game': "🎮 Game", 'ent.type.book': "📖 Book",
+  // Unscharfe Zeiten
+  'fuzzy.title': "Vague dates", 'fuzzy.none': "Every event has a concrete date. ✓",
+  // Moderation
+  'mod.queue': "Moderation queue", 'mod.queue.open': "unconfirmed entries",
+  'mod.done': "Everything moderated — nothing open. ✓",
+  'mod.stage1': "STAGE 1 · raw input", 'mod.airead': "AI interpretation",
+  'field.time': "Time",
+  // Sammel-Bestätigung
+  'bulk.checking': "… checking",
+  'bulk.nomatch': "No unconfirmed event matches this filter.",
+  'bulk.wouldconfirm': "would be confirmed",
+  'bulk.preview.n': "preview of the {n} most recent",
+  'bulk.confirm.n': "Confirm all {n}", 'bulk.confirming': "… confirming",
+  'bulk.done': "confirmed.",
+  'bulk.warn': "{n} entries become part of the fixed life database (including their linked items).",
+  'bulk.warn.title': "Confirm {n} entries?",
+  // Standort
+  'geo.unsupported': "This browser does not support location.",
+  'geo.denied': "Location permission denied.",
+  'geo.unavailable': "Location unavailable.",
+  // Bearbeiten-Dialog
+  'prov.manual': "manual", 'prov.bulk': "bulk confirmation",
+  'prov.import': "import (device data)", 'prov.on': "on",
+  'ed.days.some': "{k} of {n} days created", 'ed.days.span': "{n} days span",
+  'ed.days.fill': "Create missing days", 'ed.days.create': "Create day entries",
+  'ed.days.running': "… creating",
+  'ed.days.done': "✓ {n} day entries created — collapsed under the main event in the timeline; weather per day is added where available.",
+  'ed.days.already': "All days already exist.",
+  'ed.del.text': "The raw text in the inbox is kept.",
+  'ed.del.title': "Delete „{x}“?",
+  // Spracheingabe
+  'voice.unsupported': "This browser does not support speech input.\nUse Chrome or Edge (or type the text).",
+  'voice.listening': "listening…",
+  // Karte
+  'mp.all': "All events", 'mp.nolocated': "no located events",
+  'mp.noplaces': "No places in this period.",
+  // Welt
+  'world.unmatched': "Not matched (no known country):",
+  'world.unmatched.hint': "Fix the spelling in the collection, then it counts.",
+  'world.showmissing': "show missing ▾", 'world.hidemissing': "hide missing ▴",
+  'world.complete': "complete ✅", 'world.nothing': "nothing recorded yet",
+  'world.firstvisit': "first", 'world.firstvisited': "first visited",
+  'world.lastvisit': "last", 'world.notvisited': "not visited yet",
+  'world.mapfail': "The world map could not be loaded:",
+  // Abzeichen
+  'ach.none': "No achievements defined — achievements come from the module files and appear for every module you track.",
+  'tier.bronze': "Bronze", 'tier.silber': "Silver", 'tier.gold': "Gold",
+  'tier.platin': "Platinum",
+  // Wetter-Extreme (F12-Werte, Anmerkung 114)
+  'stat.uv': "🕶️ Strongest sun", 'stat.gust': "🌪️ Strongest gust",
+  'stat.felthot': "🥵 Hottest day (felt)", 'stat.feltcold': "🥶 Coldest day (felt)",
+  'stat.longestday': "🌅 Longest day", 'stat.shortestday': "🌆 Shortest day",
+  'wx.newdata12': "comes with new weather enrichment (v0.22 and later)",
+  // Jobs
+  'jobs.none': "No jobs have run yet.", 'jobs.col.status': "Status",
+  'jobs.col.progress': "Progress", 'jobs.col.started': "Started",
+  'jobs.col.result': "Result", 'jobs.left': "~{n} left", 'jobs.stop': "Stop",
+  'job.immich': "🖼️ Link photos from Immich",
+  'job.immich_source': "🖼️ Propose events from Immich",
+  'sched.at': "at", 'sched.oclock': "o’clock",
+  // Verwaltungs-Läufe
+  'adm.running': "… running", 'adm.preparing': "… preparing",
+  'adm.stop': "Stop", 'adm.stopping': "… stopping after this batch",
+  'adm.aborted': "aborted (AI unreachable)",
+  'adm.aborted.long': "Aborted (AI unreachable): {n} {u} processed, {r} open — start again later.",
+  'adm.stuck': "{r} not processable",
+  'adm.stuck.long': "No further progress: {n} {u} processed, {r} not processable (check configuration/network).",
+  'adm.stopped.by': "stopped by the user",
+  'adm.stopped.long': "Stopped: {n} {u} processed, {r} open — the same button resumes.",
+  'adm.jobstarted': "✓ Started — it keeps running in the background, even if you close the page.\nProgress & stop: „Jobs“ tab.",
+  // Export / Import
+  'exp.btn': "Export data", 'exp.running': "… exporting", 'exp.done': "Export created",
+  'exp.nodata': "no data", 'exp.events': "events", 'exp.entities': "items",
+  'exp.places': "places", 'exp.tracks': "routes", 'exp.metrics': "metrics",
+  'imp.btn': "Import data", 'imp.running': "… importing", 'imp.title': "Import",
+  'imp.unit': "rows", 'imp.done': "Import finished:",
+  'tlimp.btn': "Import Google Timeline", 'tlimp.title': "Timeline import",
+  'tlimp.loading': "Importing timeline…", 'tlimp.unit': "segments",
+  'tlimp.badfile': "Not a Google Timeline export: the file contains neither \"semanticSegments\" (device export) nor \"timelineObjects\" (Takeout).",
+  'tlimp.done': "Timeline import finished:",
+  'tlimp.summary': "{v} visits as events, {t} routes.",
+  'tlimp.skipped': "{n} duplicates skipped.", 'tlimp.dupes': "duplicates",
+  'tlimp.range': "Period:",
+  'tlimp.lowprob': "{n} visits below {p} % place certainty skipped.",
+  'tlimp.unnamed': "{n} places still have no real name — run „Resolve place names“ below.",
+  'tlimp.resolved': "{n} place names resolved directly.",
+  // Ortsnamen-Format
+  'fmt.min': "At least one building block has to stay selected.",
+  'fmt.saved': "✓ Place name format saved — applies to all new lookups.",
+  'track.saved': "✓ Off we go — the selection can be changed under Administration at any time.",
+  // Nutzerverwaltung
+  'usr.col.user': "User", 'usr.col.role': "Role", 'usr.col.data': "Data",
+  'usr.col.since': "Member since", 'usr.you': "that’s you",
+  'usr.fragments': "fragments", 'role.user': "User", 'role.admin': "Admin",
+  'usr.ownrole': "You cannot change your own role",
+  'usr.rolechanged': "Role changed:",
+  'usr.del.title': "Delete user?",
+  'usr.del.text': "„{who}“ is deleted with ALL their data: {e} events, {f} fragments, plus places, items, routes and weather. This cannot be undone.",
+  'usr.deleted': "User „{who}“ deleted ({n} data rows).",
+  // Datenbank-Rohansicht
+  'db.unavailable': "Database view unavailable.", 'db.action': "Action",
+  'db.empty': "Table „{x}“ is empty.",
+  'db.del.text': "The row is removed straight from the database.",
+  'db.del.title': "Delete row {id} from „{tbl}“?",
+  // Alles löschen — das Losungswort gehört mit übersetzt
+  'wipe.text': "Fragments, events, items, places, weather, embeddings — everything is removed irreversibly.",
+  'wipe.title': "Really delete ALL data?", 'wipe.last': "Final safety check",
+  'wipe.ask': "Please type {w} to confirm:", 'wipe.word': "DELETE",
+  'wipe.cancelled': "Cancelled — nothing was deleted.",
+  'wipe.done': "All data deleted ({n} rows). The database is empty.",
 };
 
 function langSetting() {
@@ -2806,6 +3002,17 @@ let LANG = langSetting();
 function t(key, de) {
   return LANG === 'en' && I18N_EN[key] !== undefined ? I18N_EN[key] : de;
 }
+/** F10: „1 Ereignis" / „12 Ereignisse". Die Mehrzahl steckt im WORT, nicht in
+ *  einem angehängten Buchstaben — `Ereignis${n === 1 ? '' : 'se'}` ist ein
+ *  deutscher Satzbau, der sich nicht übersetzen lässt. Zwei Schlüssel lösen
+ *  beide Sprachen; die Zahl bleibt bewusst draußen, damit der Aufrufer sie
+ *  formatieren kann. */
+const nEvents = n => n === 1 ? t('n.event', 'Ereignis') : t('n.events', 'Ereignisse');
+/** F10: Das Gebietsschema für Zahlen und Daten. „1.234" und „1,234" sind
+ *  dieselbe Zahl in zwei Sprachen — wer die Oberfläche auf Englisch stellt und
+ *  weiter deutsche Tausenderpunkte liest, liest im Zweifel etwas anderes, als
+ *  dasteht. Fest verdrahtetes 'de-DE' stand an dreizehn Stellen. */
+const LOC = () => LANG === 'en' ? 'en-GB' : 'de-DE';
 
 // ---------- F9: Heller Modus ----------
 // Einstellung pro Gerät (localStorage): 'auto' folgt der Systemeinstellung,
@@ -3012,6 +3219,14 @@ function redrawForLang() {
     else if (view === 'world') loadWorld();
     else if (view === 'achievements') loadAchievements();
     else if (view === 'admin') loadAdminTab(adminTab);
+    // Anmerkung 114: „Heute" und „Karte" fehlten hier — beide bauen ihre
+    // Inhalte im JS („An diesem Tag", der Schalter für importierte Besuche,
+    // Zeitraum-Beschriftung, Stopp-Liste) und blieben deshalb nach dem
+    // Umschalten in der alten Sprache stehen, während der Rahmen drumherum
+    // schon übersetzt war. Eine halb umgeschaltete Oberfläche sieht nicht wie
+    // eine Lücke aus, sondern wie ein Fehler.
+    else if (view === 'today') loadToday();
+    else if (view === 'map') renderPeriod();
     else if (view === 'compendium') {
       const tab = document.querySelector('#comp-tabs .zoom-btn.active');
       if (tab) loadCompendium(tab.dataset.type);
@@ -3159,9 +3374,14 @@ function catColor(c) { return catColors[c] || '#f5a623'; }
 
 // ---------- Datum nach Präzision formatieren ----------
 const MONTHS_SHORT = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+// F10: Monats- und Jahreszeitennamen laufen wie jeder andere Text über t() —
+// Deutsch steht hier im Quelltext, Englisch nur im Katalog. `toLocaleString`
+// wäre der kürzere Weg und der falsche: es hinge an der Browser-Sprache statt
+// an der gewählten, und die App lässt die Sprache bewusst wählen.
+const monthShort = m => t('mon.s.' + m, MONTHS_SHORT[m]);
 function eventYear(e) { return e.date_start ? new Date(e.date_start).getFullYear() : null; }
 function fmtDate(e) {
-  if (!e.date_start) return "unbekannt";
+  if (!e.date_start) return t('date.unknown', 'unbekannt');
   const d = new Date(e.date_start), y = d.getFullYear(), m = d.getMonth();
   const pad = n => String(n).padStart(2,'0');
   switch (e.date_precision) {
@@ -3179,14 +3399,16 @@ function fmtDate(e) {
       return `${base}, ${t}`;
     }
     case "day":   return `${pad(d.getDate())}.${pad(m+1)}.${y}`;
-    case "month": return `${MONTHS_SHORT[m]} ${y}`;
+    case "month": return `${monthShort(m)} ${y}`;
     case "season": {
-      const s = [2,3,4].includes(m) ? "Frühling" : [5,6,7].includes(m) ? "Sommer"
-              : [8,9,10].includes(m) ? "Herbst" : "Winter";
+      const s = [2,3,4].includes(m) ? t('season.spring', 'Frühling')
+              : [5,6,7].includes(m) ? t('season.summer', 'Sommer')
+              : [8,9,10].includes(m) ? t('season.autumn', 'Herbst')
+              : t('season.winter', 'Winter');
       return `${s} ${y}`;
     }
     case "year":   return `${y}`;
-    case "decade": return `${Math.floor(y/10)*10}er`;
+    case "decade": return `${Math.floor(y/10)*10}${t('date.decade.suffix', 'er')}`;
     default:       return `${y}`;
   }
 }
@@ -3252,6 +3474,7 @@ function eventChips(e) {
 
 // ---------- TIMELINE ----------
 const MONTHS_LONG = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+const monthLong = m => t('mon.l.' + m, MONTHS_LONG[m]);
 // A37: `events` ist ab jetzt das GELADENE Stück, nicht die ganze Geschichte —
 // offset/done/loading führen das Blättern.
 const tl = { zoom: 'year', query: '', events: [], catFilter: new Set(FILTER_CATS),
@@ -3274,7 +3497,7 @@ function tlGroup(e) {
   switch (tl.zoom) {
     case 'day':    return { key: `${y}-${pad(m+1)}-${pad(day)}`, label: `${pad(day)}.${pad(m+1)}.${y}`, sort: d.getTime() };
     case 'week':   { const w = isoWeek(d); return { key: `${w.year}-W${pad(w.week)}`, label: `KW ${w.week} · ${w.year}`, sort: w.year*100 + w.week }; }
-    case 'month':  return { key: `${y}-${pad(m+1)}`, label: `${MONTHS_LONG[m]} ${y}`, sort: y*100 + m };
+    case 'month':  return { key: `${y}-${pad(m+1)}`, label: `${monthLong(m)} ${y}`, sort: y*100 + m };
     case 'decade': { const dec = Math.floor(y/10)*10; return { key: `${dec}`, label: `${dec}er`, sort: dec }; }
     case 'year':
     default:       return { key: `${y}`, label: `${y}`, sort: y };
@@ -3525,7 +3748,7 @@ async function renderOnThisDay() {
           : '';
         return `<div style="margin:14px 0 4px">
           <div class="hint" style="margin:0 0 8px">${years(g.years_ago)} — ${
-            new Date(g.date + 'T12:00:00').toLocaleDateString(LANG === 'en' ? 'en-GB' : 'de-DE',
+            new Date(g.date + 'T12:00:00').toLocaleDateString(LOC(),
               { day: '2-digit', month: 'long', year: 'numeric' })}${more}</div>
           ${g.events.map(e => eventCard(e)).join('')}
         </div>`;
@@ -3565,12 +3788,12 @@ async function loadToday() {
   renderOnThisDay();
   try {
     const idx = await fetchIndex();
-    document.getElementById('today-events').textContent = idx.total.toLocaleString('de-DE');
+    document.getElementById('today-events').textContent = idx.total.toLocaleString(LOC());
     document.getElementById('today-unconfirmed').textContent =
-      idx.unconfirmed.toLocaleString('de-DE');
+      idx.unconfirmed.toLocaleString(LOC());
     // Anmerkung 110: zweiter Rückstand, eigene Kachel — und nur, wenn es ihn gibt.
     const fz = idx.fuzzy || 0;
-    document.getElementById('today-fuzzy').textContent = fz.toLocaleString('de-DE');
+    document.getElementById('today-fuzzy').textContent = fz.toLocaleString(LOC());
     document.getElementById('today-fuzzy-card').style.display = fz ? '' : 'none';
     document.getElementById('today-span').textContent =
       idx.year_min ? `${idx.year_min} – ${idx.year_max}` : '–';
@@ -3646,12 +3869,12 @@ function renderTimelineList() {
   renderCityChip();
   const toggle = document.getElementById('tl-visits-toggle');
   toggle.style.display = TL_VISIT_COUNT ? '' : 'none';
-  toggle.textContent = `🛰️ ${TL_VISIT_COUNT.toLocaleString('de-DE')} ${t('tl.visits.n', 'Besuche')}`;
+  toggle.textContent = `🛰️ ${TL_VISIT_COUNT.toLocaleString(LOC())} ${t('tl.visits.n', 'Besuche')}`;
   if (!filtered.length) {
     // A37: Leer heißt nur dann „nichts da", wenn auch nichts mehr kommt.
     // Sonst: Fuß mit Nachlade-Knopf, damit der Filter keine Sackgasse ist.
     el.innerHTML = (tl.done || tl.query
-      ? '<div class="hint">Keine Events. Leg unter „Eingabe" eins an — oder Suche/Filter zurücksetzen.</div>'
+      ? `<div class="hint">${t('tl.empty', 'Keine Events. Leg unter „Eingabe" eins an — oder Suche/Filter zurücksetzen.')}</div>`
       : `<div class="hint">${t('tl.nothing.yet', 'In den geladenen Einträgen ist dazu nichts — weiter zurück suchen?')}</div>`)
       + tlFooter();
     tlBindFooter(el);
@@ -3670,7 +3893,7 @@ function renderTimelineList() {
   // F1: Tagebuch-Einträge stehen als Tageskopf ÜBER den Ereignissen ihres
   // Tages (stabile Sortierung: nur innerhalb desselben Tages umsortieren).
   const dayOf = x => x.date_start ? x.date_start.slice(0, 10) : '';
-  const jr = x => x.category === 'journal' ? 1 : 0;
+  const jr = x => x.dayMedia ? 2 : x.category === 'journal' ? 1 : 0;
   Object.values(groups).forEach(g => {
     g.items = compressVisits(g.items);
     // F18: Bilder, die an einem TAG hängen statt an einem Ereignis, treten als
@@ -3684,8 +3907,15 @@ function renderTimelineList() {
     if (tl.zoom === 'day') {
       days.forEach(d => {
         const media = TL_DAY_MEDIA.get(d);
-        if (media && media.length)
-          g.items.push({ dayMedia: media, day: d, date_start: `${d}T00:00:00` });
+        if (!media || !media.length) return;
+        const row = { dayMedia: media, day: d, date_start: `${d}T00:00:00` };
+        // Anmerkung 114: NICHT anhängen. Die Gruppe zeigt nur die ersten
+        // TL_GROUP_CAP Zeilen, der Rest steht hinter „x weitere anzeigen“ —
+        // ein angehängter Fotostreifen verschwand an jedem Tag mit vielen
+        // Einträgen genau dort, und das sind die Tage, an denen fotografiert
+        // wurde. Der Streifen gehört an den KOPF seines Tages.
+        const at = g.items.findIndex(x => dayOf(x) === d);
+        if (at < 0) g.items.push(row); else g.items.splice(at, 0, row);
       });
     } else {
       // Eine Leiste für die ganze Gruppe. Ab Monat wird ausgewählt statt
@@ -3693,13 +3923,18 @@ function renderTimelineList() {
       const all = [];
       days.forEach(d => (TL_DAY_MEDIA.get(d) || []).forEach(m => all.push(m)));
       if (all.length) {
-        g.items.push({
+        // Sie vertritt die ganze Gruppe, nicht ihren ersten Tag — also an den
+        // Kopf der Gruppe, nicht in die Tages-Sortierung darunter.
+        g.items.unshift({
           dayMedia: tl.zoom === 'week' ? all : spreadPick(all, TL_PERIOD_PHOTOS),
           day: days[0], total: all.length,
           span: tl.zoom, date_start: `${days[0]}T00:00:00`,
         });
       }
     }
+    // Innerhalb eines Tages: Fotos, dann Tagebuch, dann die Ereignisse. Die
+    // Fotozeile ist oben schon an ihren Platz gesetzt; der Rang hält sie dort,
+    // wenn ein Tagebuch-Eintrag denselben Tag beansprucht.
     g.items.sort((a, b) => dayOf(a) === dayOf(b) ? jr(b) - jr(a) : 0);
   });
   const renderItem = x => x.dayMedia ? dayMediaCard(x)
@@ -3711,7 +3946,8 @@ function renderTimelineList() {
       <div class="tl-year-label">${esc(g.label)}${g.items.length > TL_GROUP_CAP ? ` <span class="stat-label">(${g.items.length})</span>` : ''}</div>
       ${g.items.slice(0, TL_GROUP_CAP).map(renderItem).join('')}
       ${g.items.length > TL_GROUP_CAP
-        ? `<div class="hint" data-tl-more="${gi}" style="cursor:pointer">▼ ${g.items.length - TL_GROUP_CAP} weitere anzeigen</div>`
+        ? `<div class="hint" data-tl-more="${gi}" style="cursor:pointer">▼ ${
+            t('tl.showmore', '{n} weitere anzeigen').replace('{n}', g.items.length - TL_GROUP_CAP)}</div>`
         : ''}
     </div>`).join('');
   // „mehr anzeigen": restliche Karten der Gruppe nachrendern
@@ -3761,14 +3997,14 @@ function visitGroupCard(g) {
   const range = dates[0].slice(0, 10) === dates[dates.length - 1].slice(0, 10)
     ? day(dates[0]) : `${day(dates[0])} – ${day(dates[dates.length - 1])}`;
   return `
-    <div class="event-card ${catClass(g.items[0].category)}" data-visit-group="${idx}" title="Klicken zum Aufklappen">
+    <div class="event-card ${catClass(g.items[0].category)}" data-visit-group="${idx}" title="${esc(t('tl.expand.tip', 'Klicken zum Aufklappen'))}">
       <div class="ev-head">
         <span class="ev-title">🔁 ${g.items.length}× ${esc(g.items[0].title)}</span>
         <span class="ev-date">${range}</span>
       </div>
       <div class="ev-meta">
-        <span class="chip">🛰️ Besuche gebündelt</span>
-        <span class="chip">▼ einzeln anzeigen</span>
+        <span class="chip">🛰️ ${esc(t('tl.visits.bundled', 'Besuche gebündelt'))}</span>
+        <span class="chip">▼ ${esc(t('tl.show.single', 'einzeln anzeigen'))}</span>
       </div>
     </div>`;
 }
@@ -3829,7 +4065,7 @@ function groupSpan(g) {
   if (!g.first) return '';
   const d = new Date(g.first);
   const hm = iso => (iso || '').slice(11, 16);
-  const day = d.toLocaleDateString(LANG === 'en' ? 'en-GB' : 'de-DE');
+  const day = d.toLocaleDateString(LOC());
   const from = hm(g.first), to = hm(g.last);
   return from && to && from !== to ? `${day} · ${from}–${to}` : day;
 }
@@ -3850,7 +4086,7 @@ function eventCard(e) {
   const g = e.group;
   const title = g ? `${g.city} · ${g.count} ${t('tl.visits', 'Besuche')}` : e.title;
   return `
-    <div class="event-card ${catClass(e.category)}${g ? ' is-group' : ''}" data-id="${esc(e.id)}" title="Klicken zum Bearbeiten">
+    <div class="event-card ${catClass(e.category)}${g ? ' is-group' : ''}" data-id="${esc(e.id)}" title="${esc(t('tl.edit.tip', 'Klicken zum Bearbeiten'))}">
       <div class="ev-head">
         <span class="ev-title">${g ? '🔁 ' : ''}${esc(title)}</span>
         <span class="ev-date">${g ? esc(groupSpan(g)) : fmtDate(e)}</span>
@@ -3861,12 +4097,13 @@ function eventCard(e) {
       <div class="ev-meta">
         <span class="chip">${catLabel(e.category)}</span>
         ${g ? `<span class="chip" data-expand-group="${esc(e.id)}" title="${esc(t('tl.group.tip', 'Die einzelnen Besuche dieses Tages zeigen'))}">📍 ${g.count} ${esc(t('tl.visits', 'Besuche'))} ▾</span>` : ''}
-        ${e.parent_event_id ? '<span class="chip">📅 Tages-Eintrag</span>' : ''}
-        ${kids ? `<span class="chip" data-expand-children="${esc(e.id)}" title="Tages-Einträge ein-/ausklappen">📅 ${kids} Tages-Einträge ▾</span>` : ''}
+        ${e.parent_event_id ? `<span class="chip">📅 ${esc(t('tl.daychild', 'Tages-Eintrag'))}</span>` : ''}
+        ${kids ? `<span class="chip" data-expand-children="${esc(e.id)}" title="${esc(t('tl.kids.tip', 'Tages-Einträge ein-/ausklappen'))}">📅 ${kids} ${esc(t('tl.daychildren', 'Tages-Einträge'))} ▾</span>` : ''}
         ${ageChip(e)}
-        ${eventChips(e).map(t => `<span class="chip">${esc(t)}</span>`).join('')}
+        ${eventChips(e).map(c => `<span class="chip">${esc(c)}</span>`).join('')}
         <span class="chip ${conf ? 'badge-confirmed' : 'badge-unconfirmed'}">
-          ${conf ? '✓ bestätigt' : `⚠ unbestätigt · ${Math.round(e.confidence*100)}%`}
+          ${conf ? `✓ ${esc(t('state.confirmed', 'bestätigt'))}`
+                 : `⚠ ${esc(t('state.unconfirmed', 'unbestätigt'))} · ${Math.round(e.confidence*100)}%`}
         </span>
       </div>
     </div>`;
@@ -3971,8 +4208,10 @@ function jrPreview(show) {
   const box = document.getElementById('jr-preview-box');
   const on = show ?? box.style.display === 'none';
   box.style.display = on ? '' : 'none';
-  if (on) box.innerHTML = mdRender(document.getElementById('jr-text').value) || '<span class="stat-label">noch kein Text</span>';
-  document.getElementById('jr-preview').textContent = on ? '✏️ zurück zum Text' : '👁 Vorschau';
+  if (on) box.innerHTML = mdRender(document.getElementById('jr-text').value)
+    || `<span class="stat-label">${esc(t('jr.notext', 'noch kein Text'))}</span>`;
+  document.getElementById('jr-preview').textContent = on
+    ? `✏️ ${t('jr.back', 'zurück zum Text')}` : `👁 ${t('jr.preview', 'Vorschau')}`;
 }
 function openJournal(dateStr) {
   const d = dateStr || new Date().toISOString().slice(0, 10);
@@ -4092,10 +4331,10 @@ async function prRefreshCount() {
   try {
     const n = (await prSelected()).length;
     box.textContent = n
-      ? `${n} Ereignis${n === 1 ? '' : 'se'} im gewählten Zeitraum.`
-      : 'Keine Ereignisse im gewählten Zeitraum — Zeitraum oder Optionen anpassen.';
+      ? `${n} ${nEvents(n)} ${t('pr.count.in', 'im gewählten Zeitraum.')}`
+      : t('pr.count.none', 'Keine Ereignisse im gewählten Zeitraum — Zeitraum oder Optionen anpassen.');
   } catch (_) {
-    box.textContent = 'Anzahl konnte nicht ermittelt werden.';
+    box.textContent = t('pr.count.fail', 'Anzahl konnte nicht ermittelt werden.');
   }
 }
 
@@ -4118,21 +4357,22 @@ function prBuildPage(events) {
   const withDesc = document.getElementById('pr-desc').checked;
   const withNotes = document.getElementById('pr-notes').checked;
   const withPhotos = document.getElementById('pr-photos').checked;
-  const fmtDay = d => new Date(d + 'T00:00:00').toLocaleDateString('de-DE',
+  const fmtDay = d => new Date(d + 'T00:00:00').toLocaleDateString(
+    LOC(),
     { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
 
   const range = from && to ? `${fmtDay(from)} – ${fmtDay(to)}`
-    : from ? `ab ${fmtDay(from)}`
-    : to ? `bis ${fmtDay(to)}` : 'gesamter Zeitraum';
+    : from ? `${t('pr.from', 'ab')} ${fmtDay(from)}`
+    : to ? `${t('pr.to', 'bis')} ${fmtDay(to)}` : t('pr.all', 'gesamter Zeitraum');
 
   let html = `<div class="pr-head">
       <h1>Life-Dash</h1>
-      <div class="pr-sub">${esc(range)} · ${events.length} Ereignis${events.length === 1 ? '' : 'se'}
-        · gedruckt am ${new Date().toLocaleDateString('de-DE')}</div>
+      <div class="pr-sub">${esc(range)} · ${events.length} ${nEvents(events.length)}
+        · ${t('pr.printedon', 'gedruckt am')} ${new Date().toLocaleDateString(LOC())}</div>
     </div>`;
 
   if (!events.length) {
-    html += '<div class="pr-empty">Keine Ereignisse im gewählten Zeitraum.</div>';
+    html += `<div class="pr-empty">${esc(t('pr.empty', 'Keine Ereignisse im gewählten Zeitraum.'))}</div>`;
     document.getElementById('print-area').innerHTML = html;
     return;
   }
@@ -4163,7 +4403,7 @@ function prBuildPage(events) {
       const meta = [catLabel(e.category)];
       if (e.location && e.location.name) meta.push('📍 ' + e.location.name);
       eventChips(e).forEach(c => meta.push(c));
-      if (e.confirmed !== 'confirmed') meta.push('unbestätigter Vorschlag');
+      if (e.confirmed !== 'confirmed') meta.push(t('pr.unconfirmed', 'unbestätigter Vorschlag'));
       html += `<div class="pr-ev">
         <div class="pr-ev-title">${esc(e.title)}</div>
         ${withDesc && e.description ? `<div class="pr-ev-desc">${esc(e.description)}</div>` : ''}
@@ -4271,7 +4511,7 @@ document.getElementById('jr-save').addEventListener('click', async ev => {
   } catch (err) {
     toast(t('toast.savefail', 'Speichern fehlgeschlagen: ') + err.message, 'error');
   } finally {
-    btn.disabled = false; btn.textContent = '💾 Speichern';
+    btn.disabled = false; btn.textContent = `💾 ${t('save', 'Speichern')}`;
   }
 });
 
@@ -4356,7 +4596,7 @@ async function openCityDetail(name) {
   const yr = s => s ? String(s).slice(0, 4) : null;
   const span = [yr(city.first_visit), yr(city.last_visit)].filter(Boolean);
   const sub = [
-    `${city.event_count.toLocaleString('de-DE')} ${t('comp.cities.entries', 'Einträge')}`,
+    `${city.event_count.toLocaleString(LOC())} ${t('comp.cities.entries', 'Einträge')}`,
     `${city.place_count} ${city.place_count === 1 ? t('comp.city.place', 'Ort') : t('comp.city.places', 'Orte')}`,
     span.length ? (span[0] === span[1] ? span[0] : `${span[0]}–${span[1]}`) : null,
     city.country,
@@ -4386,7 +4626,7 @@ async function openCityDetail(name) {
     ${desc}
     ${located.length ? '<div id="comp-map"></div>' : ''}
     ${city.events.map(eventCard).join('')}
-    ${rest > 0 ? `<div class="hint">${t('comp.city.more.a', 'Weitere')} ${rest.toLocaleString('de-DE')} `
+    ${rest > 0 ? `<div class="hint">${t('comp.city.more.a', 'Weitere')} ${rest.toLocaleString(LOC())} `
       + `${t('comp.city.more.b', 'Einträge — im Zeitstrahl zu sehen.')}</div>` : ''}`;
   document.getElementById('comp-back').addEventListener('click', () => loadCities());
   document.getElementById('city-timeline').addEventListener('click', () => tlFilterCity(city.name));
@@ -4419,13 +4659,16 @@ async function loadCompendium(type) {
   let items = [];
   try { items = await api(`/api/compendium/${type}`); }
   catch { items = []; }
-  if (!items.length) { grid.innerHTML = '<div class="hint">Für diese Kategorie gibt es noch keine Einträge.</div>'; return; }
+  if (!items.length) { grid.innerHTML = `<div class="hint">${t('comp.empty',
+    'Für diese Kategorie gibt es noch keine Einträge.')}</div>`; return; }
   items.forEach(a => { ENTITY_CACHE[a.id] = a; });
   grid.innerHTML = items.map(a => `
     <div class="comp-card" data-id="${esc(a.id)}" data-name="${esc(a.name)}">
       <div class="comp-emoji">${compEmoji(type, a.name)}</div>
       <div class="comp-name">${esc(a.name)}</div>
-      <div class="comp-count">${a.event_count} Ereignis${a.event_count === 1 ? '' : 'se'} · ${a.confirmed === 'confirmed' ? 'bestätigt' : 'unbestätigt'}</div>
+      <div class="comp-count">${a.event_count} ${nEvents(a.event_count)} · ${
+        a.confirmed === 'confirmed' ? t('state.confirmed', 'bestätigt')
+                                    : t('state.unconfirmed', 'unbestätigt')}</div>
     </div>`).join('');
   grid.querySelectorAll('.comp-card').forEach(card =>
     card.addEventListener('click', () => openEntityDetail(type, card.dataset.id, card.dataset.name)));
@@ -4439,7 +4682,7 @@ async function openEntityDetail(type, entityId, name) {
   const detail = document.getElementById('compendium-detail');
   grid.style.display = 'none';
   detail.style.display = '';
-  detail.innerHTML = '<div class="hint">lade…</div>';
+  detail.innerHTML = `<div class="hint">${t('loading', 'lade…')}</div>`;
   let events = [];
   try { events = await api(`/api/entities/${entityId}/events`); }
   catch { events = []; }
@@ -4464,16 +4707,18 @@ async function openEntityDetail(type, entityId, name) {
   const located = events.filter(e => e.location && e.location.lat != null);
   detail.innerHTML = `
     <div style="display:flex; align-items:center; gap:14px; margin-bottom:18px; flex-wrap:wrap">
-      <button class="btn small secondary" id="comp-back">‹ zurück</button>
+      <button class="btn small secondary" id="comp-back">‹ ${t('back', 'zurück')}</button>
       <span style="font-size:28px">${compEmoji(type, name)}</span>
       <div>
         <div style="font-size:18px; font-weight:700">${esc(name)}</div>
-        <div class="stat-label">${n} verknüpfte${n === 1 ? 's Ereignis' : ' Ereignisse'}${located.length ? ` · ${located.length} verortet` : ''}</div>
+        <div class="stat-label">${n} ${t('comp.linked', 'verknüpft')} · ${nEvents(n)}${
+          located.length ? ` · ${located.length} ${t('comp.located', 'verortet')}` : ''}</div>
       </div>
     </div>
     ${descBlock}
     ${located.length ? '<div id="comp-map"></div>' : ''}
-    ${n ? events.map(eventCard).join('') : '<div class="hint">Noch keine Events mit diesem Eintrag verknüpft.</div>'}`;
+    ${n ? events.map(eventCard).join('') : `<div class="hint">${t('comp.nolinks',
+      'Noch keine Events mit diesem Eintrag verknüpft.')}</div>`}`;
   document.getElementById('comp-back').addEventListener('click', () => loadCompendium(type));
 
   // Karte mit den Orten der Events (eigene Leaflet-Instanz, alte entsorgen)
@@ -4626,7 +4871,7 @@ async function renderModuleWidgets() {
 
   document.getElementById('widget-tiles').innerHTML = nums.map(w => `
     <div class="stat-card">
-      <div class="stat-num">${w.value.toLocaleString('de-DE')}</div>
+      <div class="stat-num">${w.value.toLocaleString(LOC())}</div>
       <div class="stat-label">${w.emoji ? w.emoji + ' ' : ''}${esc(w.label)}</div>
     </div>`).join('');
 
@@ -4698,6 +4943,17 @@ async function loadStats() {
   tempCard('stat-rainy', ex.rainy, ' mm', newDataHint);
   tempCard('stat-windy', ex.windy, ' km/h', newDataHint);
   tempCard('stat-snowy', ex.snowy, ' cm', newDataHint);
+  // Anmerkung 114: Diese sechs gibt es erst ab v0.22 (F12) — ältere
+  // Anreicherungen tragen die Werte nicht. Der Hinweis nennt deshalb die
+  // richtige Version; „ab v0.14" wäre hier eine Auskunft, nach der man
+  // vergeblich sucht.
+  const f12Hint = t('wx.newdata12', 'kommt mit neuen Wetter-Anreicherungen (ab v0.22)');
+  tempCard('stat-uv', ex.uv, '', f12Hint);
+  tempCard('stat-gust', ex.gust, ' km/h', f12Hint);
+  tempCard('stat-felt-hot', ex.felt_hot, ' °C', f12Hint);
+  tempCard('stat-felt-cold', ex.felt_cold, ' °C', f12Hint);
+  tempCard('stat-longest-day', ex.longest_day, ' h', f12Hint);
+  tempCard('stat-shortest-day', ex.shortest_day, ' h', f12Hint);
   renderWeatherSummary(ov);
   renderModuleWidgets();
 
@@ -4757,9 +5013,10 @@ async function loadFuzzyDates() {
   try { fuzzy = await fetchEvents({ vague: 1 }); } catch { return; }
   fuzzy.sort((a, b) => (a.date_start || '9999') < (b.date_start || '9999') ? -1 : 1);
   document.getElementById('fuzzy-title').textContent =
-    `⏳ Unscharfe Zeiten — ${fuzzy.length} Event${fuzzy.length === 1 ? '' : 's'}`;
+    `⏳ ${t('fuzzy.title', 'Unscharfe Zeiten')} — ${fuzzy.length} ${nEvents(fuzzy.length)}`;
   if (!fuzzy.length) {
-    el.innerHTML = '<div class="hint">Alle Events haben konkrete Zeitangaben. ✓</div>';
+    el.innerHTML = `<div class="hint">${t('fuzzy.none',
+      'Alle Events haben konkrete Zeitangaben. ✓')}</div>`;
     return;
   }
   el.innerHTML = fuzzy.map(e => {
@@ -4770,7 +5027,7 @@ async function loadFuzzyDates() {
         <span class="chip badge-unconfirmed">⏳ ${esc(prec)}</span>
         <b>${esc(e.title)}</b>
         <span class="stat-label">${fmtDate(e)}${e.location ? ' · ' + esc(e.location.name.split(',')[0]) : ''}</span>
-        <span class="stat-label" style="margin-left:auto">✏️ bearbeiten</span>
+        <span class="stat-label" style="margin-left:auto">✏️ ${esc(t('edit', 'bearbeiten'))}</span>
       </div>
     </div>`;
   }).join('');
@@ -4783,7 +5040,8 @@ async function loadModQueue() {
   const queue = await api("/api/moderation/queue");
   const el = document.getElementById('mod-queue');
   document.getElementById('mod-queue-title').textContent =
-    `Moderations-Queue — ${queue.length} unbestätigte Einträge`;
+    `${t('mod.queue', 'Moderations-Queue')} — ${queue.length} ${
+      t('mod.queue.open', 'unbestätigte Einträge')}`;
   // A38: Der Zähler hängt an „Verwaltung“ — die steckt auf dem Handy hinter
   // „Mehr“, also dorthin spiegeln, sonst ist er dort unsichtbar.
   const badge = document.querySelector('.sidebar > .nav-item[data-view="admin"] .nav-badge');
@@ -4792,20 +5050,24 @@ async function loadModQueue() {
     if (b) { b.textContent = queue.length; b.style.display = queue.length ? '' : 'none'; }
   });
   document.getElementById('bulk-panel').style.display = queue.length ? '' : 'none';
-  if (!queue.length) { el.innerHTML = '<div class="hint">Alles moderiert — keine offenen Einträge. ✓</div>'; return; }
+  if (!queue.length) {
+    el.innerHTML = `<div class="hint">${t('mod.done',
+      'Alles moderiert — keine offenen Einträge. ✓')}</div>`;
+    return;
+  }
   el.innerHTML = queue.map(e => `
     <div class="mod-item" data-id="${e.id}">
-      <div class="stage-num">STUFE 1 · Roh-Input</div>
+      <div class="stage-num">${esc(t('mod.stage1', 'STUFE 1 · Roh-Input'))}</div>
       <div class="mod-raw">„${esc(e.description || e.title)}"</div>
-      <div class="arrow">↓ KI-Interpretation ↓</div>
+      <div class="arrow">↓ ${esc(t('mod.airead', 'KI-Interpretation'))} ↓</div>
       <div class="field-row"><div class="field-key" data-i18n="field.title">Titel</div><div class="field-val">${esc(e.title)}</div></div>
-      <div class="field-row"><div class="field-key">Zeit</div><div class="field-val">${fmtDate(e)} (${e.date_precision})</div></div>
+      <div class="field-row"><div class="field-key">${esc(t('field.time', 'Zeit'))}</div><div class="field-val">${fmtDate(e)} (${e.date_precision})</div></div>
       <div class="field-row"><div class="field-key" data-i18n="field.location">Ort</div><div class="field-val">${e.location ? esc(e.location.name) : '–'}</div></div>
       <div class="field-row"><div class="field-key" data-i18n="field.category">Kategorie</div><div class="field-val">${catLabel(e.category)}</div></div>
       <div class="field-row"><div class="field-key">Confidence</div><div class="field-val">${Math.round(e.confidence*100)}%</div></div>
       <div class="btn-row">
-        <button class="btn small" data-act="confirm">✓ Bestätigen</button>
-        <button class="btn small ghost" data-act="discard">✗ Verwerfen</button>
+        <button class="btn small" data-act="confirm">✓ ${esc(t('confirm', 'Bestätigen'))}</button>
+        <button class="btn small ghost" data-act="discard">✗ ${esc(t('discard', 'Verwerfen'))}</button>
       </div>
     </div>`).join('');
   el.querySelectorAll('.mod-item').forEach(item => {
@@ -4840,7 +5102,7 @@ let bulkTotal = 0;
 async function bulkPreview() {
   const box = document.getElementById('bulk-result');
   const confirmBtn = document.getElementById('bulk-confirm-btn');
-  box.innerHTML = '<div class="hint">… prüfe</div>';
+  box.innerHTML = `<div class="hint">${t('bulk.checking', '… prüfe')}</div>`;
   try {
     const r = await api('/api/moderation/bulk-confirm/preview', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -4848,30 +5110,37 @@ async function bulkPreview() {
     });
     bulkTotal = r.total;
     if (!r.total) {
-      box.innerHTML = '<div class="hint">Kein unbestätigtes Event entspricht diesem Filter.</div>';
+      box.innerHTML = `<div class="hint">${t('bulk.nomatch',
+        'Kein unbestätigtes Event entspricht diesem Filter.')}</div>`;
       confirmBtn.style.display = 'none';
       return;
     }
     box.innerHTML =
-      `<div class="hint"><b>${r.total} Event(s)</b> würden bestätigt` +
-      (r.total > r.events.length ? ` — Vorschau der neuesten ${r.events.length}` : '') + ':</div>' +
+      `<div class="hint"><b>${r.total} ${nEvents(r.total)}</b> ${
+        t('bulk.wouldconfirm', 'würden bestätigt')}` +
+      (r.total > r.events.length
+        ? ` — ${t('bulk.preview.n', 'Vorschau der neuesten {n}').replace('{n}', r.events.length)}` : '')
+      + ':</div>' +
       r.events.map(e => `
         <div class="field-row">
           <div class="field-key">${Math.round(e.confidence * 100)}%</div>
           <div class="field-val">${esc(e.title)} <span class="stat-label">· ${fmtDate(e)}${e.location ? ' · ' + esc(e.location.name.split(',')[0]) : ''}</span></div>
         </div>`).join('');
-    confirmBtn.textContent = `✓ Alle ${r.total} bestätigen`;
+    confirmBtn.textContent = `✓ ${t('bulk.confirm.n', 'Alle {n} bestätigen').replace('{n}', r.total)}`;
     confirmBtn.style.display = '';
   } catch (err) {
-    box.innerHTML = `<div class="hint">Fehler: ${esc(err.message)}</div>`;
+    box.innerHTML = `<div class="hint">${t('error', 'Fehler')}: ${esc(err.message)}</div>`;
     confirmBtn.style.display = 'none';
   }
 }
 async function bulkConfirmRun() {
-  if (!(await uiConfirm(`${bulkTotal} Event(s) werden damit Teil der fixen Lebensdatenbank (inkl. ihrer verknüpften Objekte).`,
-    { title: `${bulkTotal} Event(s) bestätigen?`, okLabel: '✓ Bestätigen' }))) return;
+  if (!(await uiConfirm(
+    t('bulk.warn', '{n} Einträge werden damit Teil der fixen Lebensdatenbank (inkl. ihrer verknüpften Objekte).')
+      .replace('{n}', bulkTotal),
+    { title: t('bulk.warn.title', '{n} Einträge bestätigen?').replace('{n}', bulkTotal),
+      okLabel: `✓ ${t('confirm', 'Bestätigen')}` }))) return;
   const btn = document.getElementById('bulk-confirm-btn');
-  btn.disabled = true; btn.textContent = '… bestätige';
+  btn.disabled = true; btn.textContent = t('bulk.confirming', '… bestätige');
   try {
     const r = await api('/api/moderation/bulk-confirm', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -4879,7 +5148,7 @@ async function bulkConfirmRun() {
     });
     document.getElementById('bulk-result').innerHTML = '';
     btn.style.display = 'none';
-    toast(`✓ ${r.confirmed} Event(s) bestätigt.`);
+    toast(`✓ ${r.confirmed} ${nEvents(r.confirmed)} ${t('bulk.done', 'bestätigt.')}`);
     await refreshAll();
   } catch (err) {
     toast(t('toast.error', 'Fehler: ') + err.message, 'error');
@@ -4903,10 +5172,16 @@ let previewEvents = [];
 let capturePos = null;
 function getPosition() {
   return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) { reject(new Error('Standort wird von diesem Browser nicht unterstützt.')); return; }
+    if (!navigator.geolocation) {
+      reject(new Error(t('geo.unsupported',
+        'Standort wird von diesem Browser nicht unterstützt.')));
+      return;
+    }
     navigator.geolocation.getCurrentPosition(
       p => resolve({ lat: +p.coords.latitude.toFixed(5), lng: +p.coords.longitude.toFixed(5) }),
-      err => reject(new Error(err.code === 1 ? 'Standort-Freigabe abgelehnt.' : 'Standort nicht verfügbar.')),
+      err => reject(new Error(err.code === 1
+        ? t('geo.denied', 'Standort-Freigabe abgelehnt.')
+        : t('geo.unavailable', 'Standort nicht verfügbar.'))),
       { enableHighAccuracy: true, timeout: 10000 });
   });
 }
@@ -5033,7 +5308,7 @@ function renderOutbox() {
 }
 function fmtDateTime(iso) {
   const d = new Date(iso);
-  return isNaN(d) ? iso : d.toLocaleString(LANG === 'en' ? 'en-GB' : 'de-DE',
+  return isNaN(d) ? iso : d.toLocaleString(LOC(),
     { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
@@ -5260,15 +5535,18 @@ async function discardPreview() {
 // ---------- EVENT BEARBEITEN (Klick auf Karte im Zeitstrahl etc.) ----------
 let editingEvent = null;
 const ENT_TYPES = { animal:"🐾 Tier", country:"🌍 Land", artist:"🎤 Künstler", food:"🍽️ Gericht", movie:"🎬 Film", game:"🎮 Spiel", book:"📖 Buch" };
+// F10: Der Auswahlliste im Bearbeiten-Dialog fehlte die Übersetzung — sie
+// wird im JS gebaut, `data-i18n` erreicht sie also nie.
+const entTypeLabel = k => t('ent.type.' + k, ENT_TYPES[k] || k);
 function edEntityRow(type, name) {
   const row = document.createElement('div');
   row.className = 'ed-ent-row';
   row.style.cssText = 'display:flex; gap:8px; align-items:center';
-  const opts = Object.entries(ENT_TYPES).map(([v, l]) =>
-    `<option value="${v}"${v === type ? ' selected' : ''}>${l}</option>`).join('');
+  const opts = Object.keys(ENT_TYPES).map(v =>
+    `<option value="${v}"${v === type ? ' selected' : ''}>${esc(entTypeLabel(v))}</option>`).join('');
   row.innerHTML = `<select class="mf-select ed-ent-type" style="width:auto">${opts}</select>`
-    + `<input class="ed-ent-name" value="${esc(name || '')}" placeholder="Name" style="flex:1">`
-    + `<button class="btn small ghost ed-ent-del" title="entfernen" style="color:var(--danger)">✕</button>`;
+    + `<input class="ed-ent-name" value="${esc(name || '')}" placeholder="${esc(t('name', 'Name'))}" style="flex:1">`
+    + `<button class="btn small ghost ed-ent-del" title="${esc(t('remove', 'entfernen'))}" style="color:var(--danger)">✕</button>`;
   row.querySelector('.ed-ent-del').addEventListener('click', () => row.remove());
   return row;
 }
@@ -5444,11 +5722,14 @@ async function openEventEdit(id) {
   // Bestätigungs-Provenienz (P2.7)
   const prov = document.getElementById('ed-provenance');
   if (e.confirmed === 'confirmed') {
-    const by = { manual: 'manuell', bulk: 'Sammel-Bestätigung', import: 'Import (Gerätedaten)' }[e.confirmed_by] || e.confirmed_by;
+    const byDe = { manual: 'manuell', bulk: 'Sammel-Bestätigung',
+                   import: 'Import (Gerätedaten)' }[e.confirmed_by];
+    const by = byDe ? t('prov.' + e.confirmed_by, byDe) : e.confirmed_by;
     const when = e.confirmed_at
-      ? ' am ' + new Date(e.confirmed_at).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
+      ? ` ${t('prov.on', 'am')} ` + new Date(e.confirmed_at).toLocaleString(
+          LOC(), { dateStyle: 'medium', timeStyle: 'short' })
       : '';
-    prov.textContent = `✓ bestätigt${when}${by ? ' · ' + by : ''}`;
+    prov.textContent = `✓ ${t('state.confirmed', 'bestätigt')}${when}${by ? ' · ' + by : ''}`;
     prov.style.display = '';
   } else prov.style.display = 'none';
   const entBox = document.getElementById('ed-entities');
@@ -5462,10 +5743,12 @@ async function openEventEdit(id) {
   const kids = tl.events.filter(x => x.parent_event_id === e.id).length;
   if (!e.parent_event_id && span >= 2 && span <= 366) {
     daysRow.style.display = '';
-    document.getElementById('ed-days-info').textContent =
-      kids ? `${kids} von ${span} Tagen angelegt` : `${span} Tage Spanne`;
-    document.getElementById('ed-days-btn').textContent =
-      kids ? '📅 Fehlende Tage anlegen' : '📅 Tages-Einträge anlegen';
+    document.getElementById('ed-days-info').textContent = kids
+      ? t('ed.days.some', '{k} von {n} Tagen angelegt').replace('{k}', kids).replace('{n}', span)
+      : t('ed.days.span', '{n} Tage Spanne').replace('{n}', span);
+    document.getElementById('ed-days-btn').textContent = kids
+      ? `📅 ${t('ed.days.fill', 'Fehlende Tage anlegen')}`
+      : `📅 ${t('ed.days.create', 'Tages-Einträge anlegen')}`;
   } else daysRow.style.display = 'none';
   document.getElementById('edit-modal').classList.add('show');
 }
@@ -5475,12 +5758,13 @@ document.getElementById('ed-days-btn').addEventListener('click', async ev => {
   const e = editingEvent;
   if (!e) return;
   const btn = ev.target;
-  btn.disabled = true; btn.textContent = '… lege an';
+  btn.disabled = true; btn.textContent = t('ed.days.running', '… lege an');
   try {
     const created = await api(`/api/events/${e.id}/days`, { method: 'POST' });
     toast(created.length
-      ? `✓ ${created.length} Tages-Einträge angelegt — im Zeitstrahl eingeklappt unterm Haupt-Event; Wetter pro Tag wird ergänzt, soweit verfügbar.`
-      : 'Alle Tage sind bereits angelegt.');
+      ? t('ed.days.done', '✓ {n} Tages-Einträge angelegt — im Zeitstrahl eingeklappt unterm Haupt-Event; Wetter pro Tag wird ergänzt, soweit verfügbar.')
+          .replace('{n}', created.length)
+      : t('ed.days.already', 'Alle Tage sind bereits angelegt.'));
     closeEventEdit();
     await refreshAll();
   } catch (err) {
@@ -5611,14 +5895,15 @@ document.getElementById('ed-save').addEventListener('click', async () => {
   } catch (err) {
     toast(t('toast.savefail2', 'Fehler beim Speichern: ') + err.message, 'error');
   } finally {
-    btn.disabled = false; btn.textContent = '💾 Speichern';
+    btn.disabled = false; btn.textContent = `💾 ${t('save', 'Speichern')}`;
   }
 });
 document.getElementById('ed-delete').addEventListener('click', async () => {
   const e = editingEvent;
   if (!e) return;
-  if (!(await uiConfirm(`Der Roh-Text im Eingang bleibt erhalten.`,
-    { title: `„${e.title}" löschen?`, okLabel: '🗑️ Löschen', danger: true }))) return;
+  if (!(await uiConfirm(t('ed.del.text', 'Der Roh-Text im Eingang bleibt erhalten.'),
+    { title: t('ed.del.title', '„{x}" löschen?').replace('{x}', e.title),
+      okLabel: `🗑️ ${t('delete', 'Löschen')}`, danger: true }))) return;
   // F7: Hat das Event Tages-Einträge, fragt der Dialog, ob sie mitgehen —
   // „Abbrechen" behält sie als eigenständige Einzel-Events.
   const kids = tl.events.filter(x => x.parent_event_id === e.id).length;
@@ -5707,7 +5992,7 @@ document.getElementById('mf-save').addEventListener('click', async () => {
   } catch (err) {
     if (!String(err.message).startsWith('401')) toast(t('toast.savefail2', 'Fehler beim Speichern: ') + err.message, 'error');
   } finally {
-    btn.disabled = false; btn.textContent = '💾 Speichern';
+    btn.disabled = false; btn.textContent = `💾 ${t('save', 'Speichern')}`;
   }
 });
 
@@ -5716,11 +6001,18 @@ function startVoice() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const ta = document.getElementById('input-text');
   const btn = document.getElementById('voice-btn');
-  if (!SR) { toast('Spracheingabe wird von diesem Browser nicht unterstützt.\nNutze Chrome oder Edge (oder tippe den Text).', 'warn'); return; }
+  if (!SR) {
+    toast(t('voice.unsupported', 'Spracheingabe wird von diesem Browser nicht unterstützt.\nNutze Chrome oder Edge (oder tippe den Text).'), 'warn');
+    return;
+  }
   const rec = new SR();
-  rec.lang = 'de-DE'; rec.interimResults = true; rec.continuous = false;
+  // F10: In welcher Sprache diktiert wird, hängt an der gewählten Sprache —
+  // `de-DE` fest verdrahtet hieß: wer die App auf Englisch benutzt, bekommt
+  // seinen englischen Satz als deutschen Lautsalat zurück.
+  rec.lang = LOC();
+  rec.interimResults = true; rec.continuous = false;
   const base = ta.value ? ta.value + ' ' : '';
-  btn.textContent = '🔴 höre zu…'; btn.disabled = true;
+  btn.textContent = `🔴 ${t('voice.listening', 'höre zu…')}`; btn.disabled = true;
   rec.onresult = ev => {
     let txt = '';
     for (const r of ev.results) txt += r[0].transcript;
@@ -5772,10 +6064,10 @@ function periodLabel(key) {
   switch (mp.mode) {
     case 'day':    { const p = key.split('-'); return `${p[2]}.${p[1]}.${p[0]}`; }
     case 'week':   { const p = key.split('-W'); return `KW ${+p[1]} · ${p[0]}`; }
-    case 'month':  { const p = key.split('-'); return `${MONTHS_LONG[+p[1]-1]} ${p[0]}`; }
+    case 'month':  { const p = key.split('-'); return `${monthLong(+p[1]-1)} ${p[0]}`; }
     case 'year':   return key;
-    case 'decade': return `${key}er`;
-    default:       return 'Alle Events';
+    case 'decade': return `${key}${t('date.decade.suffix', 'er')}`;
+    default:       return t('mp.all', 'Alle Events');
   }
 }
 // Zeitraum-Schlüssel für ein Kalenderdatum im aktuellen Modus
@@ -5929,8 +6221,9 @@ function renderPeriod() {
   if (!mp.periods.length) {
     mapTracks.clearLayers();
     mpCapNote(0, 0);
-    setLabel('keine verorteten Events');
-    stops.innerHTML = '<div class="stat-label">Keine Orte in diesem Zeitraum.</div>';
+    setLabel(t('mp.nolocated', 'keine verorteten Events'));
+    stops.innerHTML = `<div class="stat-label">${t('mp.noplaces',
+      'Keine Orte in diesem Zeitraum.')}</div>`;
     return;
   }
   const key = mp.periods[mp.index];
@@ -6021,7 +6314,7 @@ function mpCapNote(hidden, total) {
   if (hidden <= 0) { box.style.display = 'none'; box.innerHTML = ''; return; }
   box.style.display = '';
   box.innerHTML = `⚠️ ${esc(t('map.cap', '{h} von {n} Punkten sind ausgeblendet.')
-      .replace('{h}', hidden.toLocaleString('de-DE')).replace('{n}', total.toLocaleString('de-DE')))}`
+      .replace('{h}', hidden.toLocaleString(LOC())).replace('{n}', total.toLocaleString(LOC())))}`
     + ` <button type="button" id="mp-cap-fix">${esc(t('map.cap.fix', '🔁 Punkte zusammenfassen'))}</button>`;
   document.getElementById('mp-cap-fix').addEventListener('click', () => {
     if (!mp.condense) document.getElementById('mp-group-toggle').click();
@@ -6193,15 +6486,17 @@ async function loadWorld() {
   const newest = data.recent[0];
   document.getElementById('world-newest').textContent = newest ? newest.name : '–';
   document.getElementById('world-newest-sub').textContent = newest && newest.first_visit
-    ? 'erstmals ' + new Date(newest.first_visit).toLocaleDateString('de-DE')
-    : 'erstmals besucht';
+    ? t('world.firstvisit', 'erstmals') + ' '
+        + new Date(newest.first_visit).toLocaleDateString(LOC())
+    : t('world.firstvisited', 'erstmals besucht');
 
   const hint = document.getElementById('world-hint');
   if (data.unmatched.length) {
     hint.style.display = '';
-    hint.innerHTML = '⚠️ Nicht zugeordnet (kein bekanntes Land): '
+    hint.innerHTML = `⚠️ ${esc(t('world.unmatched', 'Nicht zugeordnet (kein bekanntes Land):'))} `
       + data.unmatched.map(n => esc(n)).join(', ')
-      + ' — Schreibweise im Kompendium korrigieren, dann zählt es mit.';
+      + ` — ${esc(t('world.unmatched.hint',
+          'Schreibweise im Kompendium korrigieren, dann zählt es mit.'))}`;
   } else {
     hint.style.display = 'none';
   }
@@ -6217,17 +6512,19 @@ function renderWorldChecklist(data) {
     const chips = c.countries.map(x => {
       // F11: Durchschnittstemperatur, wenn das Land Wetterdaten trägt
       const temp = x.avg_temp_c != null ? ` · ⌀ ${x.avg_temp_c} °C` : '';
-      return `<span class="world-chip hit" title="${esc(x.name)}: ${x.event_count} Ereignisse${temp}">${esc(x.name)}<span class="n">${x.event_count}</span></span>`;
+      return `<span class="world-chip hit" title="${esc(x.name)}: ${x.event_count} ${esc(nEvents(x.event_count))}${temp}">${esc(x.name)}<span class="n">${x.event_count}</span></span>`;
     }).join('');
     const missing = c.missing.map(n => `<span class="world-chip">${esc(n)}</span>`).join('');
     return `<div class="world-cont" data-cont="${esc(c.code)}">
       <div class="world-cont-head">
         <h4>${esc(c.label)}</h4>
-        <span class="world-cont-count">${c.visited} von ${c.total}</span>
+        <span class="world-cont-count">${c.visited} ${esc(t('of', 'von'))} ${c.total}</span>
         <span class="world-bar"><i style="width:${pct}%"></i></span>
-        <span class="world-cont-count toggle">${c.visited < c.total ? 'fehlende zeigen ▾' : 'komplett ✅'}</span>
+        <span class="world-cont-count toggle">${esc(c.visited < c.total
+          ? t('world.showmissing', 'fehlende zeigen ▾')
+          : t('world.complete', 'komplett ✅'))}</span>
       </div>
-      <div class="world-countries">${chips || '<span class="world-chip">noch nichts erfasst</span>'}</div>
+      <div class="world-countries">${chips || `<span class="world-chip">${esc(t('world.nothing', 'noch nichts erfasst'))}</span>`}</div>
       <div class="world-countries world-missing" style="display:none">${missing}</div>
     </div>`;
   }).join('');
@@ -6239,7 +6536,8 @@ function renderWorldChecklist(data) {
       if (!list.children.length) return;
       const open = list.style.display === 'none';
       list.style.display = open ? '' : 'none';
-      toggle.textContent = open ? 'fehlende verbergen ▴' : 'fehlende zeigen ▾';
+      toggle.textContent = open ? t('world.hidemissing', 'fehlende verbergen ▴')
+                                : t('world.showmissing', 'fehlende zeigen ▾');
     });
   });
 }
@@ -6250,7 +6548,8 @@ async function renderWorldMap(data) {
     geo = await loadWorldGeo();
   } catch (e) {
     document.getElementById('world-map').innerHTML =
-      `<div class="action-desc" style="padding:16px">Weltkarte konnte nicht geladen werden: ${esc(e.message)}</div>`;
+      `<div class="action-desc" style="padding:16px">${t('world.mapfail',
+        'Weltkarte konnte nicht geladen werden:')} ${esc(e.message)}</div>`;
     return;
   }
 
@@ -6280,15 +6579,17 @@ async function renderWorldMap(data) {
     onEachFeature: (feat, layer) => {
       const hit = byIso[feat.properties.iso];
       if (hit) {
-        const first = hit.first_visit ? new Date(hit.first_visit).toLocaleDateString('de-DE') : '–';
-        const last = hit.last_visit ? new Date(hit.last_visit).toLocaleDateString('de-DE') : '–';
+        const first = hit.first_visit ? new Date(hit.first_visit).toLocaleDateString(LOC()) : '–';
+        const last = hit.last_visit ? new Date(hit.last_visit).toLocaleDateString(LOC()) : '–';
         // F11: Durchschnittstemperatur aus den bereits gespeicherten Wetterdaten
         const temp = hit.avg_temp_c != null
           ? `<br>${t('world.avgtemp', 'Ø Temperatur')} ${hit.avg_temp_c} °C` : '';
-        layer.bindPopup(`<b>${esc(hit.name)}</b><br>${hit.event_count} Ereignisse${temp}<br>
-          <span style="opacity:.7">erstmals ${first}<br>zuletzt ${last}</span>`);
+        layer.bindPopup(`<b>${esc(hit.name)}</b><br>${hit.event_count} ${esc(nEvents(hit.event_count))}${temp}<br>
+          <span style="opacity:.7">${esc(t('world.firstvisit', 'erstmals'))} ${first}<br>${
+            esc(t('world.lastvisit', 'zuletzt'))} ${last}</span>`);
       } else {
-        layer.bindPopup(`<b>${esc(feat.properties.name)}</b><br><span style="opacity:.7">noch nicht besucht</span>`);
+        layer.bindPopup(`<b>${esc(feat.properties.name)}</b><br><span style="opacity:.7">${
+          esc(t('world.notvisited', 'noch nicht besucht'))}</span>`);
       }
     },
   }).addTo(worldMap);
@@ -6314,20 +6615,24 @@ async function loadAchievements() {
 
   const list = document.getElementById('ach-list');
   if (!data.achievements.length) {
-    list.innerHTML = '<div class="panel"><div class="action-desc">Keine Erfolge definiert — '
-      + 'Erfolge kommen aus den Modul-Dateien und erscheinen für alle Module, die du trackst.</div></div>';
+    list.innerHTML = `<div class="panel"><div class="action-desc">${t('ach.none',
+      'Keine Erfolge definiert — Erfolge kommen aus den Modul-Dateien und erscheinen für alle Module, die du trackst.')}</div></div>`;
     return;
   }
   list.innerHTML = data.achievements.map(a => {
     const medal = a.tier ? TIER_MEDALS[a.tier] : (a.emoji || '🔒');
-    const num = n => n.toLocaleString('de-DE');
+    const num = n => n.toLocaleString(LOC());
+    // F10: Die Stufennamen kamen aus dem Schlüssel selbst („platin" mit
+    // großem P). Ein Bezeichner ist kein Text — englisch stand dort weiter
+    // „Silber".
+    const tierName = k => t('tier.' + k, k.charAt(0).toUpperCase() + k.slice(1));
     // F19: Oberhalb von Platin ist das Ziel keine Stufe mehr, sondern eine
     // erzeugte Marke — die Karte sagt beides in derselben Zeile, damit eine
     // seit Jahren volle Leiste nicht wieder „fertig" behauptet.
     let next;
     if (a.next_tier) {
       next = `${t('ach.togo', 'Noch')} ${num(a.next_threshold - a.value)} `
-        + `${t('ach.until', 'bis')} ${a.next_tier.charAt(0).toUpperCase() + a.next_tier.slice(1)} `
+        + `${t('ach.until', 'bis')} ${tierName(a.next_tier)} `
         + `(${num(a.next_threshold)})`;
     } else if (a.beyond_top) {
       next = `${t('ach.togo', 'Noch')} ${num(a.next_threshold - a.value)} `
@@ -6342,7 +6647,7 @@ async function loadAchievements() {
       <div class="ach-medal">${medal}</div>
       <div class="ach-body">
         <div class="ach-title">${esc(a.label)}
-          ${a.tier ? `<span class="ach-tier">${esc(a.tier)}</span>` : ''}${marks}</div>
+          ${a.tier ? `<span class="ach-tier">${esc(tierName(a.tier))}</span>` : ''}${marks}</div>
         ${a.description ? `<div class="ach-desc">${esc(a.description)}</div>` : ''}
         <div class="ach-track"><i style="width:${Math.round(a.progress * 100)}%"></i></div>
         <div class="ach-next">${esc(next)}</div>
@@ -6449,20 +6754,23 @@ async function loadUsers() {
   catch { tbl.innerHTML = ''; return; }
   // A35: Anlege-Panel nur bei lokalen Konten
   document.getElementById('user-create').style.display = AUTH.mode === 'local' ? '' : 'none';
-  tbl.innerHTML = '<thead><tr><th>Nutzer</th><th>Rolle</th><th>Daten</th><th>Dabei seit</th><th></th></tr></thead><tbody>'
+  tbl.innerHTML = `<thead><tr><th>${esc(t('usr.col.user', 'Nutzer'))}</th>`
+    + `<th>${esc(t('usr.col.role', 'Rolle'))}</th>`
+    + `<th>${esc(t('usr.col.data', 'Daten'))}</th>`
+    + `<th>${esc(t('usr.col.since', 'Dabei seit'))}</th><th></th></tr></thead><tbody>`
     + users.map(u => {
       const self = AUTH.user && u.id === AUTH.user.id;
       const authChip = u.auth === 'local' ? '' : ` <span class="chip">${esc(u.auth)}</span>`;
       return `<tr data-uid="${esc(u.id)}">
-        <td><b>${esc(u.display_name || '—')}</b>${self ? ' <span class="chip">das bist du</span>' : ''}${authChip}<br>
+        <td><b>${esc(u.display_name || '—')}</b>${self ? ` <span class="chip">${esc(t('usr.you', 'das bist du'))}</span>` : ''}${authChip}<br>
           <span class="stat-label">${esc(u.email || u.id)}</span></td>
-        <td><select class="mf-select" data-role ${self ? 'disabled title="Die eigene Rolle kann nicht geändert werden"' : ''}>
-          <option value="user" ${u.role === 'user' ? 'selected' : ''}>Nutzer</option>
-          <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+        <td><select class="mf-select" data-role ${self ? `disabled title="${esc(t('usr.ownrole', 'Die eigene Rolle kann nicht geändert werden'))}"` : ''}>
+          <option value="user" ${u.role === 'user' ? 'selected' : ''}>${esc(t('role.user', 'Nutzer'))}</option>
+          <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>${esc(t('role.admin', 'Admin'))}</option>
         </select></td>
-        <td class="stat-label">${u.events} Events · ${u.fragments} Fragmente</td>
+        <td class="stat-label">${u.events} ${esc(nEvents(u.events))} · ${u.fragments} ${esc(t('usr.fragments', 'Fragmente'))}</td>
         <td class="stat-label">${u.created_at ? u.created_at.slice(0, 10) : '—'}</td>
-        <td>${self ? '' : '<button class="btn small danger" data-del>🗑️ löschen</button>'}</td>
+        <td>${self ? '' : `<button class="btn small danger" data-del>🗑️ ${esc(t('delete', 'Löschen'))}</button>`}</td>
       </tr>`;
     }).join('') + '</tbody>';
 
@@ -6474,7 +6782,8 @@ async function loadUsers() {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ role: sel.value }),
         });
-        toast(`✓ Rolle geändert: ${r.role === 'admin' ? 'Admin' : 'Nutzer'}.`);
+        toast(`✓ ${t('usr.rolechanged', 'Rolle geändert:')} ${
+          r.role === 'admin' ? t('role.admin', 'Admin') : t('role.user', 'Nutzer')}.`);
       } catch (err) {
         toast(t('toast.rolefail', 'Rolle ändern fehlgeschlagen: ') + err.message, 'error');
         loadUsers(); // Anzeige zurücksetzen
@@ -6486,12 +6795,14 @@ async function loadUsers() {
       const u = users.find(x => x.id === row.dataset.uid);
       const who = u.display_name || u.email || u.id;
       if (!(await uiConfirm(
-        `„${who}" wird mitsamt ALLEN Daten gelöscht: ${u.events} Events, ${u.fragments} Fragmente, `
-        + `dazu Orte, Objekte, Routen und Wetter. Das ist unwiderruflich.`,
-        { title: '⚠️ Nutzer löschen?', okLabel: '🗑️ Endgültig löschen', danger: true }))) return;
+        t('usr.del.text', '„{who}" wird mitsamt ALLEN Daten gelöscht: {e} Ereignisse, {f} Fragmente, dazu Orte, Objekte, Routen und Wetter. Das ist unwiderruflich.')
+          .replace('{who}', who).replace('{e}', u.events).replace('{f}', u.fragments),
+        { title: `⚠️ ${t('usr.del.title', 'Nutzer löschen?')}`,
+          okLabel: `🗑️ ${t('delete.final', 'Endgültig löschen')}`, danger: true }))) return;
       try {
         const r = await api(`/api/admin/users/${row.dataset.uid}`, { method: 'DELETE' });
-        toast(`✓ Nutzer „${who}" gelöscht (${r.total} Datenzeilen).`);
+        toast(`✓ ${t('usr.deleted', 'Nutzer „{who}" gelöscht ({n} Datenzeilen).')
+          .replace('{who}', who).replace('{n}', r.total)}`);
         loadUsers();
       } catch (err) {
         toast(t('toast.delfail', 'Löschen fehlgeschlagen: ') + err.message, 'error');
@@ -6505,7 +6816,7 @@ async function loadDbTables() {
   const tabs = document.getElementById('db-tables');
   let tables;
   try { tables = await api('/api/admin/tables'); }
-  catch { tabs.innerHTML = '<div class="hint">DB-Ansicht nicht verfügbar.</div>'; return; }
+  catch { tabs.innerHTML = `<div class="hint">${t('db.unavailable', 'DB-Ansicht nicht verfügbar.')}</div>`; return; }
   tabs.innerHTML = tables.map(t =>
     `<div class="zoom-btn" data-table="${esc(t.name)}">${esc(t.name)} <span style="opacity:.55">(${t.rows})</span></div>`
   ).join('');
@@ -6533,8 +6844,12 @@ function renderDbTable() {
   const data = dbData;
   const tbl = document.getElementById('db-table');
   const cols = data.columns;
-  const head = `<thead><tr><th style="width:82px">Aktion</th>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>`;
-  if (!data.rows.length) { tbl.innerHTML = head + `<tbody><tr><td colspan="${cols.length+1}">Tabelle „${esc(data.table)}" ist leer.</td></tr></tbody>`; return; }
+  const head = `<thead><tr><th style="width:82px">${esc(t('db.action', 'Aktion'))}</th>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>`;
+  if (!data.rows.length) {
+    tbl.innerHTML = head + `<tbody><tr><td colspan="${cols.length+1}">${
+      esc(t('db.empty', 'Tabelle „{x}" ist leer.').replace('{x}', data.table))}</td></tr></tbody>`;
+    return;
+  }
   const body = `<tbody>${data.rows.map(r => {
     const id = r.id;
     const cells = cols.map(c => {
@@ -6543,16 +6858,18 @@ function renderDbTable() {
     }).join('');
     return `<tr data-id="${esc(String(id))}">
       <td style="white-space:nowrap">
-        <button class="btn small ghost db-edit" title="Bearbeiten" style="padding:2px 6px">✏️</button>
-        <button class="btn small ghost db-del" title="Löschen" style="padding:2px 6px">🗑️</button>
+        <button class="btn small ghost db-edit" title="${esc(t('edit.cap', 'Bearbeiten'))}" style="padding:2px 6px">✏️</button>
+        <button class="btn small ghost db-del" title="${esc(t('delete', 'Löschen'))}" style="padding:2px 6px">🗑️</button>
       </td>${cells}</tr>`;
   }).join('')}</tbody>`;
   tbl.innerHTML = head + body;
 
   tbl.querySelectorAll('.db-del').forEach(btn => btn.addEventListener('click', async e => {
     const tr = e.target.closest('tr'), id = tr.dataset.id;
-    if (!(await uiConfirm(`Die Zeile wird direkt aus der Datenbank entfernt.`,
-      { title: `Zeile ${id} aus „${data.table}" löschen?`, okLabel: '🗑️ Löschen', danger: true }))) return;
+    if (!(await uiConfirm(t('db.del.text', 'Die Zeile wird direkt aus der Datenbank entfernt.'),
+      { title: t('db.del.title', 'Zeile {id} aus „{tbl}" löschen?')
+          .replace('{id}', id).replace('{tbl}', data.table),
+        okLabel: `🗑️ ${t('delete', 'Löschen')}`, danger: true }))) return;
     try {
       const r = await api(`/api/admin/tables/${data.table}/${encodeURIComponent(id)}`, { method: 'DELETE' });
       // A4: Aufräum-Folgen anzeigen (mitgelöschte Verknüpfungen etc.)
@@ -6573,8 +6890,8 @@ function startDbEdit(tr) {
   const row = dbData.rows.find(r => String(r.id) === id);
   const actionCell = tr.children[0];
   actionCell.innerHTML = `
-    <button class="btn small db-save" title="Speichern" style="padding:2px 6px">💾</button>
-    <button class="btn small ghost db-cancel" title="Abbrechen" style="padding:2px 6px">✖</button>`;
+    <button class="btn small db-save" title="${esc(t('save', 'Speichern'))}" style="padding:2px 6px">💾</button>
+    <button class="btn small ghost db-cancel" title="${esc(t('cancel', 'Abbrechen'))}" style="padding:2px 6px">✖</button>`;
   cols.forEach((c, i) => {
     const cell = tr.children[i + 1];
     if (c === 'id') return;
@@ -6756,17 +7073,23 @@ async function loadJobs() {
   try { jobs = await api('/api/jobs?limit=12'); } catch { tbl.innerHTML = ''; return; }
   // Zeiten sind UTC gespeichert -> lokal anzeigen
   const fmt = iso => iso ? new Date(iso.endsWith('Z') ? iso : iso + 'Z')
-    .toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+    .toLocaleString(LOC(), { dateStyle: 'short', timeStyle: 'short' }) : '—';
   tbl.innerHTML = !jobs.length
-    ? '<tbody><tr><td class="stat-label" style="padding:10px">Noch keine Jobs gelaufen.</td></tr></tbody>'
-    : '<thead><tr><th>Job</th><th>Status</th><th>Fortschritt</th><th>Gestartet</th><th>Ergebnis</th><th></th></tr></thead><tbody>'
+    ? `<tbody><tr><td class="stat-label" style="padding:10px">${
+        esc(t('jobs.none', 'Noch keine Jobs gelaufen.'))}</td></tr></tbody>`
+    : `<thead><tr><th>Job</th><th>${esc(t('jobs.col.status', 'Status'))}</th>`
+      + `<th>${esc(t('jobs.col.progress', 'Fortschritt'))}</th>`
+      + `<th>${esc(t('jobs.col.started', 'Gestartet'))}</th>`
+      + `<th>${esc(t('jobs.col.result', 'Ergebnis'))}</th><th></th></tr></thead><tbody>`
     + jobs.map(j => `<tr>
         <td><b>${t('job.' + j.type, JOB_LABELS[j.type] || esc(j.type))}</b></td>
         <td style="white-space:nowrap">${JOB_STATUS[j.status] || esc(j.status)}</td>
-        <td class="stat-label">${j.done}${j.unit ? ' ' + esc(j.unit) : ''}${j.status === 'running' && j.remaining != null ? ` · noch ~${j.remaining}` : ''}</td>
+        <td class="stat-label">${j.done}${j.unit ? ' ' + esc(j.unit) : ''}${
+          j.status === 'running' && j.remaining != null
+            ? ` · ${esc(t('jobs.left', 'noch ~{n}').replace('{n}', j.remaining))}` : ''}</td>
         <td class="stat-label" style="white-space:nowrap">${fmt(j.started_at)}${j.started_by ? `<br>${t('by', 'von')} ${esc(j.started_by)}` : ''}</td>
         <td class="stat-label">${esc(j.result || '')}</td>
-        <td>${j.status === 'running' ? `<button class="btn small danger" data-job-stop="${esc(j.id)}">⏹ Stopp</button>` : ''}</td>
+        <td>${j.status === 'running' ? `<button class="btn small danger" data-job-stop="${esc(j.id)}">⏹ ${esc(t('jobs.stop', 'Stopp'))}</button>` : ''}</td>
       </tr>`).join('') + '</tbody>';
   tbl.querySelectorAll('[data-job-stop]').forEach(btn => btn.addEventListener('click', async () => {
     btn.disabled = true;
@@ -6797,8 +7120,8 @@ function renderSchedule() {
     return `<label class="stat-label" style="display:flex; align-items:center; gap:10px">
       <input type="checkbox" data-sched="${tp}" ${cfg.enabled ? 'checked' : ''}>
       <span class="job-name">${t('job.' + tp, JOB_LABELS[tp] || tp)}</span>
-      um <input type="number" min="0" max="23" value="${cfg.hour ?? 3}" data-sched-hour="${tp}"
-        style="width:56px; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:4px 6px; color:var(--text)"> Uhr
+      ${esc(t('sched.at', 'um'))} <input type="number" min="0" max="23" value="${cfg.hour ?? 3}" data-sched-hour="${tp}"
+        style="width:56px; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:4px 6px; color:var(--text)"> ${esc(t('sched.oclock', 'Uhr'))}
     </label>`;
   }).join('');
   panel.querySelectorAll('input').forEach(inp => inp.addEventListener('change', async () => {
@@ -6844,7 +7167,7 @@ function jobFinish(job, status, result) {
 // Admin-Aktionen (Neuberechnung / Enrichment)
 async function runAdmin(btn, fn, doneMsg) {
   const label = btn.textContent;
-  btn.disabled = true; btn.textContent = '… läuft';
+  btn.disabled = true; btn.textContent = t('adm.running', '… läuft');
   try {
     const res = await fn();
     toast(doneMsg(res));
@@ -6865,14 +7188,15 @@ const runningOps = {};
 async function runBatchedAdmin(btn, { reset, step, unit, doneMsg, jobType }) {
   if (runningOps[btn.id]) {                      // zweiter Klick = Stopp anfordern
     runningOps[btn.id].stop = true;
-    btn.textContent = '… stoppe nach diesem Batch';
+    btn.textContent = t('adm.stopping', '… stoppe nach diesem Batch');
     return;
   }
   const op = runningOps[btn.id] = { stop: false };
   const label = btn.textContent;
   let total = 0, remaining = null, job = null, endState = 'done', endResult = null;
   const ticker = () => {
-    btn.textContent = `⏹ Stoppen — ${total} ${unit}` + (remaining != null ? ` · noch ~${remaining}` : '');
+    btn.textContent = `⏹ ${t('adm.stop', 'Stoppen')} — ${total} ${unit}`
+      + (remaining != null ? ` · ${t('jobs.left', 'noch ~{n}').replace('{n}', remaining)}` : '');
   };
   try {
     if (jobType) {
@@ -6884,7 +7208,7 @@ async function runBatchedAdmin(btn, { reset, step, unit, doneMsg, jobType }) {
       }
     }
     if (reset) {
-      btn.textContent = '… bereite vor';
+      btn.textContent = t('adm.preparing', '… bereite vor');
       remaining = await reset();
     }
     ticker();
@@ -6893,12 +7217,29 @@ async function runBatchedAdmin(btn, { reset, step, unit, doneMsg, jobType }) {
       total += r.done;
       remaining = r.remaining;
       jobProgress(job, total, remaining);  // Heartbeat (best effort)
-      if (r.aborted) { endState = 'stopped'; endResult = 'abgebrochen (KI nicht erreichbar)'; toast(`Abgebrochen (KI nicht erreichbar): ${total} ${unit} verarbeitet, ${remaining} offen — später erneut starten.`, 'warn', 8000); break; }
+      if (r.aborted) {
+        endState = 'stopped';
+        endResult = t('adm.aborted', 'abgebrochen (KI nicht erreichbar)');
+        toast(t('adm.aborted.long', 'Abgebrochen (KI nicht erreichbar): {n} {u} verarbeitet, {r} offen — später erneut starten.')
+          .replace('{n}', total).replace('{u}', unit).replace('{r}', remaining), 'warn', 8000);
+        break;
+      }
       if (remaining === 0) { endResult = doneMsg(total); toast(endResult); break; }
-      if (r.done === 0) { endState = 'stopped'; endResult = `${remaining} nicht verarbeitbar`; toast(`Kein Fortschritt mehr: ${total} ${unit} verarbeitet, ${remaining} nicht verarbeitbar (Konfiguration/Netz prüfen).`, 'warn', 8000); break; }
+      if (r.done === 0) {
+        endState = 'stopped';
+        endResult = t('adm.stuck', '{r} nicht verarbeitbar').replace('{r}', remaining);
+        toast(t('adm.stuck.long', 'Kein Fortschritt mehr: {n} {u} verarbeitet, {r} nicht verarbeitbar (Konfiguration/Netz prüfen).')
+          .replace('{n}', total).replace('{u}', unit).replace('{r}', remaining), 'warn', 8000);
+        break;
+      }
       ticker();
     }
-    if (op.stop) { endState = 'stopped'; endResult = 'vom Nutzer gestoppt'; toast(`Gestoppt: ${total} ${unit} verarbeitet, ${remaining ?? '?'} offen — derselbe Knopf setzt fort.`, 'warn'); }
+    if (op.stop) {
+      endState = 'stopped';
+      endResult = t('adm.stopped.by', 'vom Nutzer gestoppt');
+      toast(t('adm.stopped.long', 'Gestoppt: {n} {u} verarbeitet, {r} offen — derselbe Knopf setzt fort.')
+        .replace('{n}', total).replace('{u}', unit).replace('{r}', remaining ?? '?'), 'warn');
+    }
     await refreshAll();
     if (isAdmin()) loadDbTables();
   } catch (err) {
@@ -6920,7 +7261,7 @@ async function startServerJob(btn, type, params) {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type, params: params || null }),
     });
-    toast('✓ Gestartet — läuft jetzt im Hintergrund weiter, auch wenn du die Seite schließt.\nFortschritt & Stopp: Reiter „Jobs".');
+    toast(t('adm.jobstarted', '✓ Gestartet — läuft jetzt im Hintergrund weiter, auch wenn du die Seite schließt.\nFortschritt & Stopp: Reiter „Jobs".'));
     showAdminTab('jobs');
   } catch (err) {
     toast(err.message, err.status === 409 ? 'warn' : 'error', 9000);
@@ -6960,7 +7301,7 @@ document.getElementById('btn-export').addEventListener('click', async ev => {
     return;
   }
 
-  btn.disabled = true; btn.textContent = '… exportiere';
+  btn.disabled = true; btn.textContent = t('exp.running', '… exportiere');
   try {
     const data = await api('/api/data/export' + q);
     const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
@@ -6970,15 +7311,17 @@ document.getElementById('btn-export').addEventListener('click', async ev => {
     a.click();
     URL.revokeObjectURL(a.href);
     const parts = [
-      [data.events, 'Events'], [data.fragments, 'Fragmente'], [data.entities, 'Objekte'],
-      [data.locations, 'Orte'], [data.tracks, 'Routen'], [data.metrics, 'Metriken'],
+      [data.events, t('exp.events', 'Ereignisse')], [data.fragments, t('usr.fragments', 'Fragmente')],
+      [data.entities, t('exp.entities', 'Objekte')], [data.locations, t('exp.places', 'Orte')],
+      [data.tracks, t('exp.tracks', 'Routen')], [data.metrics, t('exp.metrics', 'Metriken')],
     ].filter(([arr]) => arr && arr.length).map(([arr, label]) => `${arr.length} ${label}`);
     const size = blob.size > 1048576 ? `${(blob.size/1048576).toFixed(1)} MB` : `${Math.ceil(blob.size/1024)} kB`;
-    toast(`✓ Export erstellt (${size}):\n${parts.join(', ') || 'keine Daten'}\n→ ${a.download}`, 'ok', 9000);
+    toast(`✓ ${t('exp.done', 'Export erstellt')} (${size}):\n${
+      parts.join(', ') || t('exp.nodata', 'keine Daten')}\n→ ${a.download}`, 'ok', 9000);
   } catch (err) {
     toast(t('toast.exportfail', 'Export fehlgeschlagen: ') + err.message, 'error', 8000);
   } finally {
-    btn.disabled = false; btn.textContent = '📦 Daten exportieren';
+    btn.disabled = false; btn.textContent = `📦 ${t('exp.btn', 'Daten exportieren')}`;
   }
 });
 document.getElementById('btn-import').addEventListener('click', () =>
@@ -7017,7 +7360,7 @@ document.getElementById('import-file').addEventListener('change', async ev => {
     // A11: Import als Job registrieren — verhindert parallele Doppel-Importe
     let job = null;
     try {
-      job = await startJob('data_import', 'Zeilen');
+      job = await startJob('data_import', t('imp.unit', 'Zeilen'));
     } catch (err) {
       toast(err.message, err.status === 409 ? 'warn' : 'error', 9000);
       return;
@@ -7027,7 +7370,8 @@ document.getElementById('import-file').addEventListener('change', async ev => {
       for (const table of TABLES) {
         const rows = payload[table] || [];
         for (let i = 0; i < rows.length; i += IMPORT_CHUNK) {
-          if (big) showProgress(done, total, `📥 Import — ${done.toLocaleString('de-DE')} / ${total.toLocaleString('de-DE')} Zeilen`);
+          if (big) showProgress(done, total, `📥 ${t('imp.title', 'Import')} — ${
+            done.toLocaleString(LOC())} / ${total.toLocaleString(LOC())} ${t('imp.unit', 'Zeilen')}`);
           const r = await api('/api/data/import', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ format: payload.format, version: payload.version,
@@ -7043,13 +7387,14 @@ document.getElementById('import-file').addEventListener('change', async ev => {
       jobFinish(job, 'error', err.message);
       throw err;  // äußerer Catch zeigt den Fehler-Toast
     }
-    jobFinish(job, 'done', `${imported} Zeilen neu, ${skipped} vorhanden`);
-    toast(`✓ Import fertig: ${imported} Zeilen neu, ${skipped} bereits vorhanden.`);
+    const summary = `${imported} ${t('imp.rows', 'Zeilen neu')}, ${skipped} ${t('imp.known', 'vorhanden')}`;
+    jobFinish(job, 'done', summary);
+    toast(`✓ ${t('imp.done', 'Import fertig:')} ${summary}`);
     await refreshAll();
   } catch (err) {
     toast(t('toast.importfail', 'Import fehlgeschlagen: ') + err.message, 'error', 8000);
   } finally {
-    btn.disabled = false; btn.textContent = '📥 Daten importieren';
+    btn.disabled = false; btn.textContent = `📥 ${t('imp.btn', 'Daten importieren')}`;
     showLoading(false);
     ev.target.value = '';
   }
@@ -7079,14 +7424,14 @@ document.getElementById('timeline-file').addEventListener('change', async ev => 
   const file = ev.target.files[0];
   if (!file) return;
   const btn = document.getElementById('btn-timeline-import');
-  btn.disabled = true; btn.textContent = '… importiere';
-  showLoading('🛰️ Timeline wird importiert…');
+  btn.disabled = true; btn.textContent = t('imp.running', '… importiere');
+  showLoading(`🛰️ ${t('tlimp.loading', 'Timeline wird importiert…')}`);
   try {
     const payload = JSON.parse(await file.text());
     const key = payload.semanticSegments ? 'semanticSegments'
               : (payload.timelineObjects ? 'timelineObjects' : null);
     if (!key) {
-      toast('Kein Google-Timeline-Export: Datei enthält weder "semanticSegments" (Geräte-Export) noch "timelineObjects" (Takeout).', 'error', 8000);
+      toast(t('tlimp.badfile', 'Kein Google-Timeline-Export: Datei enthält weder "semanticSegments" (Geräte-Export) noch "timelineObjects" (Takeout).'), 'error', 8000);
       return;
     }
     const segs = payload[key] || [];
@@ -7096,7 +7441,7 @@ document.getElementById('timeline-file').addEventListener('change', async ev => 
     // A11: Import als Job registrieren — verhindert parallele Doppel-Importe
     let job = null;
     try {
-      job = await startJob('timeline_import', 'Segmente');
+      job = await startJob('timeline_import', t('tlimp.unit', 'Segmente'));
     } catch (err) {
       toast(err.message, err.status === 409 ? 'warn' : 'error', 9000);
       return;
@@ -7108,7 +7453,8 @@ document.getElementById('timeline-file').addEventListener('change', async ev => 
       for (const chunk of chunks) {
         if (chunks.length > 1) {
           showProgress(done, segs.length,
-            `🛰️ Timeline-Import — ${done.toLocaleString('de-DE')} / ${segs.length.toLocaleString('de-DE')} Segmente`);
+            `🛰️ ${t('tlimp.title', 'Timeline-Import')} — ${done.toLocaleString(LOC())} / ${
+              segs.length.toLocaleString(LOC())} ${t('tlimp.unit', 'Segmente')}`);
         }
         // Bei Etappen kein Auto-Geocoding pro Etappe (Nominatim: 1 Anfrage/s) —
         // dafür gibt es nach dem Import den Button „Ortsnamen auflösen".
@@ -7133,20 +7479,29 @@ document.getElementById('timeline-file').addEventListener('change', async ev => 
       jobFinish(job, 'error', err.message);
       throw err;  // äußerer Catch zeigt den Fehler-Toast
     }
-    jobFinish(job, 'done', `${sum.visits} Besuche, ${sum.tracks} Routen, ${sum.dupes} Dubletten`);
-    const range = sum.min ? `\nZeitraum: ${sum.min.slice(0,10)} bis ${sum.max.slice(0,10)}` : '';
-    const lowprob = sum.lowprob ? `\n${sum.lowprob} Besuche unter ${Math.round(minProb*100)} % Ortssicherheit übersprungen.` : '';
+    jobFinish(job, 'done', `${sum.visits} ${t('tl.visits', 'Besuche')}, ${sum.tracks} ${
+      t('exp.tracks', 'Routen')}, ${sum.dupes} ${t('tlimp.dupes', 'Dubletten')}`);
+    const range = sum.min ? `\n${t('tlimp.range', 'Zeitraum:')} ${sum.min.slice(0,10)} ${
+      t('to', 'bis')} ${sum.max.slice(0,10)}` : '';
+    const lowprob = sum.lowprob
+      ? `\n${t('tlimp.lowprob', '{n} Besuche unter {p} % Ortssicherheit übersprungen.')
+          .replace('{n}', sum.lowprob).replace('{p}', Math.round(minProb*100))}` : '';
     const names = sum.unnamed
-      ? `\n\n📍 ${sum.unnamed} Orte haben noch keinen echten Namen — unten „Ortsnamen auflösen" ausführen.`
-      : (sum.resolved ? `\n${sum.resolved} Ortsnamen direkt aufgelöst.` : '');
-    toast(`✓ Timeline-Import fertig:\n${sum.visits} Besuche als Events, ${sum.tracks} Routen (Tracks).`
-      + `\n${sum.dupes} Dubletten übersprungen.${lowprob}${range}${names}`, 'ok', 12000);
+      ? `\n\n📍 ${t('tlimp.unnamed', '{n} Orte haben noch keinen echten Namen — unten „Ortsnamen auflösen" ausführen.')
+          .replace('{n}', sum.unnamed)}`
+      : (sum.resolved
+          ? `\n${t('tlimp.resolved', '{n} Ortsnamen direkt aufgelöst.').replace('{n}', sum.resolved)}` : '');
+    toast(`✓ ${t('tlimp.done', 'Timeline-Import fertig:')}\n`
+      + t('tlimp.summary', '{v} Besuche als Ereignisse, {t} Routen.')
+          .replace('{v}', sum.visits).replace('{t}', sum.tracks)
+      + `\n${t('tlimp.skipped', '{n} Dubletten übersprungen.').replace('{n}', sum.dupes)}`
+      + `${lowprob}${range}${names}`, 'ok', 12000);
     trackCache.clear();
     await refreshAll();
   } catch (err) {
     toast(t('toast.tlimportfail', 'Timeline-Import fehlgeschlagen: ') + err.message, 'error', 8000);
   } finally {
-    btn.disabled = false; btn.textContent = '🛰️ Google Timeline importieren';
+    btn.disabled = false; btn.textContent = `🛰️ ${t('tlimp.btn', 'Google Timeline importieren')}`;
     showLoading(false);
     ev.target.value = '';
   }
@@ -7266,9 +7621,17 @@ async function loadPlaceFormat() {
   }
   if (s) {
     step('Ortsnamen-Format', () => {
-      const parts = Array.isArray(s.place_name_parts) ? s.place_name_parts : [];
+      // Anmerkung 114: Wer nie etwas gewählt hat, hat kein `place_name_parts`
+      // — und der Server liest das seit jeher als „alle Bausteine"
+      // (`sanitize_parts`: leere Auswahl -> alle). Die Oberfläche machte
+      // daraus vier leere Kästchen und behauptete damit das Gegenteil dessen,
+      // was tatsächlich galt. Wer dann einen Haken setzte, um „Straße" zu
+      // aktivieren, SCHALTETE DAMIT DIE ANDEREN DREI AB. Eine Voreinstellung
+      // muss an beiden Enden dieselbe sein, sonst ist die Anzeige eine Falle.
+      const parts = Array.isArray(s.place_name_parts) && s.place_name_parts.length
+        ? s.place_name_parts : null;
       document.querySelectorAll('#fmt-parts [data-part]').forEach(cb =>
-        cb.checked = parts.includes(cb.dataset.part));
+        cb.checked = parts ? parts.includes(cb.dataset.part) : true);
     });
     // A15: Tracking-Auswahl in der Verwaltung
     step('Tracking-Auswahl', () => {
@@ -7636,7 +7999,7 @@ document.getElementById('track-save').addEventListener('click', async () => {
     .map(c => c.dataset.track);
   try {
     await saveTracked(keys);
-    toast('✓ Los geht\'s — die Auswahl ist jederzeit unter Verwaltung änderbar.');
+    toast(t('track.saved', '✓ Los geht\'s — die Auswahl ist jederzeit unter Verwaltung änderbar.'));
   } catch (err) {
     toast(t('toast.savefail', 'Speichern fehlgeschlagen: ') + err.message, 'error');
   }
@@ -7647,7 +8010,7 @@ document.querySelectorAll('#fmt-parts [data-part]').forEach(cb =>
     const parts = [...document.querySelectorAll('#fmt-parts [data-part]:checked')].map(c => c.dataset.part);
     if (!parts.length) {
       cb.checked = true;
-      toast('Mindestens ein Baustein muss gewählt bleiben.', 'warn');
+      toast(t('fmt.min', 'Mindestens ein Baustein muss gewählt bleiben.'), 'warn');
       return;
     }
     try {
@@ -7655,7 +8018,7 @@ document.querySelectorAll('#fmt-parts [data-part]').forEach(cb =>
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ place_name_parts: parts }),
       });
-      toast('✓ Ortsnamen-Format gespeichert — gilt für alle neuen Auflösungen.');
+      toast(t('fmt.saved', '✓ Ortsnamen-Format gespeichert — gilt für alle neuen Auflösungen.'));
     } catch (err) {
       toast(t('toast.savefail', 'Speichern fehlgeschlagen: ') + err.message, 'error');
       loadPlaceFormat();
@@ -7663,13 +8026,22 @@ document.querySelectorAll('#fmt-parts [data-part]').forEach(cb =>
   }));
 // Alle Daten löschen — mit doppelter Sicherheitsabfrage
 document.getElementById('btn-wipe').addEventListener('click', async e => {
-  if (!(await uiConfirm('Fragmente, Events, Entities, Orte, Wetter, Embeddings — alles wird unwiderruflich entfernt.',
-    { title: '⚠️ Wirklich ALLE Daten löschen?', okLabel: 'Weiter …', danger: true }))) return;
-  const typed = await uiPrompt('Zur Bestätigung bitte LÖSCHEN eingeben:',
-    { title: 'Letzte Sicherheitsabfrage', okLabel: '🗑️ Endgültig löschen', danger: true, placeholder: 'LÖSCHEN' });
-  if (typed !== 'LÖSCHEN') { toast('Abgebrochen — es wurde nichts gelöscht.', 'warn'); return; }
+  if (!(await uiConfirm(t('wipe.text',
+      'Fragmente, Ereignisse, Objekte, Orte, Wetter, Embeddings — alles wird unwiderruflich entfernt.'),
+    { title: `⚠️ ${t('wipe.title', 'Wirklich ALLE Daten löschen?')}`,
+      okLabel: t('next', 'Weiter …'), danger: true }))) return;
+  // Das Losungswort gehört in den Katalog: eine englische Oberfläche, die
+  // „LÖSCHEN" mit Umlaut verlangt, ist auf einer englischen Tastatur eine
+  // Sackgasse — und der Weg dahin ist bewusst der letzte vor dem Datenverlust.
+  const word = t('wipe.word', 'LÖSCHEN');
+  const typed = await uiPrompt(
+    t('wipe.ask', 'Zur Bestätigung bitte {w} eingeben:').replace('{w}', word),
+    { title: t('wipe.last', 'Letzte Sicherheitsabfrage'),
+      okLabel: `🗑️ ${t('delete.final', 'Endgültig löschen')}`, danger: true, placeholder: word });
+  if (typed !== word) { toast(t('wipe.cancelled', 'Abgebrochen — es wurde nichts gelöscht.'), 'warn'); return; }
   await runAdmin(e.target, () => api('/api/admin/wipe-data', { method: 'POST' }),
-    r => `Alle Daten gelöscht (${r.total} Zeilen). Die Datenbank ist leer.`);
+    r => t('wipe.done', 'Alle Daten gelöscht ({n} Zeilen). Die Datenbank ist leer.')
+      .replace('{n}', r.total));
 });
 
 // Globale Suche -> hybrider Such-Endpoint, Ergebnis im Zeitstrahl

@@ -47,6 +47,31 @@ def test_name_defect_prefers_unnamed_over_others():
     assert _name_defect("Ort (1, 2), x, y, z", PARTS) == "unnamed"
 
 
+def test_name_defect_old_label_is_a_cut_not_a_lookup():
+    """Anmerkung 114: „Zuhause — Adresse" hat keinen Mangel, den ein Geocoder
+    beheben könnte — nur ein Präfix zu viel. Eigene Klasse, damit der Lauf sie
+    ohne Abruf erledigen kann."""
+    assert _name_defect("Zuhause — Musterstraße 1, Hamburg, Deutschland",
+                        PARTS) == "labeled"
+    assert _name_defect("Arbeit", PARTS) == "unnamed"
+
+
+def test_named_place_with_poi_is_not_forever_verbose():
+    """Anmerkung 114: `short_name` stellt den Eigennamen eines POI VOR die
+    Bausteine — der Name hat damit ein Komma mehr, als das Format zulässt.
+    Nach reinem Komma-Zählen galt jeder benannte Ort für immer als zu lang,
+    wurde bei jedem Lauf neu geocodet, kam unverändert zurück und blieb in der
+    offenen Menge: die Endlos-Abruf-Falle zum fünften Mal (F12/A39/A42/P2.1).
+    Mit den gespeicherten Bausteinen ist es keine Schätzung mehr."""
+    addr = {"road": "Kaiserstraße", "house_number": "1", "city": "Detmold",
+            "country": "Deutschland", "poi": "Café Central"}
+    name = "Café Central, Kaiserstraße 1, Detmold, Deutschland"
+    assert name.count(",") > len(PARTS) - 1        # das Komma-Zählen irrt sich
+    assert _name_defect(name, PARTS, addr) is None  # die Rechnung nicht
+    # Und ein Name, der wirklich nicht zum Format passt, fällt weiter auf
+    assert _name_defect("Kaiserstraße 1, Detmold", PARTS, addr) == "verbose"
+
+
 def test_candidates_are_deduplicated_and_unnamed_first(db, user):
     """Der Kern von A28: ein Ort mit mehreren Mängeln steht genau EINMAL in
     der Liste — vorher wurde er pro Scope-Lauf erneut geocodiert.

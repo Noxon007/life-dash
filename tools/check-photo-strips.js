@@ -91,7 +91,37 @@ setTimeout(() => {
        `"${label.trim()}" — eine Auswahl, die sich nicht als solche zeigt, behauptet Vollständigkeit`);
   }
 
-  // --- 4. Der Betrachter zeigt die Bilder DIESER Leiste ------------------- //
+  // --- 4. Die Leiste steht OBEN, nicht unten ----------------------------- //
+  // Anmerkung 114: Eine Zeitgruppe zeigt nur die ersten TL_GROUP_CAP Zeilen,
+  // der Rest liegt hinter „x weitere anzeigen“. Angehängt verschwand die
+  // Fotoleiste damit an genau den Tagen hinter dem Knopf, an denen viel los
+  // war — und das sind die Tage, an denen fotografiert wurde. Geprüft wird
+  // deshalb die POSITION, mit mehr Einträgen als der Deckel zulässt.
+  const rowsOf = zoom => {
+    w.eval(`
+      TL_DAY_MEDIA.clear();
+      TL_DAY_MEDIA.set('2024-05-06', ${JSON.stringify(media['2024-05-06'])});
+      tl.events = ${JSON.stringify(
+        Array.from({ length: 40 }, (_, i) => ({
+          id: 'v' + i, title: 'Eintrag ' + i, category: 'event', confidence: 1,
+          date_start: '2024-05-06T1' + (i % 10) + ':00:00', date_precision: 'exact',
+          confirmed: 'confirmed', source: 'manual', entities: [], metrics: [], media: [],
+        })))};
+      tl.zoom = ${JSON.stringify(zoom)};
+      tl.catFilter = new Set(FILTER_CATS_BASE.concat(['event']));
+      tl.query = ''; tl.done = true;
+      renderTimelineList();`);
+    return [...d.querySelectorAll('.tl-year > *')];
+  };
+  ['day', 'week', 'month'].forEach(zoom => {
+    const rows = rowsOf(zoom);
+    const at = rows.findIndex(r => r.hasAttribute('data-day-media'));
+    ok(`${zoom}: Fotoleiste steht am Kopf der Gruppe`, at === 1,
+       at < 0 ? 'gar nicht sichtbar — hinter „weitere anzeigen“ gerutscht'
+              : `Position ${at} von ${rows.length} (1 = direkt unter der Überschrift)`);
+  });
+
+  // --- 5. Der Betrachter zeigt die Bilder DIESER Leiste ------------------- //
   // Der Fehler, der beim Bauen entstand: die Bilder über das Datum
   // nachzuschlagen ergab bei einer Wochenleiste den Satz des ersten Tages.
   render('week');

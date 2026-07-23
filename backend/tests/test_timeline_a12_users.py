@@ -59,16 +59,28 @@ SHORT = "Musterstraße 1, Mantouki, Detmold, Deutschland"
 # A12 — Import: semantische Orte & min_probability
 # --------------------------------------------------------------------------- #
 def test_import_semantic_visit(db, user):
+    """Anmerkung 114: Googles semanticType wird zum TYP des Ortes, nicht zu
+    seinem Namen. „Zuhause" ist die Beschreibung, wie Google den Aufenthalt
+    erkannt hat — der Ort selbst heißt so wenig „Zuhause" wie „Gesuchte
+    Adresse" (A19). Der Ort bleibt also unbenannt und wartet auf seine
+    Adresse; die Tatsache steckt in `type`."""
     result = import_timeline(_device_payload(), auto_resolve=False, db=db, user=user)
     assert result.visits_created == 1
-    # Semantisches Label zählt als "noch unaufgelöst" (A12)
     assert result.locations_unnamed == 1
     loc = db.query(Location).one()
-    assert loc.name == "Zuhause"
+    assert loc.name == "Ort (51.9400, 8.8700)"
     assert loc.type == "home"
     ev = db.query(Event).one()
-    assert ev.title == "Besuch: Zuhause"
+    assert ev.title == "Besuch: Ort (51.9400, 8.8700)"
     assert ev.confirmed == ConfirmState.confirmed
+
+
+def test_import_work_type(db, user):
+    """Derselbe Weg für „Arbeit" — der Typ kommt aus semanticType, nicht mehr
+    aus einem Namensvergleich (der nur `home` kannte)."""
+    import_timeline(_device_payload(semantic="INFERRED_WORK"), auto_resolve=False,
+                    db=db, user=user)
+    assert db.query(Location).one().type == "work"
 
 
 def test_import_min_probability_filters(db, user):
@@ -88,18 +100,39 @@ def test_import_min_probability_keeps_confident(db, user):
 
 
 # --------------------------------------------------------------------------- #
-# A12 — Auflösung: Label bleibt Präfix, Typ bleibt, Overrides geschützt
+# A12 — Auflösung: reine Adresse, Typ bleibt, Overrides geschützt
 # --------------------------------------------------------------------------- #
-def test_resolve_semantic_keeps_label_prefix(db, user, fake_reverse):
+def test_resolve_semantic_gives_plain_address(db, user, fake_reverse):
     import_timeline(_device_payload(), auto_resolve=False, db=db, user=user)
     result = resolve_place_names(limit=10, scope="unnamed", db=db, user=user)
     assert result.resolved == 1 and result.remaining == 0
 
     loc = db.query(Location).one()
-    assert loc.name == f"Zuhause — {SHORT}"
+    assert loc.name == SHORT          # kein „Zuhause — " davor (Anm. 114)
     assert loc.type == "home"  # Typ wird vom Geocoder NICHT überschrieben
     ev = db.query(Event).one()
-    assert ev.title == f"Besuch: Zuhause — {SHORT}"
+    assert ev.title == f"Besuch: {SHORT}"
+
+
+def test_resolve_strips_old_label_without_network(db, user, monkeypatch):
+    """Bestandsdaten: „Zuhause — Adresse" aus früheren Importen wird zur reinen
+    Adresse — und zwar OHNE Abruf. Ein Geocoder-Aufruf dafür wären 1,2 s für
+    eine Zeichenkette, die schon dasteht."""
+    monkeypatch.setattr(tracks_router, "NOMINATIM_DELAY_S", 0)
+    monkeypatch.setattr(tracks_router.geocode_svc, "reverse_geocode",
+                        lambda *a, **k: pytest.fail("kein Abruf erwartet"))
+    loc = Location(user_id=user.id, name=f"Zuhause — {SHORT}", lat=51.94,
+                   lng=8.87, type="home")
+    db.add(loc)
+    db.flush()
+    db.add(Event(user_id=user.id, title=f"Besuch: Zuhause — {SHORT}",
+                 category="event", location_id=loc.id))
+    db.commit()
+
+    result = resolve_place_names(limit=10, db=db, user=user)
+    assert result.resolved == 1
+    assert db.query(Location).one().name == SHORT
+    assert db.query(Event).one().title == f"Besuch: {SHORT}"
 
 
 def test_resolve_is_idempotent(db, user, fake_reverse):
@@ -189,8 +222,8 @@ def test_resolve_respects_user_parts(db, user, fake_reverse):
 
     resolve_place_names(limit=10, scope="unnamed", db=db, user=user)
     loc = db.query(Location).one()
-    assert loc.name == "Zuhause — Musterstraße 1, Detmold"
-    assert db.query(Event).one().title == "Besuch: Zuhause — Musterstraße 1, Detmold"
+    assert loc.name == "Musterstraße 1, Detmold"
+    assert db.query(Event).one().title == "Besuch: Musterstraße 1, Detmold"
 
 
 def test_verbose_scope_reformats_existing_addresses(db, user, fake_reverse):

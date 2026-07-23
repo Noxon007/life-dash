@@ -189,6 +189,32 @@ def short_name(hit: dict | None, parts: list[str] | None = None) -> str:
     return ", ".join(s.strip() for s in name.split(",")[:2])
 
 
+def raw_address(hit: dict | None) -> dict | None:
+    """Die ROHEN Bausteine eines Treffers zum Aufbewahren (Location.address).
+
+    Anmerkung 110: `name` ist eine Zusammenfassung; wer später ein anderes
+    Format wählt, will dieselben Daten anders geschrieben — und musste dafür
+    bis 0.37 jeden Ort erneut abfragen (1,2 s je Ort). Der Eigenname eines POI
+    („Café Central") steht NICHT in den Adress-Bausteinen, `short_name` stellt
+    ihn aber voran; ohne ihn verlöre das Umformatieren genau die Information,
+    die den Namen ausmacht. Nominatims Bausteine kennen keinen Schlüssel `poi`,
+    die Ablage daneben kollidiert also mit nichts.
+
+    Anmerkung 114: Bewusst hier und nicht beim Aufrufer. Die Regel stand bis
+    0.38 nur im Timeline-Import — die beiden anderen Wege, auf denen ein Ort
+    entsteht (Gerätestandort F2, KI-Auflösung), warfen die Bausteine weg. Ihre
+    Orte konnten danach nur noch über das Netz umformatiert werden, und der
+    A28-Lauf musste sie über Kommas SCHÄTZEN statt zu rechnen.
+    """
+    addr = (hit or {}).get("address")
+    if not addr:
+        return None
+    raw = dict(addr)
+    if (hit or {}).get("poi"):
+        raw["poi"] = hit["poi"]
+    return raw
+
+
 def _prefer_latin(display_name: str, namedetails: dict | None,
                   lang: str | None = None) -> str:
     """Ersetzt einen fremdschriftlichen Hauptnamen (erstes Adress-Segment)

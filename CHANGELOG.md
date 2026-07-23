@@ -15,6 +15,62 @@ any `MINOR`.
 
 ## [Unreleased]
 
+### Added
+- **Six new weather records.** Strongest sun (UV index), strongest gust, hottest
+  and coldest day by *feel* rather than by thermometer, and the longest and
+  shortest day by daylight hours. All six are calculated from values that every
+  weather lookup has been fetching since 0.22 — same request, no extra traffic;
+  they simply had nowhere to go except a single entry's detail view. Entries
+  enriched before 0.22 do not carry them, and the tiles say so instead of
+  showing a zero. A polar night with no daylight at all counts as the shortest
+  day, because that is a measurement; a day without rain still does not count as
+  the wettest.
+
+### Changed
+- **Imported places no longer get called “Home” or “Work”.** Google describes
+  *how* it recognised a stay — that is not the name of the place, and it ended
+  up in the visit title, on the map and in the collection. The place is now
+  named after its address, and the fact itself is kept where it belongs: the
+  place's type. Existing entries such as “Home — Example Street 1” lose the
+  prefix on the next place-name run, and that costs nothing — it is a cut, not
+  a lookup.
+- **The whole interface now switches language.** Roughly two hundred texts were
+  built in the page itself and were therefore out of reach of the translation:
+  the moderation queue, bulk confirmation, user management, the database view,
+  the jobs table, achievements, the world checklist, import and export, months,
+  seasons and the timeline cards. Numbers and dates follow the chosen language
+  too — “1,703” and “1.703” are the same number in two languages, and reading
+  the wrong one is worse than reading no translation. Switching the language
+  now also redraws “Today” and the map, which stayed behind before.
+- Speech input dictates in the language the app is set to, instead of always
+  German.
+
+### Fixed
+- **The map was invisible on phones.** A frame added for the map's own “points
+  are hidden” notice collapsed to zero height in the mobile layout — the exact
+  same failure the map had years ago, one level higher up. A check now watches
+  the whole chain between the layout and the map, not just the one frame that
+  caused it.
+- **Photos of a day sat at the bottom of it.** A time group only shows its first
+  entries and hides the rest behind “show N more” — so on busy days the photo
+  strip disappeared behind that button, and busy days are exactly the days one
+  takes photos. The strip now leads its day (and its week or month), above the
+  diary entry and the entries.
+- **The place-name format showed nothing selected.** Anyone who had never
+  changed it saw four empty boxes, although the server was using all four
+  building blocks — and ticking one to “switch it on” silently switched the
+  other three off. The boxes now show what actually applies.
+- **Named places counted as “too long” forever.** A place with a name of its own
+  (“Café Central, …”) has one part more than the format allows, so every
+  place-name run looked it up again, got the same answer back and left it in the
+  open pile. Where the raw address parts are stored, the run now compares
+  instead of counting.
+- Places created from a device location or from an AI-analysed entry keep their
+  raw address parts as well. Reformatting them no longer needs the network — the
+  same thing imported places have been doing since 0.38 — and the fallback for a
+  failed lookup is no longer the full administrative address chain including the
+  postcode.
+
 ## [0.38.0] – 2026-07-22
 
 ### Added

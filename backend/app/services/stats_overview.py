@@ -35,7 +35,35 @@ _BIRTH_WORDS = ("geburt", "geboren", "birth")
 # Nur diese Wetterwerte gehen in Kacheln und Diagramme ein. Die Metrik-Abfrage
 # auf sie einzuschränken halbiert die Zeilen (16 Schlüssel je Ereignis).
 _WX_KEYS = ("temperature_c", "temp_max_c", "temp_min_c", "sunshine_h",
-            "rain_mm", "wind_max_kmh", "snow_cm")
+            "rain_mm", "wind_max_kmh", "snow_cm",
+            # Anmerkung 114: F12 holt diese Werte seit 0.22 bei JEDER
+            # Anreicherung mit — aus demselben Aufruf, ohne Zusatzkosten. Sie
+            # standen bisher nur in der Detailansicht eines einzelnen
+            # Ereignisses. Gespeicherte Daten, die nirgends zusammengefasst
+            # werden, sind Ballast; ein Rekord ist der Sinn eines Extremwerts.
+            "uv_max", "gust_max_kmh", "apparent_temp_max_c",
+            "apparent_temp_min_c", "daylight_h")
+
+# Extremwert-Kacheln: Name -> (Metrik-Schlüssel …, Richtung, nur echte Werte?)
+# „nur echte Werte" heißt: 0 zählt nicht als Rekord. Bei Regen und Schnee ist
+# das richtig (der trockenste Tag ist kein „nassester Tag"), bei Tageslicht
+# wäre es falsch — die Polarnacht mit 0 h IST der kürzeste Tag, und zwar der
+# interessanteste Wert der ganzen Kachel.
+_EXTREMES: tuple[tuple[str, tuple[str, ...], str, bool], ...] = (
+    ("hot", ("temp_max_c", "temperature_c"), "max", False),
+    ("cold", ("temp_min_c", "temperature_c"), "min", False),
+    ("sunny", ("sunshine_h",), "max", True),
+    ("rainy", ("rain_mm",), "max", True),
+    ("windy", ("wind_max_kmh",), "max", True),
+    ("snowy", ("snow_cm",), "max", True),
+    # --- neu (F12-Werte, Anmerkung 114) ---
+    ("uv", ("uv_max",), "max", True),
+    ("gust", ("gust_max_kmh",), "max", True),
+    ("felt_hot", ("apparent_temp_max_c",), "max", False),
+    ("felt_cold", ("apparent_temp_min_c",), "min", False),
+    ("longest_day", ("daylight_h",), "max", True),
+    ("shortest_day", ("daylight_h",), "min", False),
+)
 
 TOP_N = 8
 
@@ -217,23 +245,19 @@ def _weather_stats(db: Session, user_id: str) -> dict:
                 "place": _short_place(e.name)}
 
     # --- Extreme: je Ereignis, nicht je Tag (die heißeste Stunde zählt) ---
+    # Anmerkung 114: Eine Schleife über eine Tabelle statt zwölf Blöcke. Die
+    # ersten sechs Kacheln standen als zwei getrennte Fassungen desselben
+    # Gedankens da; mit sechs weiteren wäre daraus dieselbe stille Doppelregel
+    # geworden, an der schon Anmerkung 106 hing.
     extremes: dict[str, dict | None] = {}
-    hot = cold = None
-    for eid in values:
-        hi = val(eid, "temp_max_c", "temperature_c")
-        if hi is not None and (hot is None or hi > hot[1]):
-            hot = (eid, hi)
-        lo = val(eid, "temp_min_c", "temperature_c")
-        if lo is not None and (cold is None or lo < cold[1]):
-            cold = (eid, lo)
-    extremes["hot"] = card(*hot) if hot else None
-    extremes["cold"] = card(*cold) if cold else None
-    for name, key in (("sunny", "sunshine_h"), ("rainy", "rain_mm"),
-                      ("windy", "wind_max_kmh"), ("snowy", "snow_cm")):
+    for name, keys, direction, positive_only in _EXTREMES:
+        better = (lambda a, b: a > b) if direction == "max" else (lambda a, b: a < b)
         best = None
         for eid in values:
-            v = val(eid, key)
-            if v is not None and v > 0 and (best is None or v > best[1]):
+            v = val(eid, *keys)
+            if v is None or (positive_only and v <= 0):
+                continue
+            if best is None or better(v, best[1]):
                 best = (eid, v)
         extremes[name] = card(*best) if best else None
 
@@ -287,7 +311,7 @@ def _weather_stats(db: Session, user_id: str) -> dict:
 
 def _empty_weather() -> dict:
     return {
-        "extremes": {k: None for k in ("hot", "cold", "sunny", "rainy", "windy", "snowy")},
+        "extremes": {name: None for name, *_ in _EXTREMES},
         "weather": {"days": 0, "sun_hours": 0, "rain_days": 0, "rain_share": 0,
                     "warmest_trip": None, "rain_days_per_year": []},
     }

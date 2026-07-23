@@ -108,8 +108,11 @@ setTimeout(() => {
   if (droppedOff) {
     ok('…und sagt es AUF DER KARTE', noteVisible(),
        'genau die Stille, die den Bericht ausgelöst hat');
-    ok('…mit beiden Zahlen', /1\.?703/.test(note().textContent)
-       && /2\.?003/.test(note().textContent), note().textContent);
+    // Der Tausendertrenner hängt seit Anmerkung 114 an der Sprache (LOC()):
+    // „1.703" auf Deutsch, „1,703" auf Englisch. Beides ist dieselbe Zahl —
+    // die Prüfung gilt der ZAHL, nicht dem Punkt.
+    ok('…mit beiden Zahlen', /1[.,]?703/.test(note().textContent)
+       && /2[.,]?003/.test(note().textContent), note().textContent);
     ok('…und mit dem Weg hinaus', !!d.getElementById('mp-cap-fix'),
        'ein Hinweis ohne Ausweg ist eine Entschuldigung');
   }

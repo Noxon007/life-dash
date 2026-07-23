@@ -34,6 +34,28 @@ check('Höhendeckel in dvh statt vh', vhHits.length === 0, `noch vh: ${vhHits.jo
 const mediaBlocks = (html.match(/@media \(max-width: 860px\)/g) || []).length;
 check('Mobilblock existiert', mediaBlocks >= 1, 'kein 860px-Block gefunden');
 
+// Anmerkung 114: Die Karte war zum zweiten Mal unsichtbar, aus demselben
+// Grund wie in Anmerkung 34 — nur eine Ebene höher. `.map-layout` wird auf dem
+// Handy zur Spalte; jedes `flex: 1` DARIN bekommt damit `flex-basis: 0` in der
+// HÖHE und fällt auf null zusammen. Die Höhe steht am #map, also muss jede
+// Hülle dazwischen im Mobilblock aus dem Flex-Wachstum genommen werden.
+// Geprüft wird die KETTE, nicht der eine bekannte Fall: die nächste Hülle
+// (ein Rahmen für den nächsten Hinweis) brächte den Defekt sonst zum dritten
+// Mal zurück, und ein Wächter, der nur seinen Auslöser kennt, ist einer für
+// die Vergangenheit.
+{
+  const mobile = html.slice(html.lastIndexOf('@media (max-width: 860px)'));
+  const layout = html.match(/<div class="map-layout">([\s\S]*?)<div id="map">/);
+  // Alles, was zwischen .map-layout und #map noch aufgemacht wird
+  const wrappers = layout
+    ? [...new Set([...layout[1].matchAll(/<div class="([\w-]+)"/g)].map(m => m[1]))]
+    : ['KETTE NICHT GEFUNDEN'];
+  const missing = wrappers.filter(cls =>
+    !new RegExp(`\\.map-layout\\s+\\.${cls}\\s*\\{[^}]*flex:\\s*0 0 auto`).test(mobile));
+  check('Karten-Hüllen wachsen mobil nicht mit', missing.length === 0,
+        `ohne „flex: 0 0 auto“ im Mobilblock: ${missing.join(', ')} (Anm. 114)`);
+}
+
 // ---- Teil 2: im geladenen DOM ----------------------------------------------
 const errors = [];
 const dom = new JSDOM(html, {

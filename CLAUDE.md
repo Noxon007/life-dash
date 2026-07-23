@@ -160,6 +160,34 @@ zweite Stufe, die ältere Hälfte mit den Regeln der neueren lesen** — beide
 Befunde saßen dort, wo die Annahme des einen Teils auf die des anderen trifft,
 und genau dort greift kein Test von selbst.
 
+**Feedback-Runde nach 0.38.0 (Anmerkung 114) — sechs Punkte, drei davon ein
+zweites Mal derselbe Defekt.** Liegt auf `main`, **ohne Versionssprung**
+(Anm. 89: eigene Version nur bei Schema-Folge UND Beschwerde — hier gibt es
+kein neues Feld). **(a)** Karte auf dem Handy unsichtbar: Anmerkung 34 eine
+Ebene höher — der Rahmen für den Kartenhinweis (Anm. 110) trug `flex: 1`,
+und in Spaltenrichtung heißt das `flex-basis: 0` in der HÖHE. **Ein Wächter,
+der nur seinen Auslöser kennt, ist einer für die Vergangenheit** —
+`check-a38-mobile.js` prüft jetzt die ganze Kette zwischen `.map-layout` und
+`#map`. **(b)** Fotoleisten standen am ENDE ihrer Gruppe, also hinter
+„x weitere anzeigen" — an genau den Tagen, an denen fotografiert wurde. Der
+Kommentar darüber sagte „oben"; der Code hängte an. **(c)** „Zuhause"/
+„Arbeit" sind keine Ortsnamen (A19 hatte das für „Gesuchte Adresse" schon
+entschieden): der `semanticType` geht jetzt in `Location.type` — **und ein
+Typ, der an einem Anzeigetext hängt, verschwindet mit ihm**. **(d)**
+Endlos-Abruf-Falle, fünfte Auflage: `_name_defect` zählte Kommas, aber
+`short_name` stellt den POI-Eigennamen VORAN — jeder benannte Ort galt ewig
+als „zu lang". Mit `Location.address` ist es eine Rechnung statt einer
+Schätzung. **(e)** Die Bausteine-Auswahl zeigte vier leere Kästchen und
+meinte alle vier (`sanitize_parts`): **eine Voreinstellung muss an beiden
+Enden dieselbe sein**. **(f)** ~200 im JS gebaute Texte waren nie
+übersetzbar; `t()` fällt still auf Deutsch zurück, deshalb drei Jahre
+unbemerkt. Neu: `tools/check-i18n-coverage.js` (jeder Schlüssel im Katalog,
+kein verwaister Eintrag, kein deutscher Text IM Katalog) und
+`check-place-format.js`. Zahlen/Daten folgen jetzt `LOC()` statt hart
+`'de-DE'`. Dazu die sechs F12-Wetterrekorde (UV, Böe, gefühlt, Tageslicht) —
+die Werte kommen seit 0.22 mit; **eine Null ist beim Regen kein Rekord, beim
+Tageslicht schon** (Polarnacht = kürzester Tag, vgl. Anm. 104).
+
 **Feedback-Runde 0.38.0 (Anmerkung 110) — zwei teure Befunde, beide Stille.**
 **(a)** Der Bild-Endpunkt hielt seine DB-Verbindung, während er bei Immich auf
 das Foto wartete (15 s Zeitlimit). Hinter HTTP/2 feuert der Browser dutzende
