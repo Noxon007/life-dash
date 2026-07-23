@@ -533,10 +533,11 @@ def _run_photo_points(db: Session, job: Job) -> tuple[str, str]:
 
     job.unit = "Fotos verortet"
     db.commit()
+    report: dict = {}
     try:
         seen, added, changed = pp.scan_year(
             db, user, year, url, key,
-            heartbeat=lambda: _tick(db, job.id, 0, None))
+            heartbeat=lambda: _tick(db, job.id, 0, None), report=report)
     except immich_api.ScanAborted:
         return "stopped", f"{year}: Suche abgebrochen — nichts geändert."
     except immich_api.ImmichError as exc:
@@ -553,8 +554,18 @@ def _run_photo_points(db: Session, job: Job) -> tuple[str, str]:
     _tick(db, job.id, added, 0)
     if not seen:
         return "done", f"{year}: keine Fotos in Immich."
-    return "done", (f"{year}: {seen} Fotos gelesen, {added} neu verortet, "
-                    f"{changed} aktualisiert.")
+    # **Die Meldung muss die Differenz erklären, nicht nur die Summe nennen.**
+    # „2016 gelesen, 17 neu verortet" ließ genau die Frage offen, die man beim
+    # Lesen stellt — und die beiden möglichen Antworten („meine Bibliothek hat
+    # kein GPS" / „der Schlüssel zeigt auf ein fremdes Konto") verlangen völlig
+    # verschiedene Schritte. Dazu „unverändert": ohne die Zahl liest sich ein
+    # zweiter Lauf wie ein gescheiterter erster (Anmerkung 110).
+    msg = (f"{year}: {seen} Fotos gelesen, {added} neu verortet, "
+           f"{changed} aktualisiert, {report.get('unchanged', 0)} unverändert.")
+    reasons = pp.drop_reasons(report)
+    if reasons:
+        msg += " Ohne Punkt: " + ", ".join(reasons) + "."
+    return "done", msg
 
 
 _RUNNERS = {

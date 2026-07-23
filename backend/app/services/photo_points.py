@@ -93,8 +93,38 @@ def _district(geo: tuple[float, float],
     return best
 
 
+# Warum ein Foto KEINEN Punkt bekommen hat — in der Reihenfolge, in der
+# geprüft wird. Gezählt wird der ERSTE Grund, damit die Zahlen sich zur
+# gelesenen Menge addieren statt sie zu überzeichnen: ein fremdes Foto ohne
+# Koordinaten ist ein Ausschluss, nicht zwei.
+DROP_REASONS = {
+    "foreign": "{n} von jemand anderem",
+    "hidden": "{n} nicht im Immich-Zeitstrahl (archiviert, versteckt oder gesperrt)",
+    "no_geo": "{n} ohne Koordinaten",
+    "no_time": "{n} ohne verwertbare Aufnahmezeit",
+    "no_id": "{n} ohne Kennung",
+}
+
+
+def drop_reasons(report: dict) -> list[str]:
+    """Die Ausschlussgründe als lesbare Teilsätze, der größte zuerst.
+
+    **Die Summe allein ist keine Auskunft.** „2016 Fotos gelesen, 17 neu
+    verortet" lässt genau die Frage offen, die man beim Lesen stellt: Warum die
+    anderen 1999? Ob die Bibliothek schlicht kein GPS trägt oder ob der
+    API-Schlüssel auf ein fremdes Konto zeigt, sind zwei völlig verschiedene
+    Lagen — und sie sahen bis hier identisch aus. Das ist der wiederkehrende
+    Defekt dieses Projekts: nicht Kaputtheit, sondern Stille (Anmerkung 110).
+    """
+    dropped = report.get("dropped") or {}
+    out = [(n, DROP_REASONS[key].format(n=n))
+           for key, n in dropped.items() if n and key in DROP_REASONS]
+    out.sort(key=lambda pair: -pair[0])
+    return [text for _n, text in out]
+
+
 def upsert_assets(db: Session, user_id: str, assets: list[dict],
-                  my_id: str | None) -> tuple[int, int]:
+                  my_id: str | None, report: dict | None = None) -> tuple[int, int]:
     """Trägt die verorteten eigenen Fotos ein. Gibt (neu, aktualisiert) zurück.
 
     Dieselben drei Filter wie `immich_source.cluster_assets` — und aus denselben
@@ -106,18 +136,33 @@ def upsert_assets(db: Session, user_id: str, assets: list[dict],
     Idempotent über `asset_id`: ein zweiter Lauf findet dasselbe Foto wieder.
     Aktualisiert wird trotzdem — in Immich lässt sich ein Ort nachtragen, und
     dann ist der alte Punkt schlicht falsch.
+
+    `report` nimmt auf, was dabei liegen blieb — dieselbe Bauform wie bei
+    `immich_source.scan_year`. Die drei Filter sind hier bewusst EINZELN
+    geprüft statt in einem `or`: verodert lässt sich nicht mehr sagen, welcher
+    von ihnen zugeschlagen hat, und genau das ist die Frage.
     """
     districts = district_index(db, user_id)
+    dropped = dict.fromkeys(DROP_REASONS, 0)
     wanted: dict[str, dict] = {}
     for asset in assets:
-        if not api.is_own(asset, my_id) or not api.is_in_timeline(asset):
+        if not api.is_own(asset, my_id):
+            dropped["foreign"] += 1
+            continue
+        if not api.is_in_timeline(asset):
+            dropped["hidden"] += 1
             continue
         geo = api.asset_geo(asset)
+        if geo is None:
+            dropped["no_geo"] += 1
+            continue
         when = api.asset_time(asset)
-        if geo is None or when is None:
+        if when is None:
+            dropped["no_time"] += 1
             continue
         asset_id = asset.get("id")
         if not asset_id:
+            dropped["no_id"] += 1
             continue
         exif = asset.get("exifInfo") or {}
         wanted[asset_id] = {
@@ -127,6 +172,10 @@ def upsert_assets(db: Session, user_id: str, assets: list[dict],
             "state": (exif.get("state") or "").strip() or None,
             "country": api.asset_country(asset),
         }
+    if report is not None:
+        report["dropped"] = dropped
+        report["kept"] = len(wanted)
+        report["unchanged"] = 0
     if not wanted:
         return 0, 0
 
@@ -149,18 +198,33 @@ def upsert_assets(db: Session, user_id: str, assets: list[dict],
             for field, value in values.items():
                 setattr(point, field, value)
             changed += 1
+    if report is not None:
+        # **„Unverändert" ist die Zahl, die dem Lauf gefehlt hat.** Ohne sie
+        # liest sich der zweite Lauf über dasselbe Jahr wie ein gescheiterter
+        # erster: „2016 gelesen, 17 neu" — und die 800 Punkte, die längst da
+        # sind, kommen im Satz nicht vor.
+        report["unchanged"] = len(wanted) - added - changed
     return added, changed
 
 
 def scan_year(db: Session, user, year: int, url: str, key: str,
-              heartbeat=None) -> tuple[int, int, int]:
+              heartbeat=None, report: dict | None = None) -> tuple[int, int, int]:
     """Ein Jahr Immich → Fotopunkte. Gibt (gesehen, neu, aktualisiert) zurück.
 
     Jahresweise wie `immich_source.scan_year`, und aus demselben Grund: eine
     zwanzig Jahre alte Bibliothek in einem Zug ist kein Lauf, sondern ein
     Zeitlimit.
+
+    `report` nimmt die Aufschlüsselung auf (siehe `upsert_assets`). Der
+    Rückgabewert bleibt das Tripel: die Aufschlüsselung ist eine Auskunft über
+    den Lauf, kein Ergebnis von ihm.
     """
+    # Immer aufgeschlüsselt, auch wenn niemand danach fragt: das Protokoll
+    # braucht die Zahlen genauso wie die Oberfläche, und zwei Wege zu einer
+    # Auskunft laufen still auseinander (Anmerkung 106).
+    report = report if report is not None else {}
     my_id = api.own_user_id(url, key)
+    report["own_user_id"] = my_id
     if not my_id:
         # Ohne eigene Kennung ließe sich ein fremdes Foto nicht erkennen —
         # und ein geteiltes Album schriebe Punkte in die eigene Karte, an
@@ -171,9 +235,12 @@ def scan_year(db: Session, user, year: int, url: str, key: str,
     start = datetime(year, 1, 1)
     end = datetime(year, 12, 31, 23, 59, 59)
     assets = api.search_assets_paged(url, key, start, end, heartbeat=heartbeat)
-    added, changed = upsert_assets(db, user.id, assets, my_id)
-    log.info("Fotopunkte %d: %d Fotos gelesen, %d neu, %d aktualisiert",
-             year, len(assets), added, changed)
+    added, changed = upsert_assets(db, user.id, assets, my_id, report=report)
+    report["seen"] = len(assets)
+    log.info("Fotopunkte %d: %d Fotos gelesen, %d neu, %d aktualisiert, "
+             "%d unverändert — ohne Punkt: %s", year, len(assets), added, changed,
+             report.get("unchanged", 0),
+             "; ".join(drop_reasons(report)) or "keins")
     return len(assets), added, changed
 
 

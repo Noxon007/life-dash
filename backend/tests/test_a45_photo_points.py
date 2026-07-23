@@ -167,6 +167,68 @@ def test_the_local_time_decides_the_day(db, user, immich_cfg, fake_api):
 
 
 # --------------------------------------------------------------------------- #
+# Der Lauf sagt, was er weggeworfen hat (Anmerkung 110)
+# --------------------------------------------------------------------------- #
+def test_the_run_names_why_a_photo_got_no_point(db, user, immich_cfg, fake_api):
+    """Gemeldet aus dem Betrieb: „2016 Fotos gelesen, 17 neu verortet" — und
+    kein Wort darüber, woran die anderen 1999 gescheitert sind. Die beiden
+    möglichen Antworten (Bibliothek ohne GPS / Schlüssel auf fremdem Konto)
+    verlangen völlig verschiedene Schritte und sahen bis hier gleich aus."""
+    fake_api["assets"] = [
+        _asset(0),                                   # ein echter Punkt
+        _asset(1, lat=None, lng=None),
+        _asset(2, lat=None, lng=None),
+        _asset(3, owner=OTHER_ID),
+        _asset(4, visibility="archive"),
+    ]
+    report: dict = {}
+    seen, added, changed = pp.scan_year(db, user, YEAR, "u", "k", report=report)
+    db.commit()
+    assert (seen, added, changed) == (5, 1, 0)
+    assert report["dropped"] == {"foreign": 1, "hidden": 1, "no_geo": 2,
+                                 "no_time": 0, "no_id": 0}
+    # Die Zahlen müssen sich zur gelesenen Menge addieren — sonst ist die
+    # Aufschlüsselung selbst wieder eine Schätzung.
+    assert sum(report["dropped"].values()) + report["kept"] == seen
+    text = "; ".join(pp.drop_reasons(report))
+    assert text.startswith("2 ohne Koordinaten")     # der größte zuerst
+    assert "1 von jemand anderem" in text
+    assert "ohne verwertbare Aufnahmezeit" not in text   # keine leeren Gründe
+
+
+def test_a_second_run_reports_what_is_already_there(db, user, immich_cfg, fake_api):
+    """Ohne „unverändert" liest sich der zweite Lauf über dasselbe Jahr wie ein
+    gescheiterter erster: „5 gelesen, 0 neu" — und die fünf Punkte, die längst
+    dastehen, kommen im Satz nicht vor."""
+    fake_api["assets"] = [_asset(i) for i in range(5)]
+    pp.scan_year(db, user, YEAR, "u", "k")
+    db.commit()
+    report: dict = {}
+    pp.scan_year(db, user, YEAR, "u", "k", report=report)
+    db.commit()
+    assert report["unchanged"] == 5
+
+
+def test_the_job_message_carries_the_breakdown(db, user, immich_cfg, fake_api,
+                                               monkeypatch):
+    """Die Aufschlüsselung nützt nur dort, wo hingesehen wird — und das ist die
+    Ergebniszeile des Laufs, nicht das Server-Protokoll."""
+    from app.models import Job
+    from app.routers.jobs import _run_photo_points
+
+    fake_api["assets"] = [_asset(0), _asset(1, lat=None, lng=None)]
+    monkeypatch.setattr("app.routers.jobs._tick", lambda *a, **kw: True)
+    job = Job(user_id=user.id, type="photo_points", params={"year": YEAR})
+    db.add(job)
+    db.commit()
+    state, msg = _run_photo_points(db, job)
+    assert state == "done"
+    assert "2 Fotos gelesen" in msg and "1 neu verortet" in msg
+    assert "0 unverändert" in msg
+    assert "Ohne Punkt: 1 ohne Koordinaten." in msg
+
+
+# --------------------------------------------------------------------------- #
 # „nie nachgesehen" ist nicht „keine Fotos"
 # --------------------------------------------------------------------------- #
 def test_a_scanned_year_is_remembered(db, user, immich_cfg, fake_api):

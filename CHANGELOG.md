@@ -15,6 +15,18 @@ any `MINOR`.
 
 ## [Unreleased]
 
+### Changed
+- **“Locate photos” now says why a picture got no point.** The run reported
+  “2016 photos read, 17 newly located” and left open the one question you ask
+  when reading it: what happened to the other 1999? The two possible answers —
+  “my library simply carries no GPS” and “the API key points at somebody else’s
+  account” — call for completely different steps, and until now they looked
+  identical. The result line breaks the difference down (“without a point: 1950
+  without coordinates, 40 belonging to someone else, 9 not in the Immich
+  timeline”) and additionally names how many points were already there and
+  unchanged — without that number a second run over the same year reads like a
+  failed first one.
+
 ## [0.39.0] – 2026-07-23
 
 ### Added
