@@ -14,6 +14,12 @@
 //      Bilder bleiben trotzdem stehen. Sie sind Lebensdatenbank (Anm. 57);
 //      sie durch eine Ableitung verschwinden zu lassen wäre die schlimmere
 //      Doppelung, nämlich eine Auslassung.
+//   5. **Das Zeitfenster ist der angezeigte Zeitraum** — nicht die Spanne
+//      seiner Ereignisse. Gemeldet aus dem Betrieb: 8.120 verortete Fotos,
+//      und auf Mallorca 2018 kein einziger Punkt. Das Fenster endete am
+//      letzten Google-Besuch des Jahres, und im Jahrzehnt umfasste es ein
+//      einziges Jahr. Ein Fenster prüft kein Test von selbst: die Anfrage
+//      geht raus, die Antwort kommt, die Karte sieht bedient aus.
 //
 // Geprüft wird der Zustand, den es GEBEN MUSS (Regel aus check-a41-cities.js):
 // die Seite, nachdem jemand die Karte geöffnet und den Schalter gedrückt hat.
@@ -150,6 +156,31 @@ setTimeout(async () => {
   ok('…und zwar im Kartenbereich',
      !!note.closest('.map-wrap'),
      'wer auf die Karte sieht, liest die Liste daneben nicht');
+
+  // --- 3b. Das Fenster ist der Zeitraum, nicht seine Ereignisse ----------- //
+  // Der Bestand hat GENAU EIN Ereignis (12.07.2024). Käme das Fenster wie
+  // früher aus den Ereignissen, endete das Jahr 2024 am 12. Juli und das
+  // Jahrzehnt umfasste allein das Jahr 2020 — beides fällt hier auf.
+  const windowFor = async mode => {
+    calls.length = 0;
+    w.eval(`mp.mode = '${mode}'; rebuildPeriods(); renderPeriod();`);
+    await wait(60);
+    const hit = calls.map(([, p]) => p).reverse().find(p => /photos\/map/.test(p));
+    return hit ? decodeURIComponent(hit.split('?')[1] || '') : '';
+  };
+  const yearQs = await windowFor('year');
+  ok('Das Jahr fragt das ganze Jahr ab',
+     /from=2024-01-01T00:00:00/.test(yearQs) && /to=2024-12-31T23:59:59/.test(yearQs),
+     yearQs || 'keine Anfrage');
+  const decadeQs = await windowFor('decade');
+  ok('Das Jahrzehnt fragt zehn Jahre ab',
+     /from=2020-01-01T00:00:00/.test(decadeQs) && /to=2029-12-31T23:59:59/.test(decadeQs),
+     decadeQs || 'keine Anfrage');
+  const allQs = await windowFor('all');
+  ok('„Alle" grenzt gar nicht ein', allQs === '',
+     `„from=undefined" wäre ein Datum, das der Server zu lesen versucht: ${allQs}`);
+  w.eval("mp.mode = 'day'; rebuildPeriods(); renderPeriod();");
+  await wait(60);
 
   // --- 4. Zeitstrahl: Gruppen statt doppelter Leisten --------------------- //
   calls.length = 0;

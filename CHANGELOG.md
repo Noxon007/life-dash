@@ -15,6 +15,21 @@ any `MINOR`.
 
 ## [Unreleased]
 
+### Fixed
+- **Photo points went missing on the map — two reasons, both silent.** Reported
+  from use: 8120 located photos, Immich full of pictures from a trip to
+  Mallorca, and not a single photo dot on that map in Life-Dash. First, the
+  layer asked for the time window of the *entries* of the shown period instead
+  of the period itself: a year ended on the day of its last imported visit, and
+  a decade covered a single year. The photo layer answers “where did I take
+  pictures in this period?”, and limiting it by the entries answers a different
+  question — precisely the years this layer was built for have photos and no
+  visits. Second, when a period holds more points than one answer carries
+  (5000), the map used to keep the *oldest* ones; over a library spanning 2009
+  to today that quietly dropped everything after roughly 2016, so a trip in the
+  middle of your life vanished while the map still looked full. Points are now
+  spread evenly across the period, and the note on the map says so.
+
 ### Changed
 - **“Locate photos” now says why a picture got no point.** The run reported
   “2016 photos read, 17 newly located” and left open the one question you ask

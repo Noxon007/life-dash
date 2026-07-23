@@ -294,6 +294,20 @@ def points_for(db: Session, user_id: str, start: datetime | None = None,
     der Wert beim Import festgezurrt — die Konstante ließe sich dann weder in
     einem Test noch zur Laufzeit ändern, und beim Schreiben des Tests fiel
     genau das auf.
+
+    **Und deckeln heißt hier NICHT abschneiden.** `ORDER BY taken_at LIMIT
+    5000` liefert die 5.000 ÄLTESTEN — über eine Bibliothek von 2009 bis heute
+    also die Jahre bis etwa 2016, und alles danach fehlt auf der Karte. Ein
+    Reisejahr in der Mitte verschwindet damit vollständig, während die Karte
+    voll aussieht. Gegriffen wird deshalb gleichmäßig über den Zeitraum: die
+    Form der Antwort bleibt erhalten, jede Gegend kommt vor, und die genaue
+    Zahl steht ohnehin in `total`.
+
+    Das ist dieselbe Regel, die vierzig Zeilen weiter für die Vorschaubilder
+    einer Gruppe schon gilt (`GROUP_THUMBS`, Anmerkung 111: „gleichmäßig über
+    die Gruppe greifen statt vorne abschneiden"). Sie stand zweimal da und ist
+    genau an der zweiten Stelle nicht angewandt worden — der Anmerkung-106-Fall
+    in seiner leisesten Form.
     """
     if limit is None:
         limit = MAX_POINTS
@@ -303,7 +317,23 @@ def points_for(db: Session, user_id: str, start: datetime | None = None,
     if end is not None:
         query = query.filter(PhotoPoint.taken_at <= end)
     total = query.count()
-    rows = query.order_by(PhotoPoint.taken_at).limit(limit).all()
+    if total <= limit:
+        return query.order_by(PhotoPoint.taken_at).all(), total
+
+    # Jede `step`-te Zeile in zeitlicher Reihenfolge. Die Nummerierung macht
+    # die Datenbank (Fensterfunktion) — 8.000 Kennungen in ein `IN (…)` zu
+    # legen wäre die Sorte Abfrage, die je nach SQLite-Übersetzung an einer
+    # Parametergrenze zerbricht.
+    step = -(-total // limit)          # aufgerundet: nie mehr als `limit`
+    numbered = (query.with_entities(
+        PhotoPoint.id.label("pid"),
+        func.row_number().over(order_by=PhotoPoint.taken_at).label("rn"))
+        .subquery())
+    rows = (db.query(PhotoPoint)
+            .join(numbered, numbered.c.pid == PhotoPoint.id)
+            .filter((numbered.c.rn - 1) % step == 0)
+            .order_by(PhotoPoint.taken_at)
+            .limit(limit).all())
     return rows, total
 
 

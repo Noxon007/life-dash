@@ -2707,7 +2707,7 @@ const I18N_EN = {
   'map.photos': "📷 Photos",
   'map.photos.tip': "Every photo with coordinates as its own point — where it was taken. Has to be located first under “My data → Immich”.",
   'map.photos.none': "No photo located yet — the run is under “My data → Immich → Locate photos”.",
-  'map.photos.cap': "{s} of {n} photos shown — pick a smaller period.",
+  'map.photos.cap': "{s} of {n} photos shown, spread evenly across the period — pick a smaller period for all of them.",
   'map.photos.nowhere': "no place given",
   'tl.photos': "📷 Photos",
   'tl.photos.tip': "Located photos as their own rows in the timeline, condensed per day and place — has to be located first under “My data → Immich”",
@@ -6910,7 +6910,13 @@ const MP_PHOTOS = new Map();   // Zeitraum-Schlüssel -> {points, total, shown}
 async function mpLoadPhotos(key, from, to) {
   if (MP_PHOTOS.has(key)) return MP_PHOTOS.get(key);
   try {
-    const r = await api(`/api/photos/map?${new URLSearchParams({ from, to })}`);
+    // Ohne Grenzen fragen heißt „alles" — bei `mp.mode === 'alle'` ist genau
+    // das gemeint. `new URLSearchParams({from: undefined})` schickt dagegen
+    // die Zeichenkette „undefined", und der Server nähme sie für ein Datum.
+    const qs = new URLSearchParams();
+    if (from) qs.set('from', from);
+    if (to) qs.set('to', to);
+    const r = await api(`/api/photos/map?${qs}`);
     MP_PHOTOS.set(key, r);
     return r;
   } catch (_) {
@@ -6923,14 +6929,9 @@ function mpDrawPhotos(key, all) {
   if (!mapPhotos) return;
   mapPhotos.clearLayers();
   if (!mp.showPhotos || !mp.photoTotal) { mpPhotoNote(null); return; }
-  // Zeitfenster des angezeigten Zeitraums — aus den Ereignissen, wenn es
-  // welche gibt, sonst aus dem Zeitraum-Schlüssel selbst. Sonst hätte ein
-  // Monat ohne einen einzigen Eintrag auch keine Fotos, obwohl gerade dann
-  // welche interessant wären (die Jahre vor dem Smartphone haben Fotos und
-  // keine Besuche).
-  const span = mpPeriodSpan(key, all);
-  if (!span) { mpPhotoNote(null); return; }
-  mpLoadPhotos(key, span[0], span[1]).then(r => {
+  // Zeitfenster = der angezeigte Zeitraum, und sonst nichts.
+  const span = mpPeriodSpan(key);
+  mpLoadPhotos(key, span && span[0], span && span[1]).then(r => {
     if (!r || !mp.showPhotos) { mpPhotoNote(null); return; }
     r.points.forEach(p => {
       L.circleMarker([p.lat, p.lng], {
@@ -6944,22 +6945,31 @@ function mpDrawPhotos(key, all) {
     mpPhotoNote(r);
   });
 }
-// Der Zeitraum als ISO-Grenzen. Bei „alles" bleibt es offen — dann deckelt
-// der Server, und `mpPhotoNote` sagt es.
-function mpPeriodSpan(key, all) {
-  if (all && all.length) {
-    const dates = all.map(e => e.date_start).sort();
-    return [dates[0].slice(0, 10) + 'T00:00:00',
-            dates[dates.length - 1].slice(0, 10) + 'T23:59:59'];
-  }
-  const m = /^(\d{4})(?:-(\d{2}))?/.exec(key || '');
-  if (!m) return null;
-  const y = +m[1];
-  if (m[2]) {
-    const last = new Date(y, +m[2], 0).getDate();
-    return [`${m[1]}-${m[2]}-01T00:00:00`, `${m[1]}-${m[2]}-${last}T23:59:59`];
-  }
-  return [`${y}-01-01T00:00:00`, `${y}-12-31T23:59:59`];
+// Der Zeitraum als ISO-Grenzen; `null` heißt „alles", also keine Eingrenzung.
+//
+// **Das Fenster ist der Zeitraum, nicht der Inhalt des Zeitraums.** Bis hier
+// kam es aus den EREIGNISSEN: erst deren frühestes und spätestes Datum, und
+// nur ohne Ereignisse aus dem Schlüssel. Damit endete das Jahr 2018 an dem Tag,
+// an dem der letzte Google-Besuch stand — Fotos danach fielen still heraus,
+// und im Jahrzehnt reichte das Fenster nur über die Jahre mit Besuchen.
+// Die Foto-Ebene fragt „wo wurde in diesem Zeitraum fotografiert?"; sie durch
+// die Ereignisse zu begrenzen beantwortet eine andere Frage, nämlich „wo wurde
+// fotografiert, während ich schon etwas eingetragen hatte" — und gerade die
+// Jahre, für die es dieses Paket gibt, haben Fotos und keine Besuche.
+//
+// Gerechnet wird mit `keyRange`, dem Fenster der Routen (P2.2): dieselbe Frage
+// zweimal beantwortet, und die zweite Antwort kannte weder Wochen noch
+// Jahrzehnte — `2010` ergab dort das Jahr 2010 statt der Jahre 2010–2019
+// (Anmerkung 106). Einziger Unterschied: `keyRange` liefert das Ende
+// AUSSCHLIESSEND, der Endpunkt filtert einschließend.
+function mpPeriodSpan(key) {
+  const range = keyRange(key);
+  if (!range) return null;
+  const pad = n => String(n).padStart(2, '0');
+  const end = new Date(range[1]);
+  end.setSeconds(end.getSeconds() - 1);
+  return [range[0], `${end.getFullYear()}-${pad(end.getMonth()+1)}-${pad(end.getDate())}`
+    + `T${pad(end.getHours())}:${pad(end.getMinutes())}:${pad(end.getSeconds())}`];
 }
 // Anmerkung 110 für die Foto-Ebene: Was die Karte nicht zeigen kann, sagt sie
 // — und zwar dort, wo hingeschaut wird. Ohne diesen Satz sähe ein gedeckelter
@@ -6969,7 +6979,9 @@ function mpPhotoNote(r) {
   if (!box) return;
   if (!r || r.total <= r.shown) { box.style.display = 'none'; box.innerHTML = ''; return; }
   box.style.display = '';
-  box.innerHTML = `📷 ${esc(t('map.photos.cap', '{s} von {n} Fotos gezeigt — kleineren Zeitraum wählen.')
+  // Die Verteilung gehört in den Satz: „5.000 von 8.120" allein liest sich wie
+  // ein Ausschnitt vom Anfang — und genau das war es früher auch.
+  box.innerHTML = `📷 ${esc(t('map.photos.cap', '{s} von {n} Fotos gezeigt, gleichmäßig über den Zeitraum verteilt — kleineren Zeitraum wählen für alle.')
     .replace('{s}', r.shown.toLocaleString(LOC()))
     .replace('{n}', r.total.toLocaleString(LOC())))}`;
 }

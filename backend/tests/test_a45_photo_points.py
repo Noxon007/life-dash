@@ -274,6 +274,25 @@ def test_the_map_names_the_true_total_when_it_caps(db, user, monkeypatch):
     assert out["total"] == 10
 
 
+def test_capping_keeps_the_whole_period_instead_of_its_beginning(db, user,
+                                                                 monkeypatch):
+    """Gemeldet: 8.120 Punkte von 2009 bis heute, und auf Mallorca 2018 kein
+    einziger. `ORDER BY taken_at LIMIT 5000` liefert die ÄLTESTEN — ein
+    Reisejahr in der Mitte verschwindet vollständig, während die Karte voll
+    aussieht. Dieselbe Regel wie bei `GROUP_THUMBS` (Anmerkung 111)."""
+    monkeypatch.setattr(pp, "MAX_POINTS", 10)
+    for i in range(100):
+        db.add(PhotoPoint(user_id=user.id, provider="immich", asset_id=f"a{i:03d}",
+                          taken_at=datetime(2009 + i // 10, 7, 12, 12), lat=51.9,
+                          lng=8.8, city="Detmold", country="Deutschland"))
+    db.commit()
+    out = photo_map(db=db, user=user)
+    assert (out["shown"], out["total"]) == (10, 100)
+    years = {p["at"][:4] for p in out["points"]}
+    # Jedes Jahrzehnt-Jahr kommt vor — vorher waren es zehnmal 2009.
+    assert years == {str(y) for y in range(2009, 2019)}
+
+
 def test_the_map_window_filters_by_time(db, user):
     for day in (10, 20):
         db.add(PhotoPoint(user_id=user.id, provider="immich", asset_id=f"a{day}",
