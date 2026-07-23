@@ -24,13 +24,24 @@ any `MINOR`.
   a decade covered a single year. The photo layer answers “where did I take
   pictures in this period?”, and limiting it by the entries answers a different
   question — precisely the years this layer was built for have photos and no
-  visits. Second, when a period holds more points than one answer carries
-  (5000), the map used to keep the *oldest* ones; over a library spanning 2009
-  to today that quietly dropped everything after roughly 2016, so a trip in the
-  middle of your life vanished while the map still looked full. Points are now
-  spread evenly across the period, and the note on the map says so.
+  visits. Second, when a period held more points than one answer carried, the
+  map used to keep the *oldest* ones; over a library spanning 2009 to today
+  that quietly dropped everything after roughly 2016, so a trip in the middle
+  of your life vanished while the map still looked full.
 
 ### Changed
+- **The map now draws all your photo points instead of a selection.** The old
+  ceiling of 5000 points per answer already bit at an ordinary collection of
+  8000 located photos, so the map was condensing in everyday use while nothing
+  was actually tight — and a limit that fires normally teaches you to overlook
+  its message, which is the one thing it exists for. What made 5000 necessary
+  was drawing, not data: each dot used to be its own element in the page. The
+  dots now go onto a canvas, which moves that threshold by an order of
+  magnitude, and the ceiling is a safety net at 50 000. If it ever does apply,
+  the points are picked evenly across the period rather than from its
+  beginning, the full allowance is used (an even step of “every second point”
+  showed 4060 of 8120 while 5000 were allowed), and the note on the map says
+  what you are looking at.
 - **“Locate photos” now says why a picture got no point.** The run reported
   “2016 photos read, 17 newly located” and left open the one question you ask
   when reading it: what happened to the other 1999? The two possible answers —

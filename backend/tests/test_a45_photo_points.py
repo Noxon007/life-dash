@@ -293,6 +293,24 @@ def test_capping_keeps_the_whole_period_instead_of_its_beginning(db, user,
     assert years == {str(y) for y in range(2009, 2019)}
 
 
+def test_capping_uses_the_whole_budget(db, user, monkeypatch):
+    """Gemeldet als „warum diese Grenze?": 4.060 von 8.120 gezeigt, obwohl
+    5.000 erlaubt sind. Ein ganzzahliger Schritt trifft das Budget nur, wenn
+    es aufgeht — `ceil(8120/5000)` ist 2, also jeder zweite. Wer eine Grenze
+    liest und eine Rechnung sieht, sucht den Fehler bei sich."""
+    monkeypatch.setattr(pp, "MAX_POINTS", 10)
+    for i in range(25):          # 25/10 geht bewusst nicht auf
+        db.add(PhotoPoint(user_id=user.id, provider="immich", asset_id=f"a{i:03d}",
+                          taken_at=datetime(YEAR, 7, 12, 0, i), lat=51.9, lng=8.8,
+                          city="Detmold", country="Deutschland"))
+    db.commit()
+    out = photo_map(db=db, user=user)
+    assert (out["shown"], out["total"]) == (10, 25)
+    # …und trotzdem über den ganzen Zeitraum: der letzte Punkt liegt in der
+    # letzten Fünftelstunde, nicht bei Minute 9.
+    assert out["points"][-1]["at"] >= f"{YEAR}-07-12T00:20:00"
+
+
 def test_the_map_window_filters_by_time(db, user):
     for day in (10, 20):
         db.add(PhotoPoint(user_id=user.id, provider="immich", asset_id=f"a{day}",

@@ -34,12 +34,22 @@ from app.services.immich_link import PROVIDER
 
 log = logging.getLogger("lifedash.immich")
 
-# Wie viele Punkte höchstens in EINE Antwort gehen. Nicht die Bibliothek ist
-# die Grenze, sondern der Browser: 50.000 Marker sind kein Kartenbild mehr,
-# sondern eine blaue Fläche. Überschritten wird das nie stillschweigend —
-# `points_for` sagt, dass es mehr gibt, und der Aufrufer verdichtet
-# (Anmerkung 110: was eine Ansicht nicht zeigen kann, muss sie sagen).
-MAX_POINTS = 5000
+# Wie viele Punkte höchstens in EINE Antwort gehen — ein **Sicherheitsnetz**,
+# keine Betriebsgrenze.
+#
+# Bis hier stand 5.000 da, und schon eine gewöhnliche Sammlung von 8.120
+# verorteten Fotos lief dagegen: die Karte verdichtete im Alltag, obwohl nichts
+# eng war. Eine Grenze, die im Normalfall greift, erzieht dazu, ihre Meldung zu
+# überlesen — und dann ist sie auch dann unsichtbar, wenn sie etwas Wichtiges
+# sagt. Gedeckelt wird deshalb erst dort, wo es dem Browser wirklich weh tut;
+# die Zeichenlast trägt seit A45 die Leinwand statt einzelner SVG-Knoten
+# (`L.canvas` im Frontend), und das verschiebt diese Schwelle um eine
+# Größenordnung.
+#
+# Überschritten wird sie nie stillschweigend: `points_for` gibt die WAHRE Zahl
+# mit zurück, greift gleichmäßig über den Zeitraum statt vorne abzuschneiden,
+# und die Karte sagt beides (Anmerkung 110).
+MAX_POINTS = 50000
 
 
 # A47 — Ortsteil eines Fotos.
@@ -303,6 +313,10 @@ def points_for(db: Session, user_id: str, start: datetime | None = None,
     Form der Antwort bleibt erhalten, jede Gegend kommt vor, und die genaue
     Zahl steht ohnehin in `total`.
 
+    **Und zwar so viele, wie hineinpassen.** Eine Verdichtung, die von 8.120
+    Punkten 4.060 liefert, obwohl 5.000 erlaubt sind, erklärt sich dem
+    Betrachter nicht: er liest eine Grenze und sieht eine Rechnung.
+
     Das ist dieselbe Regel, die vierzig Zeilen weiter für die Vorschaubilder
     einer Gruppe schon gilt (`GROUP_THUMBS`, Anmerkung 111: „gleichmäßig über
     die Gruppe greifen statt vorne abschneiden"). Sie stand zweimal da und ist
@@ -320,18 +334,28 @@ def points_for(db: Session, user_id: str, start: datetime | None = None,
     if total <= limit:
         return query.order_by(PhotoPoint.taken_at).all(), total
 
-    # Jede `step`-te Zeile in zeitlicher Reihenfolge. Die Nummerierung macht
-    # die Datenbank (Fensterfunktion) — 8.000 Kennungen in ein `IN (…)` zu
-    # legen wäre die Sorte Abfrage, die je nach SQLite-Übersetzung an einer
-    # Parametergrenze zerbricht.
-    step = -(-total // limit)          # aufgerundet: nie mehr als `limit`
+    # **Gleichmäßig heißt nicht „jede n-te".** Ein ganzzahliger Schritt trifft
+    # das Budget nur, wenn es aufgeht: bei 8.120 Punkten und Platz für 5.000
+    # ist `ceil(8120/5000)` gleich 2, also jeder zweite — 4.060 gezeigte
+    # Punkte und 940 Plätze verschenkt. Genau so gemeldet („warum diese
+    # Grenze?"), und die Antwort wäre eine Rechnung statt einer Grenze gewesen.
+    #
+    # Deshalb ein mitlaufender Zähler statt eines Schrittes: behalten wird die
+    # Zeile, bei der `rn · limit / total` über die nächste ganze Zahl springt.
+    # Das ergibt EXAKT `limit` Zeilen, gleichmäßig verteilt, für jedes
+    # Verhältnis. Gerechnet wird in der Datenbank — 8.000 Kennungen in ein
+    # `IN (…)` zu legen wäre die Sorte Abfrage, die je nach Übersetzung an
+    # einer Parametergrenze zerbricht.
     numbered = (query.with_entities(
         PhotoPoint.id.label("pid"),
         func.row_number().over(order_by=PhotoPoint.taken_at).label("rn"))
         .subquery())
+    # `* 1.0` erzwingt die Division mit Nachkommastellen: SQLite teilt zwei
+    # ganze Zahlen ganzzahlig, und dann stünde links wie rechts dasselbe.
+    scaled = lambda n: func.floor(n * limit * 1.0 / total)  # noqa: E731
     rows = (db.query(PhotoPoint)
             .join(numbered, numbered.c.pid == PhotoPoint.id)
-            .filter((numbered.c.rn - 1) % step == 0)
+            .filter(scaled(numbered.c.rn - 1) < scaled(numbered.c.rn))
             .order_by(PhotoPoint.taken_at)
             .limit(limit).all())
     return rows, total

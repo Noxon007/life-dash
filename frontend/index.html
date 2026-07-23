@@ -6907,6 +6907,16 @@ function mpCapNote(hidden, total) {
 // aus einem Beleg ein Objekt zu machen erzeugt Zeilen, die danach überall
 // wieder ausgefiltert werden müssen).
 const MP_PHOTOS = new Map();   // Zeitraum-Schlüssel -> {points, total, shown}
+// EINE Leinwand für alle Fotopunkte, erst beim ersten Bedarf angelegt. Je
+// Punkt eine eigene wäre schlimmer als gar keine, und beim Laden gibt es die
+// Karte noch nicht.
+let MP_PHOTO_CANVAS = null;
+function mpPhotoCanvas() {
+  if (!MP_PHOTO_CANVAS && typeof L.canvas === 'function') {
+    MP_PHOTO_CANVAS = L.canvas({ padding: 0.5 });
+  }
+  return MP_PHOTO_CANVAS || undefined;   // ohne Leinwand: Leaflets Standard
+}
 async function mpLoadPhotos(key, from, to) {
   if (MP_PHOTOS.has(key)) return MP_PHOTOS.get(key);
   try {
@@ -6936,6 +6946,12 @@ function mpDrawPhotos(key, all) {
     r.points.forEach(p => {
       L.circleMarker([p.lat, p.lng], {
         radius: 4, fillColor: '#f0a23b', color: '#fff', weight: 1, fillOpacity: .9,
+        // Auf die Leinwand statt in den DOM: Leaflet zeichnet Kreise sonst als
+        // je ein SVG-Element, und zehntausend davon sind zehntausend Knoten,
+        // die der Browser bei jedem Verschieben neu anfassen muss. Genau diese
+        // Zeichenlast war der Grund für die frühere Deckelung bei 5.000 —
+        // nicht die Datenmenge.
+        renderer: mpPhotoCanvas(),
       }).addTo(mapPhotos).bindPopup(
         `<img src="/api/photos/${encodeURIComponent(p.id)}/thumb" alt="" `
         + `style="max-width:180px; border-radius:6px; display:block; margin-bottom:6px" loading="lazy">`
