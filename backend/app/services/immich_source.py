@@ -30,17 +30,21 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models import (ConfirmState, DatePrecision, Event, Fragment,
                         FragmentStatus, Location, MediaRef, Source)
+from app.services import geocode
 from app.services import immich as api
-from app.services.immich_link import PROVIDER
+from app.services.immich_link import MACHINE_SOURCES, PROVIDER
 
 log = logging.getLogger("lifedash.immich")
 
@@ -94,6 +98,12 @@ class Proposal:
     shared: bool = False          # aus einem GETEILTEN Album (Fall 7c)
     lat: float | None = None
     lng: float | None = None
+    # Woher der Ort stammt: „exif" ist gemessen, „title" ist GERATEN (aus dem
+    # Albumnamen). Der Unterschied steht auf der Karte und im Text, weil
+    # Genauigkeit in diesem Projekt nie überzeichnet wird (Kap. 3.1) — und
+    # weil beim Bestätigen jemand entscheiden muss, wie viel er dem glaubt.
+    place_source: str = "exif"
+    place_type: str | None = None
 
     def as_dict(self) -> dict:
         return {
@@ -101,6 +111,7 @@ class Proposal:
             "start": self.start.isoformat(), "end": self.end.isoformat(),
             "precision": self.precision.value, "place": self.place,
             "photos": self.photos, "shared": self.shared,
+            "place_source": self.place_source,
         }
 
 
@@ -143,6 +154,66 @@ def _owned_slots(db: Session, user_id: str) -> set[str]:
             .filter(Event.user_id == user_id,
                     Event.external_id.like(f"{SLOT_PREFIX}%")).all())
     return {r[0] for r in rows if r[0]}
+
+
+# Ab welchem GEGENSEITIGEN Anteil ein vorhandener Eintrag und ein Album
+# dasselbe meinen. Gegenseitig ist der Kern der Regel: „Mallorca_2005"
+# (23.07.–05.08.) und „Urlaub auf Mallorca" (23.07.–05.08.) decken einander zu
+# 100 % — dieselbe Reise. Ein dreitägiges Album INNERHALB eines
+# „Auslandsjahres" deckt sich zu 100 % mit dem Jahr, das Jahr aber nur zu
+# 0,8 % mit dem Album: verschiedene Dinge, und der Vorschlag ist berechtigt.
+# Eine einseitige Prüfung („liegt drin") würde genau den Fall verschlucken.
+_SAME_TRIP_COVERAGE = 0.5
+
+
+def covering_event(db: Session, user_id: str, prop: Proposal):
+    """Der eigene Eintrag, der dieses Album schon IST — oder None.
+
+    Der achte Fall, den Anmerkung 107 nicht hatte (Anmerkung 113): Sie hat die
+    Kollisionen von der Seite der **Tage** her durchgespielt, weil dort die
+    importierten Besuche liegen. Ein Album kollidiert aber mit etwas anderem —
+    mit der von Hand erfassten Reise. Gemeldet als „Mallorca_2005, 140 Fotos
+    aus Immich" direkt neben „Urlaub auf Mallorca, 23.07.–05.08.2005": zweimal
+    dieselbe Reise in der Lebensdatenbank, und die eine Hälfte weiß nichts von
+    der anderen.
+
+    Gefragt wird nur nach EIGENEN Einträgen (`MACHINE_SOURCES` bleibt außen
+    vor): ein importierter Besuch ist kein Reise-Eintrag, und ein früherer
+    Immich-Vorschlag ist über seinen Platz schon abgedeckt. Das ist dieselbe
+    Liste, die auch Stufe 1 liest — eine Regel an zwei Orten widerspricht sich
+    still (Anmerkung 106/111).
+
+    **Kein Grabstein.** Ein übersprungenes Album ist nicht abgelehnt, sondern
+    nur überflüssig, solange es den anderen Eintrag gibt. Wird der gelöscht,
+    darf das Album wieder vorgeschlagen werden — anders als bei einem
+    verworfenen Vorschlag, dessen Fragment bewusst bleibt.
+    """
+    a_start, a_end = prop.start.date(), prop.end.date()
+    ends = func.coalesce(Event.date_end, Event.date_start)
+    rows = (db.query(Event)
+            .filter(Event.user_id == user_id,
+                    Event.date_start.isnot(None),
+                    Event.source.notin_(MACHINE_SOURCES),
+                    Event.date_start <= prop.end,
+                    ends >= prop.start)
+            .all())
+    best, best_score = None, 0.0
+    for event in rows:
+        e_start = event.date_start.date()
+        e_end = (event.date_end or event.date_start).date()
+        if e_end < e_start:
+            e_start, e_end = e_end, e_start
+        overlap = (min(e_end, a_end) - max(e_start, a_start)).days + 1
+        if overlap <= 0:
+            continue
+        mine = overlap / ((a_end - a_start).days + 1)
+        theirs = overlap / ((e_end - e_start).days + 1)
+        if mine < _SAME_TRIP_COVERAGE or theirs < _SAME_TRIP_COVERAGE:
+            continue
+        score = min(mine, theirs)
+        if score > best_score:
+            best, best_score = event, score
+    return best
 
 
 def _days_with_owning_events(db: Session, user_id: str,
@@ -237,15 +308,26 @@ def album_proposal(album: dict, assets: list[dict], *, shared: bool) -> Proposal
     if not times:
         return None
     places: dict[str, int] = defaultdict(int)
+    per_place: dict[str, list] = defaultdict(list)
     geos = []
     for asset in assets:
         place = api.asset_place(asset)
+        geo = api.asset_geo(asset)
         if place:
             places[place] += 1
-        geo = api.asset_geo(asset)
+            if geo:
+                per_place[place].append(geo)
         if geo:
             geos.append(geo)
     top = max(places.items(), key=lambda kv: kv[1])[0] if places else None
+    # Der Punkt gehört zum NAMEN, nicht zum Album. Gemittelt wurde vorher über
+    # ALLE Fotos, während der Name vom häufigsten Ort kam — bei einem Album,
+    # das zwei Gegenden umspannt, zeigte die Karte damit auf einen Punkt
+    # dazwischen, an dem nie jemand war, und schrieb den Namen des einen Ortes
+    # daran. Jetzt der Durchschnitt genau der Fotos, die an diesem Ort
+    # entstanden sind.
+    if top and per_place.get(top):
+        geos = per_place[top]
     # Ein Album ist eine Spanne von TAGEN, kein Zeitpunkt — also Tagesgrenzen,
     # auch wenn alle Bilder aus einer Stunde stammen. Uhrzeiten stehen zu
     # lassen und daneben `day` zu behaupten, wäre eine Genauigkeit, die die
@@ -263,6 +345,74 @@ def album_proposal(album: dict, assets: list[dict], *, shared: bool) -> Proposal
         lat=round(sum(g[0] for g in geos) / len(geos), 6) if geos else None,
         lng=round(sum(g[1] for g in geos) / len(geos), 6) if geos else None,
     )
+
+
+# --------------------------------------------------------------------------- #
+# Der Ort eines Albums, wenn die Fotos keinen haben
+# --------------------------------------------------------------------------- #
+# Genau der Fall, für den dieses Paket gebaut wurde: „Mallorca_2005", 140
+# Fotos, **kein einziges mit GPS** — 2005 hatte keine Kamera einen Empfänger.
+# Immichs Rückwärts-Geokodierung liefert dann nichts, und der Vorschlag stand
+# ohne Ort da, während der Ort im Titel steht. Ein Mensch liest ihn dort sofort.
+#
+# Geraten wird trotzdem nicht: **der Geocoder ist der Prüfer**. „Mallorca" ist
+# eine Insel und wird angenommen; „Beste Bilder" findet nichts oder etwas, das
+# kein Ort ist, und wird verworfen. Eine Liste verbotener Wörter („Urlaub",
+# „Fotos") wäre der schlechtere Weg — sie wäre deutsch, unvollständig und
+# müsste ewig gepflegt werden.
+#
+# Und der Aufruf ist erlaubt: Anmerkung 100 verlangt, dass ein ausgehender
+# Abruf einer GESPEICHERTEN eigenen Tatsache dient. Der Albumname ist eine.
+_TITLE_SPLIT = re.compile(r"[_\-.,;+/\\]+")
+# Was Nominatim als `type` liefern muss, damit der Treffer als Ort durchgeht.
+_PLACE_TYPES = {
+    "island", "islet", "archipelago", "peninsula", "city", "town", "village",
+    "hamlet", "municipality", "borough", "suburb", "quarter", "locality",
+    "county", "state", "province", "region", "district", "country",
+    "administrative", "national_park", "protected_area", "isolated_dwelling",
+}
+
+
+def title_query(title: str) -> str | None:
+    """Der ortsverdächtige Teil eines Albumnamens — Jahre und Zahlen raus."""
+    words = [w for w in _TITLE_SPLIT.sub(" ", title).split()
+             if len(w) >= 3 and not w.isdigit()]
+    return " ".join(words) or None
+
+
+def place_from_title(db: Session, user_id: str, title: str) -> dict | None:
+    """{name, lat, lng, country, type} aus dem Albumnamen — oder None.
+
+    Erst der eigene Bestand, dann das Netz: Wer schon einmal in »Mallorca«
+    war, hat den Ort hier stehen, und dann ist die Frage beantwortet, ohne
+    jemanden zu fragen. Das ist nicht nur billiger, es hält auch die eigene
+    Schreibweise.
+    """
+    query = title_query(title)
+    if not query:
+        return None
+    own = (db.query(Location)
+           .filter(Location.user_id == user_id,
+                   func.lower(Location.name) == query.lower(),
+                   Location.lat.isnot(None), Location.lng.isnot(None))
+           .first())
+    if own:
+        return {"name": own.name, "lat": own.lat, "lng": own.lng,
+                "country": None, "type": own.type or "poi"}
+    if not settings.geocoding_enabled:
+        return None
+    hit = geocode.geocode(query)
+    if not hit or hit.get("type") not in _PLACE_TYPES:
+        if hit:
+            log.info("Albumname %r ergab %r (%s) — kein Ort, verworfen",
+                     query, hit.get("name"), hit.get("type"))
+        return None
+    return {
+        "name": hit.get("poi") or geocode.city_of(hit) or query,
+        "lat": hit["lat"], "lng": hit["lng"],
+        "country": (hit.get("address") or {}).get("country"),
+        "type": hit.get("type"),
+    }
 
 
 def _drop_clusters_inside_albums(clusters: list[Proposal],
@@ -339,6 +489,7 @@ def scan_year(db: Session, user, year: int, url: str, key: str,
              len(assets), len(clusters))
 
     album_props: list[Proposal] = []
+    covered: list[dict] = []
     skipped = 0
     looked_at = 0
     open_albums = 0
@@ -386,13 +537,39 @@ def scan_year(db: Session, user, year: int, url: str, key: str,
             if not items:
                 continue
             prop = album_proposal(album, items, shared=not owned)
-            if prop:
-                album_props.append(prop)
+            if not prop:
+                continue
+            if not prop.place:
+                # Kein Foto mit Koordinaten — dann steht der Ort vielleicht im
+                # Namen. Genau der Fall, für den es dieses Paket gibt: vor dem
+                # Smartphone gibt es kein GPS, und „Mallorca_2005" sagt einem
+                # Menschen trotzdem sofort, wo er war.
+                guess = place_from_title(db, user.id, prop.title)
+                if guess:
+                    prop.place = guess["name"]
+                    prop.country = guess["country"]
+                    prop.lat, prop.lng = guess["lat"], guess["lng"]
+                    prop.place_source = "title"
+                    prop.place_type = guess["type"]
+                    log.info("Album »%s«: Ort aus dem Namen — %s (%s)",
+                             prop.title, guess["name"], guess["type"])
+            twin = covering_event(db, user.id, prop)
+            if twin:
+                # Kein zweiter Eintrag für dieselbe Reise — aber auch kein
+                # stilles Verschwinden: die Vorschau nennt beide Titel, sonst
+                # wundert sich jemand, warum sein Album nie auftaucht.
+                covered.append({"album": prop.title, "event": twin.title,
+                                "event_id": twin.id})
+                log.info("Immich: Album »%s« übersprungen — »%s« deckt den "
+                         "Zeitraum bereits ab", prop.title, twin.title)
+                continue
+            album_props.append(prop)
     log.info("Immich %d: %d Alben vorgeschlagen, %d schon vergeben, "
              "%d nicht mehr angesehen (%.1fs)", year, len(album_props),
              skipped, open_albums, time.monotonic() - began)
     _note(partial=bool(open_albums), albums_open=open_albums,
-          albums_checked=looked_at, seconds=round(time.monotonic() - began, 1))
+          albums_checked=looked_at, covered=covered,
+          seconds=round(time.monotonic() - began, 1))
 
     clusters = _drop_clusters_inside_albums(clusters, album_props)
 
@@ -485,6 +662,12 @@ def _describe(prop: Proposal) -> str:
     bits = [f"{prop.photos} Fotos aus Immich"]
     if prop.place:
         bits.append(f"in {prop.place}")
+        if prop.place_source == "title":
+            # Gemessen und geraten dürfen nicht gleich aussehen. Wer den
+            # Vorschlag später liest, sieht sonst einen Ort und hält ihn für
+            # eine Angabe aus den Fotos — die haben aber gar keine.
+            bits.append("(Ort aus dem Albumnamen, die Fotos haben keine "
+                        "Koordinaten)")
     if prop.shared:
         # Steht bewusst IM Text und nicht nur in einem Feld: wer den Vorschlag
         # sieht, muss wissen, dass die Bilder von jemand anderem stammen.
@@ -511,8 +694,12 @@ def _location_for(db: Session, user, prop: Proposal) -> Location | None:
                 .first())
     if existing:
         return existing
+    # Der Typ ist die zweite Stelle, an der „gemessen" und „geraten"
+    # auseinandergehalten wird: eine Insel ist kein Punkt, und `poi` würde
+    # genau das behaupten. Was der Geocoder sagt, steht drin.
     loc = Location(user_id=user.id, name=prop.place[:255], lat=prop.lat,
-                   lng=prop.lng, type="poi", city=prop.place[:128],
+                   lng=prop.lng, type=(prop.place_type or "poi")[:32],
+                   city=prop.place[:128] if prop.place_source == "exif" else None,
                    external_ref=ref)
     db.add(loc)
     db.flush()

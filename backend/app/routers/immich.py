@@ -158,6 +158,11 @@ def source_preview(
         # sonst eine Gesamtaussage, die nur ein Ausschnitt ist.
         "partial": bool(report.get("partial")),
         "albums_open": report.get("albums_open", 0),
+        # Was NICHT vorgeschlagen wird, weil es das schon gibt. Ohne diese
+        # Liste fragt sich der Nutzer, warum sein Album fehlt — und das ist
+        # dieselbe Stille wie ein Vorschlag zu viel, nur andersherum.
+        "covered": report.get("covered", []),
+        "albums_denied": report.get("albums_denied"),
         "seconds": report.get("seconds"),
         # Die Liste selbst, damit die Vorschau die Vorschläge NENNT statt nur
         # zu zählen. „38 Vorschläge" ist eine Zahl; „Dänemark 2024, 12. Juli

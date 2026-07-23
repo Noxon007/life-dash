@@ -22,7 +22,8 @@ from datetime import date, datetime
 
 import pytest
 
-from app.models import ConfirmState, Event, Fragment, FragmentStatus, Source
+from app.models import (ConfirmState, DatePrecision, Event, Fragment,
+                        FragmentStatus, Source)
 from app.services import immich as api
 from app.services import immich_source as source
 
@@ -134,6 +135,228 @@ def test_year_list_says_when_immich_is_not_set_up(db, user):
 
     out = source_years(db=db, user=user)
     assert out["source"] == "own" and out["reason"]
+
+
+# --------------------------------------------------------------------------- #
+# Der achte Fall: ein Album, das es als eigenen Eintrag schon gibt
+# --------------------------------------------------------------------------- #
+def _album_run(db, user, monkeypatch, album, assets):
+    monkeypatch.setattr(api, "own_user_id", lambda url, key: "me")
+    monkeypatch.setattr(api, "albums",
+                        lambda url, key, owned=None: [album] if owned else [])
+    monkeypatch.setattr(api, "search_assets_paged",
+                        lambda url, key, s, e, **kw: assets if kw.get("album_id") else [])
+    report: dict = {}
+    out = source.scan_year(db, user, YEAR, "u", "k", report=report)
+    return out, report
+
+
+def _album_assets(first_day: int, last_day: int, month: int = 7) -> list[dict]:
+    return [{"id": f"a{d}", "ownerId": "me", "visibility": "timeline",
+             "localDateTime": f"{YEAR}-{month:02d}-{d:02d}T12:00:00",
+             "exifInfo": {"latitude": 39.6, "longitude": 2.9,
+                          "city": "Sencelles", "country": "Spanien"}}
+            for d in range(first_day, last_day + 1)]
+
+
+def test_album_is_not_proposed_when_the_trip_is_already_recorded(db, user, monkeypatch):
+    """Gemeldet: „Mallorca_2005, 140 Fotos aus Immich" direkt neben „Urlaub auf
+    Mallorca, 23.07.–05.08." — zweimal dieselbe Reise.
+
+    Anmerkung 107 hat die Kollisionen von der Seite der TAGE her durchgespielt
+    (dort liegen die importierten Besuche); ein Album kollidiert aber mit der
+    von Hand erfassten Reise, und dafür gab es keinen Fall.
+    """
+    db.add(Event(user_id=user.id, title="Urlaub auf Mallorca", category="trip",
+                 date_start=datetime(YEAR, 7, 23), date_end=datetime(YEAR, 8, 5),
+                 date_precision=DatePrecision.day, source=Source.manual,
+                 confirmed=ConfirmState.confirmed))
+    db.commit()
+
+    out, report = _album_run(
+        db, user, monkeypatch,
+        {"id": "alb-mallorca", "albumName": "Mallorca_2005", "_owned": True},
+        _album_assets(23, 31) + _album_assets(1, 5, month=8))
+
+    assert out == []
+    assert report["covered"][0]["event"] == "Urlaub auf Mallorca"
+    assert report["covered"][0]["album"] == "Mallorca_2005"
+
+
+def test_a_short_album_inside_a_long_entry_is_still_proposed(db, user, monkeypatch):
+    """Die Deckung muss GEGENSEITIG sein. Ein Wochenendalbum liegt vollständig
+    in einem „Auslandsjahr" — dasselbe sind die beiden deshalb nicht, und eine
+    einseitige Prüfung („liegt drin") würde den Vorschlag verschlucken."""
+    db.add(Event(user_id=user.id, title="Auslandsjahr", category="event",
+                 date_start=datetime(YEAR, 1, 1), date_end=datetime(YEAR, 12, 31),
+                 date_precision=DatePrecision.day, source=Source.manual,
+                 confirmed=ConfirmState.confirmed))
+    db.commit()
+
+    out, report = _album_run(
+        db, user, monkeypatch,
+        {"id": "alb-we", "albumName": "Wochenende Sencelles", "_owned": True},
+        _album_assets(23, 25))
+
+    assert [p.title for p in out] == ["Wochenende Sencelles"]
+    assert report["covered"] == []
+
+
+def test_an_imported_visit_does_not_count_as_an_own_entry(db, user, monkeypatch):
+    """Ein importierter Besuch ist kein Reise-Eintrag. Gefragt wird nach
+    EIGENEN Einträgen — dieselbe `MACHINE_SOURCES`-Liste wie in Stufe 1."""
+    for day in range(23, 32):
+        db.add(Event(user_id=user.id, title=f"Besuch {day}", category="place",
+                     date_start=datetime(YEAR, 7, day),
+                     date_precision=DatePrecision.exact,
+                     source=Source.google_timeline,
+                     confirmed=ConfirmState.confirmed))
+    db.commit()
+
+    out, _ = _album_run(
+        db, user, monkeypatch,
+        {"id": "alb-m", "albumName": "Mallorca_2005", "_owned": True},
+        _album_assets(23, 31))
+    assert [p.title for p in out] == ["Mallorca_2005"]
+
+
+def test_skipping_an_album_leaves_no_tombstone(db, user, monkeypatch):
+    """Übersprungen heißt nicht abgelehnt: wird der eigene Eintrag gelöscht,
+    muss das Album wieder vorgeschlagen werden. Ein Fragment als Grabstein
+    wäre hier genau falsch — die Regel gilt für VERWORFENE Vorschläge."""
+    twin = Event(user_id=user.id, title="Urlaub auf Mallorca", category="trip",
+                 date_start=datetime(YEAR, 7, 23), date_end=datetime(YEAR, 8, 5),
+                 date_precision=DatePrecision.day, source=Source.manual,
+                 confirmed=ConfirmState.confirmed)
+    db.add(twin)
+    db.commit()
+
+    album = {"id": "alb-m", "albumName": "Mallorca_2005", "_owned": True}
+    assets = _album_assets(23, 31) + _album_assets(1, 5, month=8)
+    out, _ = _album_run(db, user, monkeypatch, album, assets)
+    assert out == []
+    assert db.query(Fragment).count() == 0
+
+    db.delete(twin)
+    db.commit()
+    out2, _ = _album_run(db, user, monkeypatch, album, assets)
+    assert [p.title for p in out2] == ["Mallorca_2005"]
+
+
+# --------------------------------------------------------------------------- #
+# Der Ort, wenn die Fotos keinen haben — und der Ort, wenn sie einen haben
+# --------------------------------------------------------------------------- #
+def test_place_comes_from_the_album_name_when_photos_have_no_gps(
+        db, user, monkeypatch):
+    """„Mallorca_2005": 140 Fotos, kein einziges mit GPS — 2005 hatte keine
+    Kamera einen Empfänger. Der Ort steht im Namen, und ein Mensch liest ihn
+    dort sofort."""
+    from app.config import settings
+    from app.services import geocode
+
+    monkeypatch.setattr(settings, "geocoding_enabled", True)
+    monkeypatch.setattr(geocode, "geocode", lambda q, lang=None: {
+        "name": "Mallorca", "lat": 39.62, "lng": 2.99, "type": "island",
+        "address": {"country": "Spanien"}, "poi": "Mallorca"})
+
+    no_gps = [{"id": f"a{d}", "ownerId": "me", "visibility": "timeline",
+               "localDateTime": f"{YEAR}-07-{d:02d}T12:00:00", "exifInfo": {}}
+              for d in range(23, 28)]
+    out, _ = _album_run(db, user, monkeypatch,
+                        {"id": "alb-m", "albumName": "Mallorca_2005",
+                         "_owned": True}, no_gps)
+
+    assert out[0].place == "Mallorca"
+    assert out[0].place_source == "title"      # geraten, nicht gemessen
+    assert (out[0].lat, out[0].lng) == (39.62, 2.99)
+    assert "Albumnamen" in source._describe(out[0])
+
+
+def test_a_title_that_is_not_a_place_is_rejected(db, user, monkeypatch):
+    """Der Geocoder ist der Prüfer, keine Wortliste. „Beste Bilder" findet
+    entweder nichts oder etwas, das kein Ort ist — beides heißt: kein Ort."""
+    from app.config import settings
+    from app.services import geocode
+
+    monkeypatch.setattr(settings, "geocoding_enabled", True)
+    monkeypatch.setattr(geocode, "geocode", lambda q, lang=None: {
+        "name": "Beste Bilder Straße", "lat": 1.0, "lng": 2.0,
+        "type": "residential", "address": {}, "poi": None})
+
+    no_gps = [{"id": "a1", "ownerId": "me", "visibility": "timeline",
+               "localDateTime": f"{YEAR}-07-23T12:00:00", "exifInfo": {}}]
+    out, _ = _album_run(db, user, monkeypatch,
+                        {"id": "alb-b", "albumName": "Beste Bilder",
+                         "_owned": True}, no_gps)
+    assert out[0].place is None and out[0].lat is None
+
+
+def test_own_places_are_preferred_over_the_network(db, user, monkeypatch):
+    """Erst der eigene Bestand, dann das Netz — das hält die eigene
+    Schreibweise und spart einen Abruf (Anmerkung 100)."""
+    from app.config import settings
+    from app.models import Location
+    from app.services import geocode
+
+    db.add(Location(user_id=user.id, name="Mallorca", lat=39.5, lng=3.0,
+                    type="island"))
+    db.commit()
+    monkeypatch.setattr(settings, "geocoding_enabled", True)
+
+    def _never(*a, **kw):  # pragma: no cover - darf nicht laufen
+        raise AssertionError("Der Geocoder wurde gefragt, obwohl der Ort da ist")
+
+    monkeypatch.setattr(geocode, "geocode", _never)
+    no_gps = [{"id": "a1", "ownerId": "me", "visibility": "timeline",
+               "localDateTime": f"{YEAR}-07-23T12:00:00", "exifInfo": {}}]
+    out, _ = _album_run(db, user, monkeypatch,
+                        {"id": "alb-m", "albumName": "Mallorca 2005",
+                         "_owned": True}, no_gps)
+    assert (out[0].place, out[0].lat) == ("Mallorca", 39.5)
+
+
+def test_title_place_is_only_a_fallback(db, user, monkeypatch):
+    """Gemessen schlägt geraten: haben die Fotos Koordinaten, wird der Name
+    gar nicht erst befragt."""
+    from app.config import settings
+    from app.services import geocode
+
+    monkeypatch.setattr(settings, "geocoding_enabled", True)
+
+    def _never(*a, **kw):  # pragma: no cover
+        raise AssertionError("Der Titel wurde befragt, obwohl EXIF da ist")
+
+    monkeypatch.setattr(geocode, "geocode", _never)
+    out, _ = _album_run(db, user, monkeypatch,
+                        {"id": "alb-m", "albumName": "Mallorca_2005",
+                         "_owned": True}, _album_assets(23, 27))
+    assert out[0].place == "Sencelles" and out[0].place_source == "exif"
+
+
+def test_album_coordinates_belong_to_the_named_place(db, user, monkeypatch):
+    """Der Punkt gehört zum NAMEN. Gemittelt wurde über alle Fotos, während
+    der Name vom häufigsten Ort kam — bei einem Album über zwei Gegenden zeigt
+    die Karte damit auf einen Punkt dazwischen, an dem nie jemand war."""
+    here = [{"id": f"h{i}", "ownerId": "me", "visibility": "timeline",
+             "localDateTime": f"{YEAR}-07-2{i}T12:00:00",
+             "exifInfo": {"latitude": 39.6, "longitude": 2.9,
+                          "city": "Sencelles", "country": "Spanien"}}
+            for i in range(1, 5)]
+    far = [{"id": "f1", "ownerId": "me", "visibility": "timeline",
+            "localDateTime": f"{YEAR}-07-26T12:00:00",
+            "exifInfo": {"latitude": 60.0, "longitude": 20.0,
+                         "city": "Turku", "country": "Finnland"}}]
+    prop = source.album_proposal({"id": "x", "albumName": "Reise"},
+                                 here + far, shared=False)
+    assert prop.place == "Sencelles"
+    assert prop.lat == 39.6 and prop.lng == 2.9
+
+
+def test_title_query_drops_years_and_separators():
+    assert source.title_query("Mallorca_2005") == "Mallorca"
+    assert source.title_query("2019-08 Kreta mit Jan") == "Kreta mit Jan"
+    assert source.title_query("2005") is None
+    assert source.title_query("") is None
 
 
 # --------------------------------------------------------------------------- #

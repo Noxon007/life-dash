@@ -2434,6 +2434,8 @@ const I18N_EN = {
   'ims.more': "more",
   'ims.years.fail': "The year list could not be fetched from Immich ({e}) — the picker shows the last few years. A run still works.",
   'ims.failed': "Immich did not answer.",
+  'ims.place.title': "(from the name)",
+  'ims.covered': "{n} album(s) not proposed — there is already an entry for them:",
   'ims.partial': "Stopped after {s}s: {n} albums were not looked at. The run itself looks at all of them — it is not keeping anyone waiting.",
   'ims.years.own': "The years come from your own data, not from Immich ({e}). The years before the smartphone are missing from that list — a run still works for every year shown.",
   'ims.needpreview': "Look at the preview first — then create.",
@@ -7401,30 +7403,47 @@ document.getElementById('ims-preview')?.addEventListener('click', async ev => {
       return;
     }
     imsPreviewedYear = r.year;
+    // Die drei Nachsätze gelten in BEIDEN Fällen. „Nichts Neues" plus ein
+    // übersprungenes Album ist die häufigste Lage nach dem ersten Lauf —
+    // stünde der Grund nur beim Erfolg, fehlte er genau dann, wenn er
+    // gebraucht wird (Anmerkung 113).
+    const dup = (r.covered || []).length
+      ? `<div class="stat-label" style="margin-top:8px">🔗 ${esc(t('ims.covered', '{n} Album/Alben nicht vorgeschlagen — dafür gibt es schon einen Eintrag:').replace('{n}', r.covered.length))}<br>`
+        + r.covered.map(c => `· ${esc(c.album)} → <b>${esc(c.event)}</b>`).join('<br>') + '</div>'
+      : '';
+    const denied = r.albums_denied
+      ? `<div class="stat-label" style="margin-top:8px">⚠️ ${esc(r.albums_denied)}</div>`
+      : '';
+    // Eine abgebrochene Vorschau sagt es — sonst liest sich ein Ausschnitt
+    // wie eine Gesamtaussage.
+    const cut = r.partial
+      ? `<div class="stat-label" style="margin-top:8px">⏳ ${esc(t('ims.partial', 'Nach {s}s abgebrochen: {n} Alben wurden nicht mehr angesehen. Der Lauf selbst sieht alle an — er wartet auf niemanden.')
+          .replace('{s}', r.seconds).replace('{n}', r.albums_open))}</div>`
+      : '';
     if (!r.total) {
       box.innerHTML = `<b>${esc(String(r.year))}: ${esc(t('ims.none', 'nichts Neues vorzuschlagen.'))}</b><br>`
-        + esc(t('ims.none.why', 'Entweder gibt es keine eigenen Fotos mit Koordinaten in diesem Jahr, oder alles wurde schon vorgeschlagen — auch abgelehnte Vorschläge kommen nicht wieder.'));
+        + esc(t('ims.none.why', 'Entweder gibt es keine eigenen Fotos mit Koordinaten in diesem Jahr, oder alles wurde schon vorgeschlagen — auch abgelehnte Vorschläge kommen nicht wieder.'))
+        + dup + denied + cut;
     } else {
       // Die Vorschau NENNT die Vorschläge. Eine Zahl ist keine
       // Entscheidungsgrundlage (P2.5).
       const rows = r.proposals.slice(0, 40).map(p => `
         <div style="padding:3px 0">
           ${p.kind === 'album' ? '📗' : '📅'} <b>${esc(p.title)}</b>
-          <span class="stat-label">· ${esc(p.start.slice(0, 10))}${p.place ? ' · ' + esc(p.place) : ''} · ${p.photos} ${esc(t('ims.photos', 'Fotos'))}</span>
+          <span class="stat-label">· ${esc(p.start.slice(0, 10))}${p.place ? ' · ' + esc(p.place) : ''}${
+            // Anmerkung 113: gemessen und geraten dürfen nicht gleich
+            // aussehen. Der Ort aus dem Albumnamen ist eine Vermutung —
+            // sie steht dran, bevor jemand sie bestätigt.
+            p.place_source === 'title' ? ' ' + esc(t('ims.place.title', '(aus dem Namen)')) : ''
+          } · ${p.photos} ${esc(t('ims.photos', 'Fotos'))}</span>
           ${p.shared ? `<span class="chip badge-unconfirmed">${esc(t('ims.shared', 'geteiltes Album'))}</span>` : ''}
         </div>`).join('');
-      // Anmerkung 113: Eine abgebrochene Vorschau sagt es — sonst liest sich
-      // ein Ausschnitt wie eine Gesamtaussage.
-      const cut = r.partial
-        ? `<div class="stat-label" style="margin-top:8px">⏳ ${esc(t('ims.partial', 'Nach {s}s abgebrochen: {n} Alben wurden nicht mehr angesehen. Der Lauf selbst sieht alle an — er wartet auf niemanden.')
-            .replace('{s}', r.seconds).replace('{n}', r.albums_open))}</div>`
-        : '';
       box.innerHTML = `<b>${esc(t('ims.head', '{y}: {n} Vorschläge ({d} Fototage, {a} Alben) aus {p} Fotos')
           .replace('{y}', r.year).replace('{n}', r.total).replace('{d}', r.days)
           .replace('{a}', r.albums).replace('{p}', r.photos))}</b>
         <div style="margin-top:6px">${rows}</div>
         ${r.total > 40 ? `<div class="stat-label">… ${r.total - 40} ${esc(t('ims.more', 'weitere'))}</div>` : ''}
-        ${cut}`;
+        ${dup}${denied}${cut}`;
     }
     imsLock();
   } catch (err) {

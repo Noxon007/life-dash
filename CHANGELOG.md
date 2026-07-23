@@ -30,6 +30,25 @@ any `MINOR`.
   survives more Immich versions: the timeline endpoint changed which parameters
   it demands, so Life-Dash now tries the current form first and works its way
   back instead of giving up on the first rejection.
+- **An album was proposed even when you had already recorded that trip.**
+  “Mallorca_2005” from Immich landed next to your own “Urlaub auf Mallorca” of
+  the same fortnight — the same trip twice. Albums are now compared against your
+  own entries and skipped when one already covers the period; the preview names
+  which album it left out and which entry covers it. A short album inside a
+  long entry (a weekend during a year abroad) is still proposed — those are not
+  the same thing. Nothing is remembered about the skip: delete the entry and the
+  album is offered again.
+- **Albums whose photos predate GPS had no place at all.** For a 2005 album
+  there is nothing in the photos to read, while the place sits in the album's
+  name. The name is now looked up, and only accepted if it turns out to be a
+  real place — “Mallorca” yes, “Beste Bilder” no. Such a place is marked as
+  coming from the name, in the preview and in the entry, because a guess and a
+  measurement must not look alike. Places you already have are used before
+  anything is looked up online.
+- **An album spanning two regions was placed between them on the map.** Its
+  point was the average of all its photos while its name came from the most
+  frequent place — so the map showed a spot where nobody had been. The point now
+  belongs to the name.
 - **The setup instructions asked for too few Immich permissions.** They named
   three; proposing events from photos also needs `album.read` (albums) and
   `user.read` (telling your own photos from other people's). A key created by
