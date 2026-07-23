@@ -1,6 +1,7 @@
 """Event-Read-Endpoints (Stufe-3-Ansichten: Timeline & Karte)."""
 from __future__ import annotations
 
+import logging
 from datetime import date as date_type
 from datetime import datetime, timedelta
 from typing import Annotated
@@ -21,6 +22,8 @@ from app.services.stats_overview import find_birth
 from app.sqlutil import day_parts
 
 router = APIRouter(prefix="/api/events", tags=["Events"])
+
+log = logging.getLogger("lifedash.events")
 
 # Seit 0.35.0 in `_serialize.py` — dort, wo `event_to_read` steht: wer ein
 # Ereignis serialisiert, braucht genau diese Beziehungen (A42).
@@ -48,6 +51,62 @@ def create_event(
 # nur mit parent_event_id als Herkunftsverweis. Idempotent: Tage, die schon
 # ein Kind haben, werden übersprungen — der Knopf füllt nur Lücken auf.
 MAX_DAY_CHILDREN = 366
+# Sammelaktion: bis zu welcher Spanne ein Ereignis ohne Rückfrage aufgeteilt
+# wird. Bewusst viel kleiner als `MAX_DAY_CHILDREN` (das ist eine Grenze für
+# eine EINZELNE, ausdrücklich gewollte Aufteilung). Anmerkung 87 hat ein
+# automatisches Tages-Objekt je Tag verworfen, weil Tausende leere Container
+# entstehen, die jede Aggregation wieder ausfiltern muss — ein Sammelknopf
+# ohne Deckel wäre genau das, nur von Hand ausgelöst: EIN „Auslandsjahr"
+# ergäbe 365 Zeilen. Was darüber liegt, bleibt der Einzelentscheidung.
+BULK_DAY_SPAN = 31
+# Aufgeteilt wird nur, was tagesgenau datiert ist. „Sommer 2002" trägt
+# `date_start=2002-06-01` und eine Spanne über Monate — 92 Tages-Einträge
+# daraus zu machen behauptete eine Genauigkeit, die die Angabe selbst
+# dementiert. Dieselbe Regel wie `_ON_THIS_DAY_PRECISIONS` (F14) und wie im
+# Tagebuch-Vorschlag (F1).
+_SPLITTABLE_PRECISIONS = (DatePrecision.exact, DatePrecision.day)
+
+
+def _missing_days(parent: Event) -> list[tuple[int, date_type]]:
+    """Welche Tage der Spanne noch KEIN Kind haben — (Nummer, Datum).
+
+    Die Nummer ist der Tag innerhalb der Spanne und steckt im Titel („— Tag
+    3"). Sie muss aus der Spanne kommen und nicht aus der Reihenfolge des
+    Anlegens: sonst heißt derselbe Tag beim Lückenfüllen anders als beim
+    ersten Lauf.
+    """
+    first, last = parent.date_start.date(), parent.date_end.date()
+    have = {c.date_start.date() for c in parent.children if c.date_start}
+    return [(offset + 1, first + timedelta(days=offset))
+            for offset in range((last - first).days + 1)
+            if first + timedelta(days=offset) not in have]
+
+
+def _new_day_child(user_id: str, parent: Event, number: int,
+                   day: date_type) -> Event:
+    """Ein Tages-Kind — die EINE Stelle, an der festgelegt ist, wie es aussieht.
+
+    Einzelknopf und Sammelknopf gehen hier durch. Zwei Fassungen wären zwei
+    Regeln, und die laufen still auseinander (Anmerkung 106/111) — hier wäre
+    der Unterschied besonders teuer, weil er in der Lebensdatenbank landet.
+    """
+    start = datetime(day.year, day.month, day.day)
+    confirmed = parent.confirmed == ConfirmState.confirmed
+    return Event(
+        user_id=user_id,
+        title=f"{parent.title} — Tag {number}",
+        date_start=start,
+        date_end=start,
+        date_precision=DatePrecision.day,
+        category=parent.category,
+        confidence=1.0,
+        confirmed=parent.confirmed,
+        confirmed_at=parent.confirmed_at if confirmed else None,
+        confirmed_by=parent.confirmed_by if confirmed else None,
+        source=parent.source,
+        location_id=parent.location_id,
+        parent_event_id=parent.id,
+    )
 
 
 @router.post("/{event_id}/days", response_model=list[EventRead], status_code=201)
@@ -77,29 +136,9 @@ def create_day_children(
         raise HTTPException(status_code=400,
                             detail=f"Spanne zu groß (max. {MAX_DAY_CHILDREN} Tage)")
 
-    have = {c.date_start.date() for c in parent.children if c.date_start}
-    confirmed = parent.confirmed == ConfirmState.confirmed
     created: list[Event] = []
-    for offset in range(span):
-        day = first + timedelta(days=offset)
-        if day in have:
-            continue
-        start = datetime(day.year, day.month, day.day)
-        child = Event(
-            user_id=user.id,
-            title=f"{parent.title} — Tag {offset + 1}",
-            date_start=start,
-            date_end=start,
-            date_precision=DatePrecision.day,
-            category=parent.category,
-            confidence=1.0,
-            confirmed=parent.confirmed,
-            confirmed_at=parent.confirmed_at if confirmed else None,
-            confirmed_by=parent.confirmed_by if confirmed else None,
-            source=parent.source,
-            location_id=parent.location_id,
-            parent_event_id=parent.id,
-        )
+    for number, day in _missing_days(parent):
+        child = _new_day_child(user.id, parent, number, day)
         db.add(child)
         created.append(child)
     db.flush()
@@ -109,6 +148,128 @@ def create_day_children(
     for c in created:
         db.refresh(c)
     return [event_to_read(c) for c in created]
+
+
+# --------------------------------------------------------------------------- #
+# F7 in Serie — alle mehrtägigen Ereignisse auf einmal aufteilen
+# --------------------------------------------------------------------------- #
+# Aus dem Betrieb (Anmerkung 113): Seit Immich Alben vorschlägt, entstehen
+# mehrtägige Einträge in Serie, und jeder einzelne wollte per Hand aufgeklappt
+# und aufgeteilt werden. Ein Knopf pro Ereignis ist richtig, solange es ein
+# Ereignis ist; bei zwanzig ist er die Arbeit selbst.
+#
+# **Erst sehen, dann anlegen** — dasselbe Muster wie bei der Immich-Vorschau
+# (P2.5): Diese Aktion schreibt in die Lebensdatenbank, und zwar vervielfacht.
+# Wer 12 Ereignisse aufteilt, bekommt vielleicht 200 Zeilen, die er danach
+# einzeln wieder löschen müsste.
+_BULK_LIST_LIMIT = 60
+
+
+def _scan_splittable(db: Session, user_id: str, max_span: int):
+    """(fällige, zu lange, unscharf) — die EINE Auswahl für Vorschau und Lauf.
+
+    Zwei Auswahlen wären zwei Regeln: die Vorschau zeigte dann etwas anderes,
+    als der Knopf tut, und das fiele niemandem auf (Anmerkung 106). Deshalb
+    liefert diese Funktion die Ereignis-Objekte mitsamt ihren fehlenden Tagen —
+    die Vorschau zählt sie, der Lauf legt sie an.
+    """
+    rows = (db.query(Event).options(selectinload(Event.children))
+            .filter(Event.user_id == user_id,
+                    Event.parent_event_id.is_(None),
+                    Event.confirmed == ConfirmState.confirmed,
+                    Event.date_start.isnot(None),
+                    Event.date_end.isnot(None),
+                    Event.date_end > Event.date_start)
+            .order_by(Event.date_start.desc()).all())
+    ready, long_ones, vague = [], [], 0
+    for event in rows:
+        span = (event.date_end.date() - event.date_start.date()).days + 1
+        if span < 2:
+            continue
+        if event.date_precision not in _SPLITTABLE_PRECISIONS:
+            vague += 1
+            continue
+        missing = _missing_days(event)
+        if not missing:
+            continue                      # schon aufgeteilt — nichts zu tun
+        (ready if span <= max_span else long_ones).append((event, span, missing))
+    return ready, long_ones, vague
+
+
+def _entry(event: Event, span: int, missing: list) -> dict:
+    return {"id": event.id, "title": event.title, "span": span,
+            "days": len(missing),
+            "start": event.date_start.date().isoformat(),
+            "end": event.date_end.date().isoformat()}
+
+
+def _splittable(db: Session, user_id: str, max_span: int) -> dict:
+    """Was ein Sammellauf aufteilen würde — und was er auslässt, mit Grund.
+
+    Nur **bestätigte** Ereignisse: Kinder erben die Bestätigung, ein
+    aufgeteilter Vorschlag würde also die Moderations-Warteschlange
+    vervielfachen statt sie abzuarbeiten.
+    """
+    ready, long_ones, vague = _scan_splittable(db, user_id, max_span)
+    ready = [_entry(*r) for r in ready]
+    long_ones = [_entry(*r) for r in long_ones]
+    return {
+        "max_span": max_span,
+        "events": len(ready),
+        "days": sum(e["days"] for e in ready),
+        "list": ready[:_BULK_LIST_LIMIT],
+        "more": max(0, len(ready) - _BULK_LIST_LIMIT),
+        # Was NICHT passiert, gehört genauso in die Antwort wie was passiert:
+        # ein Ereignis, das stillschweigend ausgelassen wird, ist ein Rätsel.
+        "too_long": long_ones[:_BULK_LIST_LIMIT],
+        "too_long_count": len(long_ones),
+        "vague": vague,
+    }
+
+
+@router.get("/days/pending")
+def day_children_pending(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    max_span: Annotated[int, Query(ge=2, le=MAX_DAY_CHILDREN)] = BULK_DAY_SPAN,
+) -> dict:
+    """Vorschau: welche Ereignisse würden aufgeteilt, in wie viele Tage."""
+    return _splittable(db, user.id, max_span)
+
+
+@router.post("/days/all")
+def day_children_for_all(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    max_span: Annotated[int, Query(ge=2, le=MAX_DAY_CHILDREN)] = BULK_DAY_SPAN,
+) -> dict:
+    """Legt die fehlenden Tages-Einträge für ALLE passenden Ereignisse an.
+
+    **Ohne Wetter.** Der Einzelknopf reichert direkt an (P2.4), weil es um ein
+    Ereignis geht; hier wären es hunderte Open-Meteo-Abrufe in EINER Anfrage —
+    und ein Endpunkt, dessen Dauer an einem fremden Dienst hängt, überlebt
+    keinen umgekehrten Vertreter (Anmerkung 113, der 502). Das Wetter trägt
+    der Wetterlauf nach; genau dafür gibt es ihn.
+
+    Idempotent wie der Einzelknopf: vorhandene Tage werden übersprungen, es
+    werden nur Lücken gefüllt. Zweimal drücken legt nichts doppelt an.
+    """
+    # Dieselbe Auswahl wie die Vorschau — und die Anzeige-Deckelung
+    # (`_BULK_LIST_LIMIT`) gilt hier NICHT: sie ist eine Eigenschaft der
+    # Darstellung, kein Teil der Regel. Ein Lauf, der sechzig anlegt und über
+    # den Rest schweigt, wäre genau die Stille, die dieses Projekt jagt.
+    ready, long_ones, vague = _scan_splittable(db, user.id, max_span)
+    created = 0
+    for event, _span, missing in ready:
+        for number, day in missing:
+            db.add(_new_day_child(user.id, event, number, day))
+            created += 1
+    db.commit()
+    log.info("Tages-Einträge in Serie: %d Ereignisse, %d Tage angelegt "
+             "(max_span=%d, %d zu lang, %d unscharf)",
+             len(ready), created, max_span, len(long_ones), vague)
+    return {"events": len(ready), "created": created, "max_span": max_span,
+            "too_long_count": len(long_ones), "vague": vague}
 
 
 # A37: Datierungen, die der Nutzer selbst als „unscharf" sieht. Die Liste

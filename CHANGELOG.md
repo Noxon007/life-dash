@@ -17,6 +17,19 @@ any `MINOR`.
 
 ## [0.38.0] – 2026-07-22
 
+### Added
+- **Split every multi-day event into day entries at once.** Under Administration
+  → My data → “Day entries”. The per-event button in the edit dialog stays; this
+  one does the same for all of them, which matters once photo albums start
+  arriving as multi-day entries. Take a look first — it says how many entries
+  become how many days, and names what it leaves out and why: entries that are
+  only proposals (splitting those would multiply the moderation queue), vaguely
+  dated ones (days out of “summer 2002” would be invented), and anything longer
+  than the span you set, 31 days by default — a year-long entry is 365 rows and
+  stays a deliberate single decision. Existing days are kept and only gaps are
+  filled, so pressing twice creates nothing twice. The per-day weather is added
+  by the weather run afterwards.
+
 ### Fixed
 - **The switch for imported location visits in “On this day” did nothing.** The
   tick could be set and was remembered, but the page asked the server using the

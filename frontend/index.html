@@ -1608,6 +1608,36 @@
         </div>
 
         <!-- A28: EIN Ortsnamen-Lauf für alles — keine Scope-Auswahl mehr -->
+        <!-- Anmerkung 113: Seit Immich Alben vorschlägt, entstehen mehrtägige
+             Einträge in Serie — und jeder einzelne wollte von Hand aufgeteilt
+             werden. Erst sehen, dann anlegen (P2.5): die Aktion schreibt
+             vervielfacht in die Lebensdatenbank. -->
+        <div class="section-title" data-i18n="adm.daysplit">Tages-Einträge</div>
+        <div class="panel" style="padding:0">
+          <div class="action-row">
+            <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
+              <button class="btn secondary" id="btn-days-preview" style="text-align:left" data-i18n="ds.preview">🔍 Nachsehen</button>
+              <button class="btn" id="btn-days-run" style="text-align:left" disabled data-i18n="ds.run">📅 Alle aufteilen</button>
+              <label class="stat-label" style="display:flex; align-items:center; gap:6px">
+                <span data-i18n="ds.max">bis</span>
+                <input type="number" id="days-max-span" class="mf-select" value="31" min="2" max="366" style="width:72px">
+                <span data-i18n="ds.days">Tage</span>
+              </label>
+            </div>
+            <div class="action-desc">
+              <span data-i18n="ds.desc"><b>Mehrtägige Ereignisse in Tages-Einträge aufteilen</b> — dasselbe wie der Knopf
+              im Bearbeiten-Dialog, nur für alle auf einmal. Jeder Tag bekommt einen eigenen Eintrag
+              („… — Tag 3"), eingeklappt unter dem Haupt-Ereignis, mit eigenem Wetter je Tag.
+              Aufgeteilt wird nur, was <b>bestätigt</b> und <b>tagesgenau datiert</b> ist: ein Vorschlag
+              würde die Warteschlange vervielfachen, und aus „Sommer 2002" 92 Tage zu machen behauptet
+              eine Genauigkeit, die die Angabe selbst dementiert. Vorhandene Tage bleiben, es werden nur
+              Lücken gefüllt — zweimal drücken legt nichts doppelt an. Das <b>Wetter</b> holt der
+              Wetterlauf nach, nicht dieser Knopf.</span>
+              <div id="days-result" class="hint" style="display:none; margin-top:10px"></div>
+            </div>
+          </div>
+        </div>
+
         <div class="section-title" data-i18n="adm.placenames">Ortsnamen</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
@@ -2449,6 +2479,20 @@ const I18N_EN = {
   'im.save': "Save",
   'im.saved': "✓ Immich access saved.",
   'im.ok': "✓ Immich reachable (version {v}).",
+  // Day entries in bulk (note 113)
+  'adm.daysplit': "Day entries",
+  'ds.preview': "🔍 Take a look",
+  'ds.run': "📅 Split them all",
+  'ds.max': "up to",
+  'ds.days': "days",
+  'ds.desc': "<b>Split multi-day events into day entries</b> — the same as the button in the edit dialog, but for all of them at once. Every day gets its own entry (“… — day 3”), collapsed under the main event, with its own weather. Only what is <b>confirmed</b> and <b>dated to the day</b> is split: a proposal would multiply the moderation queue, and turning “summer 2002” into 92 days claims a precision the entry itself denies. Existing days stay, only gaps are filled — pressing twice creates nothing twice. The <b>weather</b> is added by the weather run, not by this button.",
+  'ds.none': "Nothing to split.",
+  'ds.none.why': "No confirmed, day-precise multi-day event without day entries.",
+  'ds.head': "{n} events → {d} new day entries",
+  'ds.toolong': "{n} skipped for being longer than {s} days — split those one at a time, in the edit dialog:",
+  'ds.vague': "{n} skipped for being vaguely dated (month, season, year) — days out of those would be invented.",
+  'ds.needpreview': "Take a look first — then split.",
+  'ds.done': "✓ {d} day entries created for {n} events. The per-day weather is added by the weather run.",
   'im.rights.missing': "Immich is running (version {v}), but the key is missing permissions:",
   'im.rights.toast': "The key is missing permissions: {r}",
   'im.rights.ok': "✓ Version {v} — all required permissions present.",
@@ -7113,6 +7157,90 @@ document.getElementById('timeline-file').addEventListener('change', async ev => 
 // geocodiert). Der Server kennt `scope` weiterhin, die UI bietet ihn nicht an.
 document.getElementById('btn-resolve-run').addEventListener('click', e =>
   startServerJob(e.target, 'resolve_names'));
+
+// --------------------------------------------------------------------------- //
+// Tages-Einträge in Serie (Anmerkung 113)
+// --------------------------------------------------------------------------- //
+// Dasselbe Muster wie die Immich-Vorschau: „Alle aufteilen" bleibt gesperrt,
+// bis jemand gesehen hat, was dabei entsteht. Diese Aktion schreibt
+// VERVIELFACHT in die Lebensdatenbank — 12 Ereignisse können 200 Zeilen sein,
+// und die müsste man einzeln wieder löschen.
+let daysSeen = null;               // die Spanne, für die die Vorschau galt
+function daysSpan() {
+  const el = document.getElementById('days-max-span');
+  const n = parseInt(el?.value, 10);
+  return Number.isFinite(n) ? Math.min(366, Math.max(2, n)) : 31;
+}
+function daysLock() {
+  const run = document.getElementById('btn-days-run');
+  if (run) run.disabled = daysSeen === null || daysSeen !== daysSpan();
+}
+document.getElementById('days-max-span')?.addEventListener('input', daysLock);
+document.getElementById('btn-days-preview')?.addEventListener('click', async ev => {
+  const btn = ev.target, box = document.getElementById('days-result');
+  btn.disabled = true;
+  try {
+    const r = await api(`/api/events/days/pending?max_span=${daysSpan()}`);
+    daysSeen = r.max_span;
+    box.style.display = '';
+    if (!r.events) {
+      box.innerHTML = `<b>${esc(t('ds.none', 'Nichts aufzuteilen.'))}</b><br>`
+        + esc(t('ds.none.why', 'Kein bestätigtes, tagesgenau datiertes Mehrtages-Ereignis ohne Tages-Einträge.'));
+    } else {
+      // Die Vorschau NENNT die Ereignisse. Eine Zahl ist keine
+      // Entscheidungsgrundlage (P2.5).
+      box.innerHTML = `<b>${esc(t('ds.head', '{n} Ereignisse → {d} neue Tages-Einträge')
+          .replace('{n}', r.events).replace('{d}', r.days))}</b>
+        <div style="margin-top:6px">${r.list.map(e => `
+          <div style="padding:3px 0">📅 <b>${esc(e.title)}</b>
+            <span class="stat-label">· ${esc(e.start)} – ${esc(e.end)} · ${e.days} ${esc(t('ds.days', 'Tage'))}</span>
+          </div>`).join('')}</div>
+        ${r.more ? `<div class="stat-label">… ${r.more} ${esc(t('ims.more', 'weitere'))}</div>` : ''}`;
+    }
+    // Was NICHT passiert, gehört genauso hin wie was passiert — sonst sucht
+    // jemand vergeblich sein „Auslandsjahr" in der Liste.
+    if (r.too_long_count) {
+      box.innerHTML += `<div class="stat-label" style="margin-top:8px">⏭️ ${
+        esc(t('ds.toolong', '{n} übersprungen, weil länger als {s} Tage — die teilt man einzeln auf, im Bearbeiten-Dialog:')
+          .replace('{n}', r.too_long_count).replace('{s}', r.max_span))}<br>`
+        + r.too_long.map(e => `· ${esc(e.title)} <span class="stat-label">(${e.span} ${esc(t('ds.days', 'Tage'))})</span>`).join('<br>')
+        + '</div>';
+    }
+    if (r.vague) {
+      box.innerHTML += `<div class="stat-label" style="margin-top:8px">⏳ ${
+        esc(t('ds.vague', '{n} übersprungen, weil unscharf datiert (Monat, Jahreszeit, Jahr) — Tage daraus wären erfunden.')
+          .replace('{n}', r.vague))}</div>`;
+    }
+    daysLock();
+  } catch (err) {
+    box.style.display = ''; box.textContent = err.message;
+    daysSeen = null; daysLock();
+  } finally { btn.disabled = false; }
+});
+document.getElementById('btn-days-run')?.addEventListener('click', async ev => {
+  const btn = ev.target, span = daysSpan();
+  if (daysSeen !== span) {
+    toast(t('ds.needpreview', 'Erst nachsehen — dann aufteilen.'), 'warn');
+    return;
+  }
+  btn.disabled = true;
+  try {
+    const r = await api(`/api/events/days/all?max_span=${span}`, { method: 'POST' });
+    toast(t('ds.done', '✓ {d} Tages-Einträge für {n} Ereignisse angelegt. Das Wetter je Tag trägt der Wetterlauf nach.')
+      .replace('{d}', r.created).replace('{n}', r.events), 'ok', 8000);
+    // Der Bestand ist ein anderer: die Vorschau ist verbraucht, und der
+    // Zeitstrahl zeigt noch den alten Stand.
+    daysSeen = null;
+    document.getElementById('days-result').style.display = 'none';
+    if (typeof loadTimeline === 'function') loadTimeline();
+  } catch (err) { toast(err.message, 'error', 8000); }
+  // `btn.disabled = false` wäre hier falsch und war es auch: das `finally`
+  // läuft NACH dem Zurücksetzen und hätte den Riegel wieder aufgezogen — der
+  // Knopf stand nach dem Lauf offen, obwohl die Vorschau verbraucht ist.
+  // Gefunden vom Wächter, nicht beim Lesen. `daysLock()` kennt die Regel und
+  // lässt den Knopf nach einem FEHLER offen (dann gilt die Vorschau ja noch).
+  finally { daysLock(); }
+});
 
 // Ortsnamen-Format: Bausteine (Straße/Ortsteil/Stadt/Land) pro Nutzer gespeichert
 // Anmerkung 112: Diese Funktion füllt DREI unabhängige Bereiche der
