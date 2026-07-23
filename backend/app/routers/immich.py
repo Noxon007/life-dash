@@ -111,10 +111,24 @@ def source_preview(
     **Und sie muss rechtzeitig fertig sein, nicht irgendwann** (Anmerkung 113,
     zweite Runde): Aus der Ferne steht zwischen Browser und App ein umgekehrter
     Vertreter mit fester Geduld — läuft die ab, gibt es keine späte Antwort,
-    sondern ein **502**. Die Vorschau bekommt deshalb ein Zeitbudget und
+    sondern gar keine. Die Vorschau bekommt deshalb ein Zeitbudget und
     antwortet notfalls mit dem, was sie bis dahin gesehen hat. Sie sagt dann,
     wie viele Alben sie nicht mehr angesehen hat; der LAUF sieht sie alle an,
     denn er wartet auf niemanden.
+
+    **Ein fremder Dienst, der ausfällt, ist KEIN 5xx dieser App** (Anmerkung
+    113, dritte Runde — und das war der gemeldete Fehler). Diese Funktion hat
+    `HTTPException(502, "Immich nicht erreichbar: …")` geworfen. Semantisch
+    passend, im Betrieb fatal: **Cloudflare ersetzt den Rumpf einer
+    502-Antwort durch seine eigene 6,5-kB-HTML-Seite.** Der sorgfältig
+    formulierte Satz, der genau sagt, was mit Immich los ist, wurde also von
+    der Infrastruktur weggeworfen und durch „Bad gateway" ersetzt — und die
+    Seite bekam HTML, wo sie JSON erwartete. Gemessen: 205 ms, also nicht
+    einmal langsam; Immich war schlicht sofort nicht erreichbar.
+    Deshalb: **200 mit `error` im Rumpf**, genau wie `/api/immich/years` es mit
+    `reason` hält. Ein Statuscode gehört der eigenen App; die Auskunft über
+    einen fremden Dienst gehört in die Nutzlast, wo kein Vermittler sie
+    anfasst.
     """
     url, key = _config_or_400(user)
     log.info("Immich-Vorschau für %s: Jahr %d — beginnt", user.id[:8], year)
@@ -126,7 +140,10 @@ def source_preview(
     except api.ImmichError as exc:
         log.warning("Immich-Vorschau %d abgebrochen nach %.1fs: %s",
                     year, time.monotonic() - began, exc)
-        raise HTTPException(502, str(exc)) from exc
+        return {"year": year, "error": str(exc), "total": 0, "days": 0,
+                "albums": 0, "photos": 0, "shared": 0, "partial": False,
+                "albums_open": 0, "seconds": round(time.monotonic() - began, 1),
+                "proposals": []}
     log.info("Immich-Vorschau %d fertig in %.1fs: %d Vorschläge",
              year, time.monotonic() - began, len(proposals))
     days = sum(1 for p in proposals if p.kind == "day")

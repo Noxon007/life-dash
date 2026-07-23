@@ -162,7 +162,26 @@ setTimeout(async () => {
   ok('…und räumt die alte Vorschau weg', box.style.display === 'none',
      'die Zahlen von 2024 stünden unter dem Jahr 2022');
 
-  // --- 5. Und wenn davor etwas schiefgeht? ------------------------------- //
+  // --- 5. Immich fällt aus: der Grund muss ANKOMMEN ---------------------- //
+  // Anmerkung 113, dritte Runde. Der Endpunkt hat einen Immich-Ausfall als
+  // `502` gemeldet — semantisch passend, im Betrieb fatal: ein umgekehrter
+  // Vertreter (hier Cloudflare) ersetzt den Rumpf einer 502 durch seine eigene
+  // HTML-Fehlerseite. Der Satz, der genau sagt, was mit Immich los ist, kam
+  // damit nie an; die Seite bekam HTML statt JSON und zeigte „502 Bad
+  // Gateway". Deshalb: 200 mit `error` im Rumpf — und der Wächter stellt genau
+  // diesen Zustand her.
+  preview = { year: 2022, error: 'Immich lehnt den API-Schlüssel ab (401/403)',
+              total: 0, days: 0, albums: 0, photos: 0, shared: 0,
+              partial: false, albums_open: 0, seconds: 0.2, proposals: [] };
+  d.getElementById('ims-preview').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await wait(40);
+  ok('Ein Immich-Ausfall wird im Klartext gezeigt',
+     /401|Schlüssel/.test(box.textContent),
+     `stattdessen: ${box.textContent.slice(0, 120)}`);
+  ok('…und der Anlegen-Knopf bleibt gesperrt', run.disabled,
+     'ohne echte Vorschau darf nichts angelegt werden');
+
+  // --- 6. Und wenn davor etwas schiefgeht? ------------------------------- //
   // Anmerkung 112: Genau hier lag der gemeldete Fehler. Die Jahresliste kam
   // nur vom Server, und ihr Aufruf hing hinter einem stummen `catch`. Ging
   // irgendetwas davor schief — ein fehlendes Feld in den Einstellungen, ein

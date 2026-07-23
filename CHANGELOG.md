@@ -30,6 +30,14 @@ any `MINOR`.
   survives more Immich versions: the timeline endpoint changed which parameters
   it demands, so Life-Dash now tries the current form first and works its way
   back instead of giving up on the first rejection.
+- **When Immich refused, the preview showed “Bad gateway” instead of the
+  reason.** Life-Dash reported a failure of the photo server as a server error
+  of its own — and a reverse proxy replaces the body of such a response with its
+  own error page, so the sentence explaining what was wrong (“Immich rejects the
+  API key”, “Immich does not know that address”) never arrived. The preview now
+  answers normally and puts the reason in the result, the way the year list
+  already did. If your preview has been failing, this is the change that will
+  finally tell you why.
 - **The Immich preview could end in a gateway error instead of a result.** On a
   large library it re-downloaded every album of the chosen year on every run —
   including the ones already confirmed or rejected — and when accessed from

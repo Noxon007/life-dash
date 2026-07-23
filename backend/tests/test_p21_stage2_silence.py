@@ -188,6 +188,41 @@ def test_known_albums_are_not_downloaded_again(db, user, monkeypatch):
     assert [p.slot for p in out] == [source.slot_album("alb-neu")]
 
 
+def test_preview_never_answers_with_a_gateway_status(db, user, monkeypatch):
+    """Ein Immich-Ausfall darf kein 502 dieser App sein.
+
+    Der gemeldete Fehler, mit Beweis aus dem Netzwerk-Reiter: 502 in 205 ms,
+    `content-type: text/html`, 6,5 kB. So schnell antwortet kein Zeitlimit —
+    Immich hat sofort abgelehnt, die App hat daraus ein 502 gemacht, und
+    **Cloudflare hat den Rumpf durch seine eigene Fehlerseite ersetzt**. Der
+    Satz, der genau sagt, was klemmt, kam nie an; die Seite bekam HTML, wo sie
+    JSON erwartete.
+
+    Ein Statuscode gehört der eigenen App. Die Auskunft über einen fremden
+    Dienst gehört in die Nutzlast, wo kein Vermittler sie anfasst — genauso
+    hält es `/api/immich/years` mit `reason`.
+    """
+    from fastapi import HTTPException
+
+    from app.routers.immich import source_preview
+
+    user.settings = {"immich": {"url": "http://immich.local", "api_key": "k"}}
+    db.commit()
+
+    def _boom(*a, **kw):
+        raise api.ImmichError("Immich lehnt den API-Schlüssel ab (401/403)", 401)
+
+    monkeypatch.setattr(source, "scan_year", _boom)
+    try:
+        out = source_preview(year=YEAR, db=db, user=user)
+    except HTTPException as exc:  # pragma: no cover - genau das darf nicht sein
+        raise AssertionError(
+            f"Vorschau antwortet mit {exc.status_code} — ein 5xx wird unterwegs "
+            "durch die Fehlerseite des Vermittlers ersetzt") from exc
+    assert "401" in out["error"]
+    assert out["total"] == 0 and out["proposals"] == []
+
+
 def test_preview_gives_up_in_time_and_says_so(db, user, monkeypatch):
     """Ein 502 ist keine späte Antwort, sondern gar keine.
 

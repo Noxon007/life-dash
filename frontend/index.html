@@ -2430,6 +2430,7 @@ const I18N_EN = {
   'ims.shared': "shared album",
   'ims.more': "more",
   'ims.years.fail': "The year list could not be fetched from Immich ({e}) — the picker shows the last few years. A run still works.",
+  'ims.failed': "Immich did not answer.",
   'ims.partial': "Stopped after {s}s: {n} albums were not looked at. The run itself looks at all of them — it is not keeping anyone waiting.",
   'ims.years.own': "The years come from your own data, not from Immich ({e}). The years before the smartphone are missing from that list — a run still works for every year shown.",
   'ims.needpreview': "Look at the preview first — then create.",
@@ -7367,11 +7368,20 @@ document.getElementById('ims-preview')?.addEventListener('click', async ev => {
   const timer = setInterval(tick, 1000);
   try {
     const r = await api(`/api/immich/preview?year=${year}`, { method: 'POST' });
-    imsPreviewedYear = r.year;
     box.style.display = '';
     // Der Kasten trägt sonst noch die Marke des Jahres-Hinweises — und ein
     // späteres `imsNote('')` würde dann das Vorschau-Ergebnis ausblenden.
     delete box.dataset.note;
+    // Anmerkung 113: Immich-Ausfälle kommen jetzt mit 200 und `error` im
+    // Rumpf. Ein 502 wäre unterwegs von Cloudflare durch eine HTML-Seite
+    // ersetzt worden — die Auskunft, warum es klemmt, kam nie an.
+    if (r.error) {
+      box.innerHTML = `<b>${esc(t('ims.failed', 'Immich hat nicht geantwortet.'))}</b><br>${esc(r.error)}`;
+      imsPreviewedYear = null;
+      imsLock();
+      return;
+    }
+    imsPreviewedYear = r.year;
     if (!r.total) {
       box.innerHTML = `<b>${esc(String(r.year))}: ${esc(t('ims.none', 'nichts Neues vorzuschlagen.'))}</b><br>`
         + esc(t('ims.none.why', 'Entweder gibt es keine eigenen Fotos mit Koordinaten in diesem Jahr, oder alles wurde schon vorgeschlagen — auch abgelehnte Vorschläge kommen nicht wieder.'));
