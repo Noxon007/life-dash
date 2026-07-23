@@ -194,6 +194,31 @@ englischen Katalog) und `check-place-format.js`. Zahlen/Daten folgen jetzt `LOC(
 die Werte kommen seit 0.22 mit; **eine Null ist beim Regen kein Rekord, beim
 Tageslicht schon** (Polarnacht = kürzester Tag, vgl. Anm. 104).
 
+**Einstieg-Reihenfolge (Anmerkung 115, nach 0.38.0, auf `main` ohne
+Versionssprung).** README hat jetzt einen Guide „Getting started — a sensible
+order", und „Meine Daten" steht in derselben, nummerierten Reihenfolge:
+**Module → Google-Timeline → Ortsnamen → Immich (verbinden → vorschlagen →
+bestätigen → Fotos) → Tages-Einträge → Wetter → Backup.** Zwei Gründe, die
+keine Vorlieben sind: **Ortsnamen früh**, weil das der einzige von außen
+gedrosselte Lauf ist (Nominatim) und weil bis dahin alles „Ort (53.49, 10.00)"
+heißt; **Wetter zuletzt**, weil es jede Zeile genau einmal fragt (F12-Marker) —
+ein Lauf, der einmal fragt, gehört ans Ende, nicht an den Anfang. Die Abschnitte
+standen vorher in ihrer Bauzeitpunkt-Reihenfolge (Backup oben, Module unten):
+**das ist ein Änderungsprotokoll, keine Anleitung.**
+**„Wetter ergänzen" ist aus dem System-Reiter nach „Meine Daten" gewandert** —
+der Reiter ist `admin-only`, der Endpunkt war es NIE: eine reine
+Oberflächensperre über einer instanzweiten Aktion. Jetzt filtert
+`enrich_weather(user_id=…)` auf das startende Konto; `recompute`/`embeddings`
+bleiben in System (die rechnen wirklich über alles). **Die Sperre bleibt
+global**: sie schützt nicht die Daten, sondern das Kontingent bei
+Open-Meteo/Nominatim/Immich, und das hängt an der Instanz.
+**Der stille Befund dabei: der Nachtplan fragte „lief das heute schon?" ohne
+„bei wem?"** — ab dem zweiten Konto nimmt der erste Nutzer allen anderen den
+Termin, Nacht für Nacht, ohne Fehlermeldung. Galt schon für `resolve_names`,
+`immich`, `immich_source`. Jetzt EINE Liste `USER_SCOPED_TYPES` (dieselbe Form
+wie `MACHINE_SOURCES`, Anm. 111). Tests: `backend/tests/test_job_scope.py`,
+gegengeprüft am kaputten Stand (3 von 8 fallen dort um).
+
 **Feedback-Runde 0.38.0 (Anmerkung 110) — zwei teure Befunde, beide Stille.**
 **(a)** Der Bild-Endpunkt hielt seine DB-Verbindung, während er bei Immich auf
 das Foto wartete (15 s Zeitlimit). Hinter HTTP/2 feuert der Browser dutzende

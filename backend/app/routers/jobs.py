@@ -50,6 +50,16 @@ JOB_TYPES = {
 # der Browser zu ist. Importe bleiben client-getrieben (die Datei liegt dort).
 SERVER_JOB_TYPES = ("weather", "embeddings", "resolve_names", "recompute",
                     "immich", "immich_source")
+# Diese Läufe bearbeiten die Daten GENAU EINES Kontos (`job.user_id`) — sie
+# gehören in der Oberfläche unter „Meine Daten", nicht unter System. Der Rest
+# (`recompute`, `embeddings`) rechnet über den ganzen Bestand.
+#
+# Der Unterschied ist nicht kosmetisch: „heute schon gelaufen" im Nachtplan
+# darf für diese Typen nur den EIGENEN Lauf zählen, sonst nimmt der erste
+# Nutzer allen anderen den Termin weg (Anmerkung 115). Die Sperre beim Start
+# bleibt trotzdem global — sie schützt nicht die Daten, sondern das Kontingent
+# bei Open-Meteo/Nominatim/Immich, und das hängt an der Instanz, nicht am Konto.
+USER_SCOPED_TYPES = ("weather", "resolve_names", "immich", "immich_source")
 # In Tests abgeschaltet (in-memory-DB verträgt keine fremden Threads)
 WORKERS_ENABLED = True
 
@@ -269,7 +279,7 @@ def _run_weather(db: Session, job: Job) -> tuple[str, str]:
     from app.services.enrichment import enrich_weather
 
     while True:
-        enriched, remaining = enrich_weather(db, limit=25)
+        enriched, remaining = enrich_weather(db, limit=25, user_id=job.user_id)
         cont = _tick(db, job.id, enriched, remaining)
         if remaining <= 0:
             return "done", f"{db.get(Job, job.id).done} Events mit Wetter angereichert"
@@ -543,15 +553,25 @@ def run_due_schedules() -> None:
                 if (jtype not in _RUNNERS or not cfg.get("enabled")
                         or now.hour != int(cfg.get("hour", 3))):
                     continue
-                # Heute schon gelaufen (egal von wem)? Dann nicht erneut.
-                last = (db.query(Job).filter(Job.type == jtype)
-                        .order_by(Job.started_at.desc()).first())
+                # Läuft dieser Typ gerade (egal von wem)? Dann nicht daneben —
+                # die Sperre aus `start_job` gilt auch für den Planer.
+                if (db.query(Job)
+                        .filter(Job.type == jtype,
+                                Job.status.in_(("running", "stopping")))
+                        .first()):
+                    continue
+                # Heute schon gelaufen? Bei kontogebundenen Läufen zählt nur
+                # der EIGENE (Anmerkung 115): sonst erledigt der erste Nutzer
+                # den Termin für alle, und die Ereignisse aller anderen bleiben
+                # ohne Wetter, Ortsnamen und Fotos — still, Nacht für Nacht.
+                q = db.query(Job).filter(Job.type == jtype)
+                if jtype in USER_SCOPED_TYPES:
+                    q = q.filter(Job.user_id == user.id)
+                last = q.order_by(Job.started_at.desc()).first()
                 if last:
                     started_local = (last.started_at.replace(tzinfo=timezone.utc)
                                      .astimezone())
                     if started_local.date() == now.date():
-                        continue
-                    if last.status in ("running", "stopping"):
                         continue
                 job = Job(user_id=user.id, type=jtype, unit="geplant", params=None)
                 db.add(job)

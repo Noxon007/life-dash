@@ -1498,15 +1498,11 @@
                 unangetastet. Sinnvoll nach Modell- oder Prompt-Änderungen. Bricht bei erschöpftem
                 KI-Kontingent sauber ab (bereits Berechnetes bleibt erhalten).</div>
             </div>
-            <div class="action-row">
-              <button class="btn secondary" id="btn-enrich" data-i18n="act.weather">🌤️ Wetter ergänzen</button>
-              <div class="action-desc" data-i18n="act.weather.desc"><b>Fehlendes Wetter nachtragen (Fakten-Anreicherung).</b><br>
-                Holt historisches Wetter (via Open-Meteo) für Events, die noch <i>keins</i> haben —
-                z. B. nach neuen Einträgen oder Importen. Ältere Events mit Wetter im Alt-Format
-                (nur Temperatur + Bedingung) bekommen dabei die fehlenden <i>Tageswerte</i>
-                (Min/Max, Sonne, Regen, Schnee, Wind) <b>additiv</b> nachgerüstet. Einmal geholt =
-                dauerhaft: Vorhandene Werte werden nie überschrieben oder neu berechnet.</div>
-            </div>
+            <!-- Anmerkung 115: „Wetter ergänzen" stand hier, im Admin-Reiter.
+                 Wetter ist aber eine Tatsache über MEINE Ereignisse und keine
+                 Systempflege — für Nicht-Admins war der Knopf schlicht nicht
+                 da, ihre Ereignisse blieben ohne Wetter. Jetzt in „Meine
+                 Daten", Schritt 5, und der Lauf bleibt beim eigenen Konto. -->
             <div class="action-row">
               <button class="btn secondary" id="btn-embed" data-i18n="act.embed">🧠 Embeddings berechnen</button>
               <div class="action-desc" data-i18n="act.embed.desc"><b>Semantische Suche neu aufbauen (Ableitung).</b><br>
@@ -1591,42 +1587,36 @@
         </div>
 
         <div class="admin-tabpane" data-tabpane="daten" style="display:none">
-        <!-- A26: klare Blöcke — Sichern, Importe, Ortsnamen, Tracking -->
-        <div class="section-title" data-i18n="adm.backup">Sichern &amp; Zurückspielen</div>
+        <!-- A26: klare Blöcke. Anmerkung 115: die Blöcke stehen jetzt in der
+             Reihenfolge, in der man sie beim ersten Mal braucht — jeder Schritt
+             füttert den nächsten (Import liefert Orte und Daten, die Ortsnamen
+             machen sie lesbar, Immich hängt Bilder an das, was es dann gibt,
+             das Wetter kommt zuletzt, weil es jedes Ereignis genau einmal
+             abfragt). Vorher stand das Backup oben und die Modulauswahl ganz
+             unten: die Liste war nach Bauzeitpunkt sortiert, nicht nach
+             Benutzung. Dieselbe Reihenfolge steht in der README. -->
+        <div class="hint" style="margin-bottom:18px" data-i18n="adm.firstrun">
+          <b>Zum ersten Mal hier?</b> Die Abschnitte stehen in der Reihenfolge, in der sie
+          sinnvoll sind — jeder liefert dem nächsten sein Material:
+          <b>1.</b> Module wählen · <b>2.</b> Google-Timeline importieren ·
+          <b>3.</b> Ortsnamen auflösen · <b>4.</b> Immich verbinden, Vorschläge ansehen
+          und Fotos verknüpfen · <b>5.</b> mehrtägiges aufteilen ·
+          <b>6.</b> Wetter ergänzen · <b>7.</b> Backup ziehen.
+          Nichts davon ist Pflicht, und jeder Lauf lässt sich beliebig oft wiederholen —
+          nachgetragen wird immer nur, was fehlt.</div>
+        <div class="section-title" data-i18n="adm.tracking">1 · Was trackst du?</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
-            <button class="btn secondary" id="btn-export" data-i18n="act.export">📦 Daten exportieren</button>
-            <div class="action-desc"><span data-i18n="act.export.desc"><b>Backup als JSON-Datei.</b><br>
-              Lädt alle deine Daten (Roh-Eingang, Ereignisse, Objekte, Orte, Wetter) als eine
-              JSON-Datei herunter. Embeddings sind enthalten. Regelmäßig machen — das ist dein Backup.</span><br>
-              <!-- A32: BEIDE Häkchen bedeuten dasselbe — „ist enthalten".
-                   Vorher schloss das eine aus und das andere ein; zwei Zeilen
-                   auseinander, gegenläufig. Beide sind vorangehakt, damit der
-                   Standardweg das vollständige Backup ist. -->
-              <label class="stat-label" style="display:flex; align-items:center; gap:6px; margin-top:8px">
-                <input type="checkbox" id="exp-with-media" checked>
-                <span data-i18n="exp.opt.media"><b>Fotos einschließen</b> (ergibt eine ZIP-Datei — das vollständige Backup)</span>
-              </label>
-              <label class="stat-label" style="display:flex; align-items:center; gap:6px; margin-top:4px">
-                <input type="checkbox" id="exp-with-timeline" checked>
-                <span data-i18n="exp.opt.timeline">Importierte Google-Timeline-Daten einschließen (Besuche, Routen und deren Roh-Belege)</span>
-              </label>
-              <span class="hint" style="display:block; margin-top:6px" data-i18n="exp.media.hint">Ohne dieses Häkchen
-              bekommst du reines JSON: klein, lesbar, diffbar — aber <b>ohne deine Bilddateien</b>. Die stecken nur
-              im ZIP. Immich-Bilder sind in keinem von beiden: die liegen in Immich und werden dort gesichert.</span></div>
-          </div>
-          <div class="action-row">
-            <div class="action-key">
-              <button class="btn secondary" id="btn-import" style="width:100%; text-align:left" data-i18n="act.import">📥 Daten importieren</button>
-              <input type="file" id="import-file" accept=".json,.zip,application/json,application/zip" style="display:none">
+            <div class="action-key"><b style="font-size:13px" data-i18n="adm.track.mods">🧩 Module</b></div>
+            <div class="action-desc"><span data-i18n="adm.track.desc"><b>Module für Kompendium, Statistik &amp; KI wählen.</b><br>
+              Abgewählte Module verschwinden aus Reitern, Filtern, Formularen und dem
+              KI-Prompt — vorhandene Daten bleiben erhalten und tauchen nach dem
+              Wieder-Anwählen sofort wieder auf.</span>
+              <div id="track-settings" style="margin-top:8px; columns:2; max-width:420px"></div>
             </div>
-            <div class="action-desc" data-i18n="act.import.desc"><b>Export-Datei zurückspielen.</b><br>
-              Importiert eine Life-Dash-Export-Datei. Bereits vorhandene Einträge (gleiche ID) werden
-              übersprungen — mehrfaches Importieren erzeugt keine Duplikate. Alles landet in deinem Konto.</div>
           </div>
         </div>
-
-        <div class="section-title" data-i18n="adm.imports">Importe</div>
+        <div class="section-title" data-i18n="adm.imports">2 · Importe</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key">
@@ -1647,38 +1637,7 @@
           </div>
         </div>
 
-        <!-- A28: EIN Ortsnamen-Lauf für alles — keine Scope-Auswahl mehr -->
-        <!-- Anmerkung 113: Seit Immich Alben vorschlägt, entstehen mehrtägige
-             Einträge in Serie — und jeder einzelne wollte von Hand aufgeteilt
-             werden. Erst sehen, dann anlegen (P2.5): die Aktion schreibt
-             vervielfacht in die Lebensdatenbank. -->
-        <div class="section-title" data-i18n="adm.daysplit">Tages-Einträge</div>
-        <div class="panel" style="padding:0">
-          <div class="action-row">
-            <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
-              <button class="btn secondary" id="btn-days-preview" style="text-align:left" data-i18n="ds.preview">🔍 Nachsehen</button>
-              <button class="btn" id="btn-days-run" style="text-align:left" disabled data-i18n="ds.run">📅 Alle aufteilen</button>
-              <label class="stat-label" style="display:flex; align-items:center; gap:6px">
-                <span data-i18n="ds.max">bis</span>
-                <input type="number" id="days-max-span" class="mf-select" value="31" min="2" max="366" style="width:72px">
-                <span data-i18n="ds.days">Tage</span>
-              </label>
-            </div>
-            <div class="action-desc">
-              <span data-i18n="ds.desc"><b>Mehrtägige Ereignisse in Tages-Einträge aufteilen</b> — dasselbe wie der Knopf
-              im Bearbeiten-Dialog, nur für alle auf einmal. Jeder Tag bekommt einen eigenen Eintrag
-              („… — Tag 3"), eingeklappt unter dem Haupt-Ereignis, mit eigenem Wetter je Tag.
-              Aufgeteilt wird nur, was <b>bestätigt</b> und <b>tagesgenau datiert</b> ist: ein Vorschlag
-              würde die Warteschlange vervielfachen, und aus „Sommer 2002" 92 Tage zu machen behauptet
-              eine Genauigkeit, die die Angabe selbst dementiert. Vorhandene Tage bleiben, es werden nur
-              Lücken gefüllt — zweimal drücken legt nichts doppelt an. Das <b>Wetter</b> holt der
-              Wetterlauf nach, nicht dieser Knopf.</span>
-              <div id="days-result" class="hint" style="display:none; margin-top:10px"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="section-title" data-i18n="adm.placenames">Ortsnamen</div>
+        <div class="section-title" data-i18n="adm.placenames">3 · Ortsnamen</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
@@ -1710,56 +1669,10 @@
               Die Auswahl gilt sofort für alle neuen Auflösungen; Bestandsdaten bringt der Lauf
               oben aufs gewählte Muster.</span></div>
           </div>
-          <!-- A40 (Anm. 92): Aus der Kartenansicht hierher. Es ist ein
-               Schutzwert, keine Vorliebe — er gehört zu den Einstellungen,
-               nicht neben die drei Schalter, die man beim Kartengucken bedient. -->
-          <div class="action-row">
-            <div class="action-key"><b style="font-size:13px" data-i18n="adm.cluster">🔵 Kartenpunkte bündeln</b></div>
-            <div class="action-desc"><span data-i18n="adm.cluster.desc"><b>Ab wie vielen Punkten die Karte zusammenfasst.</b><br>
-              „Punkte zusammenfassen“ ist auf der Karte ein Schalter; diese Zahl bestimmt, ab wann er
-              greift. Niedriger heißt: früher Zahlenblasen statt Einzelpunkte — schont schwächere Geräte.
-              Höher heißt: länger jeder Besuch für sich.</span><br>
-              <label class="stat-label" style="display:inline-flex; align-items:center; gap:6px; margin-top:8px">
-                <span data-i18n="adm.cluster.from">Ab</span>
-                <input id="mp-cluster-min" type="number" min="10" max="300" step="10" value="50" class="mf-select" style="width:80px">
-                <span data-i18n="adm.cluster.points">Punkten</span>
-              </label></div>
-          </div>
-        </div>
-
-        <!-- A35: Passwort ändern (nur lokale Konten) -->
-        <div class="section-title local-only" style="display:none" data-i18n="adm.password">Passwort</div>
-        <div class="panel local-only" style="padding:0; display:none">
-          <div class="action-row">
-            <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
-              <input type="password" id="pw-current" autocomplete="current-password"
-                     data-i18n-ph="pw.current" placeholder="Aktuelles Passwort" class="mf-select">
-              <input type="password" id="pw-new" autocomplete="new-password"
-                     data-i18n-ph="pw.new" placeholder="Neues Passwort (min. 8)" class="mf-select">
-              <button class="btn secondary" id="btn-pw-change" style="text-align:left" data-i18n="pw.change">🔑 Passwort ändern</button>
-            </div>
-            <div class="action-desc"><span data-i18n="pw.desc">Ändert das Passwort deines lokalen Kontos.
-              Es wird sicher gehasht gespeichert (scrypt) — im Klartext liegt es nirgends.</span></div>
-          </div>
-        </div>
-
-        <!-- A33: eigene Daten löschen — das Gegenstück zum Export -->
-        <div class="section-title" data-i18n="adm.wipemine">Meine Daten löschen</div>
-        <div class="panel" style="padding:0">
-          <div class="action-row">
-            <div class="action-key">
-              <button class="btn ghost" id="btn-wipe-mine" style="width:100%; text-align:left; color:var(--danger)"
-                      data-i18n="act.wipemine">🗑️ Alle meine Daten löschen</button>
-            </div>
-            <div class="action-desc"><span data-i18n="act.wipemine.desc"><b>Alles, was diesem Konto gehört</b> —
-              Ereignisse, Objekte, Orte, Routen, Wetter, hochgeladene Fotos und der Roh-Eingang.
-              Das Konto selbst bleibt bestehen, andere Nutzer sind nicht betroffen.
-              <b>Unwiderruflich.</b> Mach vorher ein Backup (oben, mit Fotos).</span></div>
-          </div>
         </div>
 
         <!-- P2.1: Immich-Zugang je Nutzer -->
-        <div class="section-title" data-i18n="adm.immich">Immich (Fotos)</div>
+        <div class="section-title" data-i18n="adm.immich">4 · Immich (Fotos)</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
@@ -1816,8 +1729,98 @@
           </div>
         </div>
 
-        <!-- F13: eigene Hintergrundkarte -->
-        <div class="section-title" data-i18n="adm.basemap">Hintergrundkarte</div>
+        <!-- A28: EIN Ortsnamen-Lauf für alles — keine Scope-Auswahl mehr -->
+        <!-- Anmerkung 113: Seit Immich Alben vorschlägt, entstehen mehrtägige
+             Einträge in Serie — und jeder einzelne wollte von Hand aufgeteilt
+             werden. Erst sehen, dann anlegen (P2.5): die Aktion schreibt
+             vervielfacht in die Lebensdatenbank. -->
+        <div class="section-title" data-i18n="adm.daysplit">5 · Tages-Einträge</div>
+        <div class="panel" style="padding:0">
+          <div class="action-row">
+            <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
+              <button class="btn secondary" id="btn-days-preview" style="text-align:left" data-i18n="ds.preview">🔍 Nachsehen</button>
+              <button class="btn" id="btn-days-run" style="text-align:left" disabled data-i18n="ds.run">📅 Alle aufteilen</button>
+              <label class="stat-label" style="display:flex; align-items:center; gap:6px">
+                <span data-i18n="ds.max">bis</span>
+                <input type="number" id="days-max-span" class="mf-select" value="31" min="2" max="366" style="width:72px">
+                <span data-i18n="ds.days">Tage</span>
+              </label>
+            </div>
+            <div class="action-desc">
+              <span data-i18n="ds.desc"><b>Mehrtägige Ereignisse in Tages-Einträge aufteilen</b> — dasselbe wie der Knopf
+              im Bearbeiten-Dialog, nur für alle auf einmal. Jeder Tag bekommt einen eigenen Eintrag
+              („… — Tag 3"), eingeklappt unter dem Haupt-Ereignis, mit eigenem Wetter je Tag.
+              Aufgeteilt wird nur, was <b>bestätigt</b> und <b>tagesgenau datiert</b> ist: ein Vorschlag
+              würde die Warteschlange vervielfachen, und aus „Sommer 2002" 92 Tage zu machen behauptet
+              eine Genauigkeit, die die Angabe selbst dementiert. Vorhandene Tage bleiben, es werden nur
+              Lücken gefüllt — zweimal drücken legt nichts doppelt an. Das <b>Wetter</b> holt der
+              Wetterlauf nach, nicht dieser Knopf.</span>
+              <div id="days-result" class="hint" style="display:none; margin-top:10px"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Anmerkung 115: aus dem System-Reiter hierher. Wetter ist eine
+             Tatsache über die EIGENEN Ereignisse (der Lauf filtert auf das
+             Konto), keine Systempflege — und im Admin-Reiter war der Knopf für
+             normale Nutzer gar nicht vorhanden. Bewusst nach dem Aufteilen:
+             jeder Tages-Eintrag will sein eigenes Wetter, und geholt wird je
+             Ereignis genau einmal. -->
+        <div class="section-title" data-i18n="adm.weather">6 · Wetter</div>
+        <div class="panel" style="padding:0">
+          <div class="action-row">
+            <div class="action-key">
+              <button class="btn secondary" id="btn-enrich" style="width:100%; text-align:left" data-i18n="act.weather">🌤️ Wetter ergänzen</button>
+            </div>
+            <div class="action-desc" data-i18n="act.weather.desc"><b>Fehlendes Wetter nachtragen (Fakten-Anreicherung).</b><br>
+              Holt historisches Wetter (via Open-Meteo) für <i>deine</i> Ereignisse, die noch
+              <i>keins</i> haben — z. B. nach neuen Einträgen oder Importen. Ältere Events mit Wetter
+              im Alt-Format (nur Temperatur + Bedingung) bekommen dabei die fehlenden <i>Tageswerte</i>
+              (Min/Max, Sonne, Regen, Schnee, Wind) <b>additiv</b> nachgerüstet. Einmal geholt =
+              dauerhaft: Vorhandene Werte werden nie überschrieben oder neu berechnet. Deshalb steht
+              der Lauf hier hinten: er fragt jedes Ereignis genau einmal, also lohnt er sich am
+              meisten, wenn Importe und Vorschläge durch sind. Läuft im Hintergrund auf dem Server
+              (Fortschritt und Stopp im Reiter <b>„Jobs"</b>) und lässt sich dort auch als
+              Nachtplan eintragen.</div>
+          </div>
+        </div>
+
+        <div class="section-title" data-i18n="adm.backup">7 · Sichern &amp; Zurückspielen</div>
+        <div class="panel" style="padding:0">
+          <div class="action-row">
+            <button class="btn secondary" id="btn-export" data-i18n="act.export">📦 Daten exportieren</button>
+            <div class="action-desc"><span data-i18n="act.export.desc"><b>Backup als JSON-Datei.</b><br>
+              Lädt alle deine Daten (Roh-Eingang, Ereignisse, Objekte, Orte, Wetter) als eine
+              JSON-Datei herunter. Embeddings sind enthalten. Regelmäßig machen — das ist dein Backup.</span><br>
+              <!-- A32: BEIDE Häkchen bedeuten dasselbe — „ist enthalten".
+                   Vorher schloss das eine aus und das andere ein; zwei Zeilen
+                   auseinander, gegenläufig. Beide sind vorangehakt, damit der
+                   Standardweg das vollständige Backup ist. -->
+              <label class="stat-label" style="display:flex; align-items:center; gap:6px; margin-top:8px">
+                <input type="checkbox" id="exp-with-media" checked>
+                <span data-i18n="exp.opt.media"><b>Fotos einschließen</b> (ergibt eine ZIP-Datei — das vollständige Backup)</span>
+              </label>
+              <label class="stat-label" style="display:flex; align-items:center; gap:6px; margin-top:4px">
+                <input type="checkbox" id="exp-with-timeline" checked>
+                <span data-i18n="exp.opt.timeline">Importierte Google-Timeline-Daten einschließen (Besuche, Routen und deren Roh-Belege)</span>
+              </label>
+              <span class="hint" style="display:block; margin-top:6px" data-i18n="exp.media.hint">Ohne dieses Häkchen
+              bekommst du reines JSON: klein, lesbar, diffbar — aber <b>ohne deine Bilddateien</b>. Die stecken nur
+              im ZIP. Immich-Bilder sind in keinem von beiden: die liegen in Immich und werden dort gesichert.</span></div>
+          </div>
+          <div class="action-row">
+            <div class="action-key">
+              <button class="btn secondary" id="btn-import" style="width:100%; text-align:left" data-i18n="act.import">📥 Daten importieren</button>
+              <input type="file" id="import-file" accept=".json,.zip,application/json,application/zip" style="display:none">
+            </div>
+            <div class="action-desc" data-i18n="act.import.desc"><b>Export-Datei zurückspielen.</b><br>
+              Importiert eine Life-Dash-Export-Datei. Bereits vorhandene Einträge (gleiche ID) werden
+              übersprungen — mehrfaches Importieren erzeugt keine Duplikate. Alles landet in deinem Konto.</div>
+          </div>
+        </div>
+
+        <!-- F13: eigene Hintergrundkarte (+ A40-Schwelle, Anm. 115) -->
+        <div class="section-title" data-i18n="adm.basemap">Karte</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key"><b style="font-size:13px" data-i18n="adm.basemap.own">🔧 Eigene Karte</b></div>
@@ -1835,20 +1838,55 @@
               <div style="margin-top:8px"><button class="btn small secondary" id="tile-save" data-i18n="adm.basemap.save">Speichern</button></div>
             </div>
           </div>
-        </div>
-
-        <div class="section-title" data-i18n="adm.tracking">Tracking</div>
-        <div class="panel" style="padding:0">
+          <!-- A40 (Anm. 92): Aus der Kartenansicht in die Einstellungen — es
+               ist ein Schutzwert, keine Vorliebe. Anmerkung 115: und zwar zu
+               den KARTEN-Einstellungen; unter „Ortsnamen" stand er nur, weil
+               das damals der einzige Einstellungsblock war. -->
           <div class="action-row">
-            <div class="action-key"><b style="font-size:13px">🧩 Was trackst du?</b></div>
-            <div class="action-desc"><span data-i18n="adm.track.desc"><b>Module für Kompendium, Statistik &amp; KI wählen.</b><br>
-              Abgewählte Module verschwinden aus Reitern, Filtern, Formularen und dem
-              KI-Prompt — vorhandene Daten bleiben erhalten und tauchen nach dem
-              Wieder-Anwählen sofort wieder auf.</span>
-              <div id="track-settings" style="margin-top:8px; columns:2; max-width:420px"></div>
-            </div>
+            <div class="action-key"><b style="font-size:13px" data-i18n="adm.cluster">🔵 Kartenpunkte bündeln</b></div>
+            <div class="action-desc"><span data-i18n="adm.cluster.desc"><b>Ab wie vielen Punkten die Karte zusammenfasst.</b><br>
+              „Punkte zusammenfassen“ ist auf der Karte ein Schalter; diese Zahl bestimmt, ab wann er
+              greift. Niedriger heißt: früher Zahlenblasen statt Einzelpunkte — schont schwächere Geräte.
+              Höher heißt: länger jeder Besuch für sich.</span><br>
+              <label class="stat-label" style="display:inline-flex; align-items:center; gap:6px; margin-top:8px">
+                <span data-i18n="adm.cluster.from">Ab</span>
+                <input id="mp-cluster-min" type="number" min="10" max="300" step="10" value="50" class="mf-select" style="width:80px">
+                <span data-i18n="adm.cluster.points">Punkten</span>
+              </label></div>
           </div>
         </div>
+
+        <!-- A35: Passwort ändern (nur lokale Konten) -->
+        <div class="section-title local-only" style="display:none" data-i18n="adm.password">Passwort</div>
+        <div class="panel local-only" style="padding:0; display:none">
+          <div class="action-row">
+            <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
+              <input type="password" id="pw-current" autocomplete="current-password"
+                     data-i18n-ph="pw.current" placeholder="Aktuelles Passwort" class="mf-select">
+              <input type="password" id="pw-new" autocomplete="new-password"
+                     data-i18n-ph="pw.new" placeholder="Neues Passwort (min. 8)" class="mf-select">
+              <button class="btn secondary" id="btn-pw-change" style="text-align:left" data-i18n="pw.change">🔑 Passwort ändern</button>
+            </div>
+            <div class="action-desc"><span data-i18n="pw.desc">Ändert das Passwort deines lokalen Kontos.
+              Es wird sicher gehasht gespeichert (scrypt) — im Klartext liegt es nirgends.</span></div>
+          </div>
+        </div>
+
+        <!-- A33: eigene Daten löschen — das Gegenstück zum Export -->
+        <div class="section-title" data-i18n="adm.wipemine">Meine Daten löschen</div>
+        <div class="panel" style="padding:0">
+          <div class="action-row">
+            <div class="action-key">
+              <button class="btn ghost" id="btn-wipe-mine" style="width:100%; text-align:left; color:var(--danger)"
+                      data-i18n="act.wipemine">🗑️ Alle meine Daten löschen</button>
+            </div>
+            <div class="action-desc"><span data-i18n="act.wipemine.desc"><b>Alles, was diesem Konto gehört</b> —
+              Ereignisse, Objekte, Orte, Routen, Wetter, hochgeladene Fotos und der Roh-Eingang.
+              Das Konto selbst bleibt bestehen, andere Nutzer sind nicht betroffen.
+              <b>Unwiderruflich.</b> Mach vorher ein Backup (oben, mit Fotos).</span></div>
+          </div>
+        </div>
+
 
         </div>
 
@@ -2465,10 +2503,16 @@ const I18N_EN = {
   'in.geo': "📍 Use my location",
 
   // --- Verwaltung ---
-  'adm.backup': "Backup &amp; restore",
-  'adm.imports': "Imports",
-  'adm.placenames': "Place names",
-  'adm.tracking': "Tracking",
+  // Anmerkung 115: Die Nummern gehören zum Titel und nicht in eine eigene
+  // Spalte — sie stehen für die Reihenfolge, in der die Abschnitte einander
+  // füttern, und ein Katalog, der sie weglässt, macht aus der Anleitung auf
+  // Englisch wieder eine Liste.
+  'adm.backup': "7 · Backup &amp; restore",
+  'adm.imports': "2 · Imports",
+  'adm.placenames': "3 · Place names",
+  'adm.tracking': "1 · What do you track?",
+  'adm.weather': "6 · Weather",
+  'adm.firstrun': "<b>First time here?</b> The sections are in the order that makes sense — each one feeds the next its material: <b>1.</b> pick your modules · <b>2.</b> import the Google timeline · <b>3.</b> resolve place names · <b>4.</b> connect Immich, review its proposals and link photos · <b>5.</b> split multi-day entries · <b>6.</b> add weather · <b>7.</b> take a backup. None of it is mandatory, and every run can be repeated as often as you like — it only ever fills in what is missing.",
   'adm.users.title': "Users",
   'adm.modqueue': "Moderation queue",
   'act.recompute': "🔄 Recompute AI proposals",
@@ -2488,7 +2532,7 @@ const I18N_EN = {
   'imp.known': "already present",
   'imp.photos': "photos restored",
   'imp.thumbs': "previews rebuilt",
-  'adm.immich': "Immich (photos)",
+  'adm.immich': "4 · Immich (photos)",
   // P2.1 stage 2 (0.37.0) — Immich as an event source
   'ims.desc': "<b>Photos become proposals.</b> A day with many pictures in one place (“34 photos on 12 July in Detmold”) and every album become an <b>unconfirmed</b> entry in moderation — nothing is confirmed on its own. Only <b>your own</b> photos <b>with coordinates</b> that sit in your Immich timeline are clustered; archived and locked ones stay out. Shared albums are allowed and are marked as such.",
   'ims.preview': "🔍 Preview this year",
@@ -2520,7 +2564,7 @@ const I18N_EN = {
   'im.saved': "✓ Immich access saved.",
   'im.ok': "✓ Immich reachable (version {v}).",
   // Day entries in bulk (note 113)
-  'adm.daysplit': "Day entries",
+  'adm.daysplit': "5 · Day entries",
   'ds.preview': "🔍 Take a look",
   'ds.run': "📅 Split them all",
   'ds.max': "up to",
@@ -2565,7 +2609,7 @@ const I18N_EN = {
   'wx.trip': "🏖️ Warmest trip",
   'wx.trip.sub': "no trip with weather yet",
   'wx.feels': "feels like",
-  'wx.none': "no weather data — Admin → “Add weather”",
+  'wx.none': "no weather data — Admin → My data → “Add weather”",
   'wx.noplace': "no place",
   'wx.newdata': "comes with new weather enrichment (from v0.14)",
   'chart.raindays': "Rainy days per year",
@@ -2585,7 +2629,8 @@ const I18N_EN = {
   'bm.sat': "🛰️ Satellite",
   'bm.custom': "🔧 Custom map",
   'bm.tip': "Choose the background map",
-  'adm.basemap': "Background map",
+  'adm.basemap': "Map",
+  'adm.track.mods': "🧩 Modules",
   'adm.basemap.own': "🔧 Custom map",
   'adm.basemap.desc': "The maps offer OpenStreetMap, topography and satellite in the top right. If you run your own tile server or use a provider with a key, enter it here — the option “🔧 Custom map” then appears on every map. Placeholders: <code>{z}/{x}/{y}</code>, optionally <code>{s}</code> for subdomains and <code>{r}</code> for high-resolution tiles.",
   'adm.basemap.attr.ph': "Attribution, e.g. © My map provider",
@@ -2733,7 +2778,7 @@ const I18N_EN = {
   // --- Verwaltung: Erklaertexte ---
   'adm.runs.hint': "These runs happen <b>in the background on the server</b> — you can close the page. Progress, the stop button and the nightly schedule live in the <b>“Jobs”</b> tab; progress is kept when you stop, and a restart resumes where it left off.",
   'act.recompute.desc': "<b>Repeat the AI extraction.</b><br>Discards all <i>unconfirmed</i> events and rebuilds them from the raw inbox — with the current AI model and prompt. Confirmed events and manually corrected fields are left untouched. Useful after model or prompt changes. Stops cleanly when the AI quota runs out (whatever was computed is kept).",
-  'act.weather.desc': "<b>Fill in missing weather (fact enrichment).</b><br>Fetches historical weather (via Open-Meteo) for events that have <i>none</i> yet — e.g. after new entries or imports. Older events with weather in the legacy format (temperature and condition only) get the missing <i>daily values</i> (min/max, sun, rain, snow, wind) added <b>on top</b>. Fetched once = kept forever: existing values are never overwritten or recalculated.",
+  'act.weather.desc': "<b>Fill in missing weather (fact enrichment).</b><br>Fetches historical weather (via Open-Meteo) for <i>your</i> entries that have <i>none</i> yet — e.g. after new entries or imports. Older events with weather in the legacy format (temperature and condition only) get the missing <i>daily values</i> (min/max, sun, rain, snow, wind) added <b>on top</b>. Fetched once = kept forever: existing values are never overwritten or recalculated. That is why this run comes last: it asks about each entry exactly once, so it pays off most when the imports and proposals are done. It runs in the background on the server (progress and stop in the <b>“Jobs”</b> tab), where it can also be put on the nightly schedule.",
   'act.embed.desc': "<b>Rebuild the semantic search (derived data).</b><br>Discards the vectors of all events and recomputes them with the current embedding model. Required after every model change, otherwise the “meaning search” finds nothing or the wrong things. Stops without doing anything if no embedding model is configured.",
   'act.wipe.desc': "<b style=\"color:var(--danger)\">Cannot be undone!</b><br>Deletes all life data — raw inbox, events &amp; items, places, weather &amp; embeddings. User accounts remain. There is a double confirmation; afterwards the database is empty.",
   'adm.jobs.hint': "Long-running actions (weather, recompute, embeddings, place names, imports) are registered as <b>jobs with a lock</b>: the same type cannot run twice — not even from two browsers or by two users at once (this prevents duplicate API costs and duplicate data).",
@@ -4993,7 +5038,7 @@ async function loadStats() {
   // Wetter-Extreme. Der Server liefert je Kachel Wert, Datum, Ort und Titel;
   // ein Klick öffnet den Eintrag und lädt ihn dafür bei Bedarf einzeln nach.
   const tempCard = (id, x, unit = ' °C',
-                    empty = t('wx.none', 'keine Wetterdaten — Verwaltung → „Wetter ergänzen"')) => {
+                    empty = t('wx.none', 'keine Wetterdaten — Verwaltung → Meine Daten → „Wetter ergänzen"')) => {
     num(id, x ? `${x.value}${unit}` : '–');
     num(id + '-sub', x
       ? `${fmtDate(x)} · ${x.place || t('wx.noplace', 'ohne Ort')} — ${x.title}`

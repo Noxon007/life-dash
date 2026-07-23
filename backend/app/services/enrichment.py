@@ -63,8 +63,14 @@ def _needs_weather(event: Event) -> bool:
     return rev < WEATHER_REVISION
 
 
-def _weather_candidates(db: Session) -> list[Event]:
+def _weather_candidates(db: Session, user_id: str | None = None) -> list[Event]:
     """Verortete, datierte, nicht-zukünftige Events ohne Wetter-Metrik.
+
+    `user_id` grenzt auf ein Konto ein. Der Lauf ist seit 0.38 eine Aktion
+    unter „Meine Daten": Wetter ist eine Tatsache über MEINE Ereignisse, kein
+    Systemdienst — und ohne diese Eingrenzung würde der Knopf eines Nutzers
+    die Ereignisse aller anderen anfassen. Ohne `user_id` (Admin-Endpunkt,
+    Tests) bleibt es der alte Rundum-Lauf.
 
     Diese Suche läuft VOR JEDEM Batch. Sie holte bis 0.34 den GANZEN Bestand
     (`query(Event).all()`) und filterte in Python — samt Lazy-Load von
@@ -81,14 +87,16 @@ def _weather_candidates(db: Session) -> list[Event]:
     # tagesgenau urteilt („Zukunft hat noch kein Wetter").
     tomorrow = datetime.combine(datetime.now(timezone.utc).date(), time_.min) \
         + timedelta(days=1)
-    rows = (db.query(Event)
-            .join(Location, Event.location_id == Location.id)
-            .filter(Location.lat.isnot(None),
-                    Event.date_start.isnot(None),
-                    Event.date_start < tomorrow)
-            .options(selectinload(Event.metrics),
-                     joinedload(Event.location))
-            .all())
+    q = (db.query(Event)
+         .join(Location, Event.location_id == Location.id)
+         .filter(Location.lat.isnot(None),
+                 Event.date_start.isnot(None),
+                 Event.date_start < tomorrow)
+         .options(selectinload(Event.metrics),
+                  joinedload(Event.location)))
+    if user_id is not None:
+        q = q.filter(Event.user_id == user_id)
+    rows = q.all()
     hits = [e for e in rows if _needs_weather(e)]
     log.debug("Wetter-Kandidaten: %d von %d vorgefilterten Ereignissen (%.1f s)",
               len(hits), len(rows), time.monotonic() - t0)
@@ -183,14 +191,17 @@ def auto_enrich_events(db: Session, events: list[Event]) -> int:
     return enriched
 
 
-def enrich_weather(db: Session, limit: int | None = None) -> tuple[int, int]:
+def enrich_weather(db: Session, limit: int | None = None,
+                   user_id: str | None = None) -> tuple[int, int]:
     """Hängt Temperatur + Bedingung an Events ohne Wetter (Batch fürs Admin-UI).
 
     Gibt (angereichert, verbleibend) zurück. Wetter ist Fakten-Anreicherung
     (KONZEPT Kap. 3.1): einmal geholt = dauerhaft; es wird nur ergänzt,
     nie verworfen und neu berechnet.
+
+    `user_id` grenzt auf ein Konto ein (siehe `_weather_candidates`).
     """
-    candidates = _weather_candidates(db)
+    candidates = _weather_candidates(db, user_id)
     batch = candidates if limit is None else candidates[:limit]
     # Pro Event committen: der Unique-Index (A11, ux_metrics_weather) weist
     # Dubletten aus parallelen Läufen ab — dann verliert nur DIESES Event

@@ -27,6 +27,23 @@ any `MINOR`.
   the wettest.
 
 ### Changed
+- **“My data” now reads as a first run, top to bottom.** The sections were in
+  the order they had been built in; they are now in the order in which they feed
+  each other, numbered, with a short guide at the top: pick your modules →
+  import the Google timeline → resolve place names → Immich → split multi-day
+  entries → add weather → back up. The same order, with the reasoning, is now in
+  the README, so the question “where do I start?” has one answer in two places
+  instead of none. The map's clustering threshold moved from *Place names* to
+  *Map*, where the rest of the map settings are.
+- **Adding weather is no longer an admin chore.** It used to sit in the *System*
+  tab, which meant an ordinary account had no way to run it at all and its
+  entries simply stayed without weather. It is now step 6 under *My data*, and
+  the run stays inside the account that started it — pressing your own button no
+  longer touches anybody else's entries. The nightly schedule now gives every
+  account its own turn for those runs (weather, place names and both Immich
+  runs); before, whoever ran first used up the slot for everyone. Recomputing
+  proposals and rebuilding embeddings stay in *System*: those genuinely work
+  across the whole instance.
 - **Imported places no longer get called “Home” or “Work”.** Google describes
   *how* it recognised a stay — that is not the name of the place, and it ended
   up in the visit title, on the map and in the collection. The place is now

@@ -278,7 +278,12 @@ def recompute_events(limit: int = Query(5, ge=1, le=50)) -> dict:
 
 @router.post("/enrich-weather")
 def enrich_weather_endpoint(limit: int = Query(25, ge=1, le=200)) -> dict:
-    """Wetter-Batch für Events ohne Wetter (Open-Meteo, 1 Anfrage je Event)."""
+    """Wetter-Batch für Events ohne Wetter (Open-Meteo, 1 Anfrage je Event).
+
+    Bewusst über den GANZEN Bestand: das ist der Admin-Weg (und der der Tests).
+    Der Knopf in der Oberfläche startet den Job `weather`, und der bleibt beim
+    eigenen Konto (`enrich_weather(user_id=…)`, Anmerkung 115).
+    """
     db = SessionLocal()
     try:
         enriched, remaining = enrich_weather(db, limit=limit)

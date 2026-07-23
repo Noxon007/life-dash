@@ -25,6 +25,49 @@ enough to try it out. Local development without Docker: see
 The interface speaks **English and German**; a switch in the top bar changes
 the language at any time (it follows your browser on first visit).
 
+## Getting started — a sensible order
+
+A fresh instance is empty, and it fills up from several directions that build on
+each other. This is the order that works; it is also the order of the sections
+under **Admin → My data**, so you can simply work down the page. None of it is
+mandatory, and every run can be repeated as often as you like — each one only
+fills in what is missing.
+
+**First, write one thing down.** Type a sentence into *Capture* (“12 July 2026,
+Detmold, saw an eagle”) and confirm the proposal in *Admin → Moderation*. That
+is the whole pipeline in thirty seconds — raw text → AI proposal → your
+confirmed record — and it makes the imports below much easier to judge.
+
+1. **Pick your modules** (*What do you track?*). They decide which categories,
+   filters and statistics exist, and what the AI is asked to look for.
+   Unticking one hides it; nothing is deleted.
+2. **Import your Google timeline.** This is the big one: years of visits become
+   entries and movements become routes, and everything after this step feeds on
+   the dates and coordinates it brings. Export from the phone (Android:
+   *Settings → Location → Location services → Timeline → Export timeline data*);
+   old Takeout exports work too. Importing twice creates no duplicates.
+3. **Resolve place names.** Imported visits arrive as `Place (53.49, 10.00)`.
+   The run turns them into addresses via OpenStreetMap, and it is deliberately
+   throttled — start it early, let it work in the background. Manually renamed
+   places are never touched.
+4. **Connect Immich**, if you have it. Three things, in this order: *test the
+   connection*, then **propose entries from photos** (one year at a time, with a
+   mandatory preview) and confirm what you want in *Moderation*, then **link
+   photos**, which attaches pictures to the entries that now exist. Photos stay
+   in Immich; Life-Dash stores references, and the API key it needs is read-only.
+5. **Split multi-day entries into days**, if trips and albums have produced
+   them. Each day becomes its own entry, so each day can carry its own weather
+   and its own photos.
+6. **Add weather.** Last on purpose: it asks an archive (Open-Meteo) about each
+   located, dated entry exactly once and keeps the answer forever, so it pays
+   off most when the entries above already exist. It only ever adds — nothing
+   you confirmed is overwritten.
+7. **Take a backup** (*Backup & restore*, with photos = a ZIP). Do this once the
+   instance holds something you would miss.
+
+Steps 3, 4 and 6 also run unattended: the **Jobs** tab has a nightly schedule
+per run type, which is the sensible setting once the first pass is done.
+
 ## How this was built
 
 The entire implementation was written by Anthropic's Claude models — **Fable and
