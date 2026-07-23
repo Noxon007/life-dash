@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import time
 from datetime import date
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -94,6 +95,13 @@ def source_years(
 @router.post("/preview")
 def source_preview(
     year: int = Query(..., ge=1900, le=2200),
+    # `Annotated` und NICHT `= Query(False)`: ein Query-Objekt als Default
+    # kommt beim direkten Aufruf als Wert an — und ein Query-Objekt ist wahr.
+    # Der Schalter stünde damit überall dort auf AN, wo niemand ihn gesetzt
+    # hat. Dieselbe Falle steht in `routers/events.py` bei `list_events`
+    # aufgeschrieben; hier ist sie zum zweiten Mal aufgetreten.
+    albums: Annotated[bool, Query(description="P2.1 Stufe 3: Alben mit ansehen "
+                                              "(Standard aus, siehe scan_year)")] = False,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> dict:
@@ -135,14 +143,15 @@ def source_preview(
     began = time.monotonic()
     report: dict = {}
     try:
-        proposals = source.scan_year(db, user, year, url, key,
+        proposals = source.scan_year(db, user, year, url, key, albums=albums,
                                      budget_s=PREVIEW_BUDGET_S, report=report)
     except api.ImmichError as exc:
         log.warning("Immich-Vorschau %d abgebrochen nach %.1fs: %s",
                     year, time.monotonic() - began, exc)
         return {"year": year, "error": str(exc), "total": 0, "days": 0,
                 "albums": 0, "photos": 0, "shared": 0, "partial": False,
-                "albums_open": 0, "seconds": round(time.monotonic() - began, 1),
+                "albums_open": 0, "albums_asked": albums,
+                "seconds": round(time.monotonic() - began, 1),
                 "proposals": []}
     log.info("Immich-Vorschau %d fertig in %.1fs: %d Vorschläge",
              year, time.monotonic() - began, len(proposals))
@@ -163,9 +172,77 @@ def source_preview(
         # dieselbe Stille wie ein Vorschlag zu viel, nur andersherum.
         "covered": report.get("covered", []),
         "albums_denied": report.get("albums_denied"),
+        # Ob überhaupt nach Alben gefragt wurde. Ohne das Feld sieht „keine
+        # Alben gefunden" genauso aus wie „nicht nachgesehen".
+        "albums_asked": report.get("albums_asked", False),
         "seconds": report.get("seconds"),
         # Die Liste selbst, damit die Vorschau die Vorschläge NENNT statt nur
         # zu zählen. „38 Vorschläge" ist eine Zahl; „Dänemark 2024, 12. Juli
         # in Detmold, …" ist eine Entscheidungsgrundlage.
         "proposals": [p.as_dict() for p in proposals],
     }
+
+
+# --------------------------------------------------------------------------- #
+# P2.1 Stufe 3 — vorhandene Album-Vorschläge wegräumen (Anmerkung 116)
+# --------------------------------------------------------------------------- #
+# Wer den Alben-Zweig abschaltet, hat die Alben von gestern noch in der
+# Warteschlange stehen. Sie einzeln zu verwerfen ist dieselbe Arbeit, die A46
+# beim Aufteilen abgenommen hat — und sie einfach liegen zu lassen wäre eine
+# Warteschlange, die nie leer wird.
+_ALBUM_PREFIX = f"{source.SLOT_PREFIX}album:"
+
+
+def _album_proposal_query(db: Session, user: User):
+    """Unbestätigte Album-Vorschläge dieses Kontos — und sonst nichts.
+
+    Drei Einschränkungen, jede eine eigene Zusage:
+
+    * **`unconfirmed`** — bestätigt heißt Lebensdatenbank. Ein Aufräumknopf,
+      der die anfasst, löscht die Entscheidung eines Menschen.
+    * **`external_id LIKE 'immich:album:%'`** — die FOTOTAGE sind der Zweig,
+      der bleiben soll. Ein Knopf, der beim Aufräumen mehr mitnimmt als sein
+      Text sagt, ist hier der teuerste Defekt.
+    * **`user_id`** — versteht sich, steht aber da, weil es sich eben nicht
+      von selbst versteht.
+    """
+    from app.models import ConfirmState, Event
+
+    return (db.query(Event)
+            .filter(Event.user_id == user.id,
+                    Event.confirmed == ConfirmState.unconfirmed,
+                    Event.external_id.like(f"{_ALBUM_PREFIX}%")))
+
+
+@router.get("/albums/proposals")
+def album_proposals(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Wie viele Album-Vorschläge noch offen sind — Zahl vor der Tat."""
+    from app.models import Event
+
+    rows = _album_proposal_query(db, user).with_entities(Event.title).limit(60).all()
+    return {"events": _album_proposal_query(db, user).count(),
+            "list": [r[0] for r in rows]}
+
+
+@router.post("/albums/discard")
+def discard_album_proposals(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Verwirft alle offenen Album-Vorschläge auf einmal.
+
+    **Die Fragmente bleiben liegen.** Sie sind der Grabstein (Anmerkung 107,
+    Fall 2): ohne sie schlüge „Alben ansehen" dieselben Alben beim nächsten
+    Druck sofort wieder vor — die Endlos-Abruf-Falle, diesmal von der anderen
+    Seite. Genau so verhält sich auch `discard_event` für den Einzelfall.
+    """
+    events = _album_proposal_query(db, user).all()
+    for event in events:
+        db.delete(event)
+    db.commit()
+    log.info("Album-Vorschläge verworfen: %d (Fragmente bleiben als Grabstein)",
+             len(events))
+    return {"deleted": len(events)}

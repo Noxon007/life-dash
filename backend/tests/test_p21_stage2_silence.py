@@ -147,7 +147,7 @@ def _album_run(db, user, monkeypatch, album, assets):
     monkeypatch.setattr(api, "search_assets_paged",
                         lambda url, key, s, e, **kw: assets if kw.get("album_id") else [])
     report: dict = {}
-    out = source.scan_year(db, user, YEAR, "u", "k", report=report)
+    out = source.scan_year(db, user, YEAR, "u", "k", albums=True, report=report)
     return out, report
 
 
@@ -429,7 +429,7 @@ def test_missing_album_right_still_yields_photo_days(db, user, monkeypatch):
                             for i in range(5)])
 
     report: dict = {}
-    out = source.scan_year(db, user, YEAR, "u", "k", report=report)
+    out = source.scan_year(db, user, YEAR, "u", "k", albums=True, report=report)
     assert [p.kind for p in out] == ["day"]
     assert "album.read" in report["albums_denied"]
 
@@ -481,7 +481,7 @@ def test_known_albums_are_not_downloaded_again(db, user, monkeypatch):
                             if owned is None or bool(a.get("_owned")) == owned])
     monkeypatch.setattr(api, "search_assets_paged", _search)
 
-    out = source.scan_year(db, user, YEAR, "u", "k")
+    out = source.scan_year(db, user, YEAR, "u", "k", albums=True)
     assert fetched == ["alb-neu"], "das vergebene Album wurde erneut geladen"
     assert [p.slot for p in out] == [source.slot_album("alb-neu")]
 
@@ -543,7 +543,7 @@ def test_preview_gives_up_in_time_and_says_so(db, user, monkeypatch):
     monkeypatch.setattr(api, "search_assets_paged", _slow)
 
     report: dict = {}
-    source.scan_year(db, user, YEAR, "u", "k", budget_s=0.08, report=report)
+    source.scan_year(db, user, YEAR, "u", "k", albums=True, budget_s=0.08, report=report)
     assert report["partial"] is True
     assert report["albums_open"] >= 1
     assert report["albums_checked"] < len(albums)
@@ -568,7 +568,7 @@ def test_the_run_has_no_budget(db, user, monkeypatch):
 
     monkeypatch.setattr(api, "search_assets_paged", _slow)
     report: dict = {}
-    source.scan_year(db, user, YEAR, "u", "k", report=report)
+    source.scan_year(db, user, YEAR, "u", "k", albums=True, report=report)
     assert len(seen) == len(albums)
     assert report["partial"] is False
 
@@ -593,5 +593,5 @@ def test_confirmed_album_is_not_downloaded_again(db, user, monkeypatch):
         return []
 
     monkeypatch.setattr(api, "search_assets_paged", _search)
-    assert source.scan_year(db, user, YEAR, "u", "k") == []
+    assert source.scan_year(db, user, YEAR, "u", "k", albums=True) == []
     assert fetched == []

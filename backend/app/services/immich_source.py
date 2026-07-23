@@ -435,8 +435,18 @@ def _drop_clusters_inside_albums(clusters: list[Proposal],
 # --------------------------------------------------------------------------- #
 def scan_year(db: Session, user, year: int, url: str, key: str,
               heartbeat=None, budget_s: float | None = None,
-              report: dict | None = None) -> list[Proposal]:
+              report: dict | None = None, albums: bool = False) -> list[Proposal]:
     """Was dieses Jahr an Vorschlägen ergäbe — **ohne irgendetwas anzulegen**.
+
+    **`albums` ist seit Stufe 3 standardmäßig AUS** (Anmerkung 116). Aus dem
+    Betrieb: Ein Album wird EIN Vorschlag — „London, 1200 Bilder" — und damit
+    ein mehrtägiger Eintrag mit genau einem Punkt auf der Karte, obwohl die
+    1200 Bilder einzeln wissen, wo sie entstanden sind. Dazu kommt es der von
+    Hand erfassten Reise in die Quere: `covering_event` fängt den Fall zwar ab,
+    aber nur, wenn die Reise VORHER dasteht.
+    Die Richtung ist damit umgedreht: **Reisen legt der Mensch an, die Fotos
+    hängen sich daran** (Stufe 1 tut genau das). Alben bleiben abrufbar — der
+    Weg ist ein ausdrücklicher Knopf, kein Nachtlauf.
 
     Genau dieselbe Funktion füttert die Vorschau und den Lauf. Zwei getrennte
     Wege wären zwei Regeln, und die widersprechen sich still (Anmerkung 106).
@@ -493,7 +503,10 @@ def scan_year(db: Session, user, year: int, url: str, key: str,
     skipped = 0
     looked_at = 0
     open_albums = 0
-    for owned in (True, False):
+    # Der ganze Alben-Zweig hängt an EINER Bedingung, und zwar hier oben.
+    # Nicht am Ende zu filtern ist der Punkt: die teuren Abrufe (ein
+    # `search_assets_paged` je Album) finden dann gar nicht erst statt.
+    for owned in ((True, False) if albums else ()):
         try:
             found = api.albums(url, key, owned=owned)
         except api.ImmichError as exc:
@@ -569,6 +582,10 @@ def scan_year(db: Session, user, year: int, url: str, key: str,
              skipped, open_albums, time.monotonic() - began)
     _note(partial=bool(open_albums), albums_open=open_albums,
           albums_checked=looked_at, covered=covered,
+          # Ohne diese Zeile sähe ein Lauf ohne Alben genauso aus wie einer,
+          # der keine gefunden hat — die Oberfläche könnte den Unterschied
+          # nicht benennen, und „wo sind meine Alben?" bliebe unbeantwortet.
+          albums_asked=albums,
           seconds=round(time.monotonic() - began, 1))
 
     clusters = _drop_clusters_inside_albums(clusters, album_props)

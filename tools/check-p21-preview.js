@@ -162,6 +162,67 @@ setTimeout(async () => {
   ok('…und räumt die alte Vorschau weg', box.style.display === 'none',
      'die Zahlen von 2024 stünden unter dem Jahr 2022');
 
+  // --- 4b. P2.1 Stufe 3: der Alben-Haken ist derselbe Fall --------------- //
+  // Alben laufen seit Anmerkung 116 nur noch auf ausdrückliche Nachfrage —
+  // und damit gilt für den Haken exakt der Satz von oben: Eine Vorschau gilt
+  // für die Einstellung, unter der sie entstanden ist. Ohne Haken ansehen und
+  // mit Haken laufen lassen legt Alben an, die keine Vorschau gezeigt hat.
+  const albumBox = d.getElementById('ims-albums');
+  ok('Es gibt einen Alben-Haken', !!albumBox);
+  ok('…und er ist von Haus aus AUS', albumBox && !albumBox.checked,
+     'ein Album wird EIN Vorschlag mit einem Kartenpunkt für 1200 Bilder');
+
+  sel.value = '2024';
+  sel.dispatchEvent(new w.Event('change', { bubbles: true }));
+  calls.length = 0;
+  preview = { year: 2024, total: 1, days: 1, albums: 0, photos: 9, shared: 0,
+              albums_asked: false, proposals: [preview.proposals[0]] };
+  d.getElementById('ims-preview').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await wait(40);
+  ok('Ohne Haken fragt die Vorschau NICHT nach Alben',
+     calls.some(([, p]) => /immich\/preview/.test(p) && !/albums=1/.test(p)),
+     JSON.stringify(calls.filter(([, p]) => /preview/.test(p))));
+  ok('Vorschau ohne Alben gibt den Lauf frei', !run.disabled);
+
+  albumBox.checked = true;
+  albumBox.dispatchEvent(new w.Event('change', { bubbles: true }));
+  await wait(20);
+  ok('Der Haken entwertet die Vorschau', run.disabled,
+     'sonst legt der Lauf Alben an, die keine Vorschau gezeigt hat');
+
+  calls.length = 0;
+  preview = { year: 2024, total: 2, days: 1, albums: 1, photos: 49, shared: 0,
+              albums_asked: true,
+              proposals: [preview.proposals[0]] };
+  d.getElementById('ims-preview').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await wait(40);
+  ok('Mit Haken fragt die Vorschau nach Alben',
+     calls.some(([, p]) => /immich\/preview/.test(p) && /albums=1/.test(p)),
+     JSON.stringify(calls.filter(([, p]) => /preview/.test(p))));
+  ok('…und gibt den Lauf wieder frei', !run.disabled);
+
+  calls.length = 0;
+  run.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await wait(30);
+  const albumRun = JSON.parse(started().slice(-1)[0][2] || '{}');
+  ok('Der Lauf trägt die Alben-Entscheidung mit',
+     albumRun.params && albumRun.params.albums === true,
+     JSON.stringify(albumRun.params));
+
+  // Und andersherum: der Haken wieder weg, die alte Vorschau darf nicht
+  // gelten. Die Richtung ist die unauffälligere von beiden — sie verspricht
+  // Alben, die der Lauf dann nicht anlegt.
+  preview = { year: 2024, total: 2, days: 1, albums: 1, photos: 49, shared: 0,
+              albums_asked: true, proposals: [preview.proposals[0]] };
+  d.getElementById('ims-preview').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await wait(40);
+  ok('Vorschau mit Alben gilt', !run.disabled);
+  albumBox.checked = false;
+  albumBox.dispatchEvent(new w.Event('change', { bubbles: true }));
+  await wait(20);
+  ok('Haken zurückgenommen entwertet sie ebenfalls', run.disabled,
+     'die Vorschau hätte Alben versprochen, die der Lauf nicht anlegt');
+
   // --- 5. Immich fällt aus: der Grund muss ANKOMMEN ---------------------- //
   // Anmerkung 113, dritte Runde. Der Endpunkt hat einen Immich-Ausfall als
   // `502` gemeldet — semantisch passend, im Betrieb fatal: ein umgekehrter

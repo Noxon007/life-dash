@@ -1735,17 +1735,43 @@
               <select id="ims-year" class="mf-select" data-i18n-title="ims.year.tip" title="Ein Jahr je Lauf — eine ganze Bibliothek auf einmal ergäbe tausende Vorschläge"></select>
               <button class="btn secondary" id="ims-preview" style="text-align:left" data-i18n="ims.preview">🔍 Vorschau für dieses Jahr</button>
               <button class="btn" id="ims-run" style="text-align:left" disabled data-i18n="ims.run">✚ Vorschläge anlegen</button>
+              <!-- P2.1 Stufe 3: Alben sind eine ausdrückliche Frage. Der
+                   Haken entwertet die Vorschau genauso wie ein Jahreswechsel —
+                   sonst legte ein Lauf Alben an, die nie jemand gesehen hat. -->
+              <label class="stat-label" style="display:flex; align-items:center; gap:6px">
+                <input type="checkbox" id="ims-albums">
+                <span data-i18n="ims.albums">Alben mit ansehen</span>
+              </label>
             </div>
             <div class="action-desc">
               <span data-i18n="ims.desc"><b>Aus Fotos werden Vorschläge.</b> Ein Tag mit vielen Bildern an einem Ort
-              („34 Fotos am 12. Juli in Detmold") und jedes Album werden zu einem <b>unbestätigten</b> Eintrag in der
+              („34 Fotos am 12. Juli in Detmold") wird zu einem <b>unbestätigten</b> Eintrag in der
               Moderation — bestätigt wird nichts von allein. Geclustert werden nur <b>eigene</b> Fotos <b>mit
-              Koordinaten</b>, die in deinem Immich-Zeitstrahl stehen; Archiviertes und Gesperrtes bleibt außen vor.
-              Geteilte Alben sind erlaubt und werden als solche gekennzeichnet.</span>
+              Koordinaten</b>, die in deinem Immich-Zeitstrahl stehen; Archiviertes und Gesperrtes bleibt außen vor.</span>
               <div id="ims-result" class="hint" style="display:none; margin-top:10px"></div>
               <span class="hint" style="display:block; margin-top:8px" data-i18n="ims.hint">Erst die Vorschau, dann das
               Anlegen — der Knopf bleibt bis dahin gesperrt. Ein Jahr kann hunderte Vorschläge ergeben, und
               die will man vorher gesehen haben.</span>
+              <span class="hint" style="display:block; margin-top:8px" data-i18n="ims.albums.why"><b>Alben sind
+              standardmäßig aus.</b> Ein Album wird <i>ein</i> Vorschlag („London, 1200 Bilder") — ein mehrtägiger
+              Eintrag mit genau einem Punkt auf der Karte, obwohl jedes der 1200 Bilder für sich weiß, wo es entstanden
+              ist. Und es wird zum Zwilling der Reise, die du selbst einträgst. Besser herum: <b>Reisen legst du an,
+              die Fotos hängen sich daran</b> („Fotos verknüpfen" oben). Wer trotzdem nachsehen will, setzt den Haken —
+              geteilte Alben sind dann erlaubt und werden als solche gekennzeichnet.</span>
+            </div>
+          </div>
+          <!-- Wer den Alben-Zweig abschaltet, hat die Alben von gestern noch
+               in der Warteschlange stehen. -->
+          <div class="action-row" id="ims-cleanup-row">
+            <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
+              <button class="btn secondary" id="ims-drop" style="text-align:left" data-i18n="ims.drop">🗑️ Album-Vorschläge verwerfen</button>
+            </div>
+            <div class="action-desc">
+              <span data-i18n="ims.drop.desc"><b>Alle offenen Album-Vorschläge auf einmal verwerfen.</b>
+              Betrifft nur <b>unbestätigte</b> Vorschläge, die aus einem Album entstanden sind — bestätigte Einträge
+              und die Fototage bleiben unangetastet. Verworfene Alben kommen nicht wieder, auch wenn du später erneut
+              nachsiehst.</span>
+              <div id="ims-drop-result" class="hint" style="display:none; margin-top:10px"></div>
             </div>
           </div>
         </div>
@@ -2555,7 +2581,14 @@ const I18N_EN = {
   'imp.thumbs': "previews rebuilt",
   'adm.immich': "4 · Immich (photos)",
   // P2.1 stage 2 (0.37.0) — Immich as an event source
-  'ims.desc': "<b>Photos become proposals.</b> A day with many pictures in one place (“34 photos on 12 July in Detmold”) and every album become an <b>unconfirmed</b> entry in moderation — nothing is confirmed on its own. Only <b>your own</b> photos <b>with coordinates</b> that sit in your Immich timeline are clustered; archived and locked ones stay out. Shared albums are allowed and are marked as such.",
+  'ims.desc': "<b>Photos become proposals.</b> A day with many pictures in one place (“34 photos on 12 July in Detmold”) becomes an <b>unconfirmed</b> entry in moderation — nothing is confirmed on its own. Only <b>your own</b> photos <b>with coordinates</b> that sit in your Immich timeline are clustered; archived and locked ones stay out.",
+  'ims.albums': "Look at albums too",
+  'ims.albums.why': "<b>Albums are off by default.</b> An album becomes <i>one</i> proposal (“London, 1200 pictures”) — a multi-day entry with exactly one point on the map, even though each of those 1200 pictures knows for itself where it was taken. And it becomes the twin of the trip you enter yourself. The better way round: <b>you create the trips, the photos attach themselves</b> (“Link photos” above). If you want to look anyway, tick the box — shared albums are then allowed and marked as such.",
+  'ims.drop': "🗑️ Discard album proposals",
+  'ims.drop.desc': "<b>Discard all open album proposals at once.</b> Affects only <b>unconfirmed</b> proposals that came from an album — confirmed entries and the photo days are left alone. Discarded albums never come back, even if you look again later.",
+  'ims.drop.count': "{n} open album proposals",
+  'ims.drop.empty': "No open album proposal.",
+  'ims.drop.done': "✓ {n} album proposals discarded.",
   'ims.preview': "🔍 Preview this year",
   'ims.run': "✚ Create proposals",
   'ims.busy': "🔍 looking …",
@@ -7878,6 +7911,10 @@ function renderImmichState(s) {
     : t('im.state.none', 'Noch kein Schlüssel hinterlegt.');
   // Stufe 2: Jahresauswahl füllen, sobald klar ist, dass es Immich gibt.
   loadImmichYears();
+  // Stufe 3: Die offenen Album-Vorschläge stehen in der EIGENEN Datenbank —
+  // die Zahl gibt es also auch dann, wenn Immich gerade nicht antwortet.
+  // Deshalb ein eigener Aufruf und kein Anhängsel des Jahres-Abrufs.
+  imsLoadDrop();
 }
 async function saveImmich() {
   const url = document.getElementById('im-url').value.trim();
@@ -7992,6 +8029,9 @@ document.getElementById('im-reset').addEventListener('click', async () => {
 // eine zwanzig Jahre alte Bibliothek füllt sonst eine Warteschlange, die für
 // Dutzende gebaut ist — und niemand hätte es vorher wissen können.
 let imsPreviewedYear = null;
+// P2.1 Stufe 3: unter WELCHER Alben-Einstellung die Vorschau entstanden ist.
+// Das Jahr allein reicht nicht mehr — siehe `imsLock()`.
+let imsPreviewedAlbums = false;
 // Das Auswahlfeld hat IMMER etwas anzubieten — auch ohne Server, ohne Immich
 // und ohne dass vorher irgendetwas anderes geklappt hat.
 //
@@ -8056,17 +8096,26 @@ function imsNote(text) {
   box.dataset.note = '1';
   box.textContent = '⚠️ ' + text;
 }
+function imsAlbums() { return !!document.getElementById('ims-albums')?.checked; }
 function imsLock() {
   // Jahr gewechselt = die Vorschau gilt nicht mehr. Ein Knopf, der nach dem
   // Umschalten noch offen steht, legt Vorschläge für ein Jahr an, das nie
   // jemand gesehen hat.
+  //
+  // P2.1 Stufe 3: Für den Alben-Haken gilt derselbe Satz — und zwar in BEIDE
+  // Richtungen. Ohne Haken ansehen und mit Haken laufen lassen legt Alben an,
+  // die keine Vorschau gezeigt hat; umgekehrt verspricht die Vorschau Alben,
+  // die der Lauf dann nicht anlegt. Eine Vorschau gilt für die Einstellung,
+  // unter der sie entstanden ist.
   const sel = document.getElementById('ims-year');
   const run = document.getElementById('ims-run');
-  const stale = !imsPreviewedYear || String(imsPreviewedYear) !== sel.value;
+  const stale = !imsPreviewedYear || String(imsPreviewedYear) !== sel.value
+    || imsPreviewedAlbums !== imsAlbums();
   run.disabled = stale;
   if (stale) document.getElementById('ims-result').style.display = 'none';
 }
 document.getElementById('ims-year')?.addEventListener('change', imsLock);
+document.getElementById('ims-albums')?.addEventListener('change', imsLock);
 document.getElementById('ims-preview')?.addEventListener('click', async ev => {
   const btn = ev.target, sel = document.getElementById('ims-year');
   // Sollte die Liste je leer sein, ist das ein Fehler DIESER Seite und keine
@@ -8089,7 +8138,9 @@ document.getElementById('ims-preview')?.addEventListener('click', async ev => {
   tick();
   const timer = setInterval(tick, 1000);
   try {
-    const r = await api(`/api/immich/preview?year=${year}`, { method: 'POST' });
+    const wantAlbums = imsAlbums();
+    const r = await api(`/api/immich/preview?year=${year}${wantAlbums ? '&albums=1' : ''}`,
+                        { method: 'POST' });
     box.style.display = '';
     // Der Kasten trägt sonst noch die Marke des Jahres-Hinweises — und ein
     // späteres `imsNote('')` würde dann das Vorschau-Ergebnis ausblenden.
@@ -8104,6 +8155,10 @@ document.getElementById('ims-preview')?.addEventListener('click', async ev => {
       return;
     }
     imsPreviewedYear = r.year;
+    // Was der SERVER gemacht hat, nicht was das Häkchen gerade sagt: hakt
+    // jemand während der Vorschau um, gilt trotzdem der Lauf, den er gesehen
+    // hat.
+    imsPreviewedAlbums = !!r.albums_asked;
     // Die drei Nachsätze gelten in BEIDEN Fällen. „Nichts Neues" plus ein
     // übersprungenes Album ist die häufigste Lage nach dem ersten Lauf —
     // stünde der Grund nur beim Erfolg, fehlte er genau dann, wenn er
@@ -8165,11 +8220,49 @@ document.getElementById('ims-run')?.addEventListener('click', ev => {
     toast(t('ims.needpreview', 'Erst die Vorschau ansehen — dann anlegen.'), 'warn');
     return;
   }
-  startServerJob(ev.target, 'immich_source', { year });
+  // Der Lauf bekommt dieselbe Alben-Einstellung, unter der die Vorschau
+  // entstanden ist — nicht die, die das Häkchen JETZT zeigt. `imsLock()`
+  // hält beide zwar zusammen, aber der Wert, der hier rausgeht, darf nicht
+  // von einem zweiten Ort abhängen.
+  startServerJob(ev.target, 'immich_source', { year, albums: imsPreviewedAlbums });
   // Die Vorschau ist verbraucht: nach dem Lauf ist der Bestand ein anderer,
   // und der Knopf darf nicht offen stehen bleiben.
   imsPreviewedYear = null;
   imsLock();
+});
+
+// P2.1 Stufe 3 — offene Album-Vorschläge in einem Zug verwerfen.
+async function imsLoadDrop() {
+  const box = document.getElementById('ims-drop-result');
+  const btn = document.getElementById('ims-drop');
+  if (!box || !btn) return;
+  try {
+    const r = await api('/api/immich/albums/proposals');
+    // Nichts da = nichts zu tun, und der Knopf sagt es (A40): ein
+    // Bedienelement, das gerade nichts bewirken kann, muss das ZEIGEN.
+    btn.disabled = !r.events;
+    btn.classList.toggle('inert', !r.events);
+    btn.title = r.events ? '' : t('ims.drop.empty', 'Kein offener Album-Vorschlag.');
+    box.style.display = '';
+    box.innerHTML = r.events
+      ? `<b>${esc(t('ims.drop.count', '{n} offene Album-Vorschläge').replace('{n}', r.events))}</b>`
+        + (r.list.length ? `<div style="margin-top:6px">${
+            r.list.map(x => `<div style="padding:2px 0">📗 ${esc(x)}</div>`).join('')}</div>` : '')
+      : esc(t('ims.drop.empty', 'Kein offener Album-Vorschlag.'));
+  } catch (err) {
+    box.style.display = ''; box.textContent = err.message;
+  }
+}
+document.getElementById('ims-drop')?.addEventListener('click', async ev => {
+  const btn = ev.target;
+  btn.disabled = true;
+  try {
+    const r = await api('/api/immich/albums/discard', { method: 'POST' });
+    toast(t('ims.drop.done', '✓ {n} Album-Vorschläge verworfen.').replace('{n}', r.deleted),
+          'ok', 6000);
+    await imsLoadDrop();
+    if (typeof loadTimeline === 'function') loadTimeline();
+  } catch (err) { toast(err.message, 'error', 8000); btn.disabled = false; }
 });
 
 // F13: eigene Kachelquelle — bewusst nur lokal (kein Server-Setting), weil die

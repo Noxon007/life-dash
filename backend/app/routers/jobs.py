@@ -473,7 +473,13 @@ def _run_immich_source(db: Session, job: Job) -> tuple[str, str]:
     # um danach „gestoppt" zu melden. `_tick(…, 0, None)` schlägt den Puls,
     # ohne einen Fortschritt zu behaupten, den es noch nicht gibt.
     try:
+        # P2.1 Stufe 3: Alben nur, wenn ausdrücklich angefordert. Der
+        # Nachtplan fragt damit NIE danach — und das ist der Punkt: ein Album
+        # ist ein von Hand benannter Behälter, sein Gegenstück in Life-Dash
+        # ist die von Hand erfasste Reise. Beide automatisch entstehen zu
+        # lassen erzeugt Zwillinge (Anmerkung 116).
         proposals = source.scan_year(db, user, year, url, key,
+                                     albums=bool((job.params or {}).get("albums")),
                                      heartbeat=lambda: _tick(db, job.id, 0, None))
     except immich_api.ScanAborted:
         return "stopped", f"{year}: Suche abgebrochen — nichts angelegt."

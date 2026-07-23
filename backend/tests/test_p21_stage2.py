@@ -93,12 +93,12 @@ def test_slot_is_stable_when_photos_are_added(db, user, immich_cfg, fake_api):
     nicht zu einem zweiten Vorschlag machen. Ein Hash über die Asset-IDs täte
     genau das."""
     fake_api["assets"] = _cluster_assets(6)
-    first = source.scan_year(db, user, YEAR, "u", "k")
+    first = source.scan_year(db, user, YEAR, "u", "k", albums=True)
     assert len(first) == 1
     slot_before = first[0].slot
 
     fake_api["assets"] = _cluster_assets(9)          # drei Fotos mehr
-    again = source.scan_year(db, user, YEAR, "u", "k")
+    again = source.scan_year(db, user, YEAR, "u", "k", albums=True)
     assert again[0].slot == slot_before
 
 
@@ -120,14 +120,14 @@ def test_foreign_photos_never_form_a_cluster(db, user, immich_cfg, fake_api):
     """Die eigentliche Gefahr sind geteilte Alben, nicht Screenshots: fremde
     Urlaubsfotos HABEN GPS und erfänden sonst still einen eigenen Tag."""
     fake_api["assets"] = _cluster_assets(8, owner=OTHER_ID)
-    assert source.scan_year(db, user, YEAR, "u", "k") == []
+    assert source.scan_year(db, user, YEAR, "u", "k", albums=True) == []
 
 
 def test_photos_without_coordinates_form_no_cluster(db, user, immich_cfg, fake_api):
     """Weitergeleitete Bilder, Screenshots, Downloads: kein EXIF-GPS, also
     kein erfundener Ort. Sie bleiben Anreicherung am Tag."""
     fake_api["assets"] = _cluster_assets(8, lat=None, lng=None, city=None)
-    assert source.scan_year(db, user, YEAR, "u", "k") == []
+    assert source.scan_year(db, user, YEAR, "u", "k", albums=True) == []
 
 
 def test_archived_and_locked_photos_form_no_cluster(db, user, immich_cfg, fake_api):
@@ -136,9 +136,9 @@ def test_archived_and_locked_photos_form_no_cluster(db, user, immich_cfg, fake_a
     Vertrauensbruch — `visibility` steht in der Spezifikation, also wird es
     gelesen."""
     fake_api["assets"] = _cluster_assets(8, visibility="archive")
-    assert source.scan_year(db, user, YEAR, "u", "k") == []
+    assert source.scan_year(db, user, YEAR, "u", "k", albums=True) == []
     fake_api["assets"] = _cluster_assets(8, visibility="locked")
-    assert source.scan_year(db, user, YEAR, "u", "k") == []
+    assert source.scan_year(db, user, YEAR, "u", "k", albums=True) == []
 
 
 def test_without_own_user_id_nothing_is_clustered(db, user, immich_cfg, fake_api):
@@ -147,7 +147,7 @@ def test_without_own_user_id_nothing_is_clustered(db, user, immich_cfg, fake_api
     fremden Tag behaupten."""
     fake_api["me"] = None
     fake_api["assets"] = _cluster_assets(8)
-    assert source.scan_year(db, user, YEAR, "u", "k") == []
+    assert source.scan_year(db, user, YEAR, "u", "k", albums=True) == []
 
 
 # --------------------------------------------------------------------------- #
@@ -164,12 +164,12 @@ def test_case1_day_whose_photos_already_have_a_home(db, user, immich_cfg, fake_a
     db.add(ev)
     db.commit()
     # Noch kein Foto am Ereignis -> der Tag ist offen, der Vorschlag kommt.
-    assert len(source.scan_year(db, user, YEAR, "u", "k")) == 1
+    assert len(source.scan_year(db, user, YEAR, "u", "k", albums=True)) == 1
 
     db.add(MediaRef(user_id=user.id, event_id=ev.id, provider="immich",
                     external_id="asset-0"))
     db.commit()
-    assert source.scan_year(db, user, YEAR, "u", "k") == []
+    assert source.scan_year(db, user, YEAR, "u", "k", albums=True) == []
 
 
 def test_case2_a_rejected_proposal_never_returns(db, user, immich_cfg, fake_api):
@@ -180,7 +180,7 @@ def test_case2_a_rejected_proposal_never_returns(db, user, immich_cfg, fake_api)
     from app.routers.moderation import discard_event
 
     fake_api["assets"] = _cluster_assets(6)
-    props = source.scan_year(db, user, YEAR, "u", "k")
+    props = source.scan_year(db, user, YEAR, "u", "k", albums=True)
     source.create_proposals(db, user, props)
     db.commit()
 
@@ -190,14 +190,14 @@ def test_case2_a_rejected_proposal_never_returns(db, user, immich_cfg, fake_api)
     assert db.query(Event).filter(Event.source == Source.immich).count() == 0
     # Das Fragment lebt — es IST der Grabstein.
     assert db.query(Fragment).filter(Fragment.source == Source.immich).count() == 1
-    assert source.scan_year(db, user, YEAR, "u", "k") == []
+    assert source.scan_year(db, user, YEAR, "u", "k", albums=True) == []
 
 
 def test_case3_confirmed_then_renamed_is_recognised(db, user, immich_cfg, fake_api):
     """Fall (3): bestätigt und dann umbenannt/umdatiert — der Platz erkennt
     es wieder, und ab da wird es nicht mehr angefasst."""
     fake_api["assets"] = _cluster_assets(6)
-    source.create_proposals(db, user, source.scan_year(db, user, YEAR, "u", "k"))
+    source.create_proposals(db, user, source.scan_year(db, user, YEAR, "u", "k", albums=True))
     db.commit()
 
     ev = db.query(Event).filter(Event.source == Source.immich).one()
@@ -206,7 +206,7 @@ def test_case3_confirmed_then_renamed_is_recognised(db, user, immich_cfg, fake_a
     ev.confirmed = ConfirmState.confirmed
     db.commit()
 
-    assert source.scan_year(db, user, YEAR, "u", "k") == []
+    assert source.scan_year(db, user, YEAR, "u", "k", albums=True) == []
     ev2 = db.query(Event).filter(Event.source == Source.immich).one()
     assert ev2.title == "Sommerfest bei Anke"      # unangetastet
 
@@ -215,13 +215,13 @@ def test_case4_a_grown_album_gets_no_second_proposal(db, user, immich_cfg, fake_
     fake_api["albums"] = [{"id": "alb-1", "albumName": "Dänemark 2024",
                            "assetCount": 5, "shared": False, "_owned": True}]
     fake_api["album_assets"]["alb-1"] = _cluster_assets(5, month=8, day=3)
-    props = source.scan_year(db, user, YEAR, "u", "k")
+    props = source.scan_year(db, user, YEAR, "u", "k", albums=True)
     assert len(props) == 1 and props[0].kind == "album"
     source.create_proposals(db, user, props)
     db.commit()
 
     fake_api["album_assets"]["alb-1"] = _cluster_assets(20, month=8, day=3)
-    assert source.scan_year(db, user, YEAR, "u", "k") == []
+    assert source.scan_year(db, user, YEAR, "u", "k", albums=True) == []
 
 
 def test_case5_album_beats_a_cluster_in_its_span(db, user, immich_cfg, fake_api):
@@ -233,7 +233,7 @@ def test_case5_album_beats_a_cluster_in_its_span(db, user, immich_cfg, fake_api)
                            "assetCount": 6, "shared": False, "_owned": True}]
     fake_api["album_assets"]["alb-1"] = assets
 
-    props = source.scan_year(db, user, YEAR, "u", "k")
+    props = source.scan_year(db, user, YEAR, "u", "k", albums=True)
     assert [p.kind for p in props] == ["album"]
 
 
@@ -249,7 +249,7 @@ def test_case6_photos_are_shown_not_moved(db, user, immich_cfg, fake_api):
                         captured_at=datetime(YEAR, 7, 12, 10)))
     db.commit()
 
-    source.create_proposals(db, user, source.scan_year(db, user, YEAR, "u", "k"))
+    source.create_proposals(db, user, source.scan_year(db, user, YEAR, "u", "k", albums=True))
     db.commit()
 
     still_on_day = (db.query(MediaRef)
@@ -273,7 +273,7 @@ def test_case7_a_day_of_google_visits_still_gets_a_proposal(db, user, immich_cfg
                      confirmed=ConfirmState.confirmed))
     db.commit()
 
-    props = source.scan_year(db, user, YEAR, "u", "k")
+    props = source.scan_year(db, user, YEAR, "u", "k", albums=True)
     assert len(props) == 1 and props[0].kind == "day"
 
 
@@ -288,7 +288,7 @@ def test_shared_album_is_allowed_and_declares_itself(db, user, immich_cfg, fake_
                            "assetCount": 9, "shared": True, "_owned": False}]
     fake_api["album_assets"]["alb-2"] = _cluster_assets(9, month=6, day=5,
                                                         owner=OTHER_ID)
-    props = source.scan_year(db, user, YEAR, "u", "k")
+    props = source.scan_year(db, user, YEAR, "u", "k", albums=True)
     assert len(props) == 1
     assert props[0].shared is True
 
@@ -305,7 +305,7 @@ def test_proposals_are_never_confirmed_automatically(db, user, immich_cfg, fake_
                            "shared": False, "_owned": True}]
     fake_api["album_assets"]["alb-3"] = _cluster_assets(5, month=9, day=1)
 
-    source.create_proposals(db, user, source.scan_year(db, user, YEAR, "u", "k"))
+    source.create_proposals(db, user, source.scan_year(db, user, YEAR, "u", "k", albums=True))
     db.commit()
 
     rows = db.query(Event).filter(Event.source == Source.immich).all()
@@ -330,7 +330,7 @@ def test_a_run_asks_only_for_its_year(db, user, immich_cfg, fake_api):
     """Jahresweise ist der Sinn der Sache: eine zwanzig Jahre alte Bibliothek
     auf einmal wäre genau die Warteschlange, die niemand mehr durchsieht."""
     fake_api["assets"] = _cluster_assets(6)
-    source.scan_year(db, user, YEAR, "u", "k")
+    source.scan_year(db, user, YEAR, "u", "k", albums=True)
     starts = {c[0].year for c in fake_api["asset_calls"]}
     ends = {c[1].year for c in fake_api["asset_calls"]}
     assert starts == {YEAR} and ends == {YEAR}
@@ -340,11 +340,11 @@ def test_precision_follows_the_spread_of_the_day(db, user, immich_cfg, fake_api)
     """Kap. 3.1: Genauigkeit nie überzeichnen. Vier Fotos in einer Stunde sind
     ein Zeitpunkt, über den ganzen Tag verteilt sind sie ein Tag."""
     fake_api["assets"] = [_asset(i, hour=14) for i in range(5)]
-    tight = source.scan_year(db, user, YEAR, "u", "k")
+    tight = source.scan_year(db, user, YEAR, "u", "k", albums=True)
     assert tight[0].precision == DatePrecision.exact
 
     fake_api["assets"] = [_asset(i, hour=8 + i * 3) for i in range(5)]
-    wide = source.scan_year(db, user, YEAR, "u", "k")
+    wide = source.scan_year(db, user, YEAR, "u", "k", albums=True)
     assert wide[0].precision == DatePrecision.day
 
 
@@ -357,7 +357,7 @@ def test_album_spans_whole_days(db, user, immich_cfg, fake_api):
                            "assetCount": 5, "shared": False, "_owned": True}]
     fake_api["album_assets"]["alb-9"] = [_asset(i, hour=14, month=5, day=4)
                                          for i in range(5)]
-    prop = source.scan_year(db, user, YEAR, "u", "k")[0]
+    prop = source.scan_year(db, user, YEAR, "u", "k", albums=True)[0]
     assert prop.precision == DatePrecision.day
     assert (prop.start.hour, prop.start.minute) == (0, 0)
     assert (prop.end.hour, prop.end.minute) == (23, 59)
@@ -384,7 +384,7 @@ def test_an_album_across_new_year_keeps_its_whole_span(db, user, immich_cfg,
                            "endDate": f"{YEAR}-01-03T00:00:00.000Z"}]
     fake_api["album_assets"]["alb-ny"] = silvester
 
-    prop = source.scan_year(db, user, YEAR, "u", "k")[0]
+    prop = source.scan_year(db, user, YEAR, "u", "k", albums=True)[0]
     assert prop.start.year == YEAR - 1 and prop.start.month == 12
     assert prop.end.year == YEAR and prop.end.month == 1
     assert prop.photos == 6
@@ -419,7 +419,7 @@ def test_same_place_name_in_two_countries_stays_two_places(db, user, immich_cfg,
     for a in us:
         a["exifInfo"]["country"] = "United States"
     fake_api["assets"] = us
-    source.create_proposals(db, user, source.scan_year(db, user, YEAR, "u", "k"))
+    source.create_proposals(db, user, source.scan_year(db, user, YEAR, "u", "k", albums=True))
     db.commit()
 
     uk = _cluster_assets(5, day=14, city="Springfield", lat=51.5, lng=-0.1)
@@ -427,7 +427,7 @@ def test_same_place_name_in_two_countries_stays_two_places(db, user, immich_cfg,
         a["id"] = f"uk-{i}"
         a["exifInfo"]["country"] = "United Kingdom"
     fake_api["assets"] = uk
-    source.create_proposals(db, user, source.scan_year(db, user, YEAR, "u", "k"))
+    source.create_proposals(db, user, source.scan_year(db, user, YEAR, "u", "k", albums=True))
     db.commit()
 
     places = db.query(Location).filter(Location.name == "Springfield").all()
@@ -447,7 +447,7 @@ def test_a_long_scan_keeps_the_job_alive(db, user, immich_cfg, fake_api):
                            "shared": False, "_owned": True}]
     fake_api["album_assets"]["alb-x"] = _cluster_assets(4, month=9, day=2)
 
-    source.scan_year(db, user, YEAR, "u", "k",
+    source.scan_year(db, user, YEAR, "u", "k", albums=True,
                      heartbeat=lambda: beats.append(1) or True)
     assert beats, "kein Lebenszeichen während des Scans"
 
@@ -459,7 +459,7 @@ def test_a_stopped_job_creates_nothing_from_half_a_scan(db, user, immich_cfg,
     und stünde als Datum in einem Vorschlag."""
     fake_api["assets"] = _cluster_assets(6)
     with pytest.raises(api.ScanAborted):
-        source.scan_year(db, user, YEAR, "u", "k", heartbeat=lambda: False)
+        source.scan_year(db, user, YEAR, "u", "k", albums=True, heartbeat=lambda: False)
     assert db.query(Event).count() == 0
 
 
@@ -512,4 +512,4 @@ def test_other_users_proposals_stay_invisible(db, user, immich_cfg, fake_api):
     db.commit()
 
     fake_api["assets"] = _cluster_assets(6)
-    assert len(source.scan_year(db, user, YEAR, "u", "k")) == 1
+    assert len(source.scan_year(db, user, YEAR, "u", "k", albums=True)) == 1
