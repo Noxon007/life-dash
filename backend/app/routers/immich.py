@@ -25,6 +25,14 @@ router = APIRouter(prefix="/api/immich", tags=["Immich"])
 
 log = logging.getLogger("lifedash.immich")
 
+# Wie lange die VORSCHAU höchstens rechnen darf. Der Wert ist nicht aus der
+# Bibliothek abgeleitet, sondern aus dem, was zwischen Browser und App steht:
+# umgekehrte Vertreter warten üblicherweise 30 bis 60 Sekunden auf die erste
+# Kopfzeile (nginx `proxy_read_timeout` 60 s, Cloudflare 100 s). Ein Budget
+# darunter macht aus „gar keiner Antwort" eine Teilantwort — und die ist immer
+# noch eine Entscheidungsgrundlage. Der Job kennt kein Budget.
+PREVIEW_BUDGET_S = 25.0
+
 
 def _config_or_400(user: User) -> tuple[str, str]:
     cfg = api.config_for(user)
@@ -99,12 +107,22 @@ def source_preview(
     Vorschau, die zwei Minuten über eine große Bibliothek läuft, sieht im Log
     deshalb aus wie eine Anfrage, die es nie gab. Genau so wurde sie gemeldet:
     „geht nicht, kein Log, keine Rückmeldung".
+
+    **Und sie muss rechtzeitig fertig sein, nicht irgendwann** (Anmerkung 113,
+    zweite Runde): Aus der Ferne steht zwischen Browser und App ein umgekehrter
+    Vertreter mit fester Geduld — läuft die ab, gibt es keine späte Antwort,
+    sondern ein **502**. Die Vorschau bekommt deshalb ein Zeitbudget und
+    antwortet notfalls mit dem, was sie bis dahin gesehen hat. Sie sagt dann,
+    wie viele Alben sie nicht mehr angesehen hat; der LAUF sieht sie alle an,
+    denn er wartet auf niemanden.
     """
     url, key = _config_or_400(user)
     log.info("Immich-Vorschau für %s: Jahr %d — beginnt", user.id[:8], year)
     began = time.monotonic()
+    report: dict = {}
     try:
-        proposals = source.scan_year(db, user, year, url, key)
+        proposals = source.scan_year(db, user, year, url, key,
+                                     budget_s=PREVIEW_BUDGET_S, report=report)
     except api.ImmichError as exc:
         log.warning("Immich-Vorschau %d abgebrochen nach %.1fs: %s",
                     year, time.monotonic() - began, exc)
@@ -119,6 +137,11 @@ def source_preview(
         "albums": len(proposals) - days,
         "photos": sum(p.photos for p in proposals),
         "shared": sum(1 for p in proposals if p.shared),
+        # Unvollständig heißt unvollständig — mit Zahl. „38 Vorschläge" wäre
+        # sonst eine Gesamtaussage, die nur ein Ausschnitt ist.
+        "partial": bool(report.get("partial")),
+        "albums_open": report.get("albums_open", 0),
+        "seconds": report.get("seconds"),
         # Die Liste selbst, damit die Vorschau die Vorschläge NENNT statt nur
         # zu zählen. „38 Vorschläge" ist eine Zahl; „Dänemark 2024, 12. Juli
         # in Detmold, …" ist eine Entscheidungsgrundlage.

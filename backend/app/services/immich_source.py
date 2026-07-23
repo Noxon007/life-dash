@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -283,12 +284,36 @@ def _drop_clusters_inside_albums(clusters: list[Proposal],
 # Vorschau (P2.5-Muster) und Anlegen
 # --------------------------------------------------------------------------- #
 def scan_year(db: Session, user, year: int, url: str, key: str,
-              heartbeat=None) -> list[Proposal]:
+              heartbeat=None, budget_s: float | None = None,
+              report: dict | None = None) -> list[Proposal]:
     """Was dieses Jahr an Vorschlägen ergäbe — **ohne irgendetwas anzulegen**.
 
     Genau dieselbe Funktion füttert die Vorschau und den Lauf. Zwei getrennte
     Wege wären zwei Regeln, und die widersprechen sich still (Anmerkung 106).
+
+    `budget_s` deckelt die Zeit, `report` nimmt auf, was dabei liegen blieb.
+    Beides braucht nur die **Vorschau** (Anmerkung 113): sie hängt an einer
+    einzelnen HTTP-Anfrage, und dazwischen steht bei einer Fernnutzung ein
+    umgekehrter Vertreter mit einer festen Geduld — gemeldet als **502 Bad
+    Gateway**. Ein Lauf über eine gewachsene Bibliothek fragt Immich einmal je
+    Album; das kann diese Geduld überschreiten, und dann ist das Ergebnis
+    nicht etwa spät, sondern **weg**.
+
+    Der Job braucht das nicht: er läuft im Hintergrund, hat einen Herzschlag
+    und niemanden, der auf eine Antwort wartet — er bekommt deshalb kein
+    Budget und sieht weiterhin alles an. Eine halbe Vorschau ist brauchbar
+    (man sieht, was für ein Jahr zu erwarten ist), ein halber Lauf wäre es
+    nicht.
     """
+    began = time.monotonic()
+
+    def _spent() -> bool:
+        return budget_s is not None and (time.monotonic() - began) > budget_s
+
+    def _note(**kw) -> None:
+        if report is not None:
+            report.update(kw)
+
     start = datetime(year, 1, 1)
     end = datetime(year, 12, 31, 23, 59, 59)
 
@@ -315,9 +340,19 @@ def scan_year(db: Session, user, year: int, url: str, key: str,
 
     album_props: list[Proposal] = []
     skipped = 0
+    looked_at = 0
+    open_albums = 0
     for owned in (True, False):
         for album in api.albums(url, key, owned=owned):
             if not _album_touches_year(album, year):
+                continue
+            if _spent():
+                # Abgebrochen, nicht abgeschnitten: die Vorschau SAGT, wie
+                # viele Alben sie nicht mehr angesehen hat. Eine Zahl, die
+                # aussieht wie „alles", ist hier der teurere Fehler
+                # (Anmerkung 110: was eine Ansicht nicht zeigen kann, muss sie
+                # sagen — und zwar dort, wo hingeschaut wird).
+                open_albums += 1
                 continue
             if slot_album(album["id"]) in known:
                 # Fälle (2)/(3)/(4): schon vorgeschlagen, schon bestätigt oder
@@ -335,13 +370,17 @@ def scan_year(db: Session, user, year: int, url: str, key: str,
             items = api.search_assets_paged(url, key, _WIDE_START, _WIDE_END,
                                             album_id=album["id"],
                                             heartbeat=heartbeat)
+            looked_at += 1
             if not items:
                 continue
             prop = album_proposal(album, items, shared=not owned)
             if prop:
                 album_props.append(prop)
-    log.info("Immich %d: %d Alben vorgeschlagen, %d schon vergeben",
-             year, len(album_props), skipped)
+    log.info("Immich %d: %d Alben vorgeschlagen, %d schon vergeben, "
+             "%d nicht mehr angesehen (%.1fs)", year, len(album_props),
+             skipped, open_albums, time.monotonic() - began)
+    _note(partial=bool(open_albums), albums_open=open_albums,
+          albums_checked=looked_at, seconds=round(time.monotonic() - began, 1))
 
     clusters = _drop_clusters_inside_albums(clusters, album_props)
 

@@ -30,12 +30,16 @@ any `MINOR`.
   survives more Immich versions: the timeline endpoint changed which parameters
   it demands, so Life-Dash now tries the current form first and works its way
   back instead of giving up on the first rejection.
-- **The Immich preview no longer looks broken while it is working.** It
-  re-downloaded every album in the chosen year on every run, including the ones
-  already confirmed or rejected — so on a large library it could take minutes
-  while the button said nothing and the server log stayed empty until it
-  finished. Albums that already have an entry are skipped, the run is logged
-  when it starts, and the button counts the seconds.
+- **The Immich preview could end in a gateway error instead of a result.** On a
+  large library it re-downloaded every album of the chosen year on every run —
+  including the ones already confirmed or rejected — and when accessed from
+  outside, the reverse proxy in between gave up before the answer arrived: not
+  a late result, but none at all. Albums that already have an entry are now
+  skipped, and the preview keeps to a time budget, answering with what it has
+  seen and saying how many albums it did not get to. Creating the proposals is
+  a background job and still looks at all of them. The preview also logs when it
+  starts, and the button counts the seconds, so a slow look-up no longer looks
+  like a dead one.
 - **The Immich preview button could do nothing at all.** The year picker was
   filled only from the server, and that call sat behind a chain of swallowed
   errors — so if anything went wrong beforehand, the picker stayed empty and

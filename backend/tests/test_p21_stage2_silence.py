@@ -17,6 +17,7 @@ Krankheit wie in Anmerkung 110 und 112 — **Stille**:
 from __future__ import annotations
 
 import json
+import time
 from datetime import date, datetime
 
 import pytest
@@ -185,6 +186,58 @@ def test_known_albums_are_not_downloaded_again(db, user, monkeypatch):
     out = source.scan_year(db, user, YEAR, "u", "k")
     assert fetched == ["alb-neu"], "das vergebene Album wurde erneut geladen"
     assert [p.slot for p in out] == [source.slot_album("alb-neu")]
+
+
+def test_preview_gives_up_in_time_and_says_so(db, user, monkeypatch):
+    """Ein 502 ist keine späte Antwort, sondern gar keine.
+
+    Aus der Ferne steht ein umgekehrter Vertreter mit fester Geduld dazwischen.
+    Läuft die ab, ist die Arbeit weg — deshalb ein Zeitbudget und eine
+    Teilantwort, die sich als Teilantwort zu erkennen gibt.
+    """
+    albums = [{"id": f"alb-{i}", "albumName": f"Album {i}", "_owned": True}
+              for i in range(5)]
+    monkeypatch.setattr(api, "own_user_id", lambda url, key: "me")
+    monkeypatch.setattr(api, "albums",
+                        lambda url, key, owned=None: albums if owned else [])
+
+    def _slow(url, key, start, end, *, album_id=None, heartbeat=None,
+              max_items=20000):
+        if album_id:
+            time.sleep(0.05)      # ein Album kostet Zeit — wie im Betrieb
+        return []
+
+    monkeypatch.setattr(api, "search_assets_paged", _slow)
+
+    report: dict = {}
+    source.scan_year(db, user, YEAR, "u", "k", budget_s=0.08, report=report)
+    assert report["partial"] is True
+    assert report["albums_open"] >= 1
+    assert report["albums_checked"] < len(albums)
+
+
+def test_the_run_has_no_budget(db, user, monkeypatch):
+    """Der Job wartet auf niemanden — eine halbe Vorschau ist brauchbar,
+    ein halber Lauf wäre es nicht."""
+    albums = [{"id": f"alb-{i}", "albumName": f"Album {i}", "_owned": True}
+              for i in range(4)]
+    seen: list[str] = []
+    monkeypatch.setattr(api, "own_user_id", lambda url, key: "me")
+    monkeypatch.setattr(api, "albums",
+                        lambda url, key, owned=None: albums if owned else [])
+
+    def _slow(url, key, start, end, *, album_id=None, heartbeat=None,
+              max_items=20000):
+        if album_id:
+            seen.append(album_id)
+            time.sleep(0.02)
+        return []
+
+    monkeypatch.setattr(api, "search_assets_paged", _slow)
+    report: dict = {}
+    source.scan_year(db, user, YEAR, "u", "k", report=report)
+    assert len(seen) == len(albums)
+    assert report["partial"] is False
 
 
 def test_confirmed_album_is_not_downloaded_again(db, user, monkeypatch):

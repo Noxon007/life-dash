@@ -2430,6 +2430,7 @@ const I18N_EN = {
   'ims.shared': "shared album",
   'ims.more': "more",
   'ims.years.fail': "The year list could not be fetched from Immich ({e}) — the picker shows the last few years. A run still works.",
+  'ims.partial': "Stopped after {s}s: {n} albums were not looked at. The run itself looks at all of them — it is not keeping anyone waiting.",
   'ims.years.own': "The years come from your own data, not from Immich ({e}). The years before the smartphone are missing from that list — a run still works for every year shown.",
   'ims.needpreview': "Look at the preview first — then create.",
   'im.test': "🔌 Test connection",
@@ -7383,11 +7384,18 @@ document.getElementById('ims-preview')?.addEventListener('click', async ev => {
           <span class="stat-label">· ${esc(p.start.slice(0, 10))}${p.place ? ' · ' + esc(p.place) : ''} · ${p.photos} ${esc(t('ims.photos', 'Fotos'))}</span>
           ${p.shared ? `<span class="chip badge-unconfirmed">${esc(t('ims.shared', 'geteiltes Album'))}</span>` : ''}
         </div>`).join('');
+      // Anmerkung 113: Eine abgebrochene Vorschau sagt es — sonst liest sich
+      // ein Ausschnitt wie eine Gesamtaussage.
+      const cut = r.partial
+        ? `<div class="stat-label" style="margin-top:8px">⏳ ${esc(t('ims.partial', 'Nach {s}s abgebrochen: {n} Alben wurden nicht mehr angesehen. Der Lauf selbst sieht alle an — er wartet auf niemanden.')
+            .replace('{s}', r.seconds).replace('{n}', r.albums_open))}</div>`
+        : '';
       box.innerHTML = `<b>${esc(t('ims.head', '{y}: {n} Vorschläge ({d} Fototage, {a} Alben) aus {p} Fotos')
           .replace('{y}', r.year).replace('{n}', r.total).replace('{d}', r.days)
           .replace('{a}', r.albums).replace('{p}', r.photos))}</b>
         <div style="margin-top:6px">${rows}</div>
-        ${r.total > 40 ? `<div class="stat-label">… ${r.total - 40} ${esc(t('ims.more', 'weitere'))}</div>` : ''}`;
+        ${r.total > 40 ? `<div class="stat-label">… ${r.total - 40} ${esc(t('ims.more', 'weitere'))}</div>` : ''}
+        ${cut}`;
     }
     imsLock();
   } catch (err) {
