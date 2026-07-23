@@ -29,7 +29,19 @@ PAGE_SIZE = 250
 
 
 class ImmichError(RuntimeError):
-    """Immich nicht erreichbar oder Antwort unbrauchbar — Text geht an den Nutzer."""
+    """Immich nicht erreichbar oder Antwort unbrauchbar — Text geht an den Nutzer.
+
+    `status` trägt den HTTP-Code, wenn Immich **geantwortet** hat, sonst None.
+    Dieselbe Unterscheidung wie `err.status` im Frontend (P5.1, Anmerkung 108):
+    „der Server hat geantwortet" und „die Anfrage kam nie an" sind zwei
+    verschiedene Lagen, und wer sie zusammenwirft, trifft die falsche
+    Entscheidung. Hier hängt daran, ob es sich lohnt, dieselbe Frage mit
+    anderen Parametern noch einmal zu stellen (`photo_years`).
+    """
+
+    def __init__(self, message: str, status: int | None = None):
+        super().__init__(message)
+        self.status = status
 
 
 def config_for(user) -> tuple[str, str] | None:
@@ -69,17 +81,31 @@ def _request(url: str, key: str, path: str, *, payload: dict | None = None,
                 return body if raw else json.loads(body.decode("utf-8"))
         except urllib.error.HTTPError as exc:
             if exc.code in (401, 403):
-                raise ImmichError("Immich lehnt den API-Schlüssel ab (401/403)") from exc
+                raise ImmichError("Immich lehnt den API-Schlüssel ab (401/403)",
+                                  exc.code) from exc
             if exc.code == 404:
                 raise ImmichError(f"Immich kennt {path} nicht (404) — "
-                                  "passt die URL und die Immich-Version?") from exc
+                                  "passt die URL und die Immich-Version?",
+                                  exc.code) from exc
             if exc.code in _TRANSIENT and attempt < _RETRIES:
-                last = ImmichError(f"Immich vorübergehend nicht bereit ({exc.code})")
+                last = ImmichError(f"Immich vorübergehend nicht bereit ({exc.code})",
+                                   exc.code)
                 log.info("Immich %d bei %s — erneuter Versuch %d/%d",
                          exc.code, path, attempt + 1, _RETRIES)
                 time.sleep(_RETRY_WAIT)
                 continue
-            raise ImmichError(f"Immich antwortet mit {exc.code}") from exc
+            # Der Text der Antwort steht drin: Immich sagt bei 400 genau,
+            # welcher Parameter ihm nicht passt („property size should not
+            # exist"). Ohne das steht im Log „antwortet mit 400" — wahr und
+            # nutzlos.
+            detail = ""
+            try:
+                detail = (exc.read() or b"").decode("utf-8", "replace")[:300].strip()
+            except Exception:  # pragma: no cover - Antwort schon gelesen
+                pass
+            raise ImmichError(
+                f"Immich antwortet mit {exc.code}" + (f": {detail}" if detail else ""),
+                exc.code) from exc
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             if attempt < _RETRIES:
                 last = ImmichError(f"Immich nicht erreichbar: {exc}")
@@ -311,20 +337,52 @@ def photo_years(url: str, key: str, my_id: str | None) -> dict[int, int]:
     aus den eigenen Ereignissen böte genau die nicht an — sie zeigte 2026 und
     verstecke 2004.
 
-    Ältere Immich-Versionen kennen den Endpunkt nicht; dann gibt es ein leeres
-    Ergebnis und der Aufrufer fällt auf die eigenen Jahre zurück.
+    **Die Parameter dieses Endpunkts sind eine wandernde Grenze** (Anmerkung
+    113). `size=MONTH` war bis Immich 1.133 **Pflicht** und ist seit 1.134
+    **verboten** — die Bucket-Größe wurde ersatzlos gestrichen, ohne Eintrag im
+    Änderungsprotokoll. Immich validiert streng: ein Parameter, den die
+    laufende Version nicht kennt, ist ein **400**, keine Warnung. Genauso
+    kamen `visibility` und `withCoordinates` erst später dazu; davor hieß es
+    `isArchived`.
+
+    Deshalb eine Leiter statt einer Annahme: gefragt wird von der neuesten
+    Form abwärts, und ein 400 heißt „diese Version kennt das nicht — nächste
+    Sprosse". Bei 401 oder „nicht erreichbar" wird NICHT weitergeraten; das
+    Problem läge woanders und drei Fehlversuche machten es nur langsamer.
     """
-    params = ["visibility=timeline", "withCoordinates=true", "withPartners=false"]
-    if my_id:
-        params.append(f"userId={urllib.parse.quote(my_id)}")
-    data = _request(url, key, "/timeline/buckets?" + "&".join(params))
-    years: dict[int, int] = {}
-    for bucket in data or []:
-        stamp = str(bucket.get("timeBucket") or "")[:4]
-        if not stamp.isdigit():
+    ladder = [
+        # Ab Immich 1.134: keine Bucket-Größe mehr, immer Monatsschritte.
+        ["visibility=timeline", "withCoordinates=true", "withPartners=false"],
+        # 1.133 abwärts: `size` war Pflicht.
+        ["size=MONTH", "visibility=timeline", "withCoordinates=true",
+         "withPartners=false"],
+        # Noch älter: kein `visibility`, kein `withCoordinates`. Die Zahl zählt
+        # dann auch Fotos ohne Koordinaten, ist also zu hoch — sie ist eine
+        # Empfehlung („lohnt sich 2004?"), kein Versprechen.
+        ["size=MONTH", "isArchived=false", "withPartners=false"],
+    ]
+    last: ImmichError | None = None
+    for params in ladder:
+        query = list(params)
+        if my_id:
+            query.append(f"userId={urllib.parse.quote(my_id)}")
+        try:
+            data = _request(url, key, "/timeline/buckets?" + "&".join(query))
+        except ImmichError as exc:
+            if exc.status != 400:
+                raise
+            log.info("Immich mag %s nicht (%s) — nächster Versuch",
+                     "&".join(params), exc)
+            last = exc
             continue
-        years[int(stamp)] = years.get(int(stamp), 0) + int(bucket.get("count") or 0)
-    return years
+        years: dict[int, int] = {}
+        for bucket in data or []:
+            stamp = str(bucket.get("timeBucket") or "")[:4]
+            if not stamp.isdigit():
+                continue
+            years[int(stamp)] = years.get(int(stamp), 0) + int(bucket.get("count") or 0)
+        return years
+    raise last or ImmichError("Immich liefert keine Zeitachse")
 
 
 def albums(url: str, key: str, *, owned: bool | None = None) -> list[dict]:

@@ -291,6 +291,18 @@ def scan_year(db: Session, user, year: int, url: str, key: str,
     """
     start = datetime(year, 1, 1)
     end = datetime(year, 12, 31, 23, 59, 59)
+
+    # Das eigene Wissen steht am ANFANG, nicht am Ende (Anmerkung 113). Es
+    # kostet drei billige Abfragen und entscheidet, welche teuren Netzabfragen
+    # überhaupt nötig sind. Vorher wurde erst alles geholt und dann gefiltert:
+    # jedes Album, das dieses Jahr berührt, wurde bei JEDEM Lauf vollständig
+    # heruntergeladen — auch die längst bestätigten und die abgelehnten — nur
+    # um am Ende weggeworfen zu werden. Bei einer gewachsenen Bibliothek ist
+    # das der Löwenanteil der Laufzeit, und beim zweiten Lauf ist er komplett
+    # umsonst.
+    known = _proposed_slots(db, user.id) | _owned_slots(db, user.id)
+    housed = _days_with_owning_events(db, user.id, start, end)
+
     my_id = api.own_user_id(url, key)
     if not my_id:
         log.warning("Immich nennt keine eigene Nutzerkennung — Fotocluster "
@@ -298,11 +310,20 @@ def scan_year(db: Session, user, year: int, url: str, key: str,
 
     assets = api.search_assets_paged(url, key, start, end, heartbeat=heartbeat)
     clusters = cluster_assets(assets, my_id)
+    log.info("Immich %d: %d Fotos gelesen, %d Tagescluster", year,
+             len(assets), len(clusters))
 
     album_props: list[Proposal] = []
+    skipped = 0
     for owned in (True, False):
         for album in api.albums(url, key, owned=owned):
             if not _album_touches_year(album, year):
+                continue
+            if slot_album(album["id"]) in known:
+                # Fälle (2)/(3)/(4): schon vorgeschlagen, schon bestätigt oder
+                # abgelehnt. Der Platz ist vergeben — die Fotos dazu braucht
+                # niemand mehr.
+                skipped += 1
                 continue
             # **Nicht** auf das Jahr eingegrenzt: Ein Album ist ein begrenzter
             # Behälter mit einer eigenen Spanne. Fragte man nur nach den Fotos
@@ -319,15 +340,15 @@ def scan_year(db: Session, user, year: int, url: str, key: str,
             prop = album_proposal(album, items, shared=not owned)
             if prop:
                 album_props.append(prop)
+    log.info("Immich %d: %d Alben vorgeschlagen, %d schon vergeben",
+             year, len(album_props), skipped)
 
     clusters = _drop_clusters_inside_albums(clusters, album_props)
 
     # Fall (1): Fotos, die schon ein Zuhause haben, brauchen keinen Vorschlag.
-    housed = _days_with_owning_events(db, user.id, start, end)
     clusters = [c for c in clusters if c.start.date() not in housed]
 
-    # Fälle (2), (3), (4): schon vorgeschlagen (auch abgelehnt) oder schon da.
-    known = _proposed_slots(db, user.id) | _owned_slots(db, user.id)
+    # Fälle (2), (3), (4) für die Tage — die Alben sind oben schon durch.
     return [p for p in (album_props + clusters) if p.slot not in known]
 
 

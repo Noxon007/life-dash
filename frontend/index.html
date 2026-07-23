@@ -2430,6 +2430,7 @@ const I18N_EN = {
   'ims.shared': "shared album",
   'ims.more': "more",
   'ims.years.fail': "The year list could not be fetched from Immich ({e}) — the picker shows the last few years. A run still works.",
+  'ims.years.own': "The years come from your own data, not from Immich ({e}). The years before the smartphone are missing from that list — a run still works for every year shown.",
   'ims.needpreview': "Look at the preview first — then create.",
   'im.test': "🔌 Test connection",
   'im.run': "🖼️ Link photos",
@@ -3438,8 +3439,14 @@ async function renderOnThisDay() {
     // ihn nie gesetzt — die Voreinstellung war damit unumkehrbar, und wer sich
     // fragte „warum sehe ich meine Reise von damals nicht?", bekam keine
     // Antwort. Jetzt ein Schalter; die Voreinstellung bleibt „ohne Besuche".
+    //
+    // Anmerkung 113: Der Schalter hieß hier `include_visits`, der Endpunkt
+    // heißt `include_imported`. FastAPI wirft unbekannte Parameter still weg —
+    // der Haken ließ sich setzen, merkte sich seinen Zustand und tat NICHTS.
+    // Ein Parametername ist eine Naht zwischen zwei Dateien; getestet wurde
+    // die Funktion (mit dem richtigen Namen), nie die Adresse.
     groups = await api('/api/events/on-this-day'
-      + (otdVisits ? '?include_visits=1' : ''));
+      + (otdVisits ? '?include_imported=1' : ''));
   } catch (err) { box.innerHTML = ''; return; }
   if (!groups.length) {
     // Der Schalter bleibt stehen: „hier ist nichts" und „hier ist nichts, weil
@@ -7298,7 +7305,17 @@ async function loadImmichYears() {
     }).join('');
     const has = (r.years || []).some(y => y.year === r.current);
     if (has) sel.value = String(r.current);
-    imsNote('');
+    // Anmerkung 113: Der Server antwortet auch dann mit 200, wenn er die
+    // Jahre NICHT aus Immich hat — mit den eigenen als Notnagel. Ohne diesen
+    // Zweig sieht das aus wie eine Empfehlung, ist aber genau die Liste, die
+    // das Paket abschaffen sollte: die Jahre vor dem Smartphone fehlen darin
+    // immer. Der Grund steht jetzt daneben.
+    if (r.source === 'own') {
+      imsNote(t('ims.years.own', 'Die Jahre kommen aus deinem eigenen Bestand, nicht aus Immich ({e}). Gerade die Jahre vor dem Smartphone fehlen darin — ein Lauf geht trotzdem für jedes Jahr in der Liste.')
+        .replace('{e}', r.reason || '—'));
+    } else {
+      imsNote('');
+    }
   } catch (err) {
     // Nicht mehr verschlucken: Die Auswahl steht (Standardjahre), aber der
     // Nutzer soll wissen, dass die Empfehlung fehlt — sonst wundert er sich,
@@ -7333,8 +7350,20 @@ document.getElementById('ims-preview')?.addEventListener('click', async ev => {
   // Feld ist eine Sackgasse (Anmerkung 112). Also auffüllen und weitermachen.
   if (!sel.options.length) imsDefaultYears();
   const year = sel.value || String(new Date().getFullYear());
-  btn.disabled = true; btn.textContent = t('ims.busy', '🔍 sehe nach …');
+  btn.disabled = true;
   const box = document.getElementById('ims-result');
+  // Anmerkung 113: Eine große Bibliothek braucht Minuten — Immich wird je
+  // Album einmal gefragt. Ein Knopf, auf dem unverändert „sehe nach …" steht,
+  // ist von einem hängenden Knopf nicht zu unterscheiden, und im Server-Log
+  // steht bis zur Antwort nichts. Also eine laufende Uhr: sie beantwortet die
+  // einzige Frage, die man in dieser Minute hat.
+  const began = Date.now();
+  const tick = () => {
+    const s = Math.round((Date.now() - began) / 1000);
+    btn.textContent = t('ims.busy', '🔍 sehe nach …') + (s >= 3 ? ` (${s}s)` : '');
+  };
+  tick();
+  const timer = setInterval(tick, 1000);
   try {
     const r = await api(`/api/immich/preview?year=${year}`, { method: 'POST' });
     imsPreviewedYear = r.year;
@@ -7367,6 +7396,7 @@ document.getElementById('ims-preview')?.addEventListener('click', async ev => {
     imsPreviewedYear = null;
     imsLock();
   } finally {
+    clearInterval(timer);
     btn.disabled = false; btn.textContent = t('ims.preview', '🔍 Vorschau für dieses Jahr');
   }
 });

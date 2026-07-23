@@ -18,6 +18,24 @@ any `MINOR`.
 ## [0.38.0] – 2026-07-22
 
 ### Fixed
+- **The switch for imported location visits in “On this day” did nothing.** The
+  tick could be set and was remembered, but the page asked the server using the
+  wrong name for the setting — and an unknown setting is quietly ignored. The
+  look-back now really does include imported visits when asked to.
+- **The year picker for Immich proposals offered only years Life-Dash already
+  knew.** When Immich cannot answer the question “which years are worth a run?”,
+  the picker falls back to your own data — but it did not say so, and the years
+  before the smartphone (the ones this feature exists for) are exactly the ones
+  missing from that list. It now names the reason. The question itself also
+  survives more Immich versions: the timeline endpoint changed which parameters
+  it demands, so Life-Dash now tries the current form first and works its way
+  back instead of giving up on the first rejection.
+- **The Immich preview no longer looks broken while it is working.** It
+  re-downloaded every album in the chosen year on every run, including the ones
+  already confirmed or rejected — so on a large library it could take minutes
+  while the button said nothing and the server log stayed empty until it
+  finished. Albums that already have an entry are skipped, the run is logged
+  when it starts, and the button counts the seconds.
 - **The Immich preview button could do nothing at all.** The year picker was
   filled only from the server, and that call sat behind a chain of swallowed
   errors — so if anything went wrong beforehand, the picker stayed empty and

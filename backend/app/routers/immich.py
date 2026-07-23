@@ -8,6 +8,8 @@ ist — und niemand hätte vorher gewusst, dass es passiert.
 """
 from __future__ import annotations
 
+import logging
+import time
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -20,6 +22,8 @@ from app.services import immich as api
 from app.services import immich_source as source
 
 router = APIRouter(prefix="/api/immich", tags=["Immich"])
+
+log = logging.getLogger("lifedash.immich")
 
 
 def _config_or_400(user: User) -> tuple[str, str]:
@@ -46,20 +50,32 @@ def source_years(
     zu liefern. Kennt der Server den Endpunkt nicht (ältere Immich-Version),
     bleiben die eigenen Jahre als Notnagel: lieber eine magere Auswahl als
     ein leeres Feld.
+
+    **Der Notnagel sagt jetzt, dass er einer ist** (Anmerkung 113). Vorher
+    verschwand der Grund im `except` — und wer daraufhin nur die Jahre sah,
+    die Life-Dash ohnehin schon kennt, hatte genau die Auswahl vor sich, die
+    dieses Paket abschaffen sollte, ohne eine Chance zu merken warum. Der
+    Rückfall ist richtig; das Schweigen darüber war der Fehler.
     """
-    fallback = {"years": [{"year": y, "photos": None}
+    def _fallback(reason: str | None) -> dict:
+        if reason:
+            log.warning("Immich-Jahresliste nicht verfügbar: %s", reason)
+        return {"years": [{"year": y, "photos": None}
                           for y in source.years_with_photos(db, user.id)],
-                "current": date.today().year, "source": "own"}
+                "current": date.today().year, "source": "own", "reason": reason}
+
     cfg = api.config_for(user)
     if cfg is None:
-        return fallback
+        return _fallback("Immich ist für dieses Konto nicht eingerichtet "
+                         "(Verwaltung → Meine Daten → Immich).")
     url, key = cfg
     try:
         counts = api.photo_years(url, key, api.own_user_id(url, key))
-    except api.ImmichError:
-        return fallback
+    except api.ImmichError as exc:
+        return _fallback(str(exc))
     if not counts:
-        return fallback
+        return _fallback("Immich meldet keine Fotos mit Koordinaten in seinem "
+                         "Zeitstrahl.")
     return {
         "years": [{"year": y, "photos": counts[y]} for y in sorted(counts, reverse=True)],
         "current": date.today().year,
@@ -77,12 +93,24 @@ def source_preview(
 
     Dieselbe Funktion, die der Lauf benutzt (`scan_year`) — zwei getrennte
     Wege wären zwei Regeln, und die widersprechen sich still (Anmerkung 106).
+
+    **Der Lauf steht im Log, bevor er fertig ist** (Anmerkung 113). Eine
+    Zugriffszeile schreibt der Server erst, wenn die Antwort steht — eine
+    Vorschau, die zwei Minuten über eine große Bibliothek läuft, sieht im Log
+    deshalb aus wie eine Anfrage, die es nie gab. Genau so wurde sie gemeldet:
+    „geht nicht, kein Log, keine Rückmeldung".
     """
     url, key = _config_or_400(user)
+    log.info("Immich-Vorschau für %s: Jahr %d — beginnt", user.id[:8], year)
+    began = time.monotonic()
     try:
         proposals = source.scan_year(db, user, year, url, key)
     except api.ImmichError as exc:
+        log.warning("Immich-Vorschau %d abgebrochen nach %.1fs: %s",
+                    year, time.monotonic() - began, exc)
         raise HTTPException(502, str(exc)) from exc
+    log.info("Immich-Vorschau %d fertig in %.1fs: %d Vorschläge",
+             year, time.monotonic() - began, len(proposals))
     days = sum(1 for p in proposals if p.kind == "day")
     return {
         "year": year,
