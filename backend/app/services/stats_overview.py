@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (ConfirmState, Entity, Event, EventEntityLink, Location,
                         Metric, Source)
+from app.services import weather_day
 
 # Dieselben Muster wie im Frontend (dort als RegExp über „Titel + Beschreibung")
 _MOVE_RE = re.compile(r"umzug|umgezogen|eingezogen", re.I)
@@ -264,26 +265,40 @@ def _weather_stats(db: Session, user_id: str) -> dict:
     # --- Bilanz: EIN Datensatz je Kalendertag (A31/Anmerkung 64) ---
     # Ein importierter Tag trägt dutzende Besuche mit demselben Wetter; über
     # Einträge gerechnet kämen mehr als 365 Regentage im Jahr heraus.
+    #
+    # Anmerkung 119: WELCHER Wert das ist, entscheidet nicht mehr diese Datei.
+    # Bis 0.39 gewann hier das erste Ereignis des Tages, in den Erfolgen das
+    # kleinste je Schlüssel und im Zeitstrahl das des Verdichtungs-Vertreters —
+    # drei Antworten auf eine Frage, und nur eine davon stand irgendwo
+    # begründet. Jetzt gilt überall die Regel aus `weather_day`: je Schlüssel
+    # der kleinste Wert des Tages, also der vorsichtige.
+    day_wx = weather_day.day_values(db, user_id, keys=_WX_KEYS)
+    # Das Ereignis bleibt trotzdem gebraucht — aber nur noch als IDENTITÄT
+    # (zu welcher Reise gehört der Tag, wie heißt sie). Der WERT kommt aus
+    # `day_wx`. Zwei Fragen, zwei Quellen: genau die Trennung, deren Fehlen
+    # den Vertreter zur Auskunft gemacht hat.
     by_day: dict[str, str] = {}
     for eid in sorted(values, key=lambda i: (events[i].date_start, i)):
         day = events[eid].date_start.date().isoformat()
         by_day.setdefault(day, eid)
     day_ids = list(by_day.values())
+    dval = lambda day, key: (day_wx.get(day) or {}).get(key)  # noqa: E731
+    day_of = lambda i: events[i].date_start.date().isoformat()  # noqa: E731
 
-    rain_days = sum(1 for i in day_ids if (val(i, "rain_mm") or 0) >= 1)
-    sun_hours = round(sum(val(i, "sunshine_h") or 0 for i in day_ids))
+    rain_days = sum(1 for i in day_ids if (dval(day_of(i), "rain_mm") or 0) >= 1)
+    sun_hours = round(sum(dval(day_of(i), "sunshine_h") or 0 for i in day_ids))
     rain_per_year: dict[int, int] = {}
     for i in day_ids:
         y = events[i].date_start.year
         rain_per_year.setdefault(y, 0)
-        if (val(i, "rain_mm") or 0) >= 1:
+        if (dval(day_of(i), "rain_mm") or 0) >= 1:
             rain_per_year[y] += 1
 
     # Wärmste Reise: Mittel über die TAGE einer Reise, nicht über ihre Einträge
     trips: dict[str, list] = {}
     for i in day_ids:
         e = events[i]
-        temp = val(i, "temperature_c")
+        temp = dval(day_of(i), "temperature_c")
         if e.category != "trip" or temp is None:
             continue
         key = e.parent_event_id or i

@@ -22,6 +22,31 @@ def day_parts(col):
             func.extract("day", col))
 
 
+def weather_cell(lat_col, lng_col):
+    """Eine Zahl je Wetter-Gitterzelle (0,1° ≈ 11 km) — dialektneutral.
+
+    Gedacht zum ZÄHLEN: `count(distinct weather_cell(...))` beantwortet „wie
+    viele Wetterregionen berührt dieser Tag?". Nicht zum Vergleichen mit einem
+    festen Wert — die Zahl selbst hat keine Bedeutung.
+
+    Zwei Fallen stecken hier drin, beide vom Dialekt:
+    * `round(x, 1)` gibt es in PostgreSQL **nur für `numeric`**, nicht für
+      `double precision` — `Location.lat` ist ein Float, die Abfrage stürbe
+      also erst auf der Anlage des Autors (genau der Fall, für den es
+      `test_a37_postgres_dialect.py` gibt). Einstelliges `round(x)` können
+      beide.
+    * An der exakten Hälfte (x,x5) rundet SQLite von der Null weg, PostgreSQL
+      zur geraden Zahl. Das verschiebt einen Zellenrand um eine halbe Zelle und
+      ist hier folgenlos: gezählt wird, ob zwei Punkte AUSEINANDER liegen, und
+      dafür ist die Lage des Rasters gleichgültig.
+
+    Der Multiplikator trennt die beiden Achsen: Längengrade liegen in
+    [-1800, 1800] nach der Skalierung, 3601 Werte — mehr als der Abstand
+    zweier Breitenstufen, also kann keine Kombination auf eine andere fallen.
+    """
+    return func.round(lat_col * 10) * 3601 + func.round(lng_col * 10)
+
+
 # A47: Welche Nominatim-Bausteine als „Ortsteil" gelten, in dieser Reihenfolge.
 # Nominatim benennt dieselbe Ebene je nach Land und Ortsgröße anders — in
 # Deutschland meist `suburb`, in Großstädten `city_district`, anderswo

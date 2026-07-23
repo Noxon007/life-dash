@@ -58,6 +58,35 @@ bleibt so lange auf **0.39.0**, neue CHANGELOG-Punkte gehen unter
 Kennung (Anm. 86). **Nicht bei jedem Paket die Version hochziehen** — das war
 zweimal die Ursache für den Anm.-91-Defekt: ein Bump als Startschuss statt als
 Schlussstrich.
+**Tageswetter vereinheitlicht (Anmerkung 119, auf `main` ohne Versionssprung).**
+Aus der Frage „ein Tag hat zwei Orte — wo steht dann das Wetter?" fielen VIER
+Antworten auf eine Frage: Zeitstrahl = Wetter des A39-Vertreters `min(id)`
+(UUIDs, also ein zufälliger von fünf Besuchen), Client-Sammelkarte = gar keins
+(sie ruft `eventChips` nicht auf), Erfolge = `min` je Tag, Statistik-Bilanz =
+**erstes Ereignis des Tages**. Anm. 106 in Reinform. Jetzt EINE Regel in
+`services/weather_day.py` (Schicht 4): Zahlen = Minimum des Tages (der
+VORSICHTIGE Wert), Texte nur bei Einigkeit des Tages, dazu `regions` = Zahl der
+berührten 0,1°-Zellen NEBEN dem Wert (A40: was nicht alles zeigen kann, muss es
+sagen). Endpunkt `/api/days/weather`, Tageskopf im Tages-Zoom.
+**Zwei Fragen bleiben bewusst verschieden beantwortet:** OB ein Tag zählt
+(Erfolgs-Schwelle) fragt weiter „irgendein Eintrag erreicht es" — sonst würden
+verdiente Abzeichen aberkannt (`test_f19_badges.py` seit 0.35) —, WAS er
+beisteuert, ist immer der vorsichtige Wert. Als Vorfilter geschrieben macht die
+Schwelle beides zugleich (11 h + 3 h mit `min: 10` ergibt 11, nicht 3): deshalb
+`having`. Dazu ein Prozess-Cache in `fetch_weather` je (Tag, Koordinate auf 2
+Stellen ≈ 1,1 km) — bewusst NICHT gröber (0,1° läge AUF der Auflösung der
+Quelle) und **Fehlschläge werden nicht gemerkt** (Gegenrichtung zur
+Endlos-Abruf-Falle: ein Prozess-Cache, keine dauerhafte Marke).
+**Zwei Selbstfunde:** `round(x, 1)` gibt es auf PostgreSQL nur für `numeric`,
+nicht für `double precision` (`sqlutil.weather_cell`, geprüft in
+`test_a37_postgres_dialect.py`); und die erste Spannen-Grenze des Endpunkts
+(4000 Tage) hätte in einem dünnen Bestand jede Seite von 1994 bis heute
+getroffen und das Tageswetter still weggelassen — die Antwort ist ohnehin durch
+die 300 Ereignisse der Seite begrenzt. **Eine Grenze aus dem falschen Grund
+wird zur stillen Auslassung.** Wächter `tools/check-day-weather.js` +
+`tests/test_weather_day.py`, beide gegen fünf injizierte Defekte gefahren
+(Anm. 108) — eine Zusicherung war dabei zuerst aus dem falschen Grund grün.
+
 Hinter 1.0 bleiben
 nur noch neue Import-Konnektoren (P2.8 OwnTracks, P2.9 Automatisierung,
 P2.10 Trakt, P2.11 Dawarich/GPX, P4.1 Health, P4.2 PSN) plus **P5.2**

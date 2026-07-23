@@ -170,3 +170,34 @@ def test_a39_condensation_translates_to_postgres(db, user):
 
     visits = _sql(_condensable_visits(db, user.id)).lower()
     assert "google_timeline" in visits and "locations.city" in visits
+
+
+# --------------------------------------------------------------------------- #
+# Anmerkung 119 — das Tageswetter ist die nächste dialektempfindliche Abfrage
+# --------------------------------------------------------------------------- #
+def test_day_weather_translates_to_postgres(db, user):
+    """Zwei Fallen auf einmal, und beide sterben erst auf PostgreSQL.
+
+    `round(x, 1)` gibt es dort **nur für `numeric`**, nicht für
+    `double precision` — `Location.lat` ist ein Float, die Regionen-Zählung
+    stürbe also ausgerechnet auf der Anlage des Autors. Und die Gruppierung
+    nach Kalendertag läuft wie überall über `extract`, nicht über `date(...)`.
+    """
+    from app.services.weather_day import day_regions, day_value_query
+
+    sql = _sql(day_value_query(db, user.id, "sunshine_h", min_value=10)).lower()
+    assert "extract(year from" in sql and "group by" in sql
+    assert "having" in sql, "die Schwelle gehört hinter die Verdichtung"
+    assert "min(metrics.value)" in sql and "max(metrics.value)" in sql
+
+    # `day_regions` gibt ein Dict zurück — die Abfrage selbst wird darum über
+    # denselben Baustein geprüft, aus dem sie gebaut ist.
+    from app.sqlutil import weather_cell
+    cell = str(weather_cell(Location.lat, Location.lng)
+               .compile(dialect=PG, compile_kwargs={"literal_binds": True})).lower()
+    assert "round(locations.lat * 10)" in cell, cell
+    assert "round(locations.lat, 1)" not in cell, \
+        "zweistelliges round() gibt es auf PostgreSQL nur für numeric"
+
+    # Und der Lauf selbst muss auf SQLite durchgehen (der Testdialekt).
+    assert day_regions(db, user.id) == {}

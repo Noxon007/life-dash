@@ -16,6 +16,38 @@ log = logging.getLogger("lifedash.weather")
 
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 
+# --------------------------------------------------------------------------- #
+# Anmerkung 119 — derselbe Tag am selben Ort wird EINMAL gefragt
+# --------------------------------------------------------------------------- #
+# Wetter ist eine Eigenschaft von (Tag, Ort); gespeichert wird es je EREIGNIS.
+# Nach einem Timeline-Import hat ein Tag dutzende Besuche, viele davon an
+# derselben Adresse — der Anreicherungslauf stellte dieselbe Frage dutzendfach
+# und bekam dutzendfach dieselbe Antwort. Gemessen an einem gewöhnlichen
+# Importtag: fünf Besuche, vier davon am selben Ort, fünf Abrufe.
+#
+# `_QUANT` ist der Preis dafür, dass der Schlüssel gröber ist als die Frage:
+# zwei Nachkommastellen sind ~1,1 km. Das liegt weit UNTER der Auflösung der
+# Quelle (Open-Meteos Archiv rechnet auf einem 9–25-km-Gitter), es kann also
+# keinen Wert verändern, den die Daten überhaupt unterscheiden könnten.
+# Deshalb wird auch die ANFRAGE mit den gerundeten Koordinaten gestellt: sonst
+# läge unter dem Schlüssel eine Antwort, die für einen anderen Punkt geholt
+# wurde — ein Cache darf nur ausliefern, wonach er gefragt wurde.
+#
+# **Fehlschläge werden bewusst NICHT gemerkt.** Das ist die Gegenrichtung zur
+# Endlos-Abruf-Falle (F12 `weather_rev`, A39, A42): dort geht es um eine
+# DAUERHAFT gespeicherte Marke, hier um einen Prozess-Cache. Ein einzelner
+# Netzaussetzer würde sonst den Ort für die Laufzeit des Servers vergiften,
+# und die dauerhafte Marke am Ereignis verhindert das Nachfragen ohnehin.
+_QUANT = 2
+_CACHE: dict[tuple[float, float, str], dict] = {}
+_CACHE_MAX = 4096
+
+
+def reset_cache() -> None:
+    """Cache leeren — für Tests und für den Fall, dass jemand einen Lauf
+    wiederholen will, ohne den Server neu zu starten."""
+    _CACHE.clear()
+
 # WMO-Wettercodes -> deutsche Kurzbeschreibung
 WMO = {
     0: "klar", 1: "überwiegend klar", 2: "teils bewölkt", 3: "bewölkt",
@@ -46,9 +78,15 @@ def fetch_weather(lat: float, lng: float, day: datetime | date) -> dict | None:
     if isinstance(day, datetime):
         day = day.date()
     iso = day.isoformat()
+    lat, lng = round(lat, _QUANT), round(lng, _QUANT)
+    cached = _CACHE.get((lat, lng, iso))
+    if cached is not None:
+        # Kopie: der Aufrufer hängt die Werte an ein Ereignis, und ein
+        # gemeinsam benutztes Dict wäre ein Weg, den Cache zu verändern.
+        return dict(cached)
     params = urllib.parse.urlencode({
-        "latitude": round(lat, 4),
-        "longitude": round(lng, 4),
+        "latitude": lat,
+        "longitude": lng,
         "start_date": iso,
         "end_date": iso,
         "daily": ("temperature_2m_max,temperature_2m_min,weathercode,"
@@ -84,7 +122,7 @@ def fetch_weather(lat: float, lng: float, day: datetime | date) -> dict | None:
     # ("2024-07-12T05:14"); gespeichert wird nur die Uhrzeit — das Datum
     # steht ohnehin am Event.
     clock = lambda v: v.split("T")[1][:5] if isinstance(v, str) and "T" in v else None  # noqa: E731
-    return {
+    result = {
         "temp_c": temp,
         "temp_min_c": tmin,
         "temp_max_c": tmax,
@@ -104,3 +142,10 @@ def fetch_weather(lat: float, lng: float, day: datetime | date) -> dict | None:
         "sunrise": clock(first("sunrise")),
         "sunset": clock(first("sunset")),
     }
+    # Ältestes zuerst hinaus (Dicts halten die Einfügereihenfolge). Ein Lauf
+    # arbeitet die Zeit entlang, der Deckel schneidet also das ab, was am
+    # wenigsten wahrscheinlich noch einmal drankommt.
+    if len(_CACHE) >= _CACHE_MAX:
+        del _CACHE[next(iter(_CACHE))]
+    _CACHE[(lat, lng, iso)] = result
+    return dict(result)

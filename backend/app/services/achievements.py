@@ -27,11 +27,11 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.data import countries as ref
-from app.models import ConfirmState, Entity, Event, EventEntityLink, Metric, Source
+from app.models import ConfirmState, Entity, Event, EventEntityLink
 from app.modules.registry import Module, registry
 from app.schemas import AchievementRead, AchievementsRead
 from app.services.ingestion import tracked_modules
-from app.sqlutil import day_parts
+from app.services.weather_day import day_value_query
 
 # Reihenfolge = Wertigkeit; der Index ist zugleich die Punktzahl (Bronze 1 … Platin 4)
 TIERS: tuple[str, ...] = ("bronze", "silber", "gold", "platin")
@@ -103,37 +103,21 @@ def _weather_days(db: Session, user_id: str, spec: dict):
     eine Eigenschaft des TAGES, und nach einem Timeline-Import trägt ein Tag
     dutzende Besuche mit demselben Wetter — „Tage mit mindestens 10
     Sonnenstunden" zählte also Besuche, und die gesammelten Sonnenstunden
-    wurden mit der Zahl der Einträge je Tag multipliziert. Genau der Defekt,
-    den A31 (Anmerkung 64) für die Statistik-Bilanz beseitigt hat; hier hat er
-    überlebt, weil die Erfolge in einer anderen Datei stehen. Die Beschreibungen
-    im YAML sagten die ganze Zeit „Tage" — jetzt tut es der Code auch.
+    wurden mit der Zahl der Einträge je Tag multipliziert.
 
-    `min` ist dabei nicht nur ein stabiler Vertreter (wie `min(id)` bei der
-    A39-Verdichtung), sondern der **vorsichtige**: meistens tragen alle Einträge
-    eines Tages denselben Wert, weil die Anreicherung an Ort und Datum hängt —
-    an einem Reisetag mit Einträgen in zwei Wetterregionen aber nicht. Dann
-    zählt der niedrigere. Das kann einen Erfolg verzögern und nie vorzeitig
-    auslösen, und die Richtung ist Absicht: zu früh vergebene Abzeichen sind
-    genau der Defekt, den dieses Paket beseitigt (Anmerkung 103).
+    Anmerkung 119: Die Regel steht jetzt in `services/weather_day.py`, weil
+    dieselbe Frage auch die Statistik-Bilanz und der Zeitstrahl stellen — und
+    jede hatte sich bis dahin ihre eigene Antwort gegeben. Was dabei auffiel:
+    die Schwellen wurden hier VOR der Verdichtung geprüft, der günstigste
+    Eintrag des Tages entschied also doch. Der Docstring versprach seit 0.35
+    das Gegenteil.
     """
     cfg = spec.get("weather") or {}
     key = cfg.get("key")
     if not key:
         return None
-    day = day_parts(Event.date_start)
-    q = (db.query(*day, func.min(Metric.value).label("value"))
-         .join(Event, Event.id == Metric.event_id)
-         .filter(Event.user_id == user_id,
-                 Event.confirmed == ConfirmState.confirmed,
-                 Event.date_start.isnot(None),
-                 Metric.source == Source.weather,
-                 Metric.key == key,
-                 Metric.value.isnot(None)))
-    if cfg.get("min") is not None:
-        q = q.filter(Metric.value >= float(cfg["min"]))
-    if cfg.get("max") is not None:
-        q = q.filter(Metric.value <= float(cfg["max"]))
-    return q.group_by(*day)
+    return day_value_query(db, user_id, key, confirmed_only=True,
+                           min_value=cfg.get("min"), max_value=cfg.get("max"))
 
 
 def _weather_event_count(db: Session, user_id: str, module: Module, spec: dict) -> int:

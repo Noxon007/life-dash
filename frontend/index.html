@@ -172,6 +172,10 @@
     font-size: 22px; font-weight: 700; margin-bottom: 14px; margin-left: -12px;
     color: var(--text);
   }
+  /* Anmerkung 119: Das Wetter des TAGES am Tageskopf. Bewusst leise (klein,
+     normalgewichtig) — es ist der Rahmen des Tages, nicht seine Überschrift. */
+  .tl-day-wx { font-size: 12px; font-weight: 400; color: var(--muted); margin-left: 8px; }
+  .tl-day-wx .wx-regions { color: var(--warn); }
   .event-card {
     position: relative; background: var(--bg-panel); border: 1px solid var(--border);
     border-left: 3px solid var(--accent); border-radius: var(--radius);
@@ -3116,6 +3120,10 @@ const I18N_EN = {
   'tl.visits.bundled': "visits bundled", 'tl.show.single': "show individually",
   'tl.daychild': "Day entry", 'tl.daychildren': "day entries",
   'tl.kids.tip': "Expand/collapse day entries",
+  // Anmerkung 119: Wetter je Kalendertag
+  'tl.wx.regions': "{n} weather areas",
+  'tl.wx.tip': "The weather of this calendar day — the same rule statistics and achievements are computed from.",
+  'tl.wx.regions.tip': "On this day the entries lay in several weather areas. The more cautious (lower) value is shown; a weather condition only appears where all areas agree.",
   // Tagebuch
   'jr.notext': "no text yet", 'jr.back': "back to the text",
   // Drucken
@@ -3970,6 +3978,43 @@ async function loadDayMedia(page) {
   } catch { /* Bilder sind Beiwerk — ohne sie bleibt der Zeitstrahl gültig */ }
 }
 
+// Anmerkung 119: Das Wetter der geladenen Tage — EINE Abfrage je Seite,
+// dieselbe Bauform wie loadDayMedia daneben.
+//
+// Warum überhaupt eine eigene Abfrage, wo doch jede Karte ihr Wetter
+// mitbringt: Das Wetter der KARTE gehört ihrem Ereignis. Bei verdichteten
+// Besuchen ist das der Vertreter `min(id)` — ein zufälliger von fünf, denn ids
+// sind UUIDs. Als Auskunft über den TAG war das nie gedeckt, es sah nur so
+// aus. Die Regel („je Schlüssel der kleinste Wert, Texte nur bei Einigkeit")
+// steht jetzt an genau einer Stelle, und die ist der Server
+// (`services/weather_day.py`) — dieselbe, aus der auch Erfolge und Statistik
+// lesen.
+async function loadDayWeather(page) {
+  const days = page.map(e => (e.date_start || '').slice(0, 10)).filter(Boolean).sort();
+  if (!days.length) return;
+  try {
+    const byDay = await api(`/api/days/weather?from=${days[0]}&to=${days[days.length - 1]}`);
+    Object.entries(byDay).forEach(([d, wx]) => TL_DAY_WX.set(d, wx));
+  } catch { /* Wetter ist Beiwerk — ohne es bleibt der Zeitstrahl gültig */ }
+}
+
+// Die Wetterzeile eines Tages, fertig zum Anzeigen — oder null.
+//
+// `regions > 1` heißt: an diesem Tag lagen die Einträge in verschiedenen
+// Wettergegenden, die Werte stammen also nicht alle vom selben Ort. Gezeigt
+// wird der vorsichtige (kleinste) Wert, und dass es mehr als einen gab, wird
+// GESAGT statt verschwiegen — eine Ansicht, die nicht alles zeigen kann, muss
+// das dort sagen, wo hingeschaut wird (A40/Anmerkung 110).
+function dayWeatherLine(day) {
+  const wx = TL_DAY_WX.get(day);
+  if (!wx || !wx.values) return null;
+  const line = weatherSummary({ weather: wx.values });
+  if (!line) return null;
+  const n = wx.regions || 1;
+  return { line, regions: n,
+           note: n > 1 ? t('tl.wx.regions', '{n} Wettergegenden').replace('{n}', n) : '' };
+}
+
 // A45: Die Foto-Gruppen zur geladenen Spanne. Verdichtet wird auf dem SERVER
 // (siehe /api/photos/groups) — der Zeitstrahl blättert, und eine Gruppierung
 // nach dem Blättern zerschneidet die Gruppe an der Seitengrenze; beide Hälften
@@ -4061,6 +4106,7 @@ async function loadTimeline(more = false) {
       tl.done = page.length < TL_PAGE;
       await loadDayMedia(page);   // F18: Tages-Bilder derselben Spanne
       await loadPhotoGroups(page, more);   // A45: Fotopunkte derselben Spanne
+      await loadDayWeather(page);          // Anm. 119: Wetter derselben Spanne
     }
   } finally {
     tl.loading = false;
@@ -4318,7 +4364,7 @@ function renderTimelineList() {
   const groups = {};
   filtered.forEach(e => {
     const g = tlGroup(e);
-    if (!groups[g.key]) groups[g.key] = { label: g.label, sort: g.sort, items: [] };
+    if (!groups[g.key]) groups[g.key] = { key: g.key, label: g.label, sort: g.sort, items: [] };
     groups[g.key].items.push(e);
   });
   // A5 (Besuchs-Verdichtung): Wiederholte Google-Besuche desselben Orts
@@ -4396,7 +4442,7 @@ function renderTimelineList() {
   const ordered = Object.values(groups).sort((a,b) => b.sort - a.sort);
   el.innerHTML = ordered.map((g, gi) => `
     <div class="tl-year">
-      <div class="tl-year-label">${esc(g.label)}${g.items.length > TL_GROUP_CAP ? ` <span class="stat-label">(${g.items.length})</span>` : ''}</div>
+      <div class="tl-year-label">${esc(g.label)}${g.items.length > TL_GROUP_CAP ? ` <span class="stat-label">(${g.items.length})</span>` : ''}${tlGroupWeather(g)}</div>
       ${g.items.slice(0, TL_GROUP_CAP).map(renderItem).join('')}
       ${g.items.length > TL_GROUP_CAP
         ? `<div class="hint" data-tl-more="${gi}" style="cursor:pointer">▼ ${
@@ -4411,6 +4457,22 @@ function renderTimelineList() {
     }));
   el.insertAdjacentHTML('beforeend', tlFooter());
   tlBindFooter(el);
+}
+// Anmerkung 119: Das Wetter gehört an den TAGESKOPF, nicht an eine Karte.
+//
+// Nur im Tages-Zoom, denn nur dort IST die Gruppe ein Tag — eine Woche hat
+// kein Wetter, und eine Zeile, die so täte, wäre die Verwechslung von vorn.
+// Die Werte kommen fertig verdichtet vom Server; hier wird nur dargestellt
+// (dieselbe Trennung, die `check-weather-summary.js` für die Bilanz festhält).
+function tlGroupWeather(g) {
+  if (tl.zoom !== 'day') return '';
+  const wx = dayWeatherLine(g.key);
+  if (!wx) return '';
+  const tip = wx.regions > 1
+    ? t('tl.wx.regions.tip', 'An diesem Tag lagen die Einträge in mehreren Wettergegenden. Gezeigt wird der vorsichtigere (kleinere) Wert; ein Wetterzustand steht nur dort, wo alle Gegenden übereinstimmen.')
+    : t('tl.wx.tip', 'Das Wetter dieses Kalendertages — dieselbe Regel, aus der auch Statistik und Erfolge rechnen.');
+  return ` <span class="tl-day-wx" title="${esc(tip)}">🌤️ ${esc(wx.line)}${
+    wx.note ? ` · <span class="wx-regions">⚠ ${esc(wx.note)}</span>` : ''}</span>`;
 }
 function tlBindFooter(el) {
   const more = el.querySelector('#tl-load-more');
@@ -4447,8 +4509,19 @@ function visitGroupCard(g) {
   const idx = VISIT_GROUPS.push(g.items) - 1;
   const day = iso => iso ? iso.slice(0, 10).split('-').reverse().join('.') : '';
   const dates = g.items.map(e => e.date_start).sort();
-  const range = dates[0].slice(0, 10) === dates[dates.length - 1].slice(0, 10)
+  const oneDay = dates[0].slice(0, 10) === dates[dates.length - 1].slice(0, 10);
+  const range = oneDay
     ? day(dates[0]) : `${day(dates[0])} – ${day(dates[dates.length - 1])}`;
+  // Anmerkung 119: Die Sammelkarte zeigte als einzige Ansicht GAR kein Wetter
+  // — sie ruft `eventChips` nicht auf, und damit verschwand es genau dort, wo
+  // am meisten zusammengefasst wird. Nachgetragen wird das Wetter des TAGES,
+  // nicht das eines der gebündelten Besuche.
+  //
+  // **Nur wenn alle Besuche auf einen Tag fallen.** Bündelt die Karte mehrere
+  // Tage (ab Wochen-Zoom der Normalfall), gibt es kein gemeinsames Wetter, und
+  // eines zu zeigen hieße, sich einen der Tage auszusuchen — dieselbe
+  // Willkür in klein.
+  const wx = oneDay ? dayWeatherLine(dates[0].slice(0, 10)) : null;
   return `
     <div class="event-card ${catClass(g.items[0].category)}" data-visit-group="${idx}" title="${esc(t('tl.expand.tip', 'Klicken zum Aufklappen'))}">
       <div class="ev-head">
@@ -4457,6 +4530,8 @@ function visitGroupCard(g) {
       </div>
       <div class="ev-meta">
         <span class="chip">🛰️ ${esc(t('tl.visits.bundled', 'Besuche gebündelt'))}</span>
+        ${wx ? `<span class="chip">🌤️ ${esc(wx.line)}${
+          wx.note ? ` · ⚠ ${esc(wx.note)}` : ''}</span>` : ''}
         <span class="chip">▼ ${esc(t('tl.show.single', 'einzeln anzeigen'))}</span>
       </div>
     </div>`;
@@ -4582,6 +4657,9 @@ function eventCard(e) {
 // schlichte Leiste und nicht als Karte mit Titel — ein Tag ist kein Ereignis,
 // und ihm einen Titel zu geben würde ihn wieder zu einem machen (Anm. 87).
 const TL_DAY_MEDIA = new Map();
+// Anmerkung 119: Wetter je Kalendertag, so wie der Server es verdichtet hat
+// ({ values, regions }) — NICHT je Ereignis. Siehe dayWeatherLine.
+const TL_DAY_WX = new Map();
 // Was eine GERENDERTE Leiste zeigt, Schlüssel -> Bilderliste. Nötig, seit eine
 // Leiste mehr als einen Tag umfassen kann: der Betrachter löste die Bilder
 // vorher über das Datum auf, und bei einer Wochen-Leiste wäre das der Satz des

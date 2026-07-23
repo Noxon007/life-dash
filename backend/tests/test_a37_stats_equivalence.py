@@ -64,17 +64,34 @@ def _old_rules(events: list[dict]) -> dict:
                 best = v
         return best
 
-    # Bilanz je KALENDERTAG (A31): erster Eintrag des Tages mit Wetter gewinnt
+    # Bilanz je KALENDERTAG (A31). **Anmerkung 119: die Regel hat sich hier
+    # bewusst geändert.** Bis 0.39 gewann der erste Eintrag des Tages mit
+    # Wetter — eine dritte Antwort neben der der Erfolge (`min` je Schlüssel)
+    # und der des Zeitstrahls (Wetter des Verdichtungs-Vertreters). Jetzt gilt
+    # überall `min`: an einem Tag, dessen Einträge dasselbe Wetter tragen — der
+    # Normalfall, weil die Anreicherung an (Tag, Ort) hängt — ist das derselbe
+    # Wert; verschieden wird es nur an Tagen mit zwei Wetterregionen, und dort
+    # ist der vorsichtige Wert Absicht.
+    #
+    # Der Rest dieser Datei prüft weiter, was A37 zugesagt hat: dass der Umzug
+    # vom Browser in den Server keine Zahl verändert hat. Diese eine Regel
+    # wurde danach absichtlich ersetzt, und das steht hier, damit die Datei
+    # nicht so aussieht, als sei sie an die Wirklichkeit angepasst worden.
     with_weather = [e for e in events
                     if metric_of(e, "temperature_c", "temp_max_c") is not None]
-    by_day: dict[str, dict] = {}
+    by_day: dict[str, list] = {}
     for e in sorted(with_weather, key=lambda e: e["date"]):
-        by_day.setdefault(e["date"].date().isoformat(), e)
+        by_day.setdefault(e["date"].date().isoformat(), []).append(e)
     days = list(by_day.values())
 
+    def day_min(entries, *keys):
+        vals = [v for v in (metric_of(e, *keys) for e in entries) if v is not None]
+        return min(vals) if vals else None
+
     trips: dict[str, list] = {}
-    for e in days:
-        temp = metric_of(e, "temperature_c")
+    for entries in days:
+        e = entries[0]
+        temp = day_min(entries, "temperature_c")
         if e["category"] != "trip" or temp is None:
             continue
         k = e.get("parent") or e["id"]
@@ -108,8 +125,8 @@ def _old_rules(events: list[dict]) -> dict:
         "sunny": metric_max("sunshine_h"), "rainy": metric_max("rain_mm"),
         "windy": metric_max("wind_max_kmh"), "snowy": metric_max("snow_cm"),
         "wx_days": len(days),
-        "rain_days": sum(1 for e in days if (metric_of(e, "rain_mm") or 0) >= 1),
-        "sun_hours": round(sum(metric_of(e, "sunshine_h") or 0 for e in days)),
+        "rain_days": sum(1 for d in days if (day_min(d, "rain_mm") or 0) >= 1),
+        "sun_hours": round(sum(day_min(d, "sunshine_h") or 0 for d in days)),
         "warmest_trip": round(warmest, 1) if warmest is not None else None,
         "per_year": sorted(per_year.items()),
         "top_places": sorted(per_place.items(), key=lambda kv: -kv[1])[:8],

@@ -15,7 +15,32 @@ any `MINOR`.
 
 ## [Unreleased]
 
+### Added
+- **The timeline's day heading now carries the weather of that day.** Until now
+  the weather only ever sat on individual cards, so a day with several imported
+  visits showed whichever of them the condensation happened to pick — and a
+  bundled card (“4× Home”) showed no weather at all. The day now says it once,
+  in one place, and days that touch more than one weather region say that too
+  instead of passing one of the values off as “the” weather.
+
 ### Fixed
+- **“What was the weather that day?” had four different answers.** Timeline,
+  bundled card, statistics and achievements each worked it out their own way,
+  so the same day could contribute one number to your sun-hours total and a
+  different one to a badge. There is now a single rule, written down and shared
+  by all four: per value the **lowest** reading of that day (on a travelling day
+  the more cautious one), and a weather condition only where the whole day
+  agrees. Achievements keep asking whether the day *reached* a threshold
+  anywhere, so nothing you have already earned is taken away — but the sunshine
+  balance and the warmest-trip average can shift slightly on days you spent
+  travelling between two regions, and those are the days where the old numbers
+  were picking a value at random.
+- **Adding weather no longer asks the same question over and over.** Several
+  entries at the same place on the same day used to cost one request to the
+  weather service each — after a Timeline import that is dozens per day for a
+  single answer. Identical requests are now answered once per run, which makes
+  the “add weather” run noticeably faster and much gentler on the free service
+  it depends on.
 - **Photo points went missing on the map — two reasons, both silent.** Reported
   from use: 8120 located photos, Immich full of pictures from a trip to
   Mallorca, and not a single photo dot on that map in Life-Dash. First, the
