@@ -44,6 +44,7 @@ from app.models import (
 )
 from app.schemas import PlaceNameResolveResult, TimelineImportResult, TrackRead
 from app.services import geocode as geocode_svc
+from app.services import visitsplit
 
 log = logging.getLogger("lifedash.timeline")
 
@@ -599,30 +600,48 @@ def import_timeline(
         return loc
 
     created_visits = skipped = 0
+    split_visits = long_visits = 0
     for v in visits:
-        if v["hash"] in have_events:
+        # A46: Ein Besuch über Mitternacht wird in Tagesstücke geschnitten —
+        # mehrtägig entsteht nur noch von Hand (siehe services/visitsplit.py).
+        pieces = visitsplit.day_pieces(v["start"], v["end"])
+        if not pieces:
+            # Zu lang zum Schneiden. Bleibt als eine Zeile bestehen und wird
+            # genannt, statt still anders behandelt zu werden als der Rest.
+            long_visits += 1
+            pieces = [(v["start"], v["end"])]
+        ids = visitsplit.piece_ids(v["hash"], len(pieces))
+        # **Der nackte Hash zählt mit.** Vor A46 trug ein mehrtägiger Besuch
+        # genau ihn; wer nur nach den neuen Teil-Schlüsseln fragte, hielte
+        # jeden Alt-Bestand für unbekannt und legte beim nächsten Re-Import
+        # ALLES ein zweites Mal an — daneben, nicht anstatt. Den Bestand
+        # umzuschreiben ist Sache des Aufräum-Laufs, nicht des Imports.
+        if v["hash"] in have_events or any(i in have_events for i in ids):
             skipped += 1
             continue
-        have_events.add(v["hash"])
+        have_events.update(ids)
+        if len(pieces) > 1:
+            split_visits += 1
         loc = _resolve_visit_location(v)
-        # Ortsnamen sind kompakt (short_name); alte lange Adressen heilt
-        # die Aktion „Adressen kürzen" (scope=verbose) nachträglich mit.
-        db.add(Event(
-            user_id=user.id,
-            title=f"Besuch: {loc.name}"[:255],
-            date_start=v["start"], date_end=v["end"],
-            date_precision=DatePrecision.exact,
-            category="event",
-            confidence=round(min(1.0, v["probability"]), 2),
-            confirmed=ConfirmState.confirmed,  # Gerätedaten = Fakt, nicht moderierungspflichtig
-            confirmed_at=datetime.now(timezone.utc),
-            confirmed_by="import",  # Provenienz (P2.7)
-            source=Source.google_timeline,
-            location=loc,
-            origin_fragment=fragment,
-            external_id=v["hash"],
-        ))
-        created_visits += 1
+        for (lo, hi), ext in zip(pieces, ids):
+            # Ortsnamen sind kompakt (short_name); alte lange Adressen heilt
+            # die Aktion „Adressen kürzen" (scope=verbose) nachträglich mit.
+            db.add(Event(
+                user_id=user.id,
+                title=f"Besuch: {loc.name}"[:255],
+                date_start=lo, date_end=hi,
+                date_precision=DatePrecision.exact,
+                category="event",
+                confidence=round(min(1.0, v["probability"]), 2),
+                confirmed=ConfirmState.confirmed,  # Gerätedaten = Fakt, nicht moderierungspflichtig
+                confirmed_at=datetime.now(timezone.utc),
+                confirmed_by="import",  # Provenienz (P2.7)
+                source=Source.google_timeline,
+                location=loc,
+                origin_fragment=fragment,
+                external_id=ext,
+            ))
+            created_visits += 1
 
     created_tracks = 0
     for m in moves:
@@ -665,15 +684,19 @@ def import_timeline(
                          .count())
     log.info("Timeline-Import: %d Besuche, %d Tracks, %d Dubletten übersprungen, "
              "%d unsichere Besuche gefiltert (min_probability=%.2f), "
+             "%d Besuche in Tage geschnitten, %d dafür zu lang, "
              "%d Ortsnamen aufgelöst (%d offen)",
              created_visits, created_tracks, skipped, skipped_lowprob,
-             min_probability, names_resolved, locations_unnamed)
+             min_probability, split_visits, long_visits,
+             names_resolved, locations_unnamed)
     return TimelineImportResult(
         visits_created=created_visits,
         tracks_created=created_tracks,
         skipped_duplicates=skipped,
         skipped_invalid=max(0, invalid),
         skipped_low_probability=skipped_lowprob,
+        visits_split=split_visits,
+        visits_too_long=long_visits,
         date_min=min(all_dates) if all_dates else None,
         date_max=max(all_dates) if all_dates else None,
         names_resolved=names_resolved,

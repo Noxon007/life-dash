@@ -17,6 +17,7 @@ from app.models import (ConfirmState, DatePrecision, Event, EventEntityLink,
 from app.routers._serialize import EAGER, EAGER_SLIM, event_to_read
 from app.schemas import (EventGeo, EventManualCreate, EventRead, EventsIndex,
                          LocationGeo, OnThisDayGroup, YearCount)
+from app.services import visitsplit
 from app.services.ingestion import create_manual_event
 from app.services.stats_overview import find_birth
 from app.sqlutil import day_parts
@@ -270,6 +271,149 @@ def day_children_for_all(
              len(ready), created, max_span, len(long_ones), vague)
     return {"events": len(ready), "created": created, "max_span": max_span,
             "too_long_count": len(long_ones), "vague": vague}
+
+
+# --------------------------------------------------------------------------- #
+# A46 — mehrtägige IMPORTIERTE Besuche nachträglich in Tage schneiden
+# --------------------------------------------------------------------------- #
+# Der Import legt seit A46 nur noch Tages-Besuche an; der Bestand ist damit
+# nicht geheilt. Gemeldet waren über 2.000 Zwei-Tages-Ereignisse, die meisten
+# davon Nächte am Wohnort.
+#
+# **Das hier schneidet BESTÄTIGTES, und das ist der Grund für jede seiner
+# Einschränkungen.** Die Kernregel lautet „Maschinen ändern Bestätigtes nie"
+# (KONZEPT Kap. 3.1). Erlaubt ist der Lauf trotzdem, aus zwei Gründen, die
+# beide genannt sein wollen: Ein MENSCH löst ihn aus — er läuft nie im
+# Nachtplan und nie als Nebenwirkung von irgendetwas anderem. Und `date_end`
+# war bei diesen Zeilen nie eine Aussage über die Dauer, sondern ein
+# Übernahme-Artefakt: Google liefert Anfang und Ende eines Aufenthalts, der
+# Import hat sie roh in ein Ereignisfeld geschrieben. Korrigiert wird die
+# Übernahme, nicht die Beobachtung — die Zeitpunkte selbst bleiben auf die
+# Sekunde erhalten.
+#
+# Konsequenz daraus: **nur `google_timeline`.** Kein Immich-Vorschlag, kein
+# von Hand erfasstes Ereignis, auch dann nicht, wenn es genauso aussieht.
+_MULTIDAY_SOURCE = Source.google_timeline
+
+
+def _scan_multiday_visits(db: Session, user_id: str):
+    """(schneidbar, zu lang, hat Kinder) — die EINE Auswahl für Vorschau und Lauf.
+
+    Dasselbe Muster wie `_scan_splittable` direkt darüber: zwei Auswahlen
+    wären zwei Regeln, und die Vorschau zeigte dann etwas anderes, als der
+    Knopf tut (Anmerkung 106).
+
+    Ereignisse mit F7-Tages-Kindern werden ausgelassen. Ein geschnittener
+    Elternteil ließe die Kinder auf einer Spanne sitzen, die es nicht mehr
+    gibt — und wer sich für ein importiertes Besuchs-Ereignis Tages-Kinder
+    angelegt hat, hat eine Absicht damit, die dieser Lauf nicht kennt.
+    """
+    rows = (db.query(Event).options(selectinload(Event.children))
+            .filter(Event.user_id == user_id,
+                    Event.source == _MULTIDAY_SOURCE,
+                    Event.date_start.isnot(None),
+                    Event.date_end.isnot(None),
+                    Event.date_end > Event.date_start)
+            .order_by(Event.date_start.desc()).all())
+    ready, long_ones, with_kids = [], [], 0
+    for event in rows:
+        if event.date_start.date() == event.date_end.date():
+            continue
+        if event.children:
+            with_kids += 1
+            continue
+        pieces = visitsplit.day_pieces(event.date_start, event.date_end)
+        if not pieces:
+            long_ones.append(event)
+            continue
+        ready.append((event, pieces))
+    return ready, long_ones, with_kids
+
+
+def _visit_entry(event: Event, pieces: list) -> dict:
+    return {"id": event.id, "title": event.title, "days": len(pieces),
+            "start": event.date_start.isoformat(),
+            "end": event.date_end.isoformat()}
+
+
+@router.get("/visits/multiday")
+def multiday_visits(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Vorschau: welche importierten Besuche würden geschnitten, in wie viele Tage.
+
+    Erst sehen, dann schreiben — dasselbe Muster wie beim F7-Sammellauf und
+    bei der Immich-Vorschau (P2.5). Diese Aktion fasst die Lebensdatenbank an,
+    und zwar tausendfach.
+    """
+    ready, long_ones, with_kids = _scan_multiday_visits(db, user.id)
+    entries = [_visit_entry(e, p) for e, p in ready]
+    return {
+        "events": len(entries),
+        # Was danach dasteht, ist die eigentliche Zahl: aus 2.000 Zeilen
+        # werden 4.000. Wer das erst hinterher sieht, ist überrascht worden.
+        "rows_after": sum(e["days"] for e in entries),
+        "list": entries[:_BULK_LIST_LIMIT],
+        "more": max(0, len(entries) - _BULK_LIST_LIMIT),
+        # Was NICHT passiert, gehört genauso in die Antwort wie was passiert.
+        "too_long": [_visit_entry(e, [None]) for e in long_ones[:_BULK_LIST_LIMIT]],
+        "too_long_count": len(long_ones),
+        "max_days": visitsplit.SPLIT_MAX_DAYS,
+        "with_children": with_kids,
+    }
+
+
+@router.post("/visits/split")
+def split_multiday_visits(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Schneidet die mehrtägigen importierten Besuche an der Tagesgrenze.
+
+    Das erste Stück bleibt die **vorhandene Zeile**. Das ist keine Sparsamkeit,
+    sondern der einzige Weg, der nichts verliert: an einem Besuch können
+    Fotos, Metriken und Verknüpfungen hängen, und die zeigen auf diese ID.
+    Neue Zeilen entstehen nur für die weiteren Tage.
+
+    Idempotent: ein zweiter Lauf findet nichts mehr, weil danach kein Ereignis
+    dieser Quelle mehr über eine Tagesgrenze reicht.
+    """
+    ready, long_ones, with_kids = _scan_multiday_visits(db, user.id)
+    created = 0
+    for event, pieces in ready:
+        base = event.external_id
+        ids = visitsplit.piece_ids(base, len(pieces)) if base else [None] * len(pieces)
+        # Das erste Stück in die vorhandene Zeile — samt neuem Schlüssel,
+        # damit ein späterer Re-Import diesen Besuch wiedererkennt (der
+        # Import prüft beide Formen, siehe routers/tracks.py).
+        first_lo, first_hi = pieces[0]
+        event.date_start, event.date_end = first_lo, first_hi
+        event.external_id = ids[0]
+        for (lo, hi), ext in zip(pieces[1:], ids[1:]):
+            db.add(Event(
+                user_id=user.id,
+                title=event.title,
+                description=event.description,
+                date_start=lo, date_end=hi,
+                date_precision=event.date_precision,
+                category=event.category,
+                confidence=event.confidence,
+                confirmed=event.confirmed,
+                confirmed_at=event.confirmed_at,
+                confirmed_by=event.confirmed_by,
+                source=event.source,
+                location_id=event.location_id,
+                origin_fragment_id=event.origin_fragment_id,
+                external_id=ext,
+            ))
+            created += 1
+    db.commit()
+    log.info("Mehrtägige Besuche geschnitten: %d Ereignisse, %d Zeilen neu "
+             "(%d zu lang, %d mit Tages-Kindern übersprungen)",
+             len(ready), created, len(long_ones), with_kids)
+    return {"events": len(ready), "created": created,
+            "too_long_count": len(long_ones), "with_children": with_kids}
 
 
 # A37: Datierungen, die der Nutzer selbst als „unscharf" sieht. Die Liste

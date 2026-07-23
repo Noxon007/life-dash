@@ -1635,6 +1635,27 @@
                 % überspringen (0 = alle importieren — betrifft v. a. „Gesuchte Adresse")
               </label></div>
           </div>
+          <!-- A46: Reparatur für den Bestand. Steht direkt unter dem Import,
+               weil sie genau dessen Hinterlassenschaft aufräumt — neue
+               Importe schneiden schon selbst. Erst sehen, dann schreiben
+               (P2.5-Muster): die Aktion fasst Bestätigtes an. -->
+          <div class="action-row">
+            <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
+              <button class="btn secondary" id="btn-md-preview" style="text-align:left" data-i18n="md.preview">🔍 Nachsehen</button>
+              <button class="btn" id="btn-md-run" style="text-align:left" disabled data-i18n="md.run">✂️ In Tage schneiden</button>
+            </div>
+            <div class="action-desc">
+              <span data-i18n="md.desc"><b>Mehrtägige Besuche aus alten Importen in Tage schneiden.</b><br>
+              Google liefert Anfang und Ende eines Aufenthalts; bis 0.38 wurden beide roh übernommen,
+              also wurde jede Nacht im eigenen Bett ein <b>zweitägiges</b> Ereignis — bei einem Wohnort
+              sind das schnell tausende. Neue Importe schneiden bereits selbst; dieser Knopf holt den
+              Bestand nach. Die Zeitpunkte bleiben auf die Sekunde erhalten, geschnitten wird nur an der
+              Tagesgrenze. <b>Nur importierte Besuche</b> — von Hand erfasste Reisen und Immich-Vorschläge
+              bleiben mehrtägig, denn dort ist die Spanne eine Aussage. Ereignisse mit eigenen
+              Tages-Einträgen und Spannen über einer Woche lässt der Lauf aus und sagt es.</span>
+              <div id="md-result" class="hint" style="display:none; margin-top:10px"></div>
+            </div>
+          </div>
         </div>
 
         <div class="section-title" data-i18n="adm.placenames">3 · Ortsnamen</div>
@@ -2577,6 +2598,17 @@ const I18N_EN = {
   'ds.vague': "{n} skipped for being vaguely dated (month, season, year) — days out of those would be invented.",
   'ds.needpreview': "Take a look first — then split.",
   'ds.done': "✓ {d} day entries created for {n} events. The per-day weather is added by the weather run.",
+  // A46 — cut multi-day imported visits into days
+  'md.preview': "🔍 Take a look",
+  'md.run': "✂️ Cut into days",
+  'md.desc': "<b>Cut multi-day visits from older imports into days.</b><br>Google reports the start and the end of a stay; until 0.38 both were taken over raw, so every night in your own bed became a <b>two-day</b> event — at a home address that adds up to thousands. New imports already cut by themselves; this button catches up with what is already there. The timestamps stay accurate to the second, the cut happens only at the day boundary. <b>Imported visits only</b> — trips you entered by hand and Immich proposals stay multi-day, because there the span is a statement. Events with day entries of their own, and spans longer than a week, are left alone and named.",
+  'md.none': "Nothing to cut.",
+  'md.none.why': "No imported visit reaches across a day boundary.",
+  'md.head': "{n} visits → {r} rows afterwards",
+  'md.toolong': "{n} skipped for being longer than {s} days — that is not a night, it is something else.",
+  'md.kids': "{n} skipped because they have day entries of their own — those would hang off a span that no longer exists.",
+  'md.needpreview': "Take a look first — then cut.",
+  'md.done': "✓ {n} visits cut, {c} new rows.",
   'im.rights.missing': "Immich is running (version {v}), but the key is missing permissions:",
   'im.rights.toast': "The key is missing permissions: {r}",
   'im.rights.ok': "✓ Version {v} — all required permissions present.",
@@ -7707,6 +7739,72 @@ document.getElementById('btn-days-run')?.addEventListener('click', async ev => {
   // Gefunden vom Wächter, nicht beim Lesen. `daysLock()` kennt die Regel und
   // lässt den Knopf nach einem FEHLER offen (dann gilt die Vorschau ja noch).
   finally { daysLock(); }
+});
+
+// --------------------------------------------------------------------------- //
+// A46 — mehrtägige importierte Besuche nachträglich in Tage schneiden
+// --------------------------------------------------------------------------- //
+// Dasselbe Muster wie darüber, und zwar bewusst: erst nachsehen, dann
+// schreiben. Der Unterschied ist, WAS auf dem Spiel steht — dieser Lauf legt
+// nichts an, er ÄNDERT Bestätigtes. Deshalb muss die Vorschau nicht die Zahl
+// der Ereignisse in den Vordergrund stellen, sondern die Zahl der Zeilen
+// danach: aus 2.000 werden 4.000, und das ist die Zahl, die überrascht.
+let mdSeen = false;
+function mdLock() {
+  const run = document.getElementById('btn-md-run');
+  if (run) run.disabled = !mdSeen;
+}
+document.getElementById('btn-md-preview')?.addEventListener('click', async ev => {
+  const btn = ev.target, box = document.getElementById('md-result');
+  btn.disabled = true;
+  try {
+    const r = await api('/api/events/visits/multiday');
+    mdSeen = r.events > 0;
+    box.style.display = '';
+    if (!r.events) {
+      box.innerHTML = `<b>${esc(t('md.none', 'Nichts zu schneiden.'))}</b><br>`
+        + esc(t('md.none.why', 'Kein importierter Besuch reicht über eine Tagesgrenze.'));
+    } else {
+      box.innerHTML = `<b>${esc(t('md.head', '{n} Besuche → {r} Zeilen danach')
+          .replace('{n}', r.events).replace('{r}', r.rows_after))}</b>
+        <div style="margin-top:6px">${r.list.map(e => `
+          <div style="padding:3px 0">✂️ <b>${esc(e.title)}</b>
+            <span class="stat-label">· ${esc(e.start.slice(0, 16).replace('T', ' '))} – ${
+              esc(e.end.slice(0, 16).replace('T', ' '))} · ${e.days} ${esc(t('ds.days', 'Tage'))}</span>
+          </div>`).join('')}</div>
+        ${r.more ? `<div class="stat-label">… ${r.more} ${esc(t('ims.more', 'weitere'))}</div>` : ''}`;
+    }
+    // Was der Lauf auslässt, steht dort, wo hingeschaut wird (Anmerkung 110).
+    if (r.too_long_count) {
+      box.innerHTML += `<div class="stat-label" style="margin-top:8px">⏭️ ${
+        esc(t('md.toolong', '{n} übersprungen, weil länger als {s} Tage — das ist keine Nacht, sondern etwas anderes.')
+          .replace('{n}', r.too_long_count).replace('{s}', r.max_days))}</div>`;
+    }
+    if (r.with_children) {
+      box.innerHTML += `<div class="stat-label" style="margin-top:8px">⏭️ ${
+        esc(t('md.kids', '{n} übersprungen, weil sie eigene Tages-Einträge haben — die hingen sonst an einer Spanne, die es nicht mehr gibt.')
+          .replace('{n}', r.with_children))}</div>`;
+    }
+    mdLock();
+  } catch (err) {
+    box.style.display = ''; box.textContent = err.message;
+    mdSeen = false; mdLock();
+  } finally { btn.disabled = false; }
+});
+document.getElementById('btn-md-run')?.addEventListener('click', async ev => {
+  const btn = ev.target;
+  if (!mdSeen) { toast(t('md.needpreview', 'Erst nachsehen — dann schneiden.'), 'warn'); return; }
+  btn.disabled = true;
+  try {
+    const r = await api('/api/events/visits/split', { method: 'POST' });
+    toast(t('md.done', '✓ {n} Besuche geschnitten, {c} Zeilen neu.')
+      .replace('{n}', r.events).replace('{c}', r.created), 'ok', 8000);
+    // Vorschau verbraucht, Zeitstrahl veraltet — beides wie beim F7-Lauf.
+    mdSeen = false;
+    document.getElementById('md-result').style.display = 'none';
+    if (typeof loadTimeline === 'function') loadTimeline();
+  } catch (err) { toast(err.message, 'error', 8000); }
+  finally { mdLock(); }
 });
 
 // Ortsnamen-Format: Bausteine (Straße/Ortsteil/Stadt/Land) pro Nutzer gespeichert

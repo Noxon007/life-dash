@@ -339,6 +339,12 @@ class TimelineImportResult(BaseModel):
     skipped_invalid: int
     # A12: Besuche unterhalb der Mindest-Ortssicherheit (min_probability)
     skipped_low_probability: int = 0
+    # A46: Besuche über Mitternacht, die in Tagesstücke geschnitten wurden —
+    # und die, deren Spanne dafür zu groß war (SPLIT_MAX_DAYS). Beides steht
+    # hier, weil eine Import-Zusammenfassung, die verschweigt, dass sie die
+    # Zeilen umgeformt hat, keine Zusammenfassung ist.
+    visits_split: int = 0
+    visits_too_long: int = 0
     date_min: datetime | None = None
     date_max: datetime | None = None
     # Reverse-Geocoding: direkt beim Import aufgelöste neue Orte bzw.
