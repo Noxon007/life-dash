@@ -368,11 +368,20 @@
      Hinweis in der Liste daneben erreicht den nicht, der auf die Karte
      schaut — und „mein Besuch in Amerika fehlt" war genau dieser Fall. */
   .map-wrap { position: relative; }
-  .map-note {
+  /* Die Hinweise über der Karte liegen GESTAPELT in einem Streifen, nicht
+     einzeln absolut positioniert. Mit A45 gibt es zwei davon (ausgelassene
+     Ereignisse, gedeckelte Fotos), und zwei Kästen auf derselben Koordinate
+     verdecken einander — der zweite hätte den ersten unsichtbar gemacht,
+     also genau die Stille, gegen die beide gebaut sind. */
+  .map-notes {
     position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 500;
+    display: flex; flex-direction: column; gap: 6px; pointer-events: none;
+  }
+  .map-note {
     background: var(--warn); color: #10131a; border-radius: 10px;
     padding: 9px 13px; font-size: 12.5px; font-weight: 600;
     box-shadow: 0 4px 14px rgba(0,0,0,.35); line-height: 1.45;
+    pointer-events: auto;
   }
   .map-note button {
     margin-left: 8px; border: none; border-radius: 7px; cursor: pointer;
@@ -1066,6 +1075,10 @@
                 data-i18n-title="tl.city.tip"
                 title="Zeitstrahl auf diese Stadt eingeschränkt — klicken, um wieder alles zu zeigen"></span>
           <span class="filter-chip off" id="tl-visits-toggle" data-i18n-title="tl.visits.tip" title="Importierte Timeline-Besuche (Google) im Zeitstrahl anzeigen — auf der Karte sind sie immer sichtbar" data-i18n="tl.visits">🛰️ Besuche</span>
+          <!-- A45: Fotopunkte als eigene, ausblendbare Ebene — genau wie die
+               importierten Besuche daneben, und aus demselben Grund: es sind
+               zu viele, um sie ungefragt in den Zeitstrahl zu kippen. -->
+          <span class="filter-chip off" id="tl-photos-toggle" data-i18n-title="tl.photos.tip" title="Verortete Fotos als eigene Zeilen im Zeitstrahl, je Tag und Ort zusammengefasst — muss zuerst unter „Meine Daten → Immich“ verortet werden" data-i18n="tl.photos">📷 Fotos</span>
           <span class="filter-chip" id="tl-journal-btn" data-i18n-title="tl.journal.tip" title="Tagebuch-Eintrag für einen Tag schreiben (Markdown) — erscheint als Tageskopf über den Ereignissen des Tages" data-i18n="tl.journal">📖 Tagebuch schreiben</span>
           <span class="filter-chip" id="tl-print-btn" data-i18n-title="tl.print.tip" title="Zeitraum wählen und drucken oder als PDF sichern — gedruckt wird hell, ohne Navigation und mit allen Ereignissen des Zeitraums" data-i18n="tl.print">🖨️ Drucken</span>
           <!-- F18: Ein Foto gehört oft zu einem Tag, nicht zu einem einzelnen
@@ -1116,6 +1129,11 @@
               <span class="filter-chip active" id="mp-tracks-toggle" data-i18n-title="map.tracks.tip" title="Die tatsächlich zurückgelegten Wege aus dem Timeline-Import — echte Aufzeichnungen, eingefärbt nach Fortbewegungsart" data-i18n="map.tracks">🛰️ Zurückgelegte Wege</span>
               <span class="filter-chip active" id="mp-route-toggle" data-i18n-title="map.route.tip" title="Verbindet die Orte dieses Zeitraums in ihrer zeitlichen Reihenfolge — eine gedachte Linie, kein gefahrener Weg. Bei zusammengefassten Punkten gibt es keine Reihenfolge zu zeigen." data-i18n="map.route">🧭 Reihenfolge verbinden</span>
               <span class="filter-chip active" id="mp-group-toggle" data-i18n-title="map.group.tip" title="Fasst dicht beieinander liegende Punkte zusammen: im Monat und darüber je Ort („59× Zuhause“), in Tag und Woche nach Nähe. Aus heißt: jeder Besuch einzeln." data-i18n="map.group">🔁 Punkte zusammenfassen</span>
+              <!-- A45: eine EIGENE Ebene, kein Ereignis. Ein Foto ist kein
+                   Eintrag in der Lebensdatenbank, sondern ein Beleg dafür,
+                   dass jemand dort war — und es sind zu viele, um sie
+                   ungefragt einzublenden. -->
+              <span class="filter-chip off" id="mp-photos-toggle" data-i18n-title="map.photos.tip" title="Jedes Foto mit Koordinaten als eigener Punkt — dort, wo es aufgenommen wurde. Muss zuerst unter „Meine Daten → Immich“ verortet werden." data-i18n="map.photos">📷 Fotos</span>
               <span class="filter-chip" id="mp-fullscreen" data-i18n-title="map.fs.tip" title="Karte im Vollbild (Esc beendet)" data-i18n="map.fs">⛶ Vollbild</span>
             </div>
           </div>
@@ -1130,7 +1148,12 @@
             <!-- Wenn die Karte Punkte weglässt, sagt sie es HIER. Der Hinweis
                  stand bisher nur in der Stopp-Liste daneben — und wer auf die
                  Karte sieht, sieht die Liste nicht. -->
-            <div id="mp-cap-note" class="map-note" style="display:none"></div>
+            <div class="map-notes">
+              <div id="mp-cap-note" class="map-note" style="display:none"></div>
+              <!-- A45: derselbe Ort für denselben Satz — was die Foto-Ebene
+                   nicht zeigen kann, steht auf der Karte, nicht daneben. -->
+              <div id="mp-photo-note" class="map-note" style="display:none"></div>
+            </div>
           </div>
           <div class="panel" id="mp-stops"></div>
         </div>
@@ -1760,6 +1783,27 @@
               geteilte Alben sind dann erlaubt und werden als solche gekennzeichnet.</span>
             </div>
           </div>
+          <!-- A45: Fotos verorten. Eigene Zeile unter dem Vorschlagen, weil
+               es etwas anderes tut: keine Ereignisse, nur Punkte auf der
+               Karte — und deshalb auch ohne Vorschau (es landet nichts in der
+               Lebensdatenbank, und ein Knopf räumt alles wieder weg). -->
+          <div class="action-row">
+            <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
+              <select id="pp-year" class="mf-select" data-i18n-title="pp.year.tip" title="Ein Jahr je Lauf — eine ganze Bibliothek auf einmal ist kein Lauf, sondern ein Zeitlimit"></select>
+              <button class="btn" id="pp-run" style="text-align:left" data-i18n="pp.run">📍 Fotos verorten</button>
+              <button class="btn secondary" id="pp-reset" style="text-align:left" data-i18n="pp.reset">🗑️ Punkte verwerfen</button>
+            </div>
+            <div class="action-desc">
+              <span data-i18n="pp.desc"><b>Jedes Foto mit Koordinaten bekommt einen Punkt auf der Karte</b> — dort,
+              wo es aufgenommen wurde. Ein Album mit 1200 Bildern aus London ist damit 1200 Punkte statt einem.
+              Der Lauf legt <b>keine Ereignisse</b> an und ändert nichts an deinen Einträgen; er merkt sich nur
+              Zeitpunkt, Koordinate und den Ortsnamen, den Immich selbst schon kennt. Genommen werden dieselben
+              Fotos wie oben: <b>eigene</b>, <b>mit Koordinaten</b>, <b>im Immich-Zeitstrahl</b>. Sichtbar wird
+              das Ergebnis über den Schalter <b>„📷 Fotos"</b> auf der Karte und im Zeitstrahl.</span>
+              <div id="pp-result" class="hint" style="display:none; margin-top:10px"></div>
+            </div>
+          </div>
+
           <!-- Wer den Alben-Zweig abschaltet, hat die Alben von gestern noch
                in der Warteschlange stehen. -->
           <div class="action-row" id="ims-cleanup-row">
@@ -2589,6 +2633,25 @@ const I18N_EN = {
   'ims.drop.count': "{n} open album proposals",
   'ims.drop.empty': "No open album proposal.",
   'ims.drop.done': "✓ {n} album proposals discarded.",
+  // A45 — locating photos
+  'pp.run': "📍 Locate photos",
+  'pp.reset': "🗑️ Discard points",
+  'pp.year.tip': "One year per run — a whole library at once is not a run, it is a timeout",
+  'pp.desc': "<b>Every photo with coordinates gets a point on the map</b> — where it was taken. An album of 1200 pictures from London becomes 1200 points instead of one. The run creates <b>no events</b> and changes nothing about your entries; it only remembers the time, the coordinate and the place name Immich already knows. It takes the same photos as above: <b>your own</b>, <b>with coordinates</b>, <b>in the Immich timeline</b>. The result becomes visible through the <b>“📷 Photos”</b> switch on the map and in the timeline.",
+  'pp.have': "{n} photos located",
+  'pp.years': "Searched: {y}",
+  'pp.none': "No year searched yet. Until then the photo layer on the map stays empty — that does not mean there are no photos.",
+  'pp.needyear': "Please pick a year.",
+  'pp.reset.done': "✓ {n} photo points discarded.",
+  'map.photos': "📷 Photos",
+  'map.photos.tip': "Every photo with coordinates as its own point — where it was taken. Has to be located first under “My data → Immich”.",
+  'map.photos.none': "No photo located yet — the run is under “My data → Immich → Locate photos”.",
+  'map.photos.cap': "{s} of {n} photos shown — pick a smaller period.",
+  'map.photos.nowhere': "no place given",
+  'tl.photos': "📷 Photos",
+  'tl.photos.tip': "Located photos as their own rows in the timeline, condensed per day and place — has to be located first under “My data → Immich”",
+  'tl.photos.n': "{n} photos",
+  'tl.photos.of': "{n} of {total}",
   'ims.preview': "🔍 Preview this year",
   'ims.run': "✚ Create proposals",
   'ims.busy': "🔍 looking …",
@@ -3654,7 +3717,11 @@ const monthLong = m => t('mon.l.' + m, MONTHS_LONG[m]);
 // offset/done/loading führen das Blättern.
 const tl = { zoom: 'year', query: '', events: [], catFilter: new Set(FILTER_CATS),
              showVisits: false, offset: 0, done: false, loading: false, autoPages: 0,
-             city: null };   // A41: Stadtfilter, serverseitig (siehe loadTimeline)
+             city: null,     // A41: Stadtfilter, serverseitig (siehe loadTimeline)
+             // A45: Foto-Ebene. `level` ist die Verdichtungsstufe (A47) und
+             // gilt für Fotos wie für Besuche — EINE Einstellung, nicht zwei
+             // nebeneinander.
+             showPhotos: false, photoGroups: [], level: 'city' };
 
 function isoWeek(d) {
   const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -3740,6 +3807,22 @@ document.getElementById('tl-dayphoto-file')?.addEventListener('change', async ev
 // F18: Die Tages-Bilder der gerade geladenen Seite — EINE Abfrage für die
 // ganze Spanne. Eine je sichtbarem Tag wären beim Scrollen dutzende; das ist
 // dieselbe Regel, die A37 für Wetter und Kinder-Zählungen aufgestellt hat.
+// A45: Was die F18-Fotoleiste eines Tages noch zeigen soll.
+//
+// Ist die Foto-Ebene an, steht die Zahl aus Immich schon in der Gruppe darüber
+// („34 Fotos in Detmold") — die Leiste daneben zeigte dieselben Bilder ein
+// zweites Mal, nur zwölf statt vierunddreißig. **Hochgeladene Dateien bleiben
+// trotzdem stehen:** sie sind Lebensdatenbank (Anmerkung 57) und stecken in
+// gar keinem Fotopunkt; sie durch eine Ableitung verschwinden zu lassen wäre
+// die schlimmere Doppelung — nämlich eine Auslassung.
+function tlStripFor(day) {
+  const media = TL_DAY_MEDIA.get(day);
+  if (!media || !media.length) return media;
+  if (!tl.showPhotos) return media;
+  if (!tl.photoGroups.some(g => g.day === day)) return media;
+  return media.filter(m => m.provider !== 'immich');
+}
+
 async function loadDayMedia(page) {
   const days = page.map(e => (e.date_start || '').slice(0, 10)).filter(Boolean);
   if (!days.length) return;
@@ -3748,6 +3831,31 @@ async function loadDayMedia(page) {
     const byDay = await api(`/api/days/media?from=${from}&to=${to}`);
     Object.entries(byDay).forEach(([d, media]) => TL_DAY_MEDIA.set(d, media));
   } catch { /* Bilder sind Beiwerk — ohne sie bleibt der Zeitstrahl gültig */ }
+}
+
+// A45: Die Foto-Gruppen zur geladenen Spanne. Verdichtet wird auf dem SERVER
+// (siehe /api/photos/groups) — der Zeitstrahl blättert, und eine Gruppierung
+// nach dem Blättern zerschneidet die Gruppe an der Seitengrenze; beide Hälften
+// zeigten dann eine zu kleine Zahl (A39/A37, dieselbe Regel wie bei den
+// Besuchen).
+async function loadPhotoGroups(page, more) {
+  if (!tl.showPhotos) { tl.photoGroups = []; return; }
+  const days = page.map(e => (e.date_start || '').slice(0, 10)).filter(Boolean).sort();
+  if (!days.length) return;
+  try {
+    const r = await api(`/api/photos/groups?${new URLSearchParams({
+      from: days[0] + 'T00:00:00', to: days[days.length - 1] + 'T23:59:59',
+      level: tl.level })}`);
+    const groups = r.groups || [];
+    // Beim Nachladen kommen Gruppen für einen ANDEREN Abschnitt dazu; ohne
+    // die Entdopplung stünde ein Tag, den beide Seiten berühren, zweimal da.
+    if (!more) tl.photoGroups = groups;
+    else {
+      const have = new Set(tl.photoGroups.map(g => `${g.day}|${g.place}`));
+      tl.photoGroups = tl.photoGroups.concat(
+        groups.filter(g => !have.has(`${g.day}|${g.place}`)));
+    }
+  } catch { /* Fotos sind eine Ebene, kein Fundament — der Zeitstrahl bleibt gültig */ }
 }
 
 async function loadTimeline(more = false) {
@@ -3802,6 +3910,7 @@ async function loadTimeline(more = false) {
       tl.offset += page.length;
       tl.done = page.length < TL_PAGE;
       await loadDayMedia(page);   // F18: Tages-Bilder derselben Spanne
+      await loadPhotoGroups(page, more);   // A45: Fotopunkte derselben Spanne
     }
   } finally {
     tl.loading = false;
@@ -4042,6 +4151,7 @@ function renderTimelineList() {
   // Index — in der geladenen Liste wäre sie eine beliebige Teilmenge.
   if (!tlShowsVisits()) filtered = filtered.filter(e => e.source !== 'google_timeline');
   renderCityChip();
+  ensurePhotoIndex();      // A45: entscheidet, ob der Foto-Schalter etwas kann
   const toggle = document.getElementById('tl-visits-toggle');
   toggle.style.display = TL_VISIT_COUNT ? '' : 'none';
   toggle.textContent = `🛰️ ${TL_VISIT_COUNT.toLocaleString(LOC())} ${t('tl.visits.n', 'Besuche')}`;
@@ -4068,7 +4178,7 @@ function renderTimelineList() {
   // F1: Tagebuch-Einträge stehen als Tageskopf ÜBER den Ereignissen ihres
   // Tages (stabile Sortierung: nur innerhalb desselben Tages umsortieren).
   const dayOf = x => x.date_start ? x.date_start.slice(0, 10) : '';
-  const jr = x => x.dayMedia ? 2 : x.category === 'journal' ? 1 : 0;
+  const jr = x => (x.dayMedia || x.photoGroup) ? 2 : x.category === 'journal' ? 1 : 0;
   Object.values(groups).forEach(g => {
     g.items = compressVisits(g.items);
     // F18: Bilder, die an einem TAG hängen statt an einem Ereignis, treten als
@@ -4079,9 +4189,26 @@ function renderTimelineList() {
     // untereinander, und ab dem Monat werden es dreißig Leisten mit hunderten
     // Bildern — dann ist es keine Erinnerung mehr, sondern eine Wand.
     const days = [...new Set(g.items.map(dayOf).filter(Boolean))].sort();
+    // A45: Foto-Gruppen als eigene Zeilen — VOR den F18-Leisten, weil sie
+    // dieselben Bilder meinen und dann entscheiden, was von den Leisten übrig
+    // bleibt (siehe `tlStripFor`). Angehängt statt eingefügt wären sie an
+    // genau den Tagen hinter „x weitere anzeigen" verschwunden, an denen
+    // fotografiert wurde — der Defekt aus Anmerkung 114, ein Paket später.
+    if (tl.showPhotos) {
+      const byDay = new Map();
+      tl.photoGroups.forEach(pg => {
+        if (!byDay.has(pg.day)) byDay.set(pg.day, []);
+        byDay.get(pg.day).push(pg);
+      });
+      days.forEach(d => (byDay.get(d) || []).forEach(pg => {
+        const at = g.items.findIndex(x => dayOf(x) === d);
+        const row = { photoGroup: pg, date_start: `${d}T00:00:00` };
+        if (at < 0) g.items.push(row); else g.items.splice(at, 0, row);
+      }));
+    }
     if (tl.zoom === 'day') {
       days.forEach(d => {
-        const media = TL_DAY_MEDIA.get(d);
+        const media = tlStripFor(d);
         if (!media || !media.length) return;
         const row = { dayMedia: media, day: d, date_start: `${d}T00:00:00` };
         // Anmerkung 114: NICHT anhängen. Die Gruppe zeigt nur die ersten
@@ -4096,7 +4223,7 @@ function renderTimelineList() {
       // Eine Leiste für die ganze Gruppe. Ab Monat wird ausgewählt statt
       // gezeigt — und die Leiste SAGT, dass sie auswählt (siehe dayMediaCard).
       const all = [];
-      days.forEach(d => (TL_DAY_MEDIA.get(d) || []).forEach(m => all.push(m)));
+      days.forEach(d => (tlStripFor(d) || []).forEach(m => all.push(m)));
       if (all.length) {
         // Sie vertritt die ganze Gruppe, nicht ihren ersten Tag — also an den
         // Kopf der Gruppe, nicht in die Tages-Sortierung darunter.
@@ -4112,7 +4239,8 @@ function renderTimelineList() {
     // wenn ein Tagebuch-Eintrag denselben Tag beansprucht.
     g.items.sort((a, b) => dayOf(a) === dayOf(b) ? jr(b) - jr(a) : 0);
   });
-  const renderItem = x => x.dayMedia ? dayMediaCard(x)
+  const renderItem = x => x.photoGroup ? photoGroupCard(x.photoGroup)
+    : x.dayMedia ? dayMediaCard(x)
     : x.visitGroup ? visitGroupCard(x)
     : (x.category === 'journal' ? journalCard(x) : eventCard(x));
   const ordered = Object.values(groups).sort((a,b) => b.sort - a.sort);
@@ -4330,6 +4458,30 @@ function dayMediaCard(x) {
     <div class="day-media-strip">${shots}</div>
   </div>`;
 }
+// A45: Eine Foto-Gruppe im Zeitstrahl — (Tag, Ort) auf der gewählten Stufe.
+//
+// Bewusst dieselbe Bauform wie die Besuchs-Sammelkarte daneben: Zahl, Ort,
+// Zeitspanne. Sie ist KEIN Ereignis und lässt sich deshalb auch nicht
+// bearbeiten — ein Klick öffnet nichts, sondern zeigt die Bilder.
+function photoGroupCard(g) {
+  const time = iso => iso ? iso.slice(11, 16) : '';
+  const shots = (g.assets || []).map(id =>
+    `<img src="/api/photos/${encodeURIComponent(id)}/thumb" alt="" loading="lazy">`).join('');
+  // Die Beschriftung sagt, dass sie auswählt. „6 Bilder" über einer Gruppe von
+  // 300 behauptete Vollständigkeit — dieselbe Regel wie bei den Fotoleisten
+  // (Anmerkung 110).
+  const more = g.count > (g.assets || []).length
+    ? ` <span class="stat-label">${esc(t('tl.photos.of', '{n} von {total}')
+        .replace('{n}', (g.assets || []).length).replace('{total}', g.count))}</span>`
+    : '';
+  return `<div class="day-media" data-photo-group="${esc(g.day)}">
+    <span class="day-media-label">📷 ${esc(t('tl.photos.n', '{n} Fotos').replace('{n}', g.count))}${
+      g.place ? ' · ' + esc(g.place) : ' · ' + esc(t('map.photos.nowhere', 'ohne Ortsangabe'))}
+      <span class="stat-label">${esc(time(g.first))}${
+        time(g.last) && time(g.last) !== time(g.first) ? '–' + esc(time(g.last)) : ''}</span>${more}</span>
+    <div class="day-media-strip">${shots}</div>
+  </div>`;
+}
 // F1: Tagebuch-Karte — Tageskopf mit gerendertem Markdown (sanitisiert)
 function journalCard(e) {
   EVENT_CACHE[e.id] = e;
@@ -4352,6 +4504,18 @@ document.getElementById('tl-visits-toggle').addEventListener('click', function (
   this.classList.toggle('active', tl.showVisits);
   this.classList.toggle('off', !tl.showVisits);
   loadTimeline();   // A37: der Schalter ändert die Abfrage, nicht die Anzeige
+});
+// A45: Foto-Ebene im Zeitstrahl. Wie bei den Besuchen ändert der Schalter die
+// ABFRAGE (die Gruppen kommen verdichtet vom Server), nicht nur die Anzeige.
+document.getElementById('tl-photos-toggle')?.addEventListener('click', function () {
+  if (this.classList.contains('inert')) {
+    toast(t('map.photos.none', 'Noch kein Foto verortet — der Lauf steht unter „Meine Daten → Immich → Fotos verorten".'), 'warn', 7000);
+    return;
+  }
+  tl.showPhotos = !tl.showPhotos;
+  this.classList.toggle('active', tl.showPhotos);
+  this.classList.toggle('off', !tl.showPhotos);
+  loadTimeline();
 });
 document.querySelectorAll('#tl-zoom [data-zoom]').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -6200,8 +6364,15 @@ function startVoice() {
 }
 
 // ---------- KARTE ----------
-let mapObj = null, mapMarkers = null, mapCluster = null, mapRoute = null, mapTracks = null;
-const mp = { mode: 'day', periods: [], index: 0, showRoute: true, showTracks: true, condense: true, located: [], catFilter: new Set(FILTER_CATS) };
+let mapObj = null, mapMarkers = null, mapCluster = null, mapRoute = null, mapTracks = null,
+    mapPhotos = null;   // A45: Fotopunkte, eigene Ebene
+const mp = { mode: 'day', periods: [], index: 0, showRoute: true, showTracks: true, condense: true, located: [], catFilter: new Set(FILTER_CATS),
+  // A45 — Fotopunkte als eigene Ebene. `showPhotos` ist bewusst AUS: bei
+  // zwanzig Jahren Bibliothek sind das zehntausende Marker, und wer die Karte
+  // öffnet, will zuerst seine Ereignisse sehen. `total` ist die Zahl aus dem
+  // Index (der GESAMTE Bestand) — sie entscheidet, ob der Schalter überhaupt
+  // etwas bewirken kann (A40).
+  showPhotos: false, photoTotal: 0, photoScanned: [], photoDays: {} };
 // A18: Cluster-Schwelle — vom Nutzer einstellbar (10–300, in User.settings)
 const SETTINGS = { map_cluster_min: 50 };
 function mpClusterMin() { return SETTINGS.map_cluster_min || 50; }
@@ -6218,6 +6389,42 @@ function mpSyncChips(condensed) {
   chip.title = condensed
     ? t('map.route.blocked', 'Nicht möglich, solange Punkte zusammengefasst sind — dann gibt es keine Reihenfolge zu zeigen.')
     : t('map.route.tip', 'Verbindet die Orte dieses Zeitraums in ihrer zeitlichen Reihenfolge — eine gedachte Linie, kein gefahrener Weg. Bei zusammengefassten Punkten gibt es keine Reihenfolge zu zeigen.');
+  mpSyncPhotoChip();
+}
+// A40, derselbe Satz für die Foto-Ebene: Ein Bedienelement, das gerade nichts
+// bewirken kann, muss das ZEIGEN. Solange kein Foto verortet ist, wäre der
+// Schalter ein Knopf, der aussieht wie ein Angebot und nichts tut — und der
+// Nutzer suchte den Fehler bei der Karte statt beim fehlenden Lauf.
+function mpSyncPhotoChip() {
+  // BEIDE Schalter, Karte wie Zeitstrahl: sie beantworten dieselbe Frage
+  // („gibt es überhaupt verortete Fotos?"), und zwei Antworten darauf laufen
+  // still auseinander (Anmerkung 106).
+  const empty = !mp.photoTotal;
+  [['mp-photos-toggle', mp.showPhotos], ['tl-photos-toggle', tl.showPhotos]]
+    .forEach(([id, on]) => {
+      const chip = document.getElementById(id);
+      if (!chip) return;
+      chip.classList.toggle('inert', empty);
+      chip.classList.toggle('active', !empty && on);
+      chip.classList.toggle('off', !empty && !on);
+      chip.title = empty
+        ? t('map.photos.none', 'Noch kein Foto verortet — der Lauf steht unter „Meine Daten → Immich → Fotos verorten".')
+        : t('map.photos.tip', 'Jedes Foto mit Koordinaten als eigener Punkt — dort, wo es aufgenommen wurde. Muss zuerst unter „Meine Daten → Immich" verortet werden.');
+    });
+}
+// Der Fotozähler wird an drei Stellen gebraucht (Karte, Zeitstrahl,
+// Verwaltung) und ist EIN Abruf. Ohne dieses Gedächtnis holte ihn jeder
+// Zeitstrahl-Aufbau erneut.
+let PHOTO_INDEX_DONE = false;
+async function ensurePhotoIndex(force) {
+  if (PHOTO_INDEX_DONE && !force) return;
+  PHOTO_INDEX_DONE = true;
+  try {
+    const r = await api('/api/photos/index');
+    mp.photoTotal = r.total;
+    mp.photoScanned = r.years_scanned || [];
+  } catch (_) { mp.photoTotal = 0; }
+  mpSyncPhotoChip();
 }
 // Nur Events, die den aktiven Kategorie-Filter passieren
 function mpFiltered() { return mp.located.filter(e => passesFilter(e, mp.catFilter)); }
@@ -6260,9 +6467,18 @@ function keyForDate(dateStr) {
   }
 }
 function rebuildPeriods(keepKey) {
-  const keys = [...new Set(mpFiltered().map(periodKey))].sort();
-  mp.periods = keys;
-  mp.index = keepKey && keys.includes(keepKey) ? keys.indexOf(keepKey) : keys.length - 1;
+  const keys = new Set(mpFiltered().map(periodKey));
+  // A45: Die Zeiträume kamen bisher NUR aus den Ereignissen — und genau die
+  // Jahre, für die die Foto-Ebene gemacht ist, haben Fotos und keine Besuche
+  // (vor dem Smartphone gibt es keine Timeline). Ohne diese Zeile ließe sich
+  // 2004 gar nicht ansteuern: der Schalter wäre an, die Karte leer, und
+  // nirgends stünde warum.
+  if (mp.showPhotos) {
+    Object.keys(mp.photoDays || {}).forEach(day => keys.add(keyForDate(day)));
+  }
+  const sorted = [...keys].sort();
+  mp.periods = sorted;
+  mp.index = keepKey && sorted.includes(keepKey) ? sorted.indexOf(keepKey) : sorted.length - 1;
   if (mp.index < 0) mp.index = 0;
 }
 // Kalender-Sprung: zum Zeitraum des gewählten Tages (oder dem nächstgelegenen)
@@ -6304,6 +6520,10 @@ async function openMapView() {
   // A37: eigener schlanker Endpunkt statt der Zeitstrahl-Liste — und erst
   // jetzt, beim Öffnen des Reiters, statt beim Start der App.
   mp.located = await api('/api/events/map').catch(() => []);
+  // A45: Wie viele Fotos es ÜBERHAUPT gibt — das entscheidet, ob der
+  // Foto-Schalter etwas bewirken kann (A40). Ein eigener, winziger Abruf:
+  // scheitert er, bleibt die Karte vollständig, nur ohne Fotos.
+  await ensurePhotoIndex();
   if (!mapObj) {
     mapObj = L.map('map').setView([50, 6], 4);
     addTiles(mapObj, 19);                   // F13: wählbare Hintergrundkarte
@@ -6318,6 +6538,7 @@ async function openMapView() {
     if (mapCluster) mapCluster.addTo(mapObj);
     mapRoute = L.layerGroup().addTo(mapObj);
     mapTracks = L.layerGroup().addTo(mapObj);
+    mapPhotos = L.layerGroup().addTo(mapObj);   // A45
     // Auf Mobil ändert sich die Höhe beim Drehen / Ein-/Ausblenden der Adressleiste
     window.addEventListener('resize', () => mapObj && mapObj.invalidateSize());
     window.addEventListener('orientationchange', () => mapObj && mapObj.invalidateSize());
@@ -6396,7 +6617,9 @@ function renderPeriod() {
   };
   if (!mp.periods.length) {
     mapTracks.clearLayers();
+    if (mapPhotos) mapPhotos.clearLayers();
     mpCapNote(0, 0);
+    mpPhotoNote(null);
     setLabel(t('mp.nolocated', 'keine verorteten Events'));
     stops.innerHTML = `<div class="stat-label">${t('mp.noplaces',
       'Keine Orte in diesem Zeitraum.')}</div>`;
@@ -6410,6 +6633,11 @@ function renderPeriod() {
   // A37: Wetter für genau diesen Zeitraum nachladen und neu zeichnen, sobald
   // es da ist. Die Karte steht sofort; das Wetter kommt in die Popups nach.
   mpEnsureWeather(key, all).then(got => { if (got) renderPeriod(); });
+  // A45: Die Foto-Ebene wird IMMER hier gezeichnet — vor jeder Verzweigung
+  // in Bündelung, Cluster oder Deckel. Sie hat mit alldem nichts zu tun, und
+  // ein Zeichenaufruf hinter einem `return` ist genau die Sorte Ebene, die
+  // in einer der drei Ansichten still fehlt.
+  mpDrawPhotos(key, all);
   // A5/A40 (Besuchs-Verdichtung): EIN Schalter, zwei Verfahren — welches
   // greift, entscheidet die Zoomstufe, nicht der Nutzer. Ab Monats-Ansicht
   // wird je Ort gebündelt („59× Zuhause"), in Tag/Woche nach Nähe geclustert.
@@ -6497,6 +6725,81 @@ function mpCapNote(hidden, total) {
   });
 }
 
+// --------------------------------------------------------------------------- //
+// A45 — die Foto-Ebene
+// --------------------------------------------------------------------------- //
+// Eigener Layer, eigener Abruf, eigener Hinweis. Bewusst NICHT in `mp.located`
+// gemischt: dort liegen Ereignisse, und ein Foto ist keins (Anmerkung 87 —
+// aus einem Beleg ein Objekt zu machen erzeugt Zeilen, die danach überall
+// wieder ausgefiltert werden müssen).
+const MP_PHOTOS = new Map();   // Zeitraum-Schlüssel -> {points, total, shown}
+async function mpLoadPhotos(key, from, to) {
+  if (MP_PHOTOS.has(key)) return MP_PHOTOS.get(key);
+  try {
+    const r = await api(`/api/photos/map?${new URLSearchParams({ from, to })}`);
+    MP_PHOTOS.set(key, r);
+    return r;
+  } catch (_) {
+    // Ohne Fotos bleibt die Karte vollständig — sie zeigt dann eben nur die
+    // Ereignisse, und der Rest der Ansicht funktioniert weiter.
+    return null;
+  }
+}
+function mpDrawPhotos(key, all) {
+  if (!mapPhotos) return;
+  mapPhotos.clearLayers();
+  if (!mp.showPhotos || !mp.photoTotal) { mpPhotoNote(null); return; }
+  // Zeitfenster des angezeigten Zeitraums — aus den Ereignissen, wenn es
+  // welche gibt, sonst aus dem Zeitraum-Schlüssel selbst. Sonst hätte ein
+  // Monat ohne einen einzigen Eintrag auch keine Fotos, obwohl gerade dann
+  // welche interessant wären (die Jahre vor dem Smartphone haben Fotos und
+  // keine Besuche).
+  const span = mpPeriodSpan(key, all);
+  if (!span) { mpPhotoNote(null); return; }
+  mpLoadPhotos(key, span[0], span[1]).then(r => {
+    if (!r || !mp.showPhotos) { mpPhotoNote(null); return; }
+    r.points.forEach(p => {
+      L.circleMarker([p.lat, p.lng], {
+        radius: 4, fillColor: '#f0a23b', color: '#fff', weight: 1, fillOpacity: .9,
+      }).addTo(mapPhotos).bindPopup(
+        `<img src="/api/photos/${encodeURIComponent(p.id)}/thumb" alt="" `
+        + `style="max-width:180px; border-radius:6px; display:block; margin-bottom:6px" loading="lazy">`
+        + `<b>${esc(p.place || t('map.photos.nowhere', 'ohne Ortsangabe'))}</b><br>`
+        + esc(new Date(p.at).toLocaleString(LOC())));
+    });
+    mpPhotoNote(r);
+  });
+}
+// Der Zeitraum als ISO-Grenzen. Bei „alles" bleibt es offen — dann deckelt
+// der Server, und `mpPhotoNote` sagt es.
+function mpPeriodSpan(key, all) {
+  if (all && all.length) {
+    const dates = all.map(e => e.date_start).sort();
+    return [dates[0].slice(0, 10) + 'T00:00:00',
+            dates[dates.length - 1].slice(0, 10) + 'T23:59:59'];
+  }
+  const m = /^(\d{4})(?:-(\d{2}))?/.exec(key || '');
+  if (!m) return null;
+  const y = +m[1];
+  if (m[2]) {
+    const last = new Date(y, +m[2], 0).getDate();
+    return [`${m[1]}-${m[2]}-01T00:00:00`, `${m[1]}-${m[2]}-${last}T23:59:59`];
+  }
+  return [`${y}-01-01T00:00:00`, `${y}-12-31T23:59:59`];
+}
+// Anmerkung 110 für die Foto-Ebene: Was die Karte nicht zeigen kann, sagt sie
+// — und zwar dort, wo hingeschaut wird. Ohne diesen Satz sähe ein gedeckelter
+// Ausschnitt aus wie die ganze Bibliothek.
+function mpPhotoNote(r) {
+  const box = document.getElementById('mp-photo-note');
+  if (!box) return;
+  if (!r || r.total <= r.shown) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.style.display = '';
+  box.innerHTML = `📷 ${esc(t('map.photos.cap', '{s} von {n} Fotos gezeigt — kleineren Zeitraum wählen.')
+    .replace('{s}', r.shown.toLocaleString(LOC()))
+    .replace('{n}', r.total.toLocaleString(LOC())))}`;
+}
+
 // A5: Gebündelte Darstellung eines Zeitraums — Events nach Ort gruppiert.
 // Alltagsorte (Zuhause/Arbeit) fallen damit automatisch zu je einer Zeile
 // zusammen. Marker wandern in den Cluster-Layer (Dichte-Darstellung).
@@ -6581,6 +6884,23 @@ document.getElementById('mp-group-toggle').addEventListener('click', function ()
   this.classList.toggle('active', mp.condense);
   this.classList.toggle('off', !mp.condense);
   renderPeriod();
+});
+// A45: Foto-Ebene ein/aus. Der `inert`-Zustand ist KEIN Klick — ein Schalter,
+// der nichts bewirken kann, darf auch nicht so tun (A40).
+document.getElementById('mp-photos-toggle').addEventListener('click', function () {
+  if (this.classList.contains('inert')) {
+    toast(t('map.photos.none', 'Noch kein Foto verortet — der Lauf steht unter „Meine Daten → Immich → Fotos verorten".'), 'warn', 7000);
+    return;
+  }
+  mp.showPhotos = !mp.showPhotos;
+  mpSyncPhotoChip();
+  // Die Tageliste erst beim Einschalten holen — wer die Ebene nie benutzt,
+  // zahlt auch nichts dafür.
+  const after = () => { rebuildPeriods(mp.periods[mp.index]); renderPeriod(); };
+  if (mp.showPhotos && !Object.keys(mp.photoDays).length) {
+    api('/api/photos/days').then(r => { mp.photoDays = r.days || {}; after(); })
+      .catch(() => after());
+  } else after();
 });
 // A24: Karte im Vollbild — nach dem Wechsel neu vermessen (Esc beendet)
 document.getElementById('mp-fullscreen').addEventListener('click', () => {
@@ -7915,6 +8235,7 @@ function renderImmichState(s) {
   // die Zahl gibt es also auch dann, wenn Immich gerade nicht antwortet.
   // Deshalb ein eigener Aufruf und kein Anhängsel des Jahres-Abrufs.
   imsLoadDrop();
+  ppLoadIndex();       // A45: Stand der Fotopunkte (ebenfalls eigene Daten)
 }
 async function saveImmich() {
   const url = document.getElementById('im-url').value.trim();
@@ -8080,6 +8401,10 @@ async function loadImmichYears() {
     } else {
       imsNote('');
     }
+    // A45: Dieselbe Jahresliste für den Verorten-Lauf — sie beantwortet für
+    // beide dieselbe Frage („welches Jahr lohnt sich?"). Zwei Listen wären
+    // zwei Antworten darauf (Anmerkung 106).
+    ppFillYears(sel);
   } catch (err) {
     // Nicht mehr verschlucken: Die Auswahl steht (Standardjahre), aber der
     // Nutzer soll wissen, dass die Empfehlung fehlt — sonst wundert er sich,
@@ -8087,8 +8412,75 @@ async function loadImmichYears() {
     imsDefaultYears();
     imsNote(t('ims.years.fail', 'Die Jahresliste konnte nicht aus Immich geholt werden ({e}) — die Auswahl zeigt die letzten Jahre. Ein Lauf geht trotzdem.')
       .replace('{e}', err.message));
+    ppFillYears(sel);
   }
 }
+
+// --------------------------------------------------------------------------- //
+// A45 — Fotos verorten
+// --------------------------------------------------------------------------- //
+// Kein Vorschau-Riegel wie bei den Vorschlägen: dieser Lauf schreibt nichts in
+// die Lebensdatenbank. Er legt Punkte an, die eine reine Ableitung sind — und
+// „Punkte verwerfen" macht ihn vollständig rückgängig. Ein Riegel davor wäre
+// eine Hürde ohne Risiko dahinter.
+function ppFillYears(source) {
+  const sel = document.getElementById('pp-year');
+  if (!sel || !source) return;
+  const keep = sel.value;
+  sel.innerHTML = source.innerHTML;
+  // Was schon durchsucht wurde, steht dran — sonst weiß niemand, welches
+  // Jahr noch offen ist, und der Lauf wird zum Ratespiel.
+  const done = new Set(mp.photoScanned || []);
+  [...sel.options].forEach(o => {
+    if (done.has(+o.value)) o.textContent += ' ✓';
+  });
+  if (keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
+  else sel.value = source.value;
+}
+async function ppLoadIndex() {
+  const box = document.getElementById('pp-result');
+  try {
+    const r = await api('/api/photos/index');
+    mp.photoTotal = r.total;
+    mp.photoScanned = r.years_scanned || [];
+    PHOTO_INDEX_DONE = true;
+    mpSyncPhotoChip();
+    ppFillYears(document.getElementById('ims-year'));
+    if (!box) return;
+    box.style.display = '';
+    box.innerHTML = r.total
+      ? `<b>${esc(t('pp.have', '{n} Fotos verortet').replace('{n}', r.total.toLocaleString(LOC())))}</b>`
+        + (r.first ? ` <span class="stat-label">· ${esc(r.first.slice(0, 10))} – ${esc((r.last || '').slice(0, 10))}</span>` : '')
+        + (r.years_scanned.length
+            ? `<div class="stat-label" style="margin-top:6px">${esc(t('pp.years', 'Durchsucht: {y}').replace('{y}', r.years_scanned.join(', ')))}</div>`
+            : '')
+      // „nie nachgesehen" ist nicht „keine Fotos" — der Unterschied gehört
+      // dorthin, wo jemand ihn braucht.
+      : esc(t('pp.none', 'Noch kein Jahr durchsucht. Bis dahin bleibt die Foto-Ebene auf der Karte leer — das heißt nicht, dass es keine Fotos gibt.'));
+  } catch (_) { /* ohne Immich gibt es hier schlicht nichts zu zeigen */ }
+}
+document.getElementById('pp-run')?.addEventListener('click', ev => {
+  const year = parseInt(document.getElementById('pp-year').value, 10);
+  if (!Number.isFinite(year)) {
+    toast(t('pp.needyear', 'Bitte ein Jahr wählen.'), 'warn');
+    return;
+  }
+  startServerJob(ev.target, 'photo_points', { year });
+});
+document.getElementById('pp-reset')?.addEventListener('click', async ev => {
+  const btn = ev.target;
+  btn.disabled = true;
+  try {
+    const r = await api('/api/photos/reset', { method: 'POST' });
+    toast(t('pp.reset.done', '✓ {n} Fotopunkte verworfen.').replace('{n}', r.deleted), 'ok', 6000);
+    // Der Kartenzustand ist ein anderer: Zwischenspeicher leeren, sonst
+    // zeichnet die Karte weiter die Punkte, die es nicht mehr gibt.
+    MP_PHOTOS.clear();
+    mp.photoDays = {};
+    await ppLoadIndex();
+  } catch (err) { toast(err.message, 'error', 8000); }
+  finally { btn.disabled = false; }
+});
 function imsNote(text) {
   const box = document.getElementById('ims-result');
   if (!box || !text) { if (box && box.dataset.note) { box.style.display = 'none'; delete box.dataset.note; } return; }

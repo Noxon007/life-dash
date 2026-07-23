@@ -92,6 +92,27 @@ def photo_index(
     }
 
 
+@router.get("/days")
+def photo_days(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Kalendertage mit Fotos, samt Anzahl — `{"2004-07-12": 34, …}`.
+
+    Die Karte gliedert nach Zeiträumen, und die baut sie bisher aus den
+    EREIGNISSEN. Genau die Jahre, für die dieses Paket gemacht ist, haben aber
+    Fotos und keine Besuche (vor dem Smartphone gibt es keine Timeline) — ohne
+    diese Liste ließe sich 2004 gar nicht ansteuern, und der Nutzer sähe eine
+    leere Karte statt seiner Bilder.
+
+    Tage statt Fotos: bei zwanzig Jahren sind das einige tausend Zeilen à
+    zwanzig Byte. Die Punkte selbst holt `/map` erst für den Zeitraum, den
+    jemand wirklich ansieht (A37).
+    """
+    return {"days": {d.isoformat(): n
+                     for d, n in sorted(pp.day_index(db, user.id).items())}}
+
+
 @router.get("/map")
 def photo_map(
     date_from: Annotated[datetime | None, Query(alias="from")] = None,
