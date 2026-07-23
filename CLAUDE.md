@@ -77,6 +77,41 @@ Schwelle beides zugleich (11 h + 3 h mit `min: 10` ergibt 11, nicht 3): deshalb
 Stellen ≈ 1,1 km) — bewusst NICHT gröber (0,1° läge AUF der Auflösung der
 Quelle) und **Fehlschläge werden nicht gemerkt** (Gegenrichtung zur
 Endlos-Abruf-Falle: ein Prozess-Cache, keine dauerhafte Marke).
+**Feedback-Runde: die App tat es und sagte es nicht (Anmerkung 120, auf `main`
+ohne Versionssprung).** Sieben gemeldete Punkte, sechs davon derselbe Defekt.
+**(a)** „Nachsehen" schrieb sein Ergebnis ans ENDE der Beschreibungsspalte
+daneben — auf einem breiten Bildschirm die andere Hälfte, hinter zehn Zeilen
+Erklärung; jetzt volle Zeile UNTER dem Knopf (`.action-row.has-result`), dazu
+Ladezustand und Toast. **A40 andersherum: eine Ansicht, die etwas zeigen KANN,
+muss es dorthin stellen, wo hingeschaut wird.** **(b)** Jeder Job-Start sprang
+in den Jobs-Reiter, und das WAR die Rückmeldung — bei zwanzig Jahren
+zwanzigmal weg vom Knopf. Jetzt ein Live-Streifen oben in „Meine Daten"
+(`#data-jobs`, `startServerJob(..., stay=true)`); **der zuletzt beendete Lauf
+bleibt mit seinem Ergebnis stehen**, sonst ist der Satz, für den es den Lauf
+gibt, der einzige, den niemand sieht. **(c)** Laufende Jobs rutschten unter
+die abgeschlossenen und fielen aus den zwölf Zeilen: **Abgeschlossenes ist
+eine Chronik, Laufendes ein Zustand — nur die Chronik wird beschnitten**
+(`list_jobs` liefert Aktive vollständig und zuerst). **(d)** `photo_points`
+stand als nackter Schlüssel da; das Backend kannte sein Label längst — **ein
+Fallback, der wie eine Anzeige aussieht, versteckt die Lücke**, Wächter
+`check-job-labels.js` vergleicht `JOB_TYPES` gegen deutsche Tabelle UND
+englischen Katalog, in beide Richtungen. **(e) „Alle Jahre" für beide
+Immich-Läufe:** die Jahresaufteilung (Anm. 107) war für eine ANFRAGE richtig
+(25-s-Budget der Vorschau, abgeleitet aus der Geduld umgekehrter Vertreter),
+nie für einen Hintergrund-Job. Die Vorschau geht die Jahre EINZELN durch —
+eine Sammelanfrage antwortete mit einem Ausschnitt, und ein Ausschnitt hebt
+den Riegel nicht auf („ein Zwanzigstel sehen, alles anlegen") —, und der Lauf
+bekommt `imsPreviewedYears`, die Jahre der VORSCHAU, nicht die der Auswahl
+(Anm. 106: zwei Angaben über dieselbe Sache laufen auseinander). **(f)**
+Fotopunkte wachsen mit dem Zoom, kräftigerer Rand; die REIHENFOLGE bleibt
+(Fotos unter den Pins — was oben liegt, sagt, was zählt). **(g) Die siebte
+Frage brauchte eine Antwort, keine Änderung:** ein aufgelöster Ortsname
+verschiebt die Koordinate NICHT — `reverse_geocode` liefert keine, und im
+ganzen Backend gibt es genau eine Zuweisung an `Location.lat` (in einem
+ungespeicherten Vorschlag). **Nebenbefund:** das Leaflet-Doppel gab für jede
+Eigenschaft sich selbst zurück, also auch für `getZoom()` → jeder Vergleich
+`z >= 14` stürzte ab. In 20 Wächter-Dateien dieselbe Kopie. Neu:
+`test_multi_year_jobs.py`, `check-job-labels.js`.
 **Zwei Selbstfunde:** `round(x, 1)` gibt es auf PostgreSQL nur für `numeric`,
 nicht für `double precision` (`sqlutil.weather_cell`, geprüft in
 `test_a37_postgres_dialect.py`); und die erste Spannen-Grenze des Endpunkts
