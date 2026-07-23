@@ -47,8 +47,17 @@ Entscheidungen/Anmerkungen in Kap. 15. Erst dort gezielt nachlesen statt Code ra
 ## Stand
 Umgesetzt bis **v0.39.0** (2026-07-23). **Gruppe A ist komplett** (A1–A48),
 Gruppe B bis **F19**; **P5.1, F1 und P2.1 (alle drei Stufen) sind fertig**. Offen
-ist damit nur noch: **Demo-Modus (0.40)** und **R1** (1.0, drei Etappen auf
-`main`).
+ist damit nur noch: **0.40 (offen, sammelt auf `main`)**, **Demo-Modus (0.41)**
+und **R1** (1.0, drei Etappen auf `main`).
+
+**Arbeitsweise ab 0.40 (vom User festgelegt, 2026-07-23): alles auf `main`,
+kein Versionssprung, bis der User den Demo-Modus ansagt.** Was sich bis dahin
+angesammelt hat, wird 0.40.0 — voraussichtlich überwiegend Fixes. `version.py`
+bleibt so lange auf **0.39.0**, neue CHANGELOG-Punkte gehen unter
+`[Unreleased]`; die Anzeige sagt dann `0.39.0-dev`, und genau dafür gibt es die
+Kennung (Anm. 86). **Nicht bei jedem Paket die Version hochziehen** — das war
+zweimal die Ursache für den Anm.-91-Defekt: ein Bump als Startschuss statt als
+Schlussstrich.
 Hinter 1.0 bleiben
 nur noch neue Import-Konnektoren (P2.8 OwnTracks, P2.9 Automatisierung,
 P2.10 Trakt, P2.11 Dawarich/GPX, P4.1 Health, P4.2 PSN) plus **P5.2**
@@ -62,7 +71,7 @@ P2.10 Trakt, P2.11 Dawarich/GPX, P4.1 Health, P4.2 PSN) plus **P5.2**
 Kartenschalter) + dev-Kennung · 0.34 A39+F18+A41 (Städte, Tages-Fotos) · 0.35 F19+A42 (Sammlung) ·
 0.36 P5.1+F1-Rest (Erfassen) · 0.37 P2.1 Stufe 2 (Immich als Quelle) ·
 0.38 Feedback-Runde (Anm. 110) · 0.39 A45–A48 + P2.1 Stufe 3 (Anm. 116).
-Offen: **0.40 Demo-Modus** ·
+Offen: **0.40 (was sich ansammelt)** · **0.41 Demo-Modus** ·
 **1.0 = Veröffentlichung**. Kein Termindruck (Anmerkung 58).
 Dort nachsehen statt Reihenfolge raten.
 
@@ -79,6 +88,13 @@ bewusst in Kauf genommen; Rückzugsreihenfolge steht in 14.3.
 fehlte — deshalb ist A38 zu 0.33.0 geworden und der Rest um eins gerutscht.
 Ein Tag ist das einzige Unveränderliche hier: **zuletzt setzen, nicht als
 Startschuss für das letzte Paket.** Zum Testen reicht Push auf `main`.
+**Zweites Auftreten, beim Nachtaggen am 2026-07-23 gefunden:** der Bump auf
+0.38.0 (`567c275`) lag **elf Commits vor** dem Ende dessen, was das CHANGELOG
+unter 0.38.0 beschreibt (Anm. 111–113 kamen danach). Nicht der Tag war früh,
+sondern der Bump — `v0.38.0` gehört deshalb auf `d753d0d`, den ersten Commit,
+bei dem die Sektion vollständig und `[Unreleased]` leer ist. **Der Prüfsatz
+für jeden Tag lautet: an diesem Commit muss `[Unreleased]` LEER sein.** Ab 0.40
+erübrigt sich die Frage, weil der Bump erst beim Release gesetzt wird.
 
 **Nur noch drei Versionen bis 1.0 (Anmerkung 89).** Härtung,
 Projektoberfläche und Freeze-Pass sind KEINE eigenen Versionen mehr,
