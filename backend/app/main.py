@@ -27,6 +27,7 @@ from app.routers import (
     media,
     moderation,
     modules,
+    photos,
     search,
     stats,
     tracks,
@@ -129,6 +130,7 @@ app.include_router(world.router)
 app.include_router(achievements.router)
 app.include_router(journal.router)    # F1: Tages-Zusammenfassung (Vorschlag)
 app.include_router(immich.router)     # P2.1 Stufe 2: Immich als Ereignis-Quelle
+app.include_router(photos.router)     # A45: Fotopunkte (Karte + Zeitstrahl-Ebene)
 app.include_router(admin.router)
 
 

@@ -26,6 +26,7 @@ from app.models import (
     Location,
     MediaRef,
     Metric,
+    PhotoPoint,
     Source,
     Track,
     User,
@@ -503,6 +504,12 @@ def delete_user(
     deleted["media_refs"] = (db.query(MediaRef)
                              .filter(MediaRef.user_id == user_id)
                              .delete(synchronize_session=False))
+    # A45: Fotopunkte hängen an gar keinem Ereignis — sie sind über `user_id`
+    # allein erreichbar. Dieselbe Falle wie bei F18 (Anmerkung 106), nur eine
+    # Tabelle weiter: wer Medien über Ereignisse sucht, findet sie nicht.
+    deleted["photo_points"] = (db.query(PhotoPoint)
+                               .filter(PhotoPoint.user_id == user_id)
+                               .delete(synchronize_session=False))
     deleted["event_entity_links"] = (db.query(EventEntityLink)
                                      .filter(EventEntityLink.event_id.in_(event_ids))
                                      .delete(synchronize_session=False))

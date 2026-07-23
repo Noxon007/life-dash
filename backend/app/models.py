@@ -339,6 +339,55 @@ class MediaRef(Base):
         return self.provider == "local"
 
 
+class PhotoPoint(Base):
+    """A45 — WO ein Foto entstanden ist. Eine Zeile je verortetem Bild.
+
+    **Warum das nicht in `MediaRef` steht.** `MediaRef` beantwortet „welche
+    Bilder stehen NEBEN diesem Eintrag?" und ist dafür bewusst auf zwölf je
+    Tag gedeckelt (`immich_link.MAX_PER_EVENT`) — mehr macht keine Karte im
+    Zeitstrahl lesbar. Diese Tabelle beantwortet „wo wurde fotografiert?", und
+    da ist jede Auslassung ein Loch in der Karte: ein Album mit 1200 Bildern
+    aus London ist 1200 Punkte, nicht zwölf. Zwei Fragen, zwei Deckelungen —
+    in einer Tabelle wären es zwei Bedeutungen in derselben Zeile, und daran
+    ist dieses Modell schon mehrfach hängengeblieben (Anmerkung 106).
+
+    **Schicht 4, reine Ableitung.** Verwerfen und neu berechnen ist jederzeit
+    erlaubt; hier steht nichts, was nicht auch in Immich steht. Die
+    Medien-Invariante aus Anmerkung 57 bleibt davon unberührt, weil hier
+    grundsätzlich keine hochgeladenen Dateien landen — die tragen ihre
+    Koordinaten in ihrem eigenen EXIF und bekommen ihre Zeile beim Upload.
+
+    **`asset_id` ist die Identität**, nicht die Zeile: ein zweiter Lauf findet
+    dasselbe Foto wieder, statt es erneut anzulegen (dieselbe Idempotenz wie
+    beim Timeline-Import und bei den Immich-Plätzen).
+    """
+
+    __tablename__ = "photo_points"
+    __table_args__ = (
+        UniqueConstraint("user_id", "provider", "asset_id",
+                         name="uq_photo_point_asset"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), index=True)
+    provider: Mapped[str] = mapped_column(String(32), default="immich")
+    asset_id: Mapped[str] = mapped_column(String(255), index=True)
+    # Ortszeit wie erlebt (Immichs `localDateTime`, Anmerkung 111) — an ihr
+    # hängt der Tag, und der Tag ist der Behälter.
+    taken_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    lat: Mapped[float] = mapped_column(Float)
+    lng: Mapped[float] = mapped_column(Float)
+    # Immichs eigene Rückwärts-Geokodierung (`exifInfo`) — kostet keinen
+    # Nominatim-Abruf und ist stabiler als ein Koordinatenraster, dessen
+    # Zellenrand mitten durch eine Stadt läuft (Anmerkung 109). Sie tragen die
+    # Granularitäts-Stufen aus A47.
+    district: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    state: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    country: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
 class Track(Base):
     """Routenverlauf (Stufe 3) — aus Google Timeline (später auch Workouts).
 

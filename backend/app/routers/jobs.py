@@ -43,13 +43,14 @@ JOB_TYPES = {
     "resolve_names": "Ortsnamen auflösen/formatieren",
     "immich": "Fotos aus Immich verknüpfen",
     "immich_source": "Ereignisse aus Immich vorschlagen",
+    "photo_points": "Fotos auf der Karte verorten",
     "timeline_import": "Google-Timeline-Import",
     "data_import": "Daten-Import (JSON)",
 }
 # A22: Diese Typen laufen SERVERSEITIG als Background-Thread weiter, auch wenn
 # der Browser zu ist. Importe bleiben client-getrieben (die Datei liegt dort).
 SERVER_JOB_TYPES = ("weather", "embeddings", "resolve_names", "recompute",
-                    "immich", "immich_source")
+                    "immich", "immich_source", "photo_points")
 # Diese Läufe bearbeiten die Daten GENAU EINES Kontos (`job.user_id`) — sie
 # gehören in der Oberfläche unter „Meine Daten", nicht unter System. Der Rest
 # (`recompute`, `embeddings`) rechnet über den ganzen Bestand.
@@ -59,7 +60,8 @@ SERVER_JOB_TYPES = ("weather", "embeddings", "resolve_names", "recompute",
 # Nutzer allen anderen den Termin weg (Anmerkung 115). Die Sperre beim Start
 # bleibt trotzdem global — sie schützt nicht die Daten, sondern das Kontingent
 # bei Open-Meteo/Nominatim/Immich, und das hängt an der Instanz, nicht am Konto.
-USER_SCOPED_TYPES = ("weather", "resolve_names", "immich", "immich_source")
+USER_SCOPED_TYPES = ("weather", "resolve_names", "immich", "immich_source",
+                     "photo_points")
 # In Tests abgeschaltet (in-memory-DB verträgt keine fremden Threads)
 WORKERS_ENABLED = True
 
@@ -505,10 +507,61 @@ def _run_immich_source(db: Session, job: Job) -> tuple[str, str]:
                     f"({days} Fototage, {total - days} Alben) — alle unbestätigt.")
 
 
+def _run_photo_points(db: Session, job: Job) -> tuple[str, str]:
+    """A45: ein Jahr Immich → ein Punkt je verortetem Foto.
+
+    Jahresweise wie `immich_source`, und aus demselben Grund: eine zwanzig
+    Jahre alte Bibliothek in einem Zug ist kein Lauf, sondern ein Zeitlimit.
+
+    Der Lauf legt **keine Ereignisse** an — er beantwortet nur „wo wurde
+    fotografiert?". Deshalb braucht er auch keine Vorschau: er schreibt nichts
+    in die Lebensdatenbank, und alles, was er anlegt, ist mit einem Knopf
+    wieder weg (`POST /api/photos/reset`).
+    """
+    from app.services import immich as immich_api
+    from app.services import photo_points as pp
+
+    user = db.get(User, job.user_id)
+    cfg = immich_api.config_for(user)
+    if cfg is None:
+        return "stopped", ("Immich ist für dieses Konto nicht eingerichtet "
+                           "(Verwaltung → Meine Daten → Immich).")
+    year = (job.params or {}).get("year")
+    if not isinstance(year, int) or not 1900 <= year <= 2200:
+        return "error", "Ohne gültiges Jahr kein Lauf — bitte ein Jahr auswählen."
+    url, key = cfg
+
+    job.unit = "Fotos verortet"
+    db.commit()
+    try:
+        seen, added, changed = pp.scan_year(
+            db, user, year, url, key,
+            heartbeat=lambda: _tick(db, job.id, 0, None))
+    except immich_api.ScanAborted:
+        return "stopped", f"{year}: Suche abgebrochen — nichts geändert."
+    except immich_api.ImmichError as exc:
+        return "stopped", f"Immich antwortet nicht: {exc}"
+
+    # **Erst festschreiben, dann abhaken.** Andersherum stünde das Jahr als
+    # durchsucht da, während die Punkte noch nicht in der Datenbank sind —
+    # und ein Absturz dazwischen ließe ein leeres Jahr für immer als
+    # „nachgesehen" gelten (dieselbe Falle wie beim F12-Wettermarker, nur in
+    # der Reihenfolge statt im Wert).
+    db.commit()
+    pp.mark_scanned(db, user, year)
+    db.commit()
+    _tick(db, job.id, added, 0)
+    if not seen:
+        return "done", f"{year}: keine Fotos in Immich."
+    return "done", (f"{year}: {seen} Fotos gelesen, {added} neu verortet, "
+                    f"{changed} aktualisiert.")
+
+
 _RUNNERS = {
     "weather": _run_weather,
     "immich": _run_immich,
     "immich_source": _run_immich_source,
+    "photo_points": _run_photo_points,
     "embeddings": _run_embeddings,
     "recompute": _run_recompute,
     "resolve_names": _run_resolve_names,
