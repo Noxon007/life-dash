@@ -42,6 +42,13 @@ any `MINOR`.
   too — “1,703” and “1.703” are the same number in two languages, and reading
   the wrong one is worse than reading no translation. Switching the language
   now also redraws “Today” and the map, which stayed behind before.
+- **Achievements and module figures are translated too.** Their names and
+  descriptions live in the module files (“Sonnenstunden-Sammler”, “Sichtungen
+  pro Jahr”) and reach the page through the API — text that came from a
+  different direction and was therefore missed by every earlier translation
+  pass. The module files stay German: they are the source, not the display, and
+  English lives in exactly one place. The check reads those files, so a new
+  module cannot quietly reopen the gap.
 - Speech input dictates in the language the app is set to, instead of always
   German.
 

@@ -181,9 +181,15 @@ Schätzung. **(e)** Die Bausteine-Auswahl zeigte vier leere Kästchen und
 meinte alle vier (`sanitize_parts`): **eine Voreinstellung muss an beiden
 Enden dieselbe sein**. **(f)** ~200 im JS gebaute Texte waren nie
 übersetzbar; `t()` fällt still auf Deutsch zurück, deshalb drei Jahre
-unbemerkt. Neu: `tools/check-i18n-coverage.js` (jeder Schlüssel im Katalog,
-kein verwaister Eintrag, kein deutscher Text IM Katalog) und
-`check-place-format.js`. Zahlen/Daten folgen jetzt `LOC()` statt hart
+unbemerkt. **Siebte Quelle, direkt danach gemeldet: die Modul-Dateien** —
+Abzeichen und Modul-Kennzahlen (`backend/modules/*.yaml`) kommen über die API
+in die Oberfläche, sind also Text aus einer anderen Richtung; jeder frühere
+Durchgang über `index.html` musste sie verfehlen. Übersetzt wird trotzdem im
+Katalog (Präfix `mod.`), **das YAML bleibt deutsch: es ist die Quelle, nicht
+die Anzeige.** Neu: `tools/check-i18n-coverage.js` (jeder Schlüssel im Katalog,
+kein verwaister Eintrag, kein deutscher Text IM Katalog — und er **liest die
+Modul-YAMLs**, denn wer eine Modul-Datei schreibt, denkt nicht an den
+englischen Katalog) und `check-place-format.js`. Zahlen/Daten folgen jetzt `LOC()` statt hart
 `'de-DE'`. Dazu die sechs F12-Wetterrekorde (UV, Böe, gefühlt, Tageslicht) —
 die Werte kommen seit 0.22 mit; **eine Null ist beim Regen kein Rekord, beim
 Tageslicht schon** (Polarnacht = kürzester Tag, vgl. Anm. 104).

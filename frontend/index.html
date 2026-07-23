@@ -2988,6 +2988,59 @@ const I18N_EN = {
   'wipe.ask': "Please type {w} to confirm:", 'wipe.word': "DELETE",
   'wipe.cancelled': "Cancelled — nothing was deleted.",
   'wipe.done': "All data deleted ({n} rows). The database is empty.",
+  // ---- Texte aus den Modul-Dateien (`backend/modules/*.yaml`).
+  // Sie kommen über die API in die Oberfläche und sind trotzdem Oberfläche.
+  // Das YAML bleibt deutsch — es ist die Quelle, nicht die Anzeige; Englisch
+  // steht auch für sie nur hier. `check-i18n-coverage.js` liest die
+  // Modul-Dateien und besteht auf einem Eintrag je Abzeichen und Kennzahl,
+  // damit ein neues Modul die Lücke nicht wieder still aufmacht. ----
+  'mod.stat.species_count': "Species observed",
+  'mod.stat.sightings_per_year': "Sightings per year",
+  'mod.stat.artists_seen': "Artists seen live",
+  'mod.stat.concerts_per_year': "Concerts per year",
+  'mod.stat.book_count': "Books read",
+  'mod.stat.countries_visited': "Countries visited",
+  'mod.stat.dishes_count': "Dishes recorded",
+  'mod.stat.game_count': "Games played",
+  'mod.stat.milestones_count': "Milestones",
+  'mod.stat.movie_count': "Films watched",
+  'mod.stat.trips_per_year': "Trips per year",
+  'mod.ach.animal_collector': "Animal collector",
+  'mod.ach.animal_collector.desc': "Different species seen",
+  'mod.ach.animal_watcher': "Observer",
+  'mod.ach.animal_watcher.desc': "Animal sightings recorded",
+  'mod.ach.concert_goer': "Concertgoer",
+  'mod.ach.concert_goer.desc': "Concerts and festivals attended",
+  'mod.ach.artist_collector': "Stage collector",
+  'mod.ach.artist_collector.desc': "Different artists seen live",
+  'mod.ach.bookworm': "Bookworm",
+  'mod.ach.bookworm.desc': "Different books read",
+  'mod.ach.globetrotter': "Globetrotter",
+  'mod.ach.globetrotter.desc': "Countries visited",
+  'mod.ach.continent_hopper': "Continent hopper",
+  'mod.ach.continent_hopper.desc': "Continents set foot on (seven are possible)",
+  'mod.ach.gourmet': "Gourmet",
+  'mod.ach.gourmet.desc': "Different dishes eaten",
+  'mod.ach.gamer': "Gamer",
+  'mod.ach.gamer.desc': "Different games played",
+  'mod.ach.life_chapters': "Life chapters",
+  'mod.ach.life_chapters.desc': "Milestones recorded",
+  'mod.ach.cinephile': "Cinephile",
+  'mod.ach.cinephile.desc': "Different films watched",
+  'mod.ach.traveller': "Frequent traveller",
+  'mod.ach.traveller.desc': "Trips and outings taken",
+  'mod.ach.sun_worshipper': "Sun worshipper",
+  'mod.ach.sun_worshipper.desc': "Days with at least 10 hours of sunshine",
+  'mod.ach.sun_collector': "Sunshine collector",
+  'mod.ach.sun_collector.desc': "Hours of sunshine added up over all days",
+  'mod.ach.rain_defier': "Rain defier",
+  'mod.ach.rain_defier.desc': "Days with at least 10 mm of rain — out and about anyway",
+  'mod.ach.frostbite': "Frostbite",
+  'mod.ach.frostbite.desc': "Days that never rose above freezing",
+  'mod.ach.heat_seeker': "Heat seeker",
+  'mod.ach.heat_seeker.desc': "Days of 30 °C or more",
+  'mod.ach.storm_chaser': "Storm-tested",
+  'mod.ach.storm_chaser.desc': "Days with gusts of 70 km/h or more (comes with newer weather data)",
 };
 
 function langSetting() {
@@ -3013,6 +3066,18 @@ const nEvents = n => n === 1 ? t('n.event', 'Ereignis') : t('n.events', 'Ereigni
  *  weiter deutsche Tausenderpunkte liest, liest im Zweifel etwas anderes, als
  *  dasteht. Fest verdrahtetes 'de-DE' stand an dreizehn Stellen. */
 const LOC = () => LANG === 'en' ? 'en-GB' : 'de-DE';
+/** F10: Text, der aus einer Modul-Datei kommt (`backend/modules/*.yaml`) —
+ *  Abzeichen-Namen und -Beschreibungen, Namen der Modul-Kennzahlen.
+ *
+ *  Anmerkung 114: Diese Texte sind Oberfläche wie jede andere, kommen aber
+ *  nicht aus `index.html`, sondern über die API aus einer YAML-Datei. Sie
+ *  standen deshalb auch auf Englisch deutsch da („Sonnenstunden-Sammler“,
+ *  „Sichtungen pro Jahr“). Übersetzt wird trotzdem HIER und nicht im YAML:
+ *  der Katalog ist die einzige Stelle für englische Texte (F10), und eine
+ *  zweite wäre eine zweite Wahrheit. Das YAML bleibt deutsch — es ist die
+ *  Quelle, nicht die Anzeige. Ein eigenes Präfix `mod.`, damit die statischen
+ *  `ach.*`-Schlüssel der Oberfläche davon getrennt bleiben. */
+const modText = (kind, id, de) => t(`mod.${kind}.${id}`, de);
 
 // ---------- F9: Heller Modus ----------
 // Einstellung pro Gerät (localStorage): 'auto' folgt der Systemeinstellung,
@@ -4872,13 +4937,14 @@ async function renderModuleWidgets() {
   document.getElementById('widget-tiles').innerHTML = nums.map(w => `
     <div class="stat-card">
       <div class="stat-num">${w.value.toLocaleString(LOC())}</div>
-      <div class="stat-label">${w.emoji ? w.emoji + ' ' : ''}${esc(w.label)}</div>
+      <div class="stat-label">${w.emoji ? w.emoji + ' ' : ''}${
+        esc(modText('stat', w.id, w.label))}</div>
     </div>`).join('');
 
   // Zeitreihen als eigene kleine Diagramm-Paneele
   document.getElementById('widget-charts').innerHTML = series.map(w =>
     `<div class="panel" style="margin-top:12px">
-       <h3>${w.emoji ? w.emoji + ' ' : ''}${esc(w.label)}</h3>
+       <h3>${w.emoji ? w.emoji + ' ' : ''}${esc(modText('stat', w.id, w.label))}</h3>
        <div id="wchart-${esc(w.id)}"></div>
      </div>`).join('');
   series.forEach(w => {
@@ -6646,9 +6712,10 @@ async function loadAchievements() {
     return `<div class="ach-card${a.tier ? '' : ' locked'}" data-tier="${esc(a.tier || '')}">
       <div class="ach-medal">${medal}</div>
       <div class="ach-body">
-        <div class="ach-title">${esc(a.label)}
+        <div class="ach-title">${esc(modText('ach', a.id, a.label))}
           ${a.tier ? `<span class="ach-tier">${esc(tierName(a.tier))}</span>` : ''}${marks}</div>
-        ${a.description ? `<div class="ach-desc">${esc(a.description)}</div>` : ''}
+        ${a.description ? `<div class="ach-desc">${
+          esc(modText('ach', a.id + '.desc', a.description))}</div>` : ''}
         <div class="ach-track"><i style="width:${Math.round(a.progress * 100)}%"></i></div>
         <div class="ach-next">${esc(next)}</div>
       </div>

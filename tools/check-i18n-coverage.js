@@ -55,6 +55,40 @@ const fromStructure = w => {
 // Ihre Katalog-Einträge sind deshalb NICHT verwaist, nur unbeweisbar.
 const RUNTIME_PREFIXES = ['module.'];
 
+// Anmerkung 114: Abzeichen-Namen, ihre Beschreibungen und die Namen der
+// Modul-Kennzahlen stehen in `backend/modules/*.yaml`. Sie kommen über die API
+// in die Oberfläche und sind trotzdem Oberfläche — sie standen deshalb auch auf
+// Englisch deutsch da („Sonnenstunden-Sammler", „Sichtungen pro Jahr").
+// Geraten wird hier nichts: die Dateien liegen im Repo, also werden sie
+// GELESEN. Damit deckt der Wächter auch das ab, was der eigentliche Grund für
+// die Lücke ist — ein neues Modul bringt neue Texte mit, und niemand denkt
+// beim Schreiben einer YAML-Datei an den englischen Katalog.
+const moduleKeys = () => {
+  // Relativ zum SKRIPT, nicht zur geprüften Datei: der Wächter darf auch gegen
+  // eine kopierte index.html laufen (so wird er gegen den kaputten Stand
+  // getestet), und die Modul-Dateien sind trotzdem immer die des Repos.
+  const dir = require('path').join(__dirname, '..', 'backend', 'modules');
+  const out = [];
+  let files = [];
+  try { files = fs.readdirSync(dir).filter(f => f.endsWith('.yaml')); } catch (_) { return out; }
+  files.forEach(f => {
+    let block = null, id = null;
+    fs.readFileSync(require('path').join(dir, f), 'utf8').split('\n').forEach(line => {
+      // Ein Schlüssel ganz links beendet den Block — nur so bleiben
+      // `label:`-Zeilen anderer Abschnitte (Modul-Name, Kategorien) draußen.
+      if (/^\w[\w-]*:/.test(line)) block = /^(achievements|statistics):/.test(line)
+        ? RegExp.$1 : null;
+      if (!block) return;
+      const m = line.match(/^\s*-\s*id:\s*(\S+)/);
+      if (m) { id = m[1]; out.push(`mod.${block === 'achievements' ? 'ach' : 'stat'}.${id}`); }
+      if (id && block === 'achievements' && /^\s+description:/.test(line)) {
+        out.push(`mod.ach.${id}.desc`);
+      }
+    });
+  });
+  return out;
+};
+
 const dom = new JSDOM(html, {
   runScripts: 'dangerously', pretendToBeVisual: true, url: 'http://localhost:8000/',
   beforeParse(w) {
@@ -92,6 +126,10 @@ setTimeout(() => {
   // (`t('prov.' + e.confirmed_by, …)`, `t('tier.' + k, …)`).
   ['prov.manual', 'prov.bulk', 'prov.import',
    'tier.bronze', 'tier.silber', 'tier.gold', 'tier.platin'].forEach(k => add(k, 'inline'));
+  const modKeys = moduleKeys();
+  ok('Modul-Dateien gelesen', modKeys.length > 20,
+     `${modKeys.length} Texte aus backend/modules/*.yaml — Pfad falsch?`);
+  modKeys.forEach(k => add(k, 'modules/*.yaml'));
 
   const missing = [...used.keys()].filter(k => catalog[k] === undefined).sort();
   ok('jeder benutzte Schlüssel steht im Katalog', missing.length === 0,
