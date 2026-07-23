@@ -62,6 +62,47 @@ _RETRIES = 2
 _RETRY_WAIT = 1.5
 
 
+# Welches Recht ein API-Schlüssel für welchen Pfad braucht — aus Immichs
+# Controllern (`@Authenticated({ permission: … })`), nicht geraten.
+#
+# **Der Grund, warum diese Tabelle existiert** (Anmerkung 113): Die Anleitung
+# in der Oberfläche nannte seit Stufe 1 „genau drei" Rechte — und Stufe 2 hat
+# zwei weitere Endpunkte dazugenommen, ohne dass jemand die Anleitung
+# nachgezogen hat. Ein Schlüssel, der GENAU nach unserem Text angelegt wurde,
+# konnte die neue Funktion also nicht ausführen. Immich antwortet darauf mit
+# 403, Life-Dash sagte „lehnt den API-Schlüssel ab" — und schickte damit zum
+# Wegwerfen eines Schlüssels, dem nur ein Häkchen fehlte.
+PERMISSIONS: dict[str, tuple[str, str]] = {
+    "/server/about": ("server.about", "Verbindungstest"),
+    "/users/me": ("user.read", "eigene von fremden Fotos unterscheiden"),
+    "/search/metadata": ("asset.read", "Fotos nach Zeit finden"),
+    "/timeline/buckets": ("asset.read", "welche Jahre sich lohnen"),
+    "/albums": ("album.read", "Alben als Reisen vorschlagen"),
+    "/assets/": ("asset.view", "Vorschaubilder durchreichen"),
+}
+
+
+def permission_for(path: str) -> tuple[str, str] | None:
+    """Recht und Zweck zu einem Pfad — oder None, wenn unbekannt."""
+    head = path.split("?", 1)[0]
+    for prefix, info in PERMISSIONS.items():
+        if head.startswith(prefix):
+            return info
+    return None
+
+
+def _denied(path: str, code: int) -> str:
+    """Text für 401/403 — mit dem Recht, das vermutlich fehlt."""
+    if code == 401:
+        return ("Immich kennt diesen API-Schlüssel nicht (401) — "
+                "gelöscht, abgelaufen oder vertippt?")
+    right = permission_for(path)
+    if right:
+        return (f"Immich verweigert {path.split('?')[0]} (403) — dem "
+                f"API-Schlüssel fehlt das Recht »{right[0]}« ({right[1]}).")
+    return f"Immich verweigert {path.split('?')[0]} (403)."
+
+
 def _request(url: str, key: str, path: str, *, payload: dict | None = None,
              raw: bool = False):
     """Ein Aufruf gegen Immich. `payload` -> POST (JSON), sonst GET."""
@@ -81,8 +122,14 @@ def _request(url: str, key: str, path: str, *, payload: dict | None = None,
                 return body if raw else json.loads(body.decode("utf-8"))
         except urllib.error.HTTPError as exc:
             if exc.code in (401, 403):
-                raise ImmichError("Immich lehnt den API-Schlüssel ab (401/403)",
-                                  exc.code) from exc
+                # 401 und 403 sind ZWEI Lagen, und die Unterscheidung ist die
+                # ganze Auskunft (Anmerkung 113): 401 heißt „diesen Schlüssel
+                # kenne ich nicht", 403 heißt „den Schlüssel schon, dieses
+                # Recht nicht". Zusammengefasst als „lehnt den API-Schlüssel
+                # ab" schickt die Meldung den Nutzer zum Neuanlegen eines
+                # Schlüssels, der völlig in Ordnung ist — ihm fehlt nur ein
+                # Häkchen, und zwar ein benennbares.
+                raise ImmichError(_denied(path, exc.code), exc.code) from exc
             if exc.code == 404:
                 raise ImmichError(f"Immich kennt {path} nicht (404) — "
                                   "passt die URL und die Immich-Version?",
@@ -128,9 +175,51 @@ def check(url: str, key: str) -> dict:
     Bewusst `/server/about` und NICHT `/server/ping`: ping antwortet ohne
     jede Authentifizierung und würde einen falschen API-Schlüssel als Erfolg
     melden — also genau den Fehler verschweigen, den der Test finden soll.
+
+    **Und aus demselben Grund prüft er jetzt ALLE Rechte, die der Konnektor
+    benutzt** (Anmerkung 113). Genau dieser Test hat grün gemeldet, während
+    die Vorschau an einem 403 scheiterte: er fragte `server.about`, die
+    Funktion braucht fünf Rechte. *Ein Verbindungstest, der weniger prüft als
+    die Funktion benutzt, ist keine Entwarnung — er ist eine falsche.* Die
+    Rechte werden einzeln genannt, denn „irgendetwas fehlt" schickt zum
+    Neuanlegen; „`album.read` fehlt" schickt zu einem Häkchen.
     """
-    info = _request(url.rstrip("/"), key, "/server/about")
-    return {"ok": True, "version": (info or {}).get("version") or "unbekannt"}
+    url = url.rstrip("/")
+    info = _request(url, key, "/server/about")   # scheitert -> URL/Schlüssel
+    rights: list[dict] = []
+
+    def _probe(path: str, call) -> object:
+        right, purpose = PERMISSIONS.get(path.split("?")[0], ("?", ""))
+        try:
+            out = call()
+        except ImmichError as exc:
+            rights.append({"right": right, "for": purpose, "ok": False,
+                           "why": str(exc)})
+            return None
+        rights.append({"right": right, "for": purpose, "ok": True})
+        return out
+
+    rights.append({"right": "server.about", "for": PERMISSIONS["/server/about"][1],
+                   "ok": True})
+    _probe("/users/me", lambda: _request(url, key, "/users/me"))
+    _probe("/albums", lambda: _request(url, key, "/albums?isOwned=true"))
+    # `asset.view` lässt sich nur an einem echten Bild prüfen — also eins
+    # suchen und genau den Weg gehen, den die Bildanzeige später geht. Ein
+    # Recht, das erst beim ersten angezeigten Foto auffällt, ist genau die
+    # Sorte, die dieser Knopf abfangen soll.
+    found = _probe("/search/metadata", lambda: _request(
+        url, key, "/search/metadata",
+        payload={"size": 1, "page": 1, "withExif": False}))
+    items = (((found or {}).get("assets") or {}).get("items")) or []
+    if items:
+        _probe("/assets/", lambda: _request(
+            url, key, f"/assets/{items[0]['id']}/thumbnail?size=preview", raw=True))
+    return {
+        "ok": True,
+        "version": (info or {}).get("version") or "unbekannt",
+        "rights": rights,
+        "missing": [r["right"] for r in rights if not r["ok"]],
+    }
 
 
 def _stamp(when: datetime) -> str:

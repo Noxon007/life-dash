@@ -343,7 +343,19 @@ def scan_year(db: Session, user, year: int, url: str, key: str,
     looked_at = 0
     open_albums = 0
     for owned in (True, False):
-        for album in api.albums(url, key, owned=owned):
+        try:
+            found = api.albums(url, key, owned=owned)
+        except api.ImmichError as exc:
+            # Fehlt dem Schlüssel `album.read`, sind die Fototage trotzdem zu
+            # haben — ein fehlendes Häkchen darf nicht die ganze Funktion
+            # umbringen. Verschwiegen wird es aber nicht: sonst fehlten die
+            # Alben, und niemand wüsste warum (Anmerkung 113).
+            if exc.status != 403:
+                raise
+            log.warning("Immich: Alben übersprungen — %s", exc)
+            _note(albums_denied=str(exc))
+            break
+        for album in found:
             if not _album_touches_year(album, year):
                 continue
             if _spent():

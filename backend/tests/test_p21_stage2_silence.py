@@ -137,6 +137,81 @@ def test_year_list_says_when_immich_is_not_set_up(db, user):
 
 
 # --------------------------------------------------------------------------- #
+# Rechte: die Anleitung nannte drei, der Konnektor braucht fünf
+# --------------------------------------------------------------------------- #
+def test_a_403_names_the_missing_permission(monkeypatch):
+    """„Lehnt den API-Schlüssel ab" schickt zum Wegwerfen eines Schlüssels,
+    dem nur ein Häkchen fehlt. 401 und 403 sind zwei verschiedene Lagen."""
+    import urllib.error
+
+    def _raise(*a, **kw):
+        raise urllib.error.HTTPError("http://x", 403, "Forbidden", {}, None)
+
+    monkeypatch.setattr(api.urllib.request, "urlopen", _raise)
+    with pytest.raises(api.ImmichError) as exc:
+        api._request("http://immich.local", "k", "/albums?isOwned=true")
+    assert "album.read" in str(exc.value)
+
+    def _unknown(*a, **kw):
+        raise urllib.error.HTTPError("http://x", 401, "Unauthorized", {}, None)
+
+    monkeypatch.setattr(api.urllib.request, "urlopen", _unknown)
+    with pytest.raises(api.ImmichError) as exc2:
+        api._request("http://immich.local", "k", "/albums")
+    assert "401" in str(exc2.value) and "album.read" not in str(exc2.value)
+
+
+def test_every_endpoint_we_call_has_a_known_permission():
+    """Der eigentliche Fehler war nicht der fehlende Text, sondern dass er
+    nie nachgezogen wurde, als Stufe 2 zwei Endpunkte dazunahm."""
+    for path in ("/server/about", "/users/me", "/search/metadata",
+                 "/timeline/buckets", "/albums", "/assets/x/thumbnail"):
+        assert api.permission_for(path), path
+
+
+def test_connection_test_probes_what_the_feature_uses(monkeypatch):
+    """Ein Verbindungstest, der weniger prüft als die Funktion benutzt, ist
+    keine Entwarnung — er ist eine falsche. Genau dieser Knopf meldete grün,
+    während die Vorschau an einem 403 scheiterte."""
+    def _request(url, key, path, *, payload=None, raw=False):
+        if path.startswith("/albums"):
+            raise api.ImmichError(api._denied(path, 403), 403)
+        if path == "/server/about":
+            return {"version": "1.140.0"}
+        if path == "/search/metadata":
+            return {"assets": {"items": [{"id": "a1"}]}}
+        return {"id": "me"}
+
+    monkeypatch.setattr(api, "_request", _request)
+    out = api.check("http://immich.local", "k")
+    assert out["missing"] == ["album.read"]
+    assert {r["right"] for r in out["rights"]} >= {
+        "server.about", "user.read", "asset.read", "album.read", "asset.view"}
+
+
+def test_missing_album_right_still_yields_photo_days(db, user, monkeypatch):
+    """Ein fehlendes Häkchen darf nicht die ganze Funktion umbringen —
+    verschwiegen wird es trotzdem nicht."""
+    def _albums(url, key, owned=None):
+        raise api.ImmichError(api._denied("/albums", 403), 403)
+
+    monkeypatch.setattr(api, "own_user_id", lambda url, key: "me")
+    monkeypatch.setattr(api, "albums", _albums)
+    monkeypatch.setattr(api, "search_assets_paged",
+                        lambda url, key, s, e, **kw: [
+                            {"id": f"a{i}", "ownerId": "me", "visibility": "timeline",
+                             "localDateTime": f"{YEAR}-07-12T1{i}:00:00",
+                             "exifInfo": {"latitude": 51.9, "longitude": 8.8,
+                                          "city": "Detmold", "country": "Deutschland"}}
+                            for i in range(5)])
+
+    report: dict = {}
+    out = source.scan_year(db, user, YEAR, "u", "k", report=report)
+    assert [p.kind for p in out] == ["day"]
+    assert "album.read" in report["albums_denied"]
+
+
+# --------------------------------------------------------------------------- #
 # Was der Lauf NICHT mehr herunterlädt
 # --------------------------------------------------------------------------- #
 def test_known_albums_are_not_downloaded_again(db, user, monkeypatch):

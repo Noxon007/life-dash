@@ -1708,9 +1708,12 @@
                      data-i18n-ph="im.key.ph" placeholder="API-Schlüssel (Immich → Konto → API-Schlüssel)"><br>
               <span class="hint" id="im-state" style="display:block; margin-top:8px" data-i18n="im.state.none">Noch kein Schlüssel hinterlegt.</span>
               <span class="hint" style="display:block; margin-top:8px" data-i18n="im.perms"><b>Welche Rechte braucht der Schlüssel?</b>
-              Genau drei: <code>asset.read</code> (Fotos nach Zeit finden), <code>asset.view</code> (Vorschauen holen)
-              und <code>server.about</code> (Verbindungstest). Ein so beschränkter Schlüssel kann in Immich
-              <b>nichts löschen und nichts hochladen</b>. Anzulegen unter Immich → Konto-Einstellungen → API-Schlüssel.</span>
+              Genau fünf, alle lesend: <code>asset.read</code> (Fotos nach Zeit finden), <code>asset.view</code>
+              (Vorschauen holen), <code>album.read</code> (Alben als Reisen vorschlagen), <code>user.read</code>
+              (eigene von fremden Fotos unterscheiden) und <code>server.about</code> (Verbindungstest). Ein so
+              beschränkter Schlüssel kann in Immich <b>nichts löschen und nichts hochladen</b>. Anzulegen unter
+              Immich → Konto-Einstellungen → API-Schlüssel. Der Testknopf prüft jedes dieser Rechte einzeln und
+              sagt, welches fehlt.</span>
               <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap">
                 <button class="btn small secondary" id="im-save" data-i18n="im.save">Speichern</button>
               </div>
@@ -2408,7 +2411,7 @@ const I18N_EN = {
   'adm.users.hint2': "Here you can change roles and delete users <b>together with all their data</b>. Your own account is protected — so there is always at least one admin left.",
   'exp.opt.media': "<b>Include photos</b> (produces a ZIP file — the complete backup)",
   'exp.opt.timeline': "Include imported Google timeline data (visits, routes and their raw records)",
-  'im.perms': "<b>Which permissions does the key need?</b> Exactly three: <code>asset.read</code> (finding photos by time), <code>asset.view</code> (fetching previews) and <code>server.about</code> (the connection test). A key limited to those <b>cannot delete or upload anything</b> in Immich. Create it under Immich → Account settings → API Keys.",
+  'im.perms': "<b>Which permissions does the key need?</b> Exactly five, all of them read-only: <code>asset.read</code> (finding photos by time), <code>asset.view</code> (fetching previews), <code>album.read</code> (proposing albums as trips), <code>user.read</code> (telling your own photos from other people's) and <code>server.about</code> (the connection test). A key limited to those <b>cannot delete or upload anything</b> in Immich. Create it under Immich → Account settings → API Keys. The test button checks each of these separately and names the one that is missing.",
   'exp.media.hint': "Without this tick you get plain JSON: small, readable, diffable — but <b>without your image files</b>. Those are only in the ZIP. Immich pictures are in neither: they live in Immich and are backed up there.",
   'exp.zip.started': "📦 Building the full backup — the download starts shortly. With many photos this can take a moment.",
   'imp.rows': "new rows",
@@ -2444,6 +2447,9 @@ const I18N_EN = {
   'im.save': "Save",
   'im.saved': "✓ Immich access saved.",
   'im.ok': "✓ Immich reachable (version {v}).",
+  'im.rights.missing': "Immich is running (version {v}), but the key is missing permissions:",
+  'im.rights.toast': "The key is missing permissions: {r}",
+  'im.rights.ok': "✓ Version {v} — all required permissions present.",
   'im.reset.ask': "Only the links are deleted. Your pictures in Immich and your own uploaded photos are left untouched.",
   'im.reset.done': "✓ {n} link(s) discarded.",
   'im.reset.hint': "“Discard links” removes only the associations — the pictures in Immich and your own uploaded photos stay untouched. The next run rebuilds them.",
@@ -7248,7 +7254,20 @@ document.getElementById('im-test').addEventListener('click', async ev => {
       body: JSON.stringify({ url: document.getElementById('im-url').value.trim(),
                              api_key: document.getElementById('im-key').value.trim() }),
     });
-    toast(t('im.ok', '✓ Immich erreichbar (Version {v}).').replace('{v}', res.version), 'ok', 6000);
+    // Anmerkung 113: Der Test prüft jetzt jedes Recht einzeln — und ein
+    // fehlendes ist kein Nebensatz in einem Toast, der nach sechs Sekunden
+    // weg ist. Es steht unter dem Feld, bis es behoben ist.
+    const state = document.getElementById('im-state');
+    if ((res.missing || []).length) {
+      state.innerHTML = `⚠️ ${esc(t('im.rights.missing', 'Immich läuft (Version {v}), aber dem Schlüssel fehlen Rechte:').replace('{v}', res.version))}<br>`
+        + (res.rights || []).map(r => `${r.ok ? '✅' : '❌'} <code>${esc(r.right)}</code> <span class="stat-label">${esc(r.for)}</span>`).join('<br>');
+      toast(t('im.rights.toast', 'Dem Schlüssel fehlen Rechte: {r}')
+        .replace('{r}', res.missing.join(', ')), 'warn', 9000);
+    } else {
+      state.textContent = t('im.rights.ok', '✓ Version {v} — alle nötigen Rechte vorhanden.')
+        .replace('{v}', res.version);
+      toast(t('im.ok', '✓ Immich erreichbar (Version {v}).').replace('{v}', res.version), 'ok', 6000);
+    }
   } catch (err) { toast(err.message, 'error', 8000); }
   finally { btn.disabled = false; }
 });

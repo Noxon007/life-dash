@@ -30,6 +30,15 @@ any `MINOR`.
   survives more Immich versions: the timeline endpoint changed which parameters
   it demands, so Life-Dash now tries the current form first and works its way
   back instead of giving up on the first rejection.
+- **The setup instructions asked for too few Immich permissions.** They named
+  three; proposing events from photos also needs `album.read` (albums) and
+  `user.read` (telling your own photos from other people's). A key created by
+  following them exactly could not run the feature, and Life-Dash reported that
+  as “Immich rejects the API key” — sending you off to replace a key that was
+  fine. The hint now names all five, an error names the **one** permission that
+  is missing, and the connection test checks each of them separately instead of
+  just the connection. A missing album permission no longer stops the run
+  either: photo days still work, and the result says what it had to leave out.
 - **When Immich refused, the preview showed “Bad gateway” instead of the
   reason.** Life-Dash reported a failure of the photo server as a server error
   of its own — and a reverse proxy replaces the body of such a response with its

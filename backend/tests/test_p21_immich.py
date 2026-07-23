@@ -271,13 +271,18 @@ def test_multi_day_trip_without_children_still_gets_photos(db, immich_user, fake
 
 def test_transient_errors_are_retried(monkeypatch):
     """Ein 502/503/504 vom Reverse-Proxy ist vorübergehend — einmal warten und
-    erneut versuchen, statt den ganzen Foto-Lauf abzubrechen."""
+    erneut versuchen, statt den ganzen Foto-Lauf abzubrechen.
+
+    Gezählt wird jetzt der ERSTE Pfad und nicht mehr alle Aufrufe: `check()`
+    prüft seit Anmerkung 113 jedes Recht einzeln, macht also mehrere Aufrufe.
+    Die Wiederholung gilt aber weiterhin je Aufruf, und genau das steht hier.
+    """
     import urllib.error
 
     from app.services import immich as api
 
     monkeypatch.setattr(api.time, "sleep", lambda *_: None, raising=False)
-    calls = {"n": 0}
+    seen: list[str] = []
 
     class _Resp:
         def __enter__(self): return self
@@ -285,15 +290,16 @@ def test_transient_errors_are_retried(monkeypatch):
         def read(self): return b'{"version":"1.0"}'
 
     def _open(req, timeout=0):
-        calls["n"] += 1
-        if calls["n"] == 1:
+        seen.append(req.full_url)
+        if len(seen) == 1:
             raise urllib.error.HTTPError(req.full_url, 502, "Bad Gateway", {}, None)
         return _Resp()
 
     monkeypatch.setattr("urllib.request.urlopen", _open)
     result = api.check("https://immich.example.org", "key")
     assert result["version"] == "1.0"
-    assert calls["n"] == 2      # erst 502, dann Erfolg
+    # Zweimal derselbe Pfad: erst 502, dann Erfolg.
+    assert seen[:2] == [seen[0], seen[0]] and seen[0].endswith("/server/about")
 
 
 def test_immich_job_terminates_on_photoless_events(db, immich_user, fake_search):
