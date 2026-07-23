@@ -78,3 +78,22 @@ the user's own places, and the four condensation levels over real HTTP.
 
 Rule for every future connector: **run one HTTP double that keeps to the real
 DTOs.** Twenty lines, and it reaches what a mock by construction cannot.
+
+## Upgrading an existing database
+
+`upgrade-check.sh` is the one check a fresh database cannot give you: it builds
+a database with the **previous** release's code, then opens the same file with
+the current one and asserts that the new tables and columns arrived, that the
+existing rows are untouched, and that the new endpoints answer.
+
+```bash
+bash tools/upgrade-check.sh            # from the repository root, defaults to v0.38.0
+bash tools/upgrade-check.sh v0.37.0    # or any other starting point
+```
+
+It uses a throwaway git worktree and a scratch database, never the real one.
+Two things it had to learn the hard way and that apply to any such script:
+SQLite runs in **WAL mode**, so copying only the `.db` file copies a stale
+state — the `-wal` file has to come along; and the old code **seeds demo data**
+into an empty database, so anything counted has to be counted by a targeted
+query rather than a total.
