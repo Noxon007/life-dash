@@ -43,10 +43,19 @@ def geocoder(monkeypatch):
 
     def _apply(db, loc, user_id, parts=None, lang=None):
         state["calls"].append(loc.id)
+        # A47 (0.39): Das Doppel muss hinterlassen, was das Original
+        # hinterlässt — `address` auf JEDEM Pfad, auch im Fehlschlag. Die
+        # Terminierung des Laufs hängt seit A47 daran (`address IS NULL` macht
+        # einen Ort zum Kandidaten), und ein Doppel, das ein Feld ausspart,
+        # baut genau die Endlosschleife nach, gegen die diese Datei geschrieben
+        # ist. Festgenagelt wird die Zusage in
+        # `test_resolved_name_always_marks_the_address`.
         if loc.id in state["unresolvable"]:
+            loc.address = {}
             return False
         loc.name = f"Straße, Stadt {loc.id[:4]}"
         loc.city = f"Stadt {loc.id[:4]}"
+        loc.address = {"road": "Straße", "city": f"Stadt {loc.id[:4]}"}
         return True
 
     monkeypatch.setattr(tracks, "_apply_resolved_name", _apply)

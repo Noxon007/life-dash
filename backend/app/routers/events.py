@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import false as sa_false
 from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
@@ -20,7 +21,7 @@ from app.schemas import (EventGeo, EventManualCreate, EventRead, EventsIndex,
 from app.services import visitsplit
 from app.services.ingestion import create_manual_event
 from app.services.stats_overview import find_birth
-from app.sqlutil import day_parts
+from app.sqlutil import DISTRICT_KEYS, addr_part, day_parts
 
 router = APIRouter(prefix="/api/events", tags=["Events"])
 
@@ -452,8 +453,12 @@ def list_events(
                     "alles). visits=0 lässt sie weg — der Zeitstrahl blendet "
                     "sie standardmäßig aus.")] = None,
     condense: Annotated[bool, Query(
-        description="A39: importierte Besuche desselben Tages und derselben "
-                    "Stadt zu einem Eintrag zusammenfassen")] = False,
+        description="A39: importierte Besuche desselben Tages und desselben "
+                    "Ortes zu einem Eintrag zusammenfassen")] = False,
+    group: Annotated[str, Query(
+        description="A47: auf welcher Ebene verdichtet wird — country|city|"
+                    "district|point. `point` heißt: gar nicht. Wirkt nur "
+                    "zusammen mit condense=1.")] = "city",
     city: Annotated[str | None, Query(
         description="A39: nur Ereignisse in dieser Stadt — löst eine "
                     "zusammengefasste Gruppe wieder auf")] = None,
@@ -507,9 +512,14 @@ def list_events(
     # Gruppe, und beide Hälften zeigten eine zu kleine Zahl. Deshalb wird die
     # Menge selbst reduziert: von jeder (Tag, Stadt)-Gruppe bleibt genau ein
     # Vertreter übrig, und über diese Vertreter wird paginiert.
-    if condense:
-        query = query.filter(Event.id.in_(_visit_group_reps(db, user.id))
-                             | Event.id.notin_(_condensable_visits(db, user.id)))
+    # A47: Die Stufe kommt von außen. Ein unbekannter Wert wird abgewiesen und
+    # nicht still auf „city" gebogen — sonst bekäme jemand, der sich vertippt,
+    # eine plausible Antwort auf eine andere Frage.
+    if group not in GROUP_LEVELS:
+        raise HTTPException(400, f"Unbekannte Verdichtungsstufe: {group}")
+    if condense and group != "point":
+        query = query.filter(Event.id.in_(_visit_group_reps(db, user.id, group))
+                             | Event.id.notin_(_condensable_visits(db, user.id, group)))
 
     # A37: Die Sortierung MUSS eindeutig sein, sonst blättert man an
     # Datums-Gleichständen an Einträgen vorbei oder sieht sie doppelt — bei
@@ -524,7 +534,8 @@ def list_events(
         return [event_to_read(e) for e in events]
 
     kids = _child_counts(db, user.id, events)
-    groups = _visit_group_info(db, user.id, events) if condense else {}
+    groups = (_visit_group_info(db, user.id, events, group)
+              if condense and group != "point" else {})
     return [event_to_read(e, slim=True, weather=w, child_count=kids.get(e.id),
                           group=groups.get(e.id))
             for e, w in zip(events, _weather_for(db, user.id, events))]
@@ -545,28 +556,91 @@ def list_events(
 _day_parts = day_parts
 
 
-def _condensable_base(db: Session, user_id: str):
-    """Die Menge, um die es geht: importierte Besuche mit bekannter Stadt.
+# --------------------------------------------------------------------------- #
+# A47 (Anmerkung 116) — die Verdichtungsstufe ist eine FRAGE, keine Eigenschaft
+# --------------------------------------------------------------------------- #
+# Bis 0.38 war „nach Stadt" fest verdrahtet. Das ist eine gute Voreinstellung
+# und eine schlechte Vorgabe: „In welchen Ländern war ich 2019?" und „In
+# welchen Stadtteilen von Berlin?" sind beide legitim, und welche Frage gerade
+# gilt, weiß nur der, der hinsieht.
+#
+# Die Stufen liegen absichtlich an EINER Stelle, aus der Filter, Vertreter und
+# Aggregat alle drei lesen. Drei Funktionen mit je einer fest genannten Spalte
+# wären dieselbe Regel an drei Orten — und die widerspricht sich still
+# (Anmerkung 106).
+GROUP_LEVELS = ("country", "city", "district", "point")
+
+
+def _level_column(level: str):
+    """Die Spalte (bzw. der JSON-Ausdruck) dieser Stufe — None heißt „gar nicht
+    verdichten"."""
+    if level == "country":
+        return Location.country
+    if level == "city":
+        return Location.city
+    if level == "district":
+        # `Location.address` trägt die Roh-Bausteine des Geocoders
+        # (Anmerkung 110). Welcher Baustein den Ortsteil benennt, hängt vom
+        # Land ab — deshalb die Fallback-Kette aus `sqlutil`.
+        return addr_part(Location.address, *DISTRICT_KEYS)
+    return None
+
+
+def _place_of(location, level: str) -> str | None:
+    """Derselbe Wert wie `_level_column`, nur in Python statt in SQL.
+
+    Beide müssen dasselbe sagen, sonst findet die Zuordnung ihre Gruppe nicht:
+    der Vertreter stünde ohne Chip da, obwohl es die Gruppe gibt. Die
+    Fallback-Kette ist deshalb dieselbe Konstante.
+    """
+    if not location:
+        return None
+    if level == "country":
+        return location.country
+    if level == "city":
+        return location.city
+    if level == "district":
+        address = location.address or {}
+        for key in DISTRICT_KEYS:
+            value = (address.get(key) or "").strip()
+            if value:
+                return value
+    return None
+
+
+def _condensable_base(db: Session, user_id: str, level: str = "city"):
+    """Die Menge, um die es geht: importierte Besuche mit bekanntem Ort.
 
     Alles andere bleibt unangetastet — von Hand erfasste Ereignisse werden nie
     zusammengefasst, auch wenn zwei am selben Tag in derselben Stadt liegen.
     Sie sind einzeln eingetragen worden, also sind sie einzeln gemeint.
+
+    **Ohne Wert auf der gewählten Stufe wird nicht verdichtet.** Einen Besuch
+    ohne Ortsteil in eine Ortsteil-Gruppe zu werfen, die in Wahrheit die Stadt
+    ist, wäre eine Zahl mit Anspruch — und sie stünde neben echten Ortsteilen,
+    ohne sich zu unterscheiden. Er bleibt dann eine gewöhnliche Karte.
     """
-    return (db.query(Event)
-            .join(Location, Event.location_id == Location.id)
-            .filter(Event.user_id == user_id,
-                    Event.source == Source.google_timeline,
-                    Event.date_start.isnot(None),
-                    Location.city.isnot(None), Location.city != ""))
+    column = _level_column(level)
+    query = (db.query(Event)
+             .join(Location, Event.location_id == Location.id)
+             .filter(Event.user_id == user_id,
+                     Event.source == Source.google_timeline,
+                     Event.date_start.isnot(None)))
+    if column is None:
+        # Stufe „point": es gibt nichts zu gruppieren. Die leere Menge ist die
+        # richtige Antwort — `condense` greift dann ohnehin nicht, aber die
+        # Funktion muss auch allein aufrufbar bleiben.
+        return query.filter(sa_false())
+    return query.filter(column.isnot(None), column != "")
 
 
-def _condensable_visits(db: Session, user_id: str):
+def _condensable_visits(db: Session, user_id: str, level: str = "city"):
     """IDs aller Besuche, die überhaupt zusammengefasst werden können."""
-    return _condensable_base(db, user_id).with_entities(Event.id)
+    return _condensable_base(db, user_id, level).with_entities(Event.id)
 
 
-def _visit_group_reps(db: Session, user_id: str):
-    """Je (Tag, Stadt) genau eine ID — der Vertreter der Gruppe.
+def _visit_group_reps(db: Session, user_id: str, level: str = "city"):
+    """Je (Tag, Ort) genau eine ID — der Vertreter der Gruppe.
 
     `min(id)` ist ein willkürlicher, aber stabiler Vertreter. Stabil ist das
     Entscheidende: derselbe Aufruf muss zweimal dieselbe Zeile liefern, sonst
@@ -575,43 +649,46 @@ def _visit_group_reps(db: Session, user_id: str):
     aus dem Aggregat, nicht aus dem Vertreter.
     """
     y, m, d = _day_parts(Event.date_start)
-    return (_condensable_base(db, user_id)
+    return (_condensable_base(db, user_id, level)
             .with_entities(func.min(Event.id))
-            .group_by(y, m, d, Location.city))
+            .group_by(y, m, d, _level_column(level)))
 
 
-def _visit_group_info(db: Session, user_id: str,
-                      events: list[Event]) -> dict[str, dict]:
+def _visit_group_info(db: Session, user_id: str, events: list[Event],
+                      level: str = "city") -> dict[str, dict]:
     """Anzahl und Zeitspanne der Gruppe, die ein Vertreter auf dieser Seite
     vertritt — eine Abfrage für die ganze Seite, eingegrenzt auf deren
     Zeitraum, damit nicht über den gesamten Bestand aggregiert wird.
     """
+    column = _level_column(level)
+    if column is None:
+        return {}
     reps = [e for e in events if e.date_start and e.source == Source.google_timeline]
     if not reps:
         return {}
     lo = min(e.date_start for e in reps)
     hi = max(e.date_start for e in reps)
     y, m, d = _day_parts(Event.date_start)
-    rows = (_condensable_base(db, user_id)
+    rows = (_condensable_base(db, user_id, level)
             .with_entities(y.label("y"), m.label("m"), d.label("d"),
-                           Location.city.label("city"), func.count(Event.id),
+                           column.label("place"), func.count(Event.id),
                            func.min(Event.date_start), func.max(Event.date_start))
             .filter(Event.date_start >= lo.replace(hour=0, minute=0, second=0),
                     Event.date_start <= hi.replace(hour=23, minute=59, second=59))
-            .group_by(y, m, d, Location.city).all())
+            .group_by(y, m, d, column).all())
     by_key = {(int(r[0]), int(r[1]), int(r[2]), r[3]): r for r in rows}
     out: dict[str, dict] = {}
     for e in reps:
-        loc = e.location
-        if not loc or not loc.city:
+        place = _place_of(e.location, level)
+        if not place:
             continue
-        key = (e.date_start.year, e.date_start.month, e.date_start.day, loc.city)
+        key = (e.date_start.year, e.date_start.month, e.date_start.day, place)
         row = by_key.get(key)
         # Eine Gruppe von genau einem Besuch ist keine Gruppe — dann bleibt es
         # eine gewöhnliche Karte ohne Chip und ohne Aufklappen.
         if not row or row[4] < 2:
             continue
-        out[e.id] = {"city": loc.city, "count": row[4],
+        out[e.id] = {"city": place, "count": row[4],
                      "first": row[5], "last": row[6]}
     return out
 
@@ -805,9 +882,19 @@ def events_index(
                      Event.source != Source.google_timeline,
                      Event.date_start.is_(None)
                      | Event.date_precision.in_(_VAGUE_PRECISIONS)).scalar() or 0)
+    # A47: Wie viele Orte noch nie nach ihren Adress-Bausteinen gefragt wurden.
+    # `address IS NULL` heißt „nie nachgesehen", ein gesetztes Dict heißt
+    # „nachgesehen" — auch ein leeres. Die Stufe „Ortsteil" hängt daran, und
+    # ein Auswahlfeld, das nichts bewirkt, muss das sagen können (A40).
+    loc_total = (db.query(func.count(Location.id))
+                 .filter(Location.user_id == user.id).scalar() or 0)
+    loc_open = (db.query(func.count(Location.id))
+                .filter(Location.user_id == user.id,
+                        Location.address.is_(None)).scalar() or 0)
     return EventsIndex(
         total=total, dated=dated, undated=total - dated, unconfirmed=unconfirmed,
         visits=visits, fuzzy=fuzzy,
+        locations_no_address=loc_open, locations_total=loc_total,
         year_min=years[0].year if years else None,
         year_max=years[-1].year if years else None,
         years=years,

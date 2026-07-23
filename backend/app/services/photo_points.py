@@ -42,16 +42,55 @@ log = logging.getLogger("lifedash.immich")
 MAX_POINTS = 5000
 
 
-def _district(asset: dict) -> str | None:
-    """Ortsteil, falls Immich einen kennt.
+# A47 — Ortsteil eines Fotos.
+#
+# `exifInfo` hat kein Feld dafür: Immichs Rückwärts-Geokodierung liefert
+# city/state/country und sonst nichts. Geraten wird trotzdem nicht — gefragt
+# wird der EIGENE Ortsbestand, der seine Roh-Bausteine seit Anmerkung 110
+# aufbewahrt. Ein Foto, das 200 m von einem bekannten Ort entstand, liegt im
+# selben Ortsteil; eines mitten in der Wildnis bekommt keinen und landet in
+# einer eigenen, benannten Gruppe.
+#
+# Und es kostet keinen Abruf: Anmerkung 100 verlangt, dass ein ausgehender
+# Abruf einer gespeicherten eigenen Tatsache dient — hier geht gar keiner raus.
+DISTRICT_RADIUS_KM = 0.6
 
-    `exifInfo` hat kein eigenes Feld dafür — Immichs Rückwärts-Geokodierung
-    liefert city/state/country. Der Ortsteil kommt deshalb aus dem eigenen
-    Ortsbestand (A47) und bleibt hier leer, statt geraten zu werden. Die
-    Spalte existiert trotzdem: sie wird von A47 gefüllt, wenn ein Ort mit
-    passenden Koordinaten schon Adressbausteine hat.
+
+def district_index(db: Session, user_id: str) -> list[tuple[float, float, str]]:
+    """(lat, lng, Ortsteil) aller eigenen Orte, die einen kennen.
+
+    Einmal je Lauf geladen, nicht je Foto: bei 20.000 Bildern wären das sonst
+    20.000 Abfragen für eine Frage, deren Antwort sich nicht ändert.
     """
-    return None
+    from app.models import Location
+    from app.sqlutil import DISTRICT_KEYS
+
+    out: list[tuple[float, float, str]] = []
+    rows = (db.query(Location)
+            .filter(Location.user_id == user_id,
+                    Location.lat.isnot(None), Location.address.isnot(None))
+            .all())
+    for loc in rows:
+        address = loc.address or {}
+        for key in DISTRICT_KEYS:
+            value = (address.get(key) or "").strip()
+            if value:
+                out.append((loc.lat, loc.lng, value))
+                break
+    return out
+
+
+def _district(geo: tuple[float, float],
+              index: list[tuple[float, float, str]]) -> str | None:
+    """Der Ortsteil des nächstgelegenen eigenen Ortes — oder None."""
+    if not index:
+        return None
+    best, best_km = None, DISTRICT_RADIUS_KM
+    for lat, lng, name in index:
+        km = api._km(geo, (lat, lng))
+        if km < best_km:
+            best, best_km = name, km
+    return best
 
 
 def upsert_assets(db: Session, user_id: str, assets: list[dict],
@@ -68,6 +107,7 @@ def upsert_assets(db: Session, user_id: str, assets: list[dict],
     Aktualisiert wird trotzdem — in Immich lässt sich ein Ort nachtragen, und
     dann ist der alte Punkt schlicht falsch.
     """
+    districts = district_index(db, user_id)
     wanted: dict[str, dict] = {}
     for asset in assets:
         if not api.is_own(asset, my_id) or not api.is_in_timeline(asset):
@@ -82,7 +122,7 @@ def upsert_assets(db: Session, user_id: str, assets: list[dict],
         exif = asset.get("exifInfo") or {}
         wanted[asset_id] = {
             "taken_at": when, "lat": geo[0], "lng": geo[1],
-            "district": _district(asset),
+            "district": _district(geo, districts),
             "city": (exif.get("city") or "").strip() or None,
             "state": (exif.get("state") or "").strip() or None,
             "country": api.asset_country(asset),

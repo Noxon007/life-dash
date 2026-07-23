@@ -1079,6 +1079,23 @@
                importierten Besuche daneben, und aus demselben Grund: es sind
                zu viele, um sie ungefragt in den Zeitstrahl zu kippen. -->
           <span class="filter-chip off" id="tl-photos-toggle" data-i18n-title="tl.photos.tip" title="Verortete Fotos als eigene Zeilen im Zeitstrahl, je Tag und Ort zusammengefasst — muss zuerst unter „Meine Daten → Immich“ verortet werden" data-i18n="tl.photos">📷 Fotos</span>
+          <!-- A47: Auf welcher Ebene zusammengefasst wird. Bewusst ein
+               Auswahlfeld und kein Schieberegler: vier benannte Stufen sind
+               eine Auswahl, und ein Schieber ohne beschriftete Rasterung wäre
+               wieder die Sorte Bedienelement, die man ausprobieren muss, statt
+               sie zu lesen. Gilt für Besuche UND Fotos — eine Einstellung,
+               nicht zwei nebeneinander. -->
+          <label class="stat-label" style="display:inline-flex; align-items:center; gap:6px">
+            <span data-i18n="tl.level">Zusammenfassen nach</span>
+            <select id="tl-level" class="mf-select" data-i18n-title="tl.level.tip"
+                    title="Wie fein die Einträge eines Tages zusammengefasst werden — vom Land bis zum einzelnen Punkt">
+              <option value="country" data-i18n="tl.level.country">Land</option>
+              <option value="city" selected data-i18n="tl.level.city">Stadt</option>
+              <option value="district" data-i18n="tl.level.district">Ortsteil</option>
+              <option value="point" data-i18n="tl.level.point">Exakter Punkt</option>
+            </select>
+          </label>
+          <span class="hint" id="tl-level-note" style="display:none; flex-basis:100%"></span>
           <span class="filter-chip" id="tl-journal-btn" data-i18n-title="tl.journal.tip" title="Tagebuch-Eintrag für einen Tag schreiben (Markdown) — erscheint als Tageskopf über den Ereignissen des Tages" data-i18n="tl.journal">📖 Tagebuch schreiben</span>
           <span class="filter-chip" id="tl-print-btn" data-i18n-title="tl.print.tip" title="Zeitraum wählen und drucken oder als PDF sichern — gedruckt wird hell, ohne Navigation und mit allen Ereignissen des Zeitraums" data-i18n="tl.print">🖨️ Drucken</span>
           <!-- F18: Ein Foto gehört oft zu einem Tag, nicht zu einem einzelnen
@@ -1697,7 +1714,12 @@
               („Zuhause — Musterstraße 1").<br>
               <b>Lange Adressen:</b> werden auf die unten gewählten Bausteine gekürzt.<br>
               <b>Fremdschrift:</b> Namen in Lokalschrift (z. B. Griechisch) werden mit Sprach-Fallback
-              zur lateinischen Umschrift neu aufgelöst.</div>
+              zur lateinischen Umschrift neu aufgelöst.<br>
+              <b>Fehlende Bausteine:</b> Orte, deren Name stimmt, für die aber nie die einzelnen
+              Adressteile (Straße, Ortsteil, Stadt, Land) gespeichert wurden — die trägt die Stufe
+              „Ortsteil" im Zeitstrahl. Sie kommen ganz zuletzt dran und werden <b>genau einmal</b>
+              geholt; danach lässt der Lauf sie in Ruhe. Beim ersten Mal nach der Aktualisierung
+              kann das viele Orte betreffen — der Lauf ist jederzeit unterbrechbar und setzt fort.</div>
           </div>
           <div class="action-row">
             <div class="action-key"><b style="font-size:13px" data-i18n="adm.format">📐 Anzeige-Format</b></div>
@@ -2652,6 +2674,14 @@ const I18N_EN = {
   'tl.photos.tip': "Located photos as their own rows in the timeline, condensed per day and place — has to be located first under “My data → Immich”",
   'tl.photos.n': "{n} photos",
   'tl.photos.of': "{n} of {total}",
+  // A47 — how coarsely entries of a day are condensed
+  'tl.level': "Condense by",
+  'tl.level.tip': "How finely the entries of a day are condensed — from the country down to the individual point",
+  'tl.level.country': "Country",
+  'tl.level.city': "City",
+  'tl.level.district': "District",
+  'tl.level.point': "Exact point",
+  'tl.level.thin': "No district is known for {n} of {t} places — they stay on their own. Catch up under “My data → Place names”.",
   'ims.preview': "🔍 Preview this year",
   'ims.run': "✚ Create proposals",
   'ims.busy': "🔍 looking …",
@@ -2918,7 +2948,7 @@ const I18N_EN = {
   'act.export.desc': "<b>Backup as a JSON file.</b><br>Downloads all your data (raw inbox, events, items, places, weather) as a single JSON file. Embeddings are included. Do this regularly — this is your backup.",
   'act.import.desc': "<b>Restore an export file.</b><br>Imports a Life-Dash export file. Entries that already exist (same ID) are skipped — importing repeatedly creates no duplicates. Everything lands in your account.",
   'act.tlimport.desc': "<b>Location history &amp; routes from Google Maps.</b><br>Imports the timeline export from your phone (Android: Settings → Location → Location services → Timeline → “Export timeline data”; older Takeout exports work too). Visits become events, routes become tracks on the map. Importing repeatedly creates no duplicates.",
-  'act.namerun.desc': "<b>One run for every place name</b> (reverse geocoding via OpenStreetMap, rate limited; runs as a background job in stages and can be resumed at any time; manually renamed entries are always left alone). The run takes on every place whose name is not yet right and geocodes it <b>at most once</b>, even when several points apply to it:<br><b>Missing names:</b> imported visits are called “Place (53.49, 10.00)” or carry only a label such as “Home” — the run fetches real addresses, labels stay as a prefix (“Home — Example Street 1”).<br><b>Long addresses:</b> are shortened to the building blocks chosen below.<br><b>Foreign scripts:</b> names in local scripts (e.g. Greek) are re-resolved with a language fallback to the Latin transliteration.",
+  'act.namerun.desc': "<b>One run for every place name</b> (reverse geocoding via OpenStreetMap, rate limited; runs as a background job in stages and can be resumed at any time; manually renamed entries are always left alone). The run takes on every place whose name is not yet right and geocodes it <b>at most once</b>, even when several points apply to it:<br><b>Missing names:</b> imported visits are called “Place (53.49, 10.00)” or carry only a label such as “Home” — the run fetches real addresses, labels stay as a prefix (“Home — Example Street 1”).<br><b>Long addresses:</b> are shortened to the building blocks chosen below.<br><b>Foreign scripts:</b> names in local scripts (e.g. Greek) are re-resolved with a language fallback to the Latin transliteration.<br><b>Missing building blocks:</b> places whose name is fine but whose individual address parts (street, district, city, country) were never stored — those carry the “district” level in the timeline. They come last and are fetched <b>exactly once</b>; after that the run leaves them alone. The first time after the update this may affect many places — the run can be interrupted at any point and resumes.",
   'adm.format.desc': "<b>Building blocks for resolved addresses</b> — instead of the long address chain with administrative regions and postcode:",
   'adm.track.desc': "<b>Choose modules for collection, statistics &amp; AI.</b><br>Deselected modules disappear from tabs, filters, forms and the AI prompt — existing data is kept and reappears immediately once you select them again.",
   'adm.fuzzy.hint': "Events with a vague date (month, season, year, decade or no date at all). Clicking one opens the quick editor — the more precise the dates, the better the timeline and map.",
@@ -3868,6 +3898,13 @@ async function loadTimeline(more = false) {
     fetchIndex().then(idx => {
       BIRTH_DATE = idx.birth ? new Date(idx.birth.date_start) : null;
       TL_VISIT_COUNT = idx.visits || 0;
+      // A47: Die Stufe „Ortsteil" liest `Location.address`, und die gibt es
+      // erst seit 0.38. Ein Auswahlfeld, das man anklickt und bei dem nichts
+      // passiert, ist genau der stille Defekt, den A40 abgeschafft hat —
+      // also wird gesagt, woran es liegt, statt still auf Stadt zurückzufallen.
+      TL_NO_ADDRESS = idx.locations_no_address || 0;
+      TL_LOC_TOTAL = idx.locations_total || 0;
+      tlLevelNote();
     }).catch(() => {});
     if (tl.query) {
       // Suche nutzt den hybriden Such-Endpoint (Volltext + semantisch);
@@ -3904,6 +3941,12 @@ async function loadTimeline(more = false) {
       const cityMode = !!tl.city;
       const page = await fetchEvents({ limit: TL_PAGE, offset: tl.offset,
                                        visits: (cityMode || tl.showVisits) ? 1 : 0,
+                                       // A47: Die Stufe geht IMMER mit, auch
+                                       // wenn gerade nicht verdichtet wird —
+                                       // sonst hinge die Antwort davon ab, in
+                                       // welcher Reihenfolge zwei Schalter
+                                       // umgelegt wurden.
+                                       group: tl.level,
                                        ...(cityMode ? { city: tl.city }
                                            : tl.showVisits ? { condense: 1 } : {}) });
       tl.events = more ? tl.events.concat(page) : page;
@@ -4344,6 +4387,23 @@ let BIRTH_DATE = null;
 // A37: Zahl der importierten Besuche im GESAMTEN Bestand (aus dem Index) —
 // der Schalter „🛰️ N Besuche" nannte vorher die der geladenen Liste.
 let TL_VISIT_COUNT = 0;
+// A47: Orte ohne gespeicherte Adress-Bausteine — trägt den Hinweis unter der
+// Stufen-Auswahl.
+let TL_NO_ADDRESS = 0, TL_LOC_TOTAL = 0;
+function tlLevelNote() {
+  const box = document.getElementById('tl-level-note');
+  if (!box) return;
+  // Nur bei „Ortsteil", und nur wenn die Lücke wirklich groß ist. Ein Hinweis,
+  // der immer dasteht, wird nicht mehr gelesen.
+  const thin = tl.level === 'district' && TL_LOC_TOTAL
+    && TL_NO_ADDRESS / TL_LOC_TOTAL > 0.25;
+  box.style.display = thin ? '' : 'none';
+  if (!thin) { box.innerHTML = ''; return; }
+  box.innerHTML = `⚠️ ${esc(t('tl.level.thin',
+    'Für {n} von {t} Orten ist kein Ortsteil bekannt — sie bleiben einzeln stehen. Nachholen unter „Meine Daten → Ortsnamen".')
+    .replace('{n}', TL_NO_ADDRESS.toLocaleString(LOC()))
+    .replace('{t}', TL_LOC_TOTAL.toLocaleString(LOC())))}`;
+}
 // F17: Alter beim Ereignis als Ableitung — volle Jahre zwischen Geburt und
 // Ereignis. Nur wenn eine Geburt bekannt ist und das Ereignis danach liegt;
 // bei vager Datierung mit „~", damit die Zahl nicht mehr behauptet als die
@@ -4515,6 +4575,13 @@ document.getElementById('tl-photos-toggle')?.addEventListener('click', function 
   tl.showPhotos = !tl.showPhotos;
   this.classList.toggle('active', tl.showPhotos);
   this.classList.toggle('off', !tl.showPhotos);
+  loadTimeline();
+});
+// A47: Stufe wechseln = neu abfragen. Verdichtet wird auf dem Server, also
+// ist das keine Anzeige-Einstellung (A39: verdichtet wird VOR dem Blättern).
+document.getElementById('tl-level')?.addEventListener('change', function () {
+  tl.level = this.value;
+  tlLevelNote();
   loadTimeline();
 });
 document.querySelectorAll('#tl-zoom [data-zoom]').forEach(btn => {

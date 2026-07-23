@@ -161,7 +161,17 @@ class Location(Base):
     # Schicht 4 im Sinne von Kap. 3.1: reine Ableitungsgrundlage, jederzeit
     # verwerfbar, nie eine Aussage für sich. Für Bestandsorte bleibt das Feld
     # leer, bis der Ortsnamen-Lauf sie das nächste Mal anfasst.
-    address: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    #
+    # **`none_as_null=True` ist hier nicht Kosmetik** (A47). Ohne das Flag
+    # schreibt SQLAlchemy ein Python-`None` als JSON-`null` in die Spalte —
+    # also einen WERT, kein SQL-NULL. `address IS NULL` fände die Zeile dann
+    # nicht, und genau daran hängen zwei Dinge: der Rückfüll-Lauf
+    # (`scope="no_address"`) übersähe sie für immer, und die Zahl im Index
+    # behauptete, es sei nichts offen. Drei Zustände müssen unterscheidbar
+    # bleiben: **NULL** = nie nachgesehen, **{}** = nachgesehen und nichts
+    # bekommen, **gefüllt** = Bausteine da.
+    address: Mapped[dict | None] = mapped_column(
+        JSON(none_as_null=True), nullable=True)
     external_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     events: Mapped[list["Event"]] = relationship(back_populates="location")

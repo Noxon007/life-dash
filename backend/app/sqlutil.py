@@ -20,3 +20,27 @@ def day_parts(col):
     """
     return (func.extract("year", col), func.extract("month", col),
             func.extract("day", col))
+
+
+# A47: Welche Nominatim-Bausteine als „Ortsteil" gelten, in dieser Reihenfolge.
+# Nominatim benennt dieselbe Ebene je nach Land und Ortsgröße anders — in
+# Deutschland meist `suburb`, in Großstädten `city_district`, anderswo
+# `neighbourhood` oder `quarter`. Eine einzige Abfrage auf `suburb` fände
+# deshalb in halb Europa nichts und sähe aus wie „es gibt keinen Ortsteil".
+DISTRICT_KEYS = ("suburb", "city_district", "neighbourhood", "quarter",
+                 "borough", "town", "village")
+
+
+def addr_part(col, *keys):
+    """Ein Feld aus einer JSON-Spalte — dialektneutral, mit Fallback-Kette.
+
+    Derselbe Grund wie bei `day_parts`: SQLite kann `json_extract`, PostgreSQL
+    kennt `->>`, und `test_a37_postgres_dialect.py` hält fest, was es kostet,
+    wenn ein Router den einen Dialekt fest verdrahtet — der Testlauf ist
+    SQLite, die Anlage des Autors PostgreSQL.
+
+    SQLAlchemys `col[key].as_string()` erzeugt in beiden Dialekten das
+    Richtige; `coalesce` über mehrere Schlüssel liefert den ersten, der da ist.
+    """
+    parts = [col[key].as_string() for key in keys]
+    return func.coalesce(*parts) if len(parts) > 1 else parts[0]

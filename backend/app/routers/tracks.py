@@ -358,9 +358,21 @@ def _apply_resolved_name(db: Session, loc: Location, user_id: str,
     field_overrides) bleiben unangetastet."""
     hit = geocode_svc.reverse_geocode(loc.lat, loc.lng, lang)
     if not hit:
+        # A47: Ein leeres Dict heißt „nachgesehen, nichts bekommen" — NULL
+        # heißt „nie nachgesehen". Ohne diese Marke fragte der Rückfüll-Lauf
+        # (`scope="no_address"`) genau die Orte ewig neu, bei denen OSM nichts
+        # hergibt. Dieselbe Falle wie F12 `weather_rev`, A39-Leerstring, A42
+        # „kein Artikel", der P2.1-Grabstein und `_name_defect` — und die
+        # beiden frühen Ausstiege hier waren die einzige Stelle, an der sie
+        # nach Anmerkung 114 noch offen stand.
+        if loc.address is None:
+            loc.address = {}
         return False
     short = geocode_svc.short_name(hit, parts)
     if not short:
+        # Getroffen, aber kein brauchbarer Name: die Bausteine sind trotzdem
+        # da und sind genau das, was die Ortsteil-Stufe braucht.
+        loc.address = geocode_svc.raw_address(hit) or loc.address or {}
         return False
     # Anmerkung 110/114: die ROHEN Bausteine aufbewahren, nicht nur das
     # Ergebnis — jetzt an EINER Stelle, die alle drei Entstehungswege eines
@@ -515,6 +527,23 @@ def _resolve_candidates(db: Session, user_id: str, parts: list[str]) -> list[Loc
     # einmal dafür abgefragt wird.
     seen = {l.id for _, l in scored}
     scored += [(3, l) for l in rows if l.city is None and l.id not in seen]
+    # A47: Orte ohne gespeicherte Adress-Bausteine. Genau dieselbe Bauart wie
+    # die A39-Zeile darüber, und aus genau demselben Grund: Der NAME stimmt,
+    # es fehlt ein Feld, das es vorher nicht gab (`Location.address` seit
+    # 0.38, Anmerkung 110) — und daran hängt die Stufe „Ortsteil".
+    #
+    # Bewusst KEIN zweiter Knopf in der Oberfläche: A28 hat die drei Scopes
+    # abgeschafft, weil ein Ort in mehreren Mengen liegen kann und dann
+    # mehrfach geocodiert wurde. Ein neuer Scope wäre derselbe Fehler noch
+    # einmal. Der eine Lauf nimmt sie mit, ganz hinten.
+    #
+    # `address IS NULL` heißt „nie nachgesehen", ein gesetztes Dict heißt
+    # „nachgesehen" — auch das leere, das `_apply_resolved_name` bei einem
+    # Fehlversuch schreibt. Ohne diese Unterscheidung liefe der Lauf ewig auf
+    # denselben Orten (F12 `weather_rev`, A39-Leerstring, A42 „kein Artikel",
+    # P2.1-Grabstein, `_name_defect`, A45-Jahresliste — das achte Mal).
+    seen = {l.id for _, l in scored}
+    scored += [(4, l) for l in rows if l.address is None and l.id not in seen]
     scored.sort(key=lambda t: t[0])
     return [l for _, l in scored]
 
@@ -771,6 +800,23 @@ def resolve_names_batch(
             return (db.query(Location)
                     .filter(Location.user_id == user.id,
                             _unresolved_name_filter(),
+                            Location.lat.isnot(None))
+                    .all())
+        if scope == "no_address":
+            # A47: Orte ohne gespeicherte Adress-Bausteine. Ihr NAME ist in
+            # Ordnung — deshalb fasst der reguläre Lauf sie nie an —, aber die
+            # Stufe „Ortsteil" liest genau diese Bausteine, und die gibt es
+            # erst seit 0.38 (Anmerkung 110).
+            #
+            # `address IS NULL` heißt „nie nachgesehen", ein gesetztes Dict
+            # heißt „nachgesehen" — **auch ein leeres**. Ohne diese
+            # Unterscheidung fragte der Lauf jeden Ort ohne Ortsteil bei jedem
+            # Durchgang neu: die Endlos-Abruf-Falle, inzwischen zum siebten Mal
+            # (F12 `weather_rev`, A39-Leerstring, A42 „kein Artikel",
+            # P2.1-Grabstein, `_name_defect`, A45-Jahresliste).
+            return (db.query(Location)
+                    .filter(Location.user_id == user.id,
+                            Location.address.is_(None),
                             Location.lat.isnot(None))
                     .all())
         return _resolve_candidates(db, user.id, parts)

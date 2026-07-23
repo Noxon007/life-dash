@@ -58,8 +58,17 @@ def test_city_is_independent_of_the_chosen_name_format():
 # --------------------------------------------------------------------------- #
 # Rückfüllung: jeder Ort genau einmal
 # --------------------------------------------------------------------------- #
-def _loc(db, user, name="Kaiserstraße, Düsseldorf", city=None, lat=51.2, lng=6.7):
-    loc = Location(user_id=user.id, name=name, lat=lat, lng=lng, city=city)
+# A47 (0.39): „fertig" heißt seither Name, Stadt UND Adress-Bausteine — die
+# Stufe „Ortsteil" liest `Location.address`, und die gab es vorher nicht.
+# `address={}` heißt hier „nachgesehen, nichts bekommen" und ist genau das
+# Gegenstück zum Leerstring bei der Stadt. Ohne diesen Vorgabewert prüften die
+# Tests unten einen Ort, an dem noch eine Frage offen ist, und wären zu Recht
+# rot. Dass ein Ort ohne Bausteine genau EINMAL geholt wird und nicht bei jedem
+# Lauf, steht in `test_a47_levels.py`.
+def _loc(db, user, name="Kaiserstraße, Düsseldorf", city=None, lat=51.2, lng=6.7,
+         address={}):
+    loc = Location(user_id=user.id, name=name, lat=lat, lng=lng, city=city,
+                   address=address)
     db.add(loc)
     db.flush()
     return loc

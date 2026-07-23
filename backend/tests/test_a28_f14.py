@@ -76,7 +76,8 @@ def test_candidates_are_deduplicated_and_unnamed_first(db, user):
     """Der Kern von A28: ein Ort mit mehreren Mängeln steht genau EINMAL in
     der Liste — vorher wurde er pro Scope-Lauf erneut geocodiert.
 
-    Angepasst in 0.34 (A39): „fertig" heißt seither Name **und** Stadt. Der
+    Angepasst in 0.34 (A39) und noch einmal in 0.39 (A47): „fertig" heißt
+    seither Name, Stadt **und** Adress-Bausteine. Der
     Lauf zieht auch Orte nach, deren Name stimmt, denen aber die Stadt fehlt —
     das Feld gab es vorher nicht. `fine` trägt hier deshalb eine Stadt; ohne
     sie wäre der Ort zu Recht Kandidat. Dass er dann genau einmal geholt wird
@@ -86,6 +87,10 @@ def test_candidates_are_deduplicated_and_unnamed_first(db, user):
     unnamed = _loc(db, user, "Ort (53.4900, 10.0000)")
     fine = _loc(db, user, "Musterstraße 1, Hamburg, Deutschland")
     fine.city = "Hamburg"
+    # A47 (0.39): dieselbe Anpassung ein Feld weiter — „fertig" heißt jetzt
+    # auch „Adress-Bausteine geholt". `{}` ist die Marke für „nachgesehen,
+    # nichts bekommen".
+    fine.address = {}
     greek_and_long.city = "Αθήνα"
     unnamed.city = ""
     db.flush()

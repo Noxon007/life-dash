@@ -252,6 +252,12 @@ class EventsIndex(BaseModel):
     # oder ganz ohne Datum). Ein eigener Rückstand neben `unconfirmed`, nicht
     # dieselbe Frage: „stimmt das?" gegen „wann war das?".
     fuzzy: int = 0
+    # A47: Orte, für die noch nie Adress-Bausteine geholt wurden. Sie tragen
+    # die Stufe „Ortsteil" — ohne sie wäre die Auswahl ein Feld, das man
+    # anklickt und bei dem nichts passiert. Die Oberfläche sagt es stattdessen,
+    # statt still auf die Stadt zurückzufallen (A40).
+    locations_no_address: int = 0
+    locations_total: int = 0
     year_min: int | None = None
     year_max: int | None = None
     years: list[YearCount] = []
