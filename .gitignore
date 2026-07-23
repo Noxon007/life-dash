@@ -10,6 +10,8 @@ backend/.env
 # Compose-Bind-Mounts (App-Daten + PostgreSQL-Datenverzeichnis)
 /data/
 /db/
+# Isolierter Test-Cluster von tools/pg-test.ps1 (eigener Port, wegwerfbar)
+backend/_pgtest/
 
 # Python
 __pycache__/

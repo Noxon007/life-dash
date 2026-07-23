@@ -9,6 +9,16 @@ Entscheidungen/Anmerkungen in Kap. 15. Erst dort gezielt nachlesen statt Code ra
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI, Geocoding aus)
+  — 590 Tests, ~12 s, SQLite im Arbeitsspeicher
+- **Tests gegen echtes PostgreSQL** (das, worauf betrieben wird — `postgres:18-alpine`):
+  `pwsh tools/pg-test.ps1` (Container `lifedash-pgtest` auf Port **55432**, danach weg;
+  `-Keep` lässt ihn stehen). Setzt `TEST_DATABASE_URL`, das `conftest.py` auswertet;
+  **zwei Riegel davor**, weil die Suite das Schema löscht: die URL darf nicht die
+  betriebene sein, und der DB-Name muss `test` enthalten.
+- Wächter: `cd tools` → `npm run check` (27 jsdom-Prüfungen)
+- **CI** (`.github/workflows/tests.yml`): fährt bei jedem Push/PR beides — pytest auf
+  SQLite *und* auf PostgreSQL — plus die Wächter. Bewusst ohne Pfadfilter und ohne
+  `cancel-in-progress`: ein übersprungener Test sieht aus wie ein bestandener.
 - Smoke-Server mit Scratch-DB (echte DB nie anfassen):
   `$env:DATABASE_URL="sqlite:///./_smoke.db"; $env:AUTH_MODE="dev"; $env:AI_PROVIDER="mock"`
   dann `<python> -m uvicorn app.main:app --port 8123` aus `backend/`

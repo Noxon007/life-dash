@@ -1,0 +1,96 @@
+# PRÜFGLEIS. Läuft bei jedem Push und jedem Pull Request.
+#
+# Bis hierher gab es 43 Testdateien und 27 Wächter — und keinen Auslöser, der
+# sie fährt. Sie liefen genau dann, wenn jemand daran dachte. Ein Wächter, den
+# niemand startet, prüft nichts (dieselbe Klasse wie Anmerkung 108: eine
+# Prüfung, die nie gegen den Defekt läuft, ist keine).
+#
+# Bewusst eine dritte Datei neben den zwei Docker-Gleisen (Anmerkung 86): die
+# haben Pfadfilter und brechen laufende Bauten ab, was für Testbauten richtig
+# ist. Prüfungen dürfen weder gefiltert noch abgebrochen werden — ein
+# übersprungener Test sieht aus wie ein bestandener.
+name: Tests
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ------------------------------------------------------------------------ #
+  # Backend — dieselbe Suite zweimal: SQLite (schnell, wie bisher) und
+  # PostgreSQL (das, worauf betrieben wird).
+  # ------------------------------------------------------------------------ #
+  backend:
+    runs-on: ubuntu-latest
+
+    services:
+      # Dieselbe Hauptversion wie in docker-compose.yml. Eine andere zu testen
+      # als die, die läuft, ist die halbe Zusicherung.
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: lifedash_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Abhängigkeiten
+        run: pip install -r backend/requirements-dev.txt
+
+      # Erst SQLite: der Lauf, den auch jeder lokal fährt. Scheitert er, ist
+      # der PostgreSQL-Lauf danach uninteressant.
+      - name: Tests auf SQLite
+        working-directory: backend
+        run: python -m pytest tests -q
+
+      # Dann PostgreSQL. Die Fehlerklasse dahinter ist die, die auf SQLite
+      # NICHT auffällt: native Enum-Typen, JSON gegen JSONB, `round()` auf
+      # `double precision`, der PostgreSQL-Zweig der Migrationen.
+      - name: Tests auf PostgreSQL
+        working-directory: backend
+        env:
+          TEST_DATABASE_URL: postgresql+psycopg2://postgres:test@localhost:5432/lifedash_test
+        run: python -m pytest tests -q
+
+  # ------------------------------------------------------------------------ #
+  # Frontend — die jsdom-Wächter aus tools/.
+  # ------------------------------------------------------------------------ #
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: tools/package-lock.json
+
+      - name: Abhängigkeiten
+        working-directory: tools
+        run: npm ci
+
+      - name: Wächter
+        working-directory: tools
+        run: npm run check
