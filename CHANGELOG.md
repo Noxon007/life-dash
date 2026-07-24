@@ -94,8 +94,12 @@ any `MINOR`.
   of explanation next to its button — accurate, but a wall of text. The buttons
   now carry a single sentence of what they do; the detailed how-and-why has moved
   into the README guide (“Getting started — a sensible order”), which each step
-  points to. Nothing was removed and no run changed — only the reading. The map
-  and its controls are untouched for now.
+  points to. Every step now leads with one primary button, and the controls you
+  set once and rarely touch again — the import-confidence filter, the address
+  display format, the one-off “cut older data into days” repair — sit behind a
+  small **Advanced** toggle instead of being always open. Nothing was removed and
+  no run changed — only the reading. The map and its controls are untouched for
+  now.
 - **The map now draws all your photo points instead of a selection.** The old
   ceiling of 5000 points per answer already bit at an ordinary collection of
   8000 located photos, so the map was condensing in everyday use while nothing

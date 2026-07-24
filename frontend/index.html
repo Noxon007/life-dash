@@ -263,6 +263,17 @@
      umbrechen lassen, sobald es eng wird. */
   .action-row.has-result { flex-wrap: wrap; }
   .action-result { flex: 0 0 100%; margin: 2px 0 0; }
+  /* Feedback Punkt 2 (A3): selten gebrauchte Regler und einmalige
+     Reparaturläufe hinter „Erweitert“ — natives <details>, kein JS.
+     Zusammengeklappt bleibt die Ansicht ruhig; die Steuerelemente bleiben im
+     DOM (IDs, Werte, Listener unberührt), nur eingeklappt. */
+  details.adv { flex: 0 0 100%; margin-top: 4px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  details.adv > summary { cursor: pointer; color: var(--text-dim); font-size: 12.5px; font-weight: 600; list-style: none; display: inline-flex; align-items: center; gap: 6px; user-select: none; }
+  details.adv > summary::-webkit-details-marker { display: none; }
+  details.adv > summary::before { content: "▸"; font-size: 10px; }
+  details.adv[open] > summary::before { content: "▾"; }
+  details.adv > summary:hover { color: var(--text); }
+  details.adv .adv-body { margin-top: 12px; }
   /* Was gerade läuft, steht dort, wo man es gestartet hat (Anmerkung 120) —
      statt eines Reiterwechsels bei jedem Knopfdruck. */
   .job-live { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -1697,43 +1708,54 @@
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key">
-              <button class="btn secondary" id="btn-timeline-import" style="width:100%; text-align:left" data-i18n="act.tlimport">🛰️ Google Timeline importieren</button>
+              <button class="btn" id="btn-timeline-import" style="width:100%; text-align:left" data-i18n="act.tlimport">🛰️ Google Timeline importieren</button>
               <input type="file" id="timeline-file" accept=".json,application/json" style="display:none">
             </div>
             <div class="action-desc"><span data-i18n="act.tlimport.desc"><b>Orts-Historie &amp; Routen aus Google Maps.</b><br>
               Besuche werden zu Ereignissen, Bewegungen zu Routen; Mehrfach-Import erzeugt keine
-              Duplikate. Wie du am Smartphone exportierst, steht in der README-Anleitung (Schritt 2).</span><br>
-              <label class="stat-label" style="display:inline-flex; align-items:center; gap:6px; margin-top:8px">
-                Besuche mit Ortssicherheit unter
-                <input id="tl-minprob" type="number" min="0" max="100" step="5" value="0"
-                       style="width:60px; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:4px 6px; color:var(--text)">
-                % überspringen (0 = alle importieren — betrifft v. a. „Gesuchte Adresse")
-              </label></div>
+              Duplikate. Wie du am Smartphone exportierst, steht in der README-Anleitung (Schritt 2).</span>
+              <details class="adv">
+                <summary data-i18n="adm.adv.import">Erweiterte Import-Option</summary>
+                <div class="adv-body">
+                  <label class="stat-label" style="display:inline-flex; align-items:center; gap:6px">
+                    Besuche mit Ortssicherheit unter
+                    <input id="tl-minprob" type="number" min="0" max="100" step="5" value="0"
+                           style="width:60px; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:4px 6px; color:var(--text)">
+                    % überspringen (0 = alle importieren — betrifft v. a. „Gesuchte Adresse")
+                  </label>
+                </div>
+              </details></div>
           </div>
           <!-- A46: Reparatur für den Bestand. Steht direkt unter dem Import,
                weil sie genau dessen Hinterlassenschaft aufräumt — neue
                Importe schneiden schon selbst. Erst sehen, dann schreiben
-               (P2.5-Muster): die Aktion fasst Bestätigtes an. -->
-          <div class="action-row has-result">
-            <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
-              <button class="btn secondary" id="btn-md-preview" style="text-align:left" data-i18n="md.preview">🔍 Nachsehen</button>
-              <button class="btn" id="btn-md-run" style="text-align:left" disabled data-i18n="md.run">✂️ In Tage schneiden</button>
+               (P2.5-Muster): die Aktion fasst Bestätigtes an. A3: einmaliger
+               Reparaturlauf, deshalb zusammengeklappt. -->
+          <details class="adv">
+            <summary data-i18n="adm.adv.repair">Erweitert: alten Bestand in Tage schneiden</summary>
+            <div class="adv-body">
+              <div class="action-row has-result" style="padding:0; border-bottom:none">
+                <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
+                  <button class="btn secondary" id="btn-md-preview" style="text-align:left" data-i18n="md.preview">🔍 Nachsehen</button>
+                  <button class="btn secondary" id="btn-md-run" style="text-align:left" disabled data-i18n="md.run">✂️ In Tage schneiden</button>
+                </div>
+                <div class="action-desc">
+                  <span data-i18n="md.desc"><b>Mehrtägige Besuche aus alten Importen in Tage schneiden.</b><br>
+                  Neue Importe schneiden schon selbst; dieser Knopf holt den Bestand nach — <b>nur
+                  importierte Besuche</b>, von Hand Erfasstes bleibt mehrtägig. „Nachsehen" zeigt vorher,
+                  was passiert. Hintergrund in der README-Anleitung (Schritt 2).</span>
+                </div>
+                <div id="md-result" class="hint action-result" style="display:none"></div>
+              </div>
             </div>
-            <div class="action-desc">
-              <span data-i18n="md.desc"><b>Mehrtägige Besuche aus alten Importen in Tage schneiden.</b><br>
-              Neue Importe schneiden schon selbst; dieser Knopf holt den Bestand nach — <b>nur
-              importierte Besuche</b>, von Hand Erfasstes bleibt mehrtägig. „Nachsehen" zeigt vorher,
-              was passiert. Hintergrund in der README-Anleitung (Schritt 2).</span>
-            </div>
-            <div id="md-result" class="hint action-result" style="display:none"></div>
-          </div>
+          </details>
         </div>
 
         <div class="section-title" data-i18n="adm.placenames">3 · Ortsnamen</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
-              <button class="btn secondary" id="btn-resolve-run" style="text-align:left" data-i18n="act.namerun">📍 Lauf starten</button>
+              <button class="btn" id="btn-resolve-run" style="text-align:left" data-i18n="act.namerun">📍 Lauf starten</button>
             </div>
             <div class="action-desc" data-i18n="act.namerun.desc"><b>Ein Lauf für alle Ortsnamen</b> (Reverse-Geocoding
               via OpenStreetMap, gedrosselt; läuft als Hintergrund-Job in Etappen, jederzeit fortsetzbar;
@@ -1742,20 +1764,24 @@
               einmal</b>. Sonderfälle (Labels wie „Zuhause", Fremdschrift, fehlende Bausteine) erklärt die
               README-Anleitung (Schritt 3).</div>
           </div>
-          <div class="action-row">
-            <div class="action-key"><b style="font-size:13px" data-i18n="adm.format">📐 Anzeige-Format</b></div>
-            <div class="action-desc"><span data-i18n="adm.format.desc"><b>Bausteine für aufgelöste Adressen</b> — statt der langen
-              Adresskette mit Verwaltungsregionen und Postleitzahl:</span><br>
-              <span id="fmt-parts" style="display:inline-flex; gap:14px; flex-wrap:wrap; margin:8px 0">
-                <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="road" checked> <span data-i18n="pn.street">Straße</span></label>
-                <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="suburb" checked> <span data-i18n="pn.district">Ortsteil</span></label>
-                <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="city" checked> <span data-i18n="pn.city">Stadt</span></label>
-                <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="country" checked> <span data-i18n="pn.country">Land</span></label>
-              </span><br>
-              <span data-i18n="adm.format.desc2">Benannte Orte (Restaurant, Museum …) behalten ihren Eigennamen immer vorn.
-              Die Auswahl gilt sofort für alle neuen Auflösungen; Bestandsdaten bringt der Lauf
-              oben aufs gewählte Muster.</span></div>
-          </div>
+          <details class="adv">
+            <summary data-i18n="adm.format">📐 Anzeige-Format der Adressen</summary>
+            <div class="adv-body">
+              <div class="action-row" style="padding:0; border-bottom:none">
+                <div class="action-desc"><span data-i18n="adm.format.desc"><b>Bausteine für aufgelöste Adressen</b> — statt der langen
+                  Adresskette mit Verwaltungsregionen und Postleitzahl:</span><br>
+                  <span id="fmt-parts" style="display:inline-flex; gap:14px; flex-wrap:wrap; margin:8px 0">
+                    <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="road" checked> <span data-i18n="pn.street">Straße</span></label>
+                    <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="suburb" checked> <span data-i18n="pn.district">Ortsteil</span></label>
+                    <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="city" checked> <span data-i18n="pn.city">Stadt</span></label>
+                    <label class="stat-label" style="display:flex; align-items:center; gap:5px"><input type="checkbox" data-part="country" checked> <span data-i18n="pn.country">Land</span></label>
+                  </span><br>
+                  <span data-i18n="adm.format.desc2">Benannte Orte (Restaurant, Museum …) behalten ihren Eigennamen immer vorn.
+                  Die Auswahl gilt sofort für alle neuen Auflösungen; Bestandsdaten bringt der Lauf
+                  oben aufs gewählte Muster.</span></div>
+              </div>
+            </div>
+          </details>
         </div>
 
         <!-- P2.1: Immich-Zugang je Nutzer -->
@@ -1764,7 +1790,7 @@
           <div class="action-row">
             <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
               <button class="btn secondary" id="im-test" style="text-align:left" data-i18n="im.test">🔌 Verbindung testen</button>
-              <button class="btn secondary" id="im-run" style="text-align:left" data-i18n="im.run">🖼️ Fotos verknüpfen</button>
+              <button class="btn" id="im-run" style="text-align:left" data-i18n="im.run">🖼️ Fotos verknüpfen</button>
               <button class="btn ghost" id="im-reset" style="text-align:left" data-i18n="im.reset">↺ Verknüpfungen verwerfen</button>
             </div>
             <div class="action-desc">
@@ -1893,7 +1919,7 @@
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key">
-              <button class="btn secondary" id="btn-enrich" style="width:100%; text-align:left" data-i18n="act.weather">🌤️ Wetter ergänzen</button>
+              <button class="btn" id="btn-enrich" style="width:100%; text-align:left" data-i18n="act.weather">🌤️ Wetter ergänzen</button>
             </div>
             <div class="action-desc" data-i18n="act.weather.desc"><b>Fehlendes Wetter nachtragen</b> (via Open-Meteo,
               <b>additiv</b> — Vorhandenes wird nie überschrieben).<br>
@@ -1906,7 +1932,7 @@
         <div class="section-title" data-i18n="adm.backup">7 · Sichern &amp; Zurückspielen</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
-            <button class="btn secondary" id="btn-export" data-i18n="act.export">📦 Daten exportieren</button>
+            <button class="btn" id="btn-export" data-i18n="act.export">📦 Daten exportieren</button>
             <div class="action-desc"><span data-i18n="act.export.desc"><b>Backup als JSON-Datei.</b><br>
               Lädt alle deine Daten (Roh-Eingang, Ereignisse, Objekte, Orte, Wetter) als eine
               JSON-Datei herunter. Embeddings sind enthalten. Regelmäßig machen — das ist dein Backup.</span><br>
@@ -2917,7 +2943,9 @@ const I18N_EN = {
   'otd.year': "one year ago",
   'otd.years': "{n} years ago",
   'act.namerun': "📍 Start run",
-  'adm.format': "📐 Display format",
+  'adm.format': "📐 Address display format",
+  'adm.adv.import': "Advanced import option",
+  'adm.adv.repair': "Advanced: cut older data into days",
   'opt.allcats': "All categories",
   'opt.allsources': "All sources",
   'opt.src.ai': "AI extraction",
