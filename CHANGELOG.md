@@ -90,6 +90,12 @@ any `MINOR`.
   of your life vanished while the map still looked full.
 
 ### Changed
+- **“My data” reads more calmly.** Each of the seven steps kept a full paragraph
+  of explanation next to its button — accurate, but a wall of text. The buttons
+  now carry a single sentence of what they do; the detailed how-and-why has moved
+  into the README guide (“Getting started — a sensible order”), which each step
+  points to. Nothing was removed and no run changed — only the reading. The map
+  and its controls are untouched for now.
 - **The map now draws all your photo points instead of a selection.** The old
   ceiling of 5000 points per answer already bit at an ordinary collection of
   8000 located photos, so the map was condensing in everyday use while nothing

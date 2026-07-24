@@ -52,14 +52,26 @@ confirmed record — and it makes the imports below much easier to judge.
 3. **Resolve place names.** Imported visits arrive as `Place (53.49, 10.00)`.
    The run turns them into addresses via OpenStreetMap, and it is deliberately
    throttled — start it early, let it work in the background. Manually renamed
-   places are never touched.
+   places are never touched. Each place is geocoded at most once, and long
+   addresses are shortened to the building blocks you pick below the button
+   (street, district, city, country). Special cases it handles: labels such as
+   *Home* are kept as a prefix (“Home — Example Street 1”); names in non-Latin
+   scripts (e.g. Greek) are re-resolved to a Latin transliteration; and places
+   whose name is fine but whose individual address parts were never stored are
+   backfilled once, so the timeline can group them by district.
 4. **Connect Immich**, if you have it. Four things, in this order: *test the
    connection*, then **propose entries from photos** (one year at a time, with a
    mandatory preview) and confirm what you want in *Moderation*, then **link
    photos**, which attaches pictures to the entries that now exist, and finally
    **locate photos** — that one puts every geotagged picture on the map as its
    own point and creates no entries at all. Photos stay in Immich; Life-Dash
-   stores references, and the API key it needs is read-only.
+   stores references, and the API key it needs is read-only. It needs exactly
+   five read-only permissions — `asset.read` (find photos by time), `asset.view`
+   (fetch previews), `album.read` (propose albums as trips), `user.read` (tell
+   your own photos from other people's) and `server.about` (the connection
+   test) — so it can neither delete nor upload anything in Immich. Create it
+   under Immich → Account → API Keys; the *test connection* button checks each
+   permission separately and names any that is missing.
 
    Albums are *not* proposed automatically. An album would become one multi-day
    entry with a single point on the map, and the twin of the trip you enter

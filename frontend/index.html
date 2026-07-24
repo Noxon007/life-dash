@@ -1678,7 +1678,9 @@
           und Fotos verknüpfen · <b>5.</b> mehrtägiges aufteilen ·
           <b>6.</b> Wetter ergänzen · <b>7.</b> Backup ziehen.
           Nichts davon ist Pflicht, und jeder Lauf lässt sich beliebig oft wiederholen —
-          nachgetragen wird immer nur, was fehlt.</div>
+          nachgetragen wird immer nur, was fehlt.
+          <br><b>Ausführliche Erklärung zu jedem Schritt</b> steht in der README-Anleitung
+          („Getting started — a sensible order").</div>
         <div class="section-title" data-i18n="adm.tracking">1 · Was trackst du?</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
@@ -1699,10 +1701,8 @@
               <input type="file" id="timeline-file" accept=".json,application/json" style="display:none">
             </div>
             <div class="action-desc"><span data-i18n="act.tlimport.desc"><b>Orts-Historie &amp; Routen aus Google Maps.</b><br>
-              Importiert den Timeline-Export vom Smartphone (Android: Einstellungen → Standort →
-              Standortdienste → Zeitachse → „Zeitachsendaten exportieren"; auch alte Takeout-Exporte
-              funktionieren). Besuche werden zu Events, Bewegungen zu Routen auf der Karte.
-              Mehrfach-Import erzeugt keine Duplikate (Segment-Hash).</span><br>
+              Besuche werden zu Ereignissen, Bewegungen zu Routen; Mehrfach-Import erzeugt keine
+              Duplikate. Wie du am Smartphone exportierst, steht in der README-Anleitung (Schritt 2).</span><br>
               <label class="stat-label" style="display:inline-flex; align-items:center; gap:6px; margin-top:8px">
                 Besuche mit Ortssicherheit unter
                 <input id="tl-minprob" type="number" min="0" max="100" step="5" value="0"
@@ -1721,13 +1721,9 @@
             </div>
             <div class="action-desc">
               <span data-i18n="md.desc"><b>Mehrtägige Besuche aus alten Importen in Tage schneiden.</b><br>
-              Google liefert Anfang und Ende eines Aufenthalts; bis 0.38 wurden beide roh übernommen,
-              also wurde jede Nacht im eigenen Bett ein <b>zweitägiges</b> Ereignis — bei einem Wohnort
-              sind das schnell tausende. Neue Importe schneiden bereits selbst; dieser Knopf holt den
-              Bestand nach. Die Zeitpunkte bleiben auf die Sekunde erhalten, geschnitten wird nur an der
-              Tagesgrenze. <b>Nur importierte Besuche</b> — von Hand erfasste Reisen und Immich-Vorschläge
-              bleiben mehrtägig, denn dort ist die Spanne eine Aussage. Ereignisse mit eigenen
-              Tages-Einträgen und Spannen über einer Woche lässt der Lauf aus und sagt es.</span>
+              Neue Importe schneiden schon selbst; dieser Knopf holt den Bestand nach — <b>nur
+              importierte Besuche</b>, von Hand Erfasstes bleibt mehrtägig. „Nachsehen" zeigt vorher,
+              was passiert. Hintergrund in der README-Anleitung (Schritt 2).</span>
             </div>
             <div id="md-result" class="hint action-result" style="display:none"></div>
           </div>
@@ -1740,21 +1736,11 @@
               <button class="btn secondary" id="btn-resolve-run" style="text-align:left" data-i18n="act.namerun">📍 Lauf starten</button>
             </div>
             <div class="action-desc" data-i18n="act.namerun.desc"><b>Ein Lauf für alle Ortsnamen</b> (Reverse-Geocoding
-              via OpenStreetMap, gedrosselt; läuft als Hintergrund-Job in Etappen und ist jederzeit
-              fortsetzbar; manuell umbenannte Einträge bleiben immer unangetastet). Der Lauf nimmt sich
-              jeden Ort vor, dessen Name noch nicht stimmt, und geocodiert ihn <b>höchstens einmal</b> —
-              auch wenn mehrere Punkte auf ihn zutreffen:<br>
-              <b>Fehlende Namen:</b> importierte Besuche heißen „Ort (53.49, 10.00)" oder tragen nur
-              ein Label wie „Zuhause" — der Lauf holt echte Adressen, Labels bleiben als Präfix
-              („Zuhause — Musterstraße 1").<br>
-              <b>Lange Adressen:</b> werden auf die unten gewählten Bausteine gekürzt.<br>
-              <b>Fremdschrift:</b> Namen in Lokalschrift (z. B. Griechisch) werden mit Sprach-Fallback
-              zur lateinischen Umschrift neu aufgelöst.<br>
-              <b>Fehlende Bausteine:</b> Orte, deren Name stimmt, für die aber nie die einzelnen
-              Adressteile (Straße, Ortsteil, Stadt, Land) gespeichert wurden — die trägt die Stufe
-              „Ortsteil" im Zeitstrahl. Sie kommen ganz zuletzt dran und werden <b>genau einmal</b>
-              geholt; danach lässt der Lauf sie in Ruhe. Beim ersten Mal nach der Aktualisierung
-              kann das viele Orte betreffen — der Lauf ist jederzeit unterbrechbar und setzt fort.</div>
+              via OpenStreetMap, gedrosselt; läuft als Hintergrund-Job in Etappen, jederzeit fortsetzbar;
+              manuell umbenannte Einträge bleiben unangetastet). Holt echte Adressen für „Ort (53.49, 10.00)",
+              kürzt lange Adressen auf die unten gewählten Bausteine und geocodiert jeden Ort <b>höchstens
+              einmal</b>. Sonderfälle (Labels wie „Zuhause", Fremdschrift, fehlende Bausteine) erklärt die
+              README-Anleitung (Schritt 3).</div>
           </div>
           <div class="action-row">
             <div class="action-key"><b style="font-size:13px" data-i18n="adm.format">📐 Anzeige-Format</b></div>
@@ -1791,13 +1777,11 @@
               <input type="password" id="im-key" class="mf-select" style="width:100%; max-width:520px"
                      data-i18n-ph="im.key.ph" placeholder="API-Schlüssel (Immich → Konto → API-Schlüssel)"><br>
               <span class="hint" id="im-state" style="display:block; margin-top:8px" data-i18n="im.state.none">Noch kein Schlüssel hinterlegt.</span>
-              <span class="hint" style="display:block; margin-top:8px" data-i18n="im.perms"><b>Welche Rechte braucht der Schlüssel?</b>
-              Genau fünf, alle lesend: <code>asset.read</code> (Fotos nach Zeit finden), <code>asset.view</code>
-              (Vorschauen holen), <code>album.read</code> (Alben als Reisen vorschlagen), <code>user.read</code>
-              (eigene von fremden Fotos unterscheiden) und <code>server.about</code> (Verbindungstest). Ein so
-              beschränkter Schlüssel kann in Immich <b>nichts löschen und nichts hochladen</b>. Anzulegen unter
-              Immich → Konto-Einstellungen → API-Schlüssel. Der Testknopf prüft jedes dieser Rechte einzeln und
-              sagt, welches fehlt.</span>
+              <span class="hint" style="display:block; margin-top:8px" data-i18n="im.perms"><b>Der Schlüssel braucht fünf lesende Rechte:</b>
+              <code>asset.read</code>, <code>asset.view</code>, <code>album.read</code>, <code>user.read</code>,
+              <code>server.about</code> — so beschränkt kann er in Immich <b>nichts löschen und nichts
+              hochladen</b>. Anlegen unter Immich → Konto → API-Schlüssel; der Testknopf prüft jedes einzeln
+              und nennt das fehlende. Was jedes Recht tut, steht in der README-Anleitung (Schritt 4).</span>
               <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap">
                 <button class="btn small secondary" id="im-save" data-i18n="im.save">Speichern</button>
               </div>
@@ -1832,11 +1816,10 @@
               Anlegen — der Knopf bleibt bis dahin gesperrt. Ein Jahr kann hunderte Vorschläge ergeben, und
               die will man vorher gesehen haben.</span>
               <span class="hint" style="display:block; margin-top:8px" data-i18n="ims.albums.why"><b>Alben sind
-              standardmäßig aus.</b> Ein Album wird <i>ein</i> Vorschlag („London, 1200 Bilder") — ein mehrtägiger
-              Eintrag mit genau einem Punkt auf der Karte, obwohl jedes der 1200 Bilder für sich weiß, wo es entstanden
-              ist. Und es wird zum Zwilling der Reise, die du selbst einträgst. Besser herum: <b>Reisen legst du an,
-              die Fotos hängen sich daran</b> („Fotos verknüpfen" oben). Wer trotzdem nachsehen will, setzt den Haken —
-              geteilte Alben sind dann erlaubt und werden als solche gekennzeichnet.</span>
+              standardmäßig aus.</b> Ein Album würde <i>ein</i> mehrtägiger Vorschlag mit einem Kartenpunkt — der
+              Zwilling deiner selbst erfassten Reise. Besser herum: <b>Reisen legst du an, die Fotos hängen sich
+              daran</b> („Fotos verknüpfen" oben). Wer trotzdem nachsehen will, setzt den Haken. Warum, in der
+              README-Anleitung (Schritt 4).</span>
             </div>
             <div id="ims-result" class="hint action-result" style="display:none"></div>
           </div>
@@ -1852,11 +1835,8 @@
             </div>
             <div class="action-desc">
               <span data-i18n="pp.desc"><b>Jedes Foto mit Koordinaten bekommt einen Punkt auf der Karte</b> — dort,
-              wo es aufgenommen wurde. Ein Album mit 1200 Bildern aus London ist damit 1200 Punkte statt einem.
-              Der Lauf legt <b>keine Ereignisse</b> an und ändert nichts an deinen Einträgen; er merkt sich nur
-              Zeitpunkt, Koordinate und den Ortsnamen, den Immich selbst schon kennt. Genommen werden dieselben
-              Fotos wie oben: <b>eigene</b>, <b>mit Koordinaten</b>, <b>im Immich-Zeitstrahl</b>. Sichtbar wird
-              das Ergebnis über den Schalter <b>„📷 Fotos"</b> auf der Karte und im Zeitstrahl.</span>
+              wo es aufgenommen wurde. Der Lauf legt <b>keine Ereignisse</b> an und ändert nichts an deinen
+              Einträgen. Sichtbar über den Schalter <b>„📷 Fotos"</b> auf Karte und Zeitstrahl (standardmäßig aus).</span>
             </div>
             <div id="pp-result" class="hint action-result" style="display:none"></div>
           </div>
@@ -1869,9 +1849,8 @@
             </div>
             <div class="action-desc">
               <span data-i18n="ims.drop.desc"><b>Alle offenen Album-Vorschläge auf einmal verwerfen.</b>
-              Betrifft nur <b>unbestätigte</b> Vorschläge, die aus einem Album entstanden sind — bestätigte Einträge
-              und die Fototage bleiben unangetastet. Verworfene Alben kommen nicht wieder, auch wenn du später erneut
-              nachsiehst.</span>
+              Nur <b>unbestätigte</b> aus Alben — bestätigte Einträge und Fototage bleiben. Verworfene kommen
+              nicht wieder.</span>
             </div>
             <div id="ims-drop-result" class="hint action-result" style="display:none"></div>
           </div>
@@ -1895,14 +1874,10 @@
               </label>
             </div>
             <div class="action-desc">
-              <span data-i18n="ds.desc"><b>Mehrtägige Ereignisse in Tages-Einträge aufteilen</b> — dasselbe wie der Knopf
-              im Bearbeiten-Dialog, nur für alle auf einmal. Jeder Tag bekommt einen eigenen Eintrag
-              („… — Tag 3"), eingeklappt unter dem Haupt-Ereignis, mit eigenem Wetter je Tag.
-              Aufgeteilt wird nur, was <b>bestätigt</b> und <b>tagesgenau datiert</b> ist: ein Vorschlag
-              würde die Warteschlange vervielfachen, und aus „Sommer 2002" 92 Tage zu machen behauptet
-              eine Genauigkeit, die die Angabe selbst dementiert. Vorhandene Tage bleiben, es werden nur
-              Lücken gefüllt — zweimal drücken legt nichts doppelt an. Das <b>Wetter</b> holt der
-              Wetterlauf nach, nicht dieser Knopf.</span>
+              <span data-i18n="ds.desc"><b>Mehrtägige Ereignisse in Tages-Einträge aufteilen</b> — wie im
+              Bearbeiten-Dialog, nur für alle auf einmal. Jeder Tag bekommt einen eigenen Eintrag, eingeklappt
+              unter dem Haupt-Ereignis. Nur <b>Bestätigtes</b> mit <b>tagesgenauem Datum</b>; vorhandene Tage
+              bleiben, zweimal drücken legt nichts doppelt an. Das Wetter holt der Wetterlauf nach.</span>
             </div>
             <div id="days-result" class="hint action-result" style="display:none"></div>
           </div>
@@ -1920,16 +1895,11 @@
             <div class="action-key">
               <button class="btn secondary" id="btn-enrich" style="width:100%; text-align:left" data-i18n="act.weather">🌤️ Wetter ergänzen</button>
             </div>
-            <div class="action-desc" data-i18n="act.weather.desc"><b>Fehlendes Wetter nachtragen (Fakten-Anreicherung).</b><br>
-              Holt historisches Wetter (via Open-Meteo) für <i>deine</i> Ereignisse, die noch
-              <i>keins</i> haben — z. B. nach neuen Einträgen oder Importen. Ältere Events mit Wetter
-              im Alt-Format (nur Temperatur + Bedingung) bekommen dabei die fehlenden <i>Tageswerte</i>
-              (Min/Max, Sonne, Regen, Schnee, Wind) <b>additiv</b> nachgerüstet. Einmal geholt =
-              dauerhaft: Vorhandene Werte werden nie überschrieben oder neu berechnet. Deshalb steht
-              der Lauf hier hinten: er fragt jedes Ereignis genau einmal, also lohnt er sich am
-              meisten, wenn Importe und Vorschläge durch sind. Läuft im Hintergrund auf dem Server
-              (Fortschritt und Stopp im Reiter <b>„Jobs"</b>) und lässt sich dort auch als
-              Nachtplan eintragen.</div>
+            <div class="action-desc" data-i18n="act.weather.desc"><b>Fehlendes Wetter nachtragen</b> (via Open-Meteo,
+              <b>additiv</b> — Vorhandenes wird nie überschrieben).<br>
+              Steht bewusst hinten: jedes Ereignis wird genau einmal gefragt, also lohnt der Lauf am meisten,
+              wenn Importe und Vorschläge durch sind. Läuft im Hintergrund (Fortschritt/Stopp im Reiter
+              <b>„Jobs"</b>, auch als Nachtplan). Details in der README-Anleitung (Schritt 6).</div>
           </div>
         </div>
 
@@ -2698,7 +2668,7 @@ const I18N_EN = {
   'adm.placenames': "3 · Place names",
   'adm.tracking': "1 · What do you track?",
   'adm.weather': "6 · Weather",
-  'adm.firstrun': "<b>First time here?</b> The sections are in the order that makes sense — each one feeds the next its material: <b>1.</b> pick your modules · <b>2.</b> import the Google timeline · <b>3.</b> resolve place names · <b>4.</b> connect Immich, review its proposals and link photos · <b>5.</b> split multi-day entries · <b>6.</b> add weather · <b>7.</b> take a backup. None of it is mandatory, and every run can be repeated as often as you like — it only ever fills in what is missing.",
+  'adm.firstrun': "<b>First time here?</b> The sections are in the order that makes sense — each one feeds the next its material: <b>1.</b> pick your modules · <b>2.</b> import the Google timeline · <b>3.</b> resolve place names · <b>4.</b> connect Immich, review its proposals and link photos · <b>5.</b> split multi-day entries · <b>6.</b> add weather · <b>7.</b> take a backup. None of it is mandatory, and every run can be repeated as often as you like — it only ever fills in what is missing.<br><b>A detailed explanation of every step</b> is in the README guide (“Getting started — a sensible order”).",
   'adm.users.title': "Users",
   'adm.modqueue': "Moderation queue",
   'act.recompute': "🔄 Recompute AI proposals",
@@ -2711,7 +2681,7 @@ const I18N_EN = {
   'adm.users.hint2': "Here you can change roles and delete users <b>together with all their data</b>. Your own account is protected — so there is always at least one admin left.",
   'exp.opt.media': "<b>Include photos</b> (produces a ZIP file — the complete backup)",
   'exp.opt.timeline': "Include imported Google timeline data (visits, routes and their raw records)",
-  'im.perms': "<b>Which permissions does the key need?</b> Exactly five, all of them read-only: <code>asset.read</code> (finding photos by time), <code>asset.view</code> (fetching previews), <code>album.read</code> (proposing albums as trips), <code>user.read</code> (telling your own photos from other people's) and <code>server.about</code> (the connection test). A key limited to those <b>cannot delete or upload anything</b> in Immich. Create it under Immich → Account settings → API Keys. The test button checks each of these separately and names the one that is missing.",
+  'im.perms': "<b>The key needs five read-only permissions:</b> <code>asset.read</code>, <code>asset.view</code>, <code>album.read</code>, <code>user.read</code>, <code>server.about</code> — so limited it <b>cannot delete or upload anything</b> in Immich. Create it under Immich → Account → API Keys; the test button checks each one and names the one that is missing. What each permission is for is in the README guide (step 4).",
   'exp.media.hint': "Without this tick you get plain JSON: small, readable, diffable — but <b>without your image files</b>. Those are only in the ZIP. Immich pictures are in neither: they live in Immich and are backed up there.",
   'exp.zip.started': "📦 Building the full backup — the download starts shortly. With many photos this can take a moment.",
   'imp.rows': "new rows",
@@ -2722,9 +2692,9 @@ const I18N_EN = {
   // P2.1 stage 2 (0.37.0) — Immich as an event source
   'ims.desc': "<b>Photos become proposals.</b> A day with many pictures in one place (“34 photos on 12 July in Detmold”) becomes an <b>unconfirmed</b> entry in moderation — nothing is confirmed on its own. Only <b>your own</b> photos <b>with coordinates</b> that sit in your Immich timeline are clustered; archived and locked ones stay out.",
   'ims.albums': "Look at albums too",
-  'ims.albums.why': "<b>Albums are off by default.</b> An album becomes <i>one</i> proposal (“London, 1200 pictures”) — a multi-day entry with exactly one point on the map, even though each of those 1200 pictures knows for itself where it was taken. And it becomes the twin of the trip you enter yourself. The better way round: <b>you create the trips, the photos attach themselves</b> (“Link photos” above). If you want to look anyway, tick the box — shared albums are then allowed and marked as such.",
+  'ims.albums.why': "<b>Albums are off by default.</b> An album would become <i>one</i> multi-day proposal with a single point on the map — the twin of the trip you enter yourself. The better way round: <b>you create the trips, the photos attach themselves</b> (“Link photos” above). Tick the box if you want to look anyway. Why, in the README guide (step 4).",
   'ims.drop': "🗑️ Discard album proposals",
-  'ims.drop.desc': "<b>Discard all open album proposals at once.</b> Affects only <b>unconfirmed</b> proposals that came from an album — confirmed entries and the photo days are left alone. Discarded albums never come back, even if you look again later.",
+  'ims.drop.desc': "<b>Discard all open album proposals at once.</b> Only <b>unconfirmed</b> ones that came from an album — confirmed entries and photo days stay. Discarded ones do not come back.",
   'ims.drop.count': "{n} open album proposals",
   'ims.drop.empty': "No open album proposal.",
   'ims.drop.done': "✓ {n} album proposals discarded.",
@@ -2732,7 +2702,7 @@ const I18N_EN = {
   'pp.run': "📍 Locate photos",
   'pp.reset': "🗑️ Discard points",
   'pp.year.tip': "One year per run — a whole library at once is not a run, it is a timeout",
-  'pp.desc': "<b>Every photo with coordinates gets a point on the map</b> — where it was taken. An album of 1200 pictures from London becomes 1200 points instead of one. The run creates <b>no events</b> and changes nothing about your entries; it only remembers the time, the coordinate and the place name Immich already knows. It takes the same photos as above: <b>your own</b>, <b>with coordinates</b>, <b>in the Immich timeline</b>. The result becomes visible through the <b>“📷 Photos”</b> switch on the map and in the timeline.",
+  'pp.desc': "<b>Every photo with coordinates gets a point on the map</b> — where it was taken. The run creates <b>no events</b> and changes nothing about your entries. It becomes visible through the <b>“📷 Photos”</b> switch on the map and in the timeline (off by default).",
   'pp.have': "{n} photos located",
   'pp.years': "Searched: {y}",
   'pp.none': "No year searched yet. Until then the photo layer on the map stays empty — that does not mean there are no photos.",
@@ -2789,7 +2759,7 @@ const I18N_EN = {
   'ds.run': "📅 Split them all",
   'ds.max': "up to",
   'ds.days': "days",
-  'ds.desc': "<b>Split multi-day events into day entries</b> — the same as the button in the edit dialog, but for all of them at once. Every day gets its own entry (“… — day 3”), collapsed under the main event, with its own weather. Only what is <b>confirmed</b> and <b>dated to the day</b> is split: a proposal would multiply the moderation queue, and turning “summer 2002” into 92 days claims a precision the entry itself denies. Existing days stay, only gaps are filled — pressing twice creates nothing twice. The <b>weather</b> is added by the weather run, not by this button.",
+  'ds.desc': "<b>Split multi-day events into day entries</b> — the same as the button in the edit dialog, but for all of them at once. Every day gets its own entry, collapsed under the main event. Only what is <b>confirmed</b> and <b>dated to the day</b>; existing days stay, pressing twice creates nothing twice. The weather is added by the weather run.",
   'ds.none': "Nothing to split.",
   'ds.none.why': "No confirmed, day-precise multi-day event without day entries.",
   'ds.head': "{n} events → {d} new day entries",
@@ -2800,7 +2770,7 @@ const I18N_EN = {
   // A46 — cut multi-day imported visits into days
   'md.preview': "🔍 Take a look",
   'md.run': "✂️ Cut into days",
-  'md.desc': "<b>Cut multi-day visits from older imports into days.</b><br>Google reports the start and the end of a stay; until 0.38 both were taken over raw, so every night in your own bed became a <b>two-day</b> event — at a home address that adds up to thousands. New imports already cut by themselves; this button catches up with what is already there. The timestamps stay accurate to the second, the cut happens only at the day boundary. <b>Imported visits only</b> — trips you entered by hand and Immich proposals stay multi-day, because there the span is a statement. Events with day entries of their own, and spans longer than a week, are left alone and named.",
+  'md.desc': "<b>Cut multi-day visits from older imports into days.</b><br>New imports already cut by themselves; this button catches up with what is already there — <b>imported visits only</b>, anything entered by hand stays multi-day. “Check first” shows what will happen. Background in the README guide (step 2).",
   'md.none': "Nothing to cut.",
   'md.none.why': "No imported visit reaches across a day boundary.",
   'md.head': "{n} visits → {r} rows afterwards",
@@ -3040,7 +3010,7 @@ const I18N_EN = {
   // --- Verwaltung: Erklaertexte ---
   'adm.runs.hint': "These runs happen <b>in the background on the server</b> — you can close the page. Progress, the stop button and the nightly schedule live in the <b>“Jobs”</b> tab; progress is kept when you stop, and a restart resumes where it left off.",
   'act.recompute.desc': "<b>Repeat the AI extraction.</b><br>Discards all <i>unconfirmed</i> events and rebuilds them from the raw inbox — with the current AI model and prompt. Confirmed events and manually corrected fields are left untouched. Useful after model or prompt changes. Stops cleanly when the AI quota runs out (whatever was computed is kept).",
-  'act.weather.desc': "<b>Fill in missing weather (fact enrichment).</b><br>Fetches historical weather (via Open-Meteo) for <i>your</i> entries that have <i>none</i> yet — e.g. after new entries or imports. Older events with weather in the legacy format (temperature and condition only) get the missing <i>daily values</i> (min/max, sun, rain, snow, wind) added <b>on top</b>. Fetched once = kept forever: existing values are never overwritten or recalculated. That is why this run comes last: it asks about each entry exactly once, so it pays off most when the imports and proposals are done. It runs in the background on the server (progress and stop in the <b>“Jobs”</b> tab), where it can also be put on the nightly schedule.",
+  'act.weather.desc': "<b>Fill in missing weather</b> (via Open-Meteo, <b>additive</b> — existing values are never overwritten).<br>Deliberately last: each entry is asked exactly once, so the run pays off most when imports and proposals are done. It runs in the background (progress and stop in the <b>“Jobs”</b> tab, and can be put on the nightly schedule). Details in the README guide (step 6).",
   'act.embed.desc': "<b>Rebuild the semantic search (derived data).</b><br>Discards the vectors of all events and recomputes them with the current embedding model. Required after every model change, otherwise the “meaning search” finds nothing or the wrong things. Stops without doing anything if no embedding model is configured.",
   'act.wipe.desc': "<b style=\"color:var(--danger)\">Cannot be undone!</b><br>Deletes all life data — raw inbox, events &amp; items, places, weather &amp; embeddings. User accounts remain. There is a double confirmation; afterwards the database is empty.",
   'adm.jobs.hint': "Long-running actions (weather, recompute, embeddings, place names, imports) are registered as <b>jobs with a lock</b>: the same type cannot run twice — not even from two browsers or by two users at once (this prevents duplicate API costs and duplicate data).",
@@ -3051,8 +3021,8 @@ const I18N_EN = {
   'adm.sched.hint': "Ticked runs start automatically once a day at the configured hour (server time) — e.g. at night when nobody is working. Runs server-side; no open browser needed.",
   'act.export.desc': "<b>Backup as a JSON file.</b><br>Downloads all your data (raw inbox, events, items, places, weather) as a single JSON file. Embeddings are included. Do this regularly — this is your backup.",
   'act.import.desc': "<b>Restore an export file.</b><br>Imports a Life-Dash export file. Entries that already exist (same ID) are skipped — importing repeatedly creates no duplicates. Everything lands in your account.",
-  'act.tlimport.desc': "<b>Location history &amp; routes from Google Maps.</b><br>Imports the timeline export from your phone (Android: Settings → Location → Location services → Timeline → “Export timeline data”; older Takeout exports work too). Visits become events, routes become tracks on the map. Importing repeatedly creates no duplicates.",
-  'act.namerun.desc': "<b>One run for every place name</b> (reverse geocoding via OpenStreetMap, rate limited; runs as a background job in stages and can be resumed at any time; manually renamed entries are always left alone). The run takes on every place whose name is not yet right and geocodes it <b>at most once</b>, even when several points apply to it:<br><b>Missing names:</b> imported visits are called “Place (53.49, 10.00)” or carry only a label such as “Home” — the run fetches real addresses, labels stay as a prefix (“Home — Example Street 1”).<br><b>Long addresses:</b> are shortened to the building blocks chosen below.<br><b>Foreign scripts:</b> names in local scripts (e.g. Greek) are re-resolved with a language fallback to the Latin transliteration.<br><b>Missing building blocks:</b> places whose name is fine but whose individual address parts (street, district, city, country) were never stored — those carry the “district” level in the timeline. They come last and are fetched <b>exactly once</b>; after that the run leaves them alone. The first time after the update this may affect many places — the run can be interrupted at any point and resumes.",
+  'act.tlimport.desc': "<b>Location history &amp; routes from Google Maps.</b><br>Visits become events, movements become routes; importing repeatedly creates no duplicates. How to export from your phone is in the README guide (step 2).",
+  'act.namerun.desc': "<b>One run for every place name</b> (reverse geocoding via OpenStreetMap, rate limited; runs as a background job in stages, resumable at any time; manually renamed entries are left alone). Fetches real addresses for “Place (53.49, 10.00)”, shortens long addresses to the building blocks chosen below, and geocodes each place <b>at most once</b>. Special cases (labels like “Home”, foreign scripts, missing building blocks) are explained in the README guide (step 3).",
   'adm.format.desc': "<b>Building blocks for resolved addresses</b> — instead of the long address chain with administrative regions and postcode:",
   'adm.track.desc': "<b>Choose modules for collection, statistics &amp; AI.</b><br>Deselected modules disappear from tabs, filters, forms and the AI prompt — existing data is kept and reappears immediately once you select them again.",
   'adm.fuzzy.hint': "Events with a vague date (month, season, year, decade or no date at all). Clicking one opens the quick editor — the more precise the dates, the better the timeline and map.",
