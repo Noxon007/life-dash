@@ -273,8 +273,14 @@ def compute(db: Session, user_id: str) -> AchievementsRead:
                 continue
             out.append(_evaluate(spec, module, metric(db, user_id, module, spec)))
 
-    # Fast Geschaffte zuerst: erreichte Stufe absteigend, dann Fortschritt.
-    out.sort(key=lambda a: (-a.tier_index, -a.progress, a.label))
+    # Reihenfolge: erreichte Stufe absteigend, dann die passierten Marken
+    # oberhalb von Platin, dann Fortschritt zum nächsten Ziel, dann Name.
+    # Ohne die Marken-Stufe stünde ein Platin OHNE Marke (Fortschritt 1.0,
+    # „Höchste Stufe erreicht") über einem Platin MIT Marken (das gerade zur
+    # nächsten Marke zählt, Fortschritt < 1.0) — obwohl das mit Marken die
+    # größere Leistung ist. Die Marken sind der eigentliche Rang oberhalb von
+    # Platin (Feedback 2026-07-24), also gehören sie VOR den Fortschritt.
+    out.sort(key=lambda a: (-a.tier_index, -a.marks_passed, -a.progress, a.label))
 
     return AchievementsRead(
         earned=sum(1 for a in out if a.tier_index > 0),

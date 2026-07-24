@@ -84,8 +84,14 @@ setTimeout(() => {
   // zerschnitte die Seitengrenze die Gruppen.
   check('Zeitstrahl fordert condense beim Server an',
         /condense:\s*1/.test(html), 'kein condense-Parameter in der Abfrage');
-  check('Aufklappen filtert nach Stadt am Server',
-        /fetchEvents\(\{\s*city:/.test(html), 'kein city-Filter beim Aufklappen');
+  // Anmerkung 134: Aufgeklappt wird nach der VERDICHTUNGSSTUFE (`place` +
+  // `group`), nicht mehr fest nach `city`. Bei „district" trägt group.city
+  // einen Ortsteil („HafenCity"), und ein Filter auf Location.city fände ihn
+  // nie — die Karte klappte ins Leere auf. Der Filter muss die Stufen-Spalte
+  // prüfen, dieselbe, die die Gruppe gebildet hat.
+  check('Aufklappen löst die Gruppe stufengerecht auf (place + group)',
+        /fetchEvents\(\{\s*group:[^}]*place:/.test(html),
+        'kein place/group-Filter beim Aufklappen — ein Ortsteil klappt ins Leere');
 
   ok.forEach(n => console.log('  ok  ' + n));
   fails.forEach(n => console.log('  XX  ' + n));

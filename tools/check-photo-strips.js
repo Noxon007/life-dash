@@ -6,6 +6,12 @@
 // und im Monatszoom wurden daraus dreißig Leisten mit hunderten Vorschaubildern.
 // Entschieden wurde: Woche bündeln, ab Monat **zwölf Bilder als Auswahl**.
 //
+// Feedback 2026-07-24: der Deckel gilt jetzt auf JEDER Zoomstufe — auch Tag und
+// Woche zeigen höchstens zwölf. Vorher zeigte die Woche ALLE Bilder (und ein
+// einzelner Tag ohnehin), und eine fotoreiche Woche/ein fotoreicher Tag ließ den
+// Zeitstrahl ruckeln. Die Zwölf sind über die Spanne gestreut (spreadPick), die
+// Gesamtzahl steht in der Beschriftung.
+//
 // Eine Auswahl, die sich nicht als Auswahl zu erkennen gibt, ist eine
 // Behauptung — deshalb prüft dieser Wächter vor allem die BESCHRIFTUNG. Und er
 // prüft den Betrachter: solange eine Leiste genau einen Tag umfasste, konnte
@@ -69,15 +75,17 @@ setTimeout(() => {
   ok('…und sie heißt nach dem Tag',
      /dieses Tages|this day/i.test(strips[0].textContent), strips[0].textContent.trim());
 
-  // --- 2. Woche: EINE Leiste, alle Bilder --------------------------------- //
+  // --- 2. Woche: EINE Leiste, gedeckelt auf zwölf ------------------------- //
   strips = render('week');
   ok('Wochenzoom: nur noch eine Leiste', strips.length === 1,
      `${strips.length} Leisten — die Tage stapeln sich wieder`);
   if (strips.length === 1) {
     const imgs = strips[0].querySelectorAll('img').length;
-    ok('…mit allen 40 Bildern der Woche', imgs === 40, `${imgs} Bilder`);
-    ok('…und sie heißt nach der Woche',
-       /Woche|week/i.test(strips[0].textContent), strips[0].textContent.trim());
+    ok('…gedeckelt auf zwölf Bilder (Feedback 2026-07-24)', imgs === 12, `${imgs} Bilder`);
+    const label = strips[0].textContent;
+    ok('…und sie heißt nach der Woche', /Woche|week/i.test(label), label.trim());
+    ok('…und nennt die Auswahl (12 von 40)', /12/.test(label) && /40/.test(label),
+       `"${label.trim()}" — eine Auswahl, die sich nicht als solche zeigt, behauptet Vollständigkeit`);
   }
 
   // --- 3. Monat: Auswahl, und sie sagt es -------------------------------- //
@@ -124,17 +132,19 @@ setTimeout(() => {
   // --- 5. Der Betrachter zeigt die Bilder DIESER Leiste ------------------- //
   // Der Fehler, der beim Bauen entstand: die Bilder über das Datum
   // nachzuschlagen ergab bei einer Wochenleiste den Satz des ersten Tages.
+  // Jetzt hält die Leiste die zwölf gestreuten Bilder selbst, der Betrachter
+  // zeigt genau diese — über die Woche verteilt, nicht nur den ersten Tag.
   render('week');
   let opened = null;
   w.eval('window.__origLb = openLightbox; openLightbox = (m, i) => { window.__lb = { n: m.length, i }; };');
-  const img = d.querySelectorAll('[data-day-media] img')[25];
+  const img = d.querySelectorAll('[data-day-media] img')[5];
   if (img) {
     img.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
     opened = w.__lb;
   }
-  ok('Klick öffnet den Betrachter mit der ganzen Wochenleiste',
-     opened && opened.n === 40, JSON.stringify(opened));
-  ok('…und beim angeklickten Bild', opened && opened.i === 25, JSON.stringify(opened));
+  ok('Klick öffnet den Betrachter mit der gedeckelten Wochenleiste',
+     opened && opened.n === 12, JSON.stringify(opened));
+  ok('…und beim angeklickten Bild', opened && opened.i === 5, JSON.stringify(opened));
 
   console.log(fail ? `\nFotoleisten: ${fail} Prüfung(en) fehlgeschlagen`
                    : '\nFotoleisten: alles grün');

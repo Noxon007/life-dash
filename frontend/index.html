@@ -300,6 +300,10 @@
   .eff.add   { color: var(--accent-2); border-color: color-mix(in srgb, var(--accent-2) 40%, transparent); background: color-mix(in srgb, var(--accent-2) 12%, transparent); }
   .eff.mod   { color: var(--warn);     border-color: color-mix(in srgb, var(--warn) 40%, transparent);     background: color-mix(in srgb, var(--warn) 12%, transparent); }
   .eff.layer { color: var(--text-dim); border-color: color-mix(in srgb, var(--text-dim) 40%, transparent); background: color-mix(in srgb, var(--text-dim) 12%, transparent); }
+  /* Anmerkung 133: Effekt-Badges auch außerhalb des Immich-Blocks. `write` =
+     fasst Bestätigtes an (Warnfarbe), `read` = liest nur (Akzent). */
+  .eff.write { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+  .eff.read  { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
   /* Was gerade läuft, steht dort, wo man es gestartet hat (Anmerkung 120) —
      statt eines Reiterwechsels bei jedem Knopfdruck. */
   .job-live { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -1064,6 +1068,10 @@
       <!-- F16: „Heute" — der Rückblick hat hier Platz, ohne den Zeitstrahl zu
            begraben. Bewusst schlank: was ansteht, was damals war. -->
       <div class="view active" id="view-today">
+        <!-- Anmerkung 127 (2026-07-24): eine persönliche Begrüßung, dynamisch
+             nach Tageszeit. Bewusst KURZ (der Rückblick „An diesem Tag" steht
+             ohnehin gleich darunter) — nur Gruß, Name und Datum. -->
+        <div id="today-greeting" style="margin-bottom:18px"></div>
         <div class="grid cols-4" style="margin-bottom:20px">
           <div class="stat-card" data-go="input" style="cursor:pointer">
             <div class="stat-num">✍️</div>
@@ -1089,11 +1097,6 @@
             <div class="stat-num" id="today-events">–</div>
             <div class="stat-label" data-i18n="today.total">Ereignisse gesamt</div>
             <div class="stat-sub" id="today-span">–</div>
-          </div>
-          <div class="stat-card" data-go="timeline" style="cursor:pointer">
-            <div class="stat-num">📅</div>
-            <div class="stat-label" data-i18n="today.timeline">Zum Zeitstrahl</div>
-            <div class="stat-sub" data-i18n="today.timeline.sub">Alles chronologisch</div>
           </div>
         </div>
         <!-- A35/Anmerkung 73: Startformular für die ersten Einträge, nur bei leerer
@@ -1140,7 +1143,7 @@
           <span class="filter-chip active" id="tl-city-chip" style="display:none"
                 data-i18n-title="tl.city.tip"
                 title="Zeitstrahl auf diese Stadt eingeschränkt — klicken, um wieder alles zu zeigen"></span>
-          <span class="filter-chip off" id="tl-visits-toggle" data-i18n-title="tl.visits.tip" title="Importierte Timeline-Besuche (Google) im Zeitstrahl anzeigen — auf der Karte sind sie immer sichtbar" data-i18n="tl.visits">🛰️ Besuche</span>
+          <span class="filter-chip off" id="tl-visits-toggle" data-i18n-title="tl.visits.tip" title="Importierte Timeline-Besuche (Google) im Zeitstrahl anzeigen — auf der Karte sind sie immer sichtbar" data-i18n="tl.visits.chip">🛰️ Besuche</span>
           <!-- A45: Fotopunkte als eigene, ausblendbare Ebene — genau wie die
                importierten Besuche daneben, und aus demselben Grund: es sind
                zu viele, um sie ungefragt in den Zeitstrahl zu kippen. -->
@@ -1291,15 +1294,14 @@
             <div class="stat-label" data-i18n="stat.snow">❄️ Schneereichster Tag</div>
             <div class="stat-sub" id="stat-snowy-sub">–</div>
           </div>
-          <!-- Anmerkung 114: Diese sechs rechnen aus Werten, die seit F12 bei
-               jeder Anreicherung mitkommen (UV, Böen, gefühlte Temperatur,
+          <!-- Anmerkung 114: Diese Kacheln rechnen aus Werten, die seit F12 bei
+               jeder Anreicherung mitkommen (Böen, gefühlte Temperatur,
                Tageslicht) und bisher nur an einem einzelnen Ereignis standen.
-               Kein neuer Abruf, keine neue Spalte — nur die Frage gestellt. -->
-          <div class="stat-card" data-event-slot="uv">
-            <div class="stat-num" id="stat-uv">–</div>
-            <div class="stat-label" data-i18n="stat.uv">🕶️ Stärkste Sonne</div>
-            <div class="stat-sub" id="stat-uv-sub">–</div>
-          </div>
+               Kein neuer Abruf, keine neue Spalte — nur die Frage gestellt.
+               Anmerkung 123 (2026-07-24): die UV-Kachel „Stärkste Sonne" ist
+               raus — Open-Meteos Archiv (ERA5) liefert `uv_index_max` für
+               historische Tage grundsätzlich `null`; die Kachel konnte gar nicht
+               füllen. „Sonnigster Tag" (Sonnenstunden) bleibt und deckt Sonne ab. -->
           <div class="stat-card" data-event-slot="gust">
             <div class="stat-num" id="stat-gust">–</div>
             <div class="stat-label" data-i18n="stat.gust">🌪️ Stärkste Böe</div>
@@ -1583,7 +1585,7 @@
           <div class="stage">
             <div class="stage-num" data-i18n="layer.out">ABLEITUNGEN</div>
             <h4 data-i18n="layer.out.title">Ansichten &amp; Suche</h4>
-            <p data-i18n="layer.out.text">Timeline, Karte, Statistik, Such-Embeddings. Berechnet — jederzeit gefahrlos verwerfbar und neu erzeugbar.</p>
+            <p data-i18n="layer.out.text">Timeline, Karte, Statistik. Berechnet — jederzeit gefahrlos verwerfbar und neu erzeugbar.</p>
           </div>
         </div>
 
@@ -1609,13 +1611,12 @@
                  Systempflege — für Nicht-Admins war der Knopf schlicht nicht
                  da, ihre Ereignisse blieben ohne Wetter. Jetzt in „Meine
                  Daten", Schritt 5, und der Lauf bleibt beim eigenen Konto. -->
-            <div class="action-row">
-              <button class="btn secondary" id="btn-embed" data-i18n="act.embed">🧠 Embeddings berechnen</button>
-              <div class="action-desc" data-i18n="act.embed.desc"><b>Semantische Suche neu aufbauen (Ableitung).</b><br>
-                Verwirft die Vektoren aller Events und berechnet sie mit dem aktuellen Embedding-Modell neu.
-                Nötig nach jedem Modellwechsel, sonst findet die „Bedeutungs-Suche" nichts oder Falsches.
-                Bricht ohne Fortschritt ab, wenn kein Embedding-Modell konfiguriert ist.</div>
-            </div>
+            <!-- Anmerkung 131 (2026-07-24): „Embeddings berechnen" stand hier.
+                 Mit dem Wegfall der semantischen Suche (Anmerkung 121) hat der
+                 Lauf keinen Abnehmer mehr — ein Knopf ohne Wirkung ist genau die
+                 Stille, gegen die A40 gebaut ist. Der Job bleibt im Backend
+                 erhalten (für eine mögliche pgvector-Suche später), nur der
+                 Auslöser ist raus. -->
             <div class="action-row" style="border-top:1px solid var(--danger)">
               <button class="btn danger" id="btn-wipe" data-i18n="act.wipe">🗑️ Alle Daten löschen</button>
               <div class="action-desc" data-i18n="act.wipe.desc"><b style="color:var(--danger)">Unwiderruflich!</b><br>
@@ -1623,6 +1624,21 @@
                 Orte, Wetter &amp; Embeddings. Nutzer-Konten bleiben bestehen. Es gibt eine doppelte
                 Sicherheitsabfrage; danach ist die Datenbank leer.</div>
             </div>
+          </div>
+        </div>
+
+        <!-- Anmerkung 131 (2026-07-24): Links, die beim Betreiben helfen.
+             Die Frage war „was braucht man als Admin?" — die zwei Antworten,
+             die kein anderer Reiter gibt: jeden Endpunkt zum Ausprobieren, und
+             eine Ein-Zeilen-Auskunft für einen Uptime-Monitor. -->
+        <div class="admin-only" style="margin-bottom:24px">
+          <div class="section-title" data-i18n="adm.links">🔧 Diagnose &amp; Links</div>
+          <div class="hint" data-i18n="adm.links.hint">Beim Betreiben nützlich: die API-Oberfläche listet jeden
+            Endpunkt zum Ausprobieren (mit deiner Anmeldung), die Health-Seite sagt in einer Zeile, ob Backend und
+            Datenbank stehen — der richtige Ziel-URL für einen Uptime-Monitor.</div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px">
+            <a class="btn secondary" href="/docs" target="_blank" rel="noopener" data-i18n="adm.links.api">📖 API-Dokumentation (/docs)</a>
+            <a class="btn secondary" href="/health" target="_blank" rel="noopener" data-i18n="adm.links.health">💚 Health-Status (/health)</a>
           </div>
         </div>
         </div>
@@ -1686,9 +1702,15 @@
 
         <div id="mod-queue"></div>
 
-        <div class="section-title" id="fuzzy-title" style="margin-top:24px" data-i18n="adm.fuzzy">⏳ Unscharfe Zeiten</div>
-        <div class="hint" data-i18n="adm.fuzzy.hint">Events mit grober Zeitangabe (Monat, Jahreszeit, Jahr, Jahrzehnt oder ganz ohne Datum).
-          Anklicken öffnet die Schnellbearbeitung — je konkreter die Daten, desto besser Timeline &amp; Karte.</div>
+        <!-- Anmerkung 128 (2026-07-24): Titel + Erklärung waren zwei getrennte
+             Blöcke (fette Überschrift, dann eine umrandete Hinweisbox). Jetzt
+             EIN Kopf: die Überschrift, darunter die Erklärung als schlichte
+             Unterzeile ohne Kasten. -->
+        <div style="margin-top:24px">
+          <div class="section-title" id="fuzzy-title" style="margin:0" data-i18n="adm.fuzzy">⏳ Unscharfe Zeiten</div>
+          <div class="stat-label" style="margin:4px 0 12px; max-width:640px" data-i18n="adm.fuzzy.hint">Events mit grober Zeitangabe (Monat, Jahreszeit, Jahr, Jahrzehnt oder ganz ohne Datum).
+            Anklicken öffnet die Schnellbearbeitung — je konkreter die Daten, desto besser Timeline &amp; Karte.</div>
+        </div>
         <div id="fuzzy-list"></div>
         </div>
 
@@ -1718,7 +1740,7 @@
           nachgetragen wird immer nur, was fehlt.
           <br><b>Ausführliche Erklärung zu jedem Schritt</b> steht in der README-Anleitung
           („Getting started — a sensible order").</div>
-        <div class="section-title" data-i18n="adm.tracking">1 · Was trackst du?</div>
+        <div class="section-title" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap"><span data-i18n="adm.tracking">1 · Was trackst du?</span><span class="eff layer" data-i18n="eff.setting">Einstellung</span></div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key"><b style="font-size:13px" data-i18n="adm.track.mods">🧩 Module</b></div>
@@ -1730,7 +1752,7 @@
             </div>
           </div>
         </div>
-        <div class="section-title" data-i18n="adm.imports">2 · Importe</div>
+        <div class="section-title" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap"><span data-i18n="adm.imports">2 · Importe</span><span class="eff mod" data-i18n="eff.propose">legt Vorschläge an</span></div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key">
@@ -1777,7 +1799,7 @@
           </details>
         </div>
 
-        <div class="section-title" data-i18n="adm.placenames">3 · Ortsnamen</div>
+        <div class="section-title" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap"><span data-i18n="adm.placenames">3 · Ortsnamen</span><span class="eff add" data-i18n="eff.enrich">ergänzt</span></div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
@@ -1958,7 +1980,7 @@
              Einträge in Serie — und jeder einzelne wollte von Hand aufgeteilt
              werden. Erst sehen, dann anlegen (P2.5): die Aktion schreibt
              vervielfacht in die Lebensdatenbank. -->
-        <div class="section-title" data-i18n="adm.daysplit">5 · Tages-Einträge</div>
+        <div class="section-title" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap"><span data-i18n="adm.daysplit">5 · Tages-Einträge</span><span class="eff write" data-i18n="eff.write">ändert Bestätigtes</span></div>
         <div class="panel" style="padding:0">
           <div class="action-row has-result">
             <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
@@ -1986,7 +2008,7 @@
              normale Nutzer gar nicht vorhanden. Bewusst nach dem Aufteilen:
              jeder Tages-Eintrag will sein eigenes Wetter, und geholt wird je
              Ereignis genau einmal. -->
-        <div class="section-title" data-i18n="adm.weather">6 · Wetter</div>
+        <div class="section-title" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap"><span data-i18n="adm.weather">6 · Wetter</span><span class="eff add" data-i18n="eff.enrich">ergänzt</span></div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key">
@@ -2003,7 +2025,10 @@
         <div class="section-title" data-i18n="adm.backup">7 · Sichern &amp; Zurückspielen</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
-            <button class="btn" id="btn-export" data-i18n="act.export">📦 Daten exportieren</button>
+            <div class="action-key" style="display:flex; flex-direction:column; gap:8px; align-items:flex-start">
+              <button class="btn" id="btn-export" data-i18n="act.export">📦 Daten exportieren</button>
+              <span class="eff read" data-i18n="eff.read">nur Lesen</span>
+            </div>
             <div class="action-desc"><span data-i18n="act.export.desc"><b>Backup als JSON-Datei.</b><br>
               Lädt alle deine Daten (Roh-Eingang, Ereignisse, Objekte, Orte, Wetter) als eine
               JSON-Datei herunter. Embeddings sind enthalten. Regelmäßig machen — das ist dein Backup.</span><br>
@@ -2024,9 +2049,10 @@
               im ZIP. Immich-Bilder sind in keinem von beiden: die liegen in Immich und werden dort gesichert.</span></div>
           </div>
           <div class="action-row">
-            <div class="action-key">
+            <div class="action-key" style="display:flex; flex-direction:column; gap:8px; align-items:flex-start">
               <button class="btn secondary" id="btn-import" style="width:100%; text-align:left" data-i18n="act.import">📥 Daten importieren</button>
               <input type="file" id="import-file" accept=".json,.zip,application/json,application/zip" style="display:none">
+              <span class="eff write" data-i18n="eff.restore">schreibt</span>
             </div>
             <div class="action-desc" data-i18n="act.import.desc"><b>Export-Datei zurückspielen.</b><br>
               Importiert eine Life-Dash-Export-Datei. Bereits vorhandene Einträge (gleiche ID) werden
@@ -2035,7 +2061,7 @@
         </div>
 
         <!-- F13: eigene Hintergrundkarte (+ A40-Schwelle, Anm. 115) -->
-        <div class="section-title" data-i18n="adm.basemap">Karte</div>
+        <div class="section-title" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap"><span data-i18n="adm.basemap">Karte</span><span class="eff layer" data-i18n="eff.setting">Einstellung</span></div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key"><b style="font-size:13px" data-i18n="adm.basemap.own">🔧 Eigene Karte</b></div>
@@ -2113,11 +2139,11 @@
         </div>
 
         <!-- A33: eigene Daten löschen — das Gegenstück zum Export -->
-        <div class="section-title" data-i18n="adm.wipemine">Meine Daten löschen</div>
+        <div class="section-title" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap"><span data-i18n="adm.wipemine">Meine Daten löschen</span><span class="eff write" data-i18n="eff.delete">löscht endgültig</span></div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key">
-              <button class="btn ghost" id="btn-wipe-mine" style="width:100%; text-align:left; color:var(--danger)"
+              <button class="btn ghost" id="btn-wipe-mine" style="width:100%; text-align:left; color:var(--danger); background:rgba(255,92,114,.12); border:1px solid var(--danger)"
                       data-i18n="act.wipemine">🗑️ Alle meine Daten löschen</button>
             </div>
             <div class="action-desc"><span data-i18n="act.wipemine.desc"><b>Alles, was diesem Konto gehört</b> —
@@ -2173,19 +2199,22 @@
 
         <!-- A17 — Log-Ansicht: letzte Zeilen aus dem Ring-Puffer -->
         <div class="admin-tabpane admin-only" data-tabpane="logs" style="display:none">
-          <div class="section-title" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap">Logs
-            <select id="logs-level" class="mf-select" style="margin-left:auto">
-              <option value="DEBUG">ab DEBUG</option>
-              <option value="INFO" selected>ab INFO</option>
-              <option value="WARNING">ab WARNING</option>
-              <option value="ERROR">ab ERROR</option>
+          <div class="section-title" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap">Logs
+            <span class="stat-label" style="margin-left:auto" data-i18n="adm.logs.show">Anzeige ab Stufe:</span>
+            <select id="logs-level" class="mf-select">
+              <option value="DEBUG">DEBUG</option>
+              <option value="INFO" selected>INFO</option>
+              <option value="WARNING">WARNING</option>
+              <option value="ERROR">ERROR</option>
             </select>
-            <button class="btn small secondary" id="logs-refresh">↻ Aktualisieren</button>
           </div>
           <div class="hint" style="margin-bottom:12px" data-i18n="adm.logs.hint">Die letzten App-Log-Zeilen seit Prozessstart
-            (max. 2000, nur im Speicher — kein Datei-Zugriff), aktualisiert sich alle paar Sekunden,
-            solange dieser Reiter offen ist. Vollständige Logs weiterhin über
-            <code>docker logs</code>; Ausführlichkeit steuert <code>LOG_LEVEL</code> in der .env.</div>
+            (max. 2000, nur im Speicher — kein Datei-Zugriff). <b>Aktualisiert sich von selbst</b>, solange dieser
+            Reiter offen ist — ein Knopf dafür ist nicht nötig. Das Auswahlfeld rechts filtert nur die
+            <b>Anzeige</b>: Zeilen unterhalb der gewählten Stufe werden ausgeblendet. <b>Was der Server
+            überhaupt aufzeichnet</b>, legt <code>LOG_LEVEL</code> in der <code>.env</code> fest — steht es auf
+            <code>INFO</code>, gibt es gar keine <code>DEBUG</code>-Zeilen, die das Auswahlfeld zeigen könnte.
+            Vollständige Logs weiterhin über <code>docker logs</code>.</div>
           <pre id="logs-list" style="background:var(--bg-elev); border:1px solid var(--border); border-radius:10px; padding:12px; max-height:60dvh; overflow:auto; font-size:12px; line-height:1.55; white-space:pre-wrap; margin:0"></pre>
         </div>
       </div>
@@ -2611,7 +2640,7 @@ const I18N_EN = {
   'map.tracks.tip': "The paths you actually travelled, from the timeline import — real recordings, coloured by how you moved.",
   'map.group.tip': "Merges points that sit close together: per place from month view up (“59× Home”), by proximity in day and week view. Off means every visit on its own.",
   'map.fs.tip': "Map in fullscreen (Esc exits)",
-  'tl.visits': "🛰️ Visits",
+  'tl.visits.chip': "🛰️ Visits",
   'tl.visits.n': "visits",
   'tl.journal': "📖 Write journal",
   'tl.print': "🖨️ Print",
@@ -2818,6 +2847,10 @@ const I18N_EN = {
   'im.eff.add': "attaches",
   'im.eff.mod': "creates proposals",
   'im.eff.layer': "map only",
+  // Anmerkung 133: Effekt-Badges für die übrigen „Meine Daten"-Abschnitte
+  'eff.setting': "setting", 'eff.propose': "creates proposals", 'eff.enrich': "enriches",
+  'eff.write': "changes confirmed data", 'eff.read': "read only",
+  'eff.restore': "writes", 'eff.delete': "deletes for good",
   'im.adv.reset': "Advanced: discard links",
   'im.adv.albums': "Advanced: clean up album proposals",
   'map.photos': "📷 Photos",
@@ -2931,7 +2964,8 @@ const I18N_EN = {
   'tl.loading': "Loading …",
   'tl.end': "That is the beginning of your story.",
   'tl.nothing.yet': "Nothing matching in the entries loaded so far — look further back?",
-  'tl.search.fallback': "Search limited (server search unavailable) — showing plain text matches.",
+  'tl.search.label': "Search",
+  'tl.search.hits': "hits",
   'stat.born': "born",
   'stat.born.hint': "add your birth as a milestone",
   'ev.notfound': "Entry could not be loaded.",
@@ -3010,6 +3044,7 @@ const I18N_EN = {
   'nav.today': "Today",
   'view.today.title': "Today",
   'view.today.sub': "What is waiting — and what happened on this day in earlier years",
+  'greet.morning': "Good morning", 'greet.day': "Good afternoon", 'greet.evening': "Good evening",
   'today.capture': "Capture something",
   'today.capture.sub': "Free text — the AI structures it",
   'today.pending': "Waiting for review",
@@ -3021,8 +3056,6 @@ const I18N_EN = {
   'tl.periodphotos.some': "{n} of {total} pictures from this period",
   'today.fuzzy.sub': "month, year or no date at all",
   'today.total': "Entries in total",
-  'today.timeline': "Go to the timeline",
-  'today.timeline.sub': "everything in order",
   'today.empty': "Nothing has been recorded on this calendar day in earlier years yet. That changes as the life database grows — or with your next import.",
   'otd.more': "+{n} more",
   'otd.title': "🕰️ On this day",
@@ -3119,13 +3152,16 @@ const I18N_EN = {
   'field.time.tip': "Time (optional)",
   'btn.addobj': "+ Item",
   'layer.in.text': "Immutable fragments (text, voice, import). An evidence archive — never overwritten, never deleted automatically.",
-  'layer.out.text': "Timeline, map, statistics, search embeddings. Computed — safe to discard and rebuild at any time.",
+  'layer.out.text': "Timeline, map, statistics. Computed — safe to discard and rebuild at any time.",
 
   // --- Verwaltung: Erklaertexte ---
   'adm.runs.hint': "These runs happen <b>in the background on the server</b> — you can close the page. Progress, the stop button and the nightly schedule live in the <b>“Jobs”</b> tab; progress is kept when you stop, and a restart resumes where it left off.",
   'act.recompute.desc': "<b>Repeat the AI extraction.</b><br>Discards all <i>unconfirmed</i> events and rebuilds them from the raw inbox — with the current AI model and prompt. Confirmed events and manually corrected fields are left untouched. Useful after model or prompt changes. Stops cleanly when the AI quota runs out (whatever was computed is kept).",
   'act.weather.desc': "<b>Fill in missing weather</b> (via Open-Meteo, <b>additive</b> — existing values are never overwritten).<br>Deliberately last: each entry is asked exactly once, so the run pays off most when imports and proposals are done. It runs in the background (progress and stop in the <b>“Jobs”</b> tab, and can be put on the nightly schedule). Details in the README guide (step 6).",
-  'act.embed.desc': "<b>Rebuild the semantic search (derived data).</b><br>Discards the vectors of all events and recomputes them with the current embedding model. Required after every model change, otherwise the “meaning search” finds nothing or the wrong things. Stops without doing anything if no embedding model is configured.",
+  'adm.links': "🔧 Diagnostics & links",
+  'adm.links.hint': "Useful when self-hosting: the API UI lists every endpoint to try out (with your login), the health page says in one line whether the backend and database are up — the right target URL for an uptime monitor.",
+  'adm.links.api': "📖 API documentation (/docs)",
+  'adm.links.health': "💚 Health status (/health)",
   'act.wipe.desc': "<b style=\"color:var(--danger)\">Cannot be undone!</b><br>Deletes all life data — raw inbox, events &amp; items, places, weather &amp; embeddings. User accounts remain. There is a double confirmation; afterwards the database is empty.",
   'adm.jobs.hint': "Long-running actions (weather, recompute, embeddings, place names, imports) are registered as <b>jobs with a lock</b>: the same type cannot run twice — not even from two browsers or by two users at once (this prevents duplicate API costs and duplicate data).",
   'adm.bulk.hint': "Move many correct AI proposals into the life database at once: filter → check the <b>preview</b> → confirm.",
@@ -3177,7 +3213,6 @@ const I18N_EN = {
   'banner.timeout': "⚠ The data did not arrive in time (network, or a large amount of data). <a href=\"#\" onclick=\"location.reload();return false\" style=\"color:var(--accent)\">Try again</a>",
   'banner.loaderr': "Error while loading",
   'act.weather': "🌤️ Add weather",
-  'act.embed': "🧠 Build embeddings",
   'act.import': "📥 Import data",
   'act.tlimport': "🛰️ Import Google Timeline",
   'btn.refresh': "↻ Refresh",
@@ -3196,7 +3231,8 @@ const I18N_EN = {
   'stats.hint': "💡 Statistics are <b>computed views</b> — rebuildable at any time. Every module (trips, animals …) brings its own widgets.",
   'adm.db.title': "Database — raw view",
   'adm.db.hint': "🗄️ A direct look at the tables (admin). Raw inbox = <code>fragments</code>, life database = <code>events</code>/<code>entities</code>/<code>locations</code>, enrichments = <code>media_refs</code>/<code>metrics</code>.",
-  'adm.logs.hint': "The most recent app log lines since the process started (max. 2000, in memory only — no file access), refreshed every few seconds while this tab is open. Full logs remain available via <code>docker logs</code>; the level is controlled by <code>LOG_LEVEL</code> in the .env.",
+  'adm.logs.show': "Show from level:",
+  'adm.logs.hint': "The most recent app log lines since the process started (max. 2000, in memory only — no file access). <b>Refreshes on its own</b> while this tab is open — no button needed. The selector on the right only filters the <b>display</b>: lines below the chosen level are hidden. <b>What the server records at all</b> is set by <code>LOG_LEVEL</code> in the <code>.env</code> — if it is <code>INFO</code>, there are no <code>DEBUG</code> lines for the selector to show. Full logs remain available via <code>docker logs</code>.",
   'adm.logs.empty': "No log entries at this level yet (since app start).",
   'adm.logs.fail': "Logs unavailable: ",
   'track.modal.hint': "Pick the areas that interest you — they decide the collection, the statistics and what the AI recognises. Changeable at any time under Settings → My data.",
@@ -3322,7 +3358,7 @@ const I18N_EN = {
   'tier.bronze': "Bronze", 'tier.silber': "Silver", 'tier.gold': "Gold",
   'tier.platin': "Platinum",
   // Wetter-Extreme (F12-Werte, Anmerkung 114)
-  'stat.uv': "🕶️ Strongest sun", 'stat.gust': "🌪️ Strongest gust",
+  'stat.gust': "🌪️ Strongest gust",
   'stat.felthot': "🥵 Hottest day (felt)", 'stat.feltcold': "🥶 Coldest day (felt)",
   'stat.longestday': "🌅 Longest day", 'stat.shortestday': "🌆 Shortest day",
   'wx.newdata12': "comes with new weather enrichment (v0.22 and later)",
@@ -4192,18 +4228,11 @@ async function loadTimeline(more = false) {
       tlLevelNote();
     }).catch(() => {});
     if (tl.query) {
-      // Suche nutzt den hybriden Such-Endpoint (Volltext + semantisch);
-      // Treffermengen sind klein, hier wird nicht geblättert.
-      try {
-        tl.events = await api(`/api/search?q=${encodeURIComponent(tl.query)}`);
-      } catch (err) {
-        // Anm. 33: Scheitert die Server-Suche (z. B. Embedding-Dienst), gab es
-        // vorher STILL keine Filterung. Der Rückfall ist jetzt die einfache
-        // Textsuche DESSELBEN Endpunkts — nicht mehr ein Filter über die volle
-        // Liste im Browser, die es nicht mehr gibt.
-        tl.events = await fetchEvents({ q: tl.query, limit: TL_PAGE });
-        toast(t('tl.search.fallback', 'Suche eingeschränkt (Server-Suche nicht erreichbar) — zeige einfache Texttreffer.'), 'warn', 6000);
-      }
+      // Suche nutzt den serverseitigen Volltext-Endpunkt (Titel, Beschreibung,
+      // Ort, Entity-Namen); Treffermengen sind klein, hier wird nicht
+      // geblättert. Die semantische Suche wurde entfernt (2026-07-24), damit ist
+      // dies der einzige Suchpfad — kein Rückfall mehr auf einen zweiten.
+      tl.events = await api(`/api/search?q=${encodeURIComponent(tl.query)}`);
       tl.done = true;
     } else {
       // A37: Der Besuchs-Schalter filtert im SERVER. Täte er es erst hier,
@@ -4297,7 +4326,7 @@ function renderTimeline() {
   const note = document.getElementById('tl-search-note');
   if (tl.query) {
     note.style.display = '';
-    note.innerHTML = `🔍 Suche: <b>${esc(tl.query)}</b> — ${tl.events.length} Treffer (Volltext + semantisch). `
+    note.innerHTML = `🔍 ${t('tl.search.label', 'Suche')}: <b>${esc(tl.query)}</b> — ${tl.events.length} ${t('tl.search.hits', 'Treffer')}. `
       + `<a href="#" id="tl-clear" style="color:var(--accent)">zurücksetzen</a>`;
     const c = document.getElementById('tl-clear');
     if (c) c.addEventListener('click', ev => {
@@ -4397,7 +4426,27 @@ function otdBindSwitch() {
 // A37: Drei Zahlen über den GESAMTEN Bestand — genau die Sorte, die ein
 // Zeitfenster still verfälscht hätte. Sie kommen deshalb aus dem Jahres-Index
 // (drei Aggregat-Abfragen), nicht mehr aus einer geladenen Liste.
+// Anmerkung 127: Gruß nach Tageszeit. Drei Fenster (Morgen/Tag/Abend) — alle
+// drei sind echte Begrüßungen; „Gute Nacht" wäre ein Abschied. Der Name kommt
+// aus dem angemeldeten Konto, das Datum über LOC() (nicht hart 'de-DE').
+function renderGreeting() {
+  const el = document.getElementById('today-greeting');
+  if (!el) return;
+  const u = AUTH.user || {};
+  const name = u.display_name || (u.email || '').split('@')[0] || '';
+  const h = new Date().getHours();
+  const hello = h < 11 ? t('greet.morning', 'Guten Morgen')
+              : h < 18 ? t('greet.day', 'Guten Tag')
+              : t('greet.evening', 'Guten Abend');
+  const date = new Date().toLocaleDateString(LOC(),
+    { weekday: 'long', day: 'numeric', month: 'long' });
+  el.innerHTML = `<div style="font-size:20px; font-weight:700">👋 ${esc(hello)}${
+    name ? ', ' + esc(name) : ''}</div>
+    <div class="stat-label" style="margin-top:2px">${esc(date)}</div>`;
+}
+
 async function loadToday() {
+  renderGreeting();
   renderOnThisDay();
   try {
     const idx = await fetchIndex();
@@ -4539,7 +4588,12 @@ function renderTimelineList() {
       days.forEach(d => {
         const media = tlStripFor(d);
         if (!media || !media.length) return;
-        const row = { dayMedia: media, day: d, date_start: `${d}T00:00:00` };
+        // Feedback 2026-07-24: auch der Tageszoom deckelt jetzt auf zwölf. Ein
+        // einzelner Tag kann hunderte Fotos tragen, und die alle als
+        // Vorschaubild zu zeichnen ließ den Zeitstrahl ruckeln. Die Auswahl ist
+        // über den Tag gestreut (spreadPick), die Gesamtzahl steht daneben.
+        const row = { dayMedia: spreadPick(media, TL_PERIOD_PHOTOS), day: d,
+                      total: media.length, date_start: `${d}T00:00:00` };
         // Anmerkung 114: NICHT anhängen. Die Gruppe zeigt nur die ersten
         // TL_GROUP_CAP Zeilen, der Rest steht hinter „x weitere anzeigen“ —
         // ein angehängter Fotostreifen verschwand an jedem Tag mit vielen
@@ -4557,7 +4611,11 @@ function renderTimelineList() {
         // Sie vertritt die ganze Gruppe, nicht ihren ersten Tag — also an den
         // Kopf der Gruppe, nicht in die Tages-Sortierung darunter.
         g.items.unshift({
-          dayMedia: tl.zoom === 'week' ? all : spreadPick(all, TL_PERIOD_PHOTOS),
+          // Feedback 2026-07-24: auch die Woche deckelt jetzt auf zwölf (vorher
+          // ALLE Bilder der Woche, Anm. 110/114). Bei einer fotoreichen Woche
+          // waren das schnell hunderte Vorschaubilder — es ruckelte. Die Zwölf
+          // sind über die Woche gestreut, die Gesamtzahl steht in der Leiste.
+          dayMedia: spreadPick(all, TL_PERIOD_PHOTOS),
           day: days[0], total: all.length,
           span: tl.zoom, date_start: `${days[0]}T00:00:00`,
         });
@@ -4800,9 +4858,11 @@ const TL_DAY_WX = new Map();
 // darin. Eine Leiste, eine Liste, ein Nachschlagen.
 const TL_STRIP_MEDIA = new Map();
 let TL_STRIP_SEQ = 0;
-// Ab Monatszoom wird eine AUSWAHL gezeigt. Zwölf, weil eine Reihe daraus
-// aufgeht und weil dreihundert Vorschaubilder je Gruppe die Seite (und den
-// Bild-Endpunkt) erschlagen — genau das hat den Verbindungspool umgebracht.
+// Jede Fotoleiste zeigt höchstens zwölf Bilder — auf JEDER Zoomstufe (Feedback
+// 2026-07-24; bis dahin nur ab Monat, Tag und Woche zeigten alle). Zwölf, weil
+// eine Reihe daraus aufgeht und weil hunderte Vorschaubilder je Gruppe die Seite
+// (und den Bild-Endpunkt) erschlagen — genau das hat den Verbindungspool
+// umgebracht, und genau das ließ den Zeitstrahl an fotoreichen Tagen ruckeln.
 const TL_PERIOD_PHOTOS = 12;
 // Gleichmäßig über den Zeitraum greifen statt vorne abzuschneiden: die ersten
 // zwölf eines Monats stammen alle vom ersten Tag, und dann zeigt die „Auswahl
@@ -4828,6 +4888,12 @@ function dayMediaCard(x) {
     label = t('tl.periodphotos.some', '{n} von {total} Bildern aus diesem Zeitraum')
       .replace('{n}', x.dayMedia.length).replace('{total}', x.total);
   else label = t('tl.periodphotos', 'Bilder aus diesem Zeitraum');
+  // Tag und Woche deckeln jetzt ebenfalls auf zwölf (Feedback 2026-07-24). Ist
+  // dabei etwas weggefallen, muss die Leiste es sagen — sonst behauptet eine
+  // Auswahl Vollständigkeit (A40). Der Monatszweig oben sagt es schon selbst.
+  if ((!x.span || x.span === 'week') && x.total != null && x.total > x.dayMedia.length)
+    label += ' · ' + t('tl.photos.of', '{n} von {total}')
+      .replace('{n}', x.dayMedia.length).replace('{total}', x.total);
   const key = `s${++TL_STRIP_SEQ}`;
   TL_STRIP_MEDIA.set(key, x.dayMedia);
   return `<div class="day-media" data-day-media="${key}"${
@@ -5433,17 +5499,23 @@ async function openEntityDetail(type, entityId, name) {
     <div style="display:flex; align-items:center; gap:14px; margin-bottom:18px; flex-wrap:wrap">
       <button class="btn small secondary" id="comp-back">‹ ${t('back', 'zurück')}</button>
       <span style="font-size:28px">${compEmoji(type, name)}</span>
-      <div>
+      <div style="flex:1; min-width:0">
         <div style="font-size:18px; font-weight:700">${esc(name)}</div>
         <div class="stat-label">${n} ${t('comp.linked', 'verknüpft')} · ${nEvents(n)}${
           located.length ? ` · ${located.length} ${t('comp.located', 'verortet')}` : ''}</div>
       </div>
+      ${n ? `<button class="btn small" id="entity-timeline">${t('comp.city.timeline', 'Im Zeitstrahl')}</button>` : ''}
     </div>
     ${descBlock}
     ${located.length ? '<div id="comp-map"></div>' : ''}
     ${n ? events.map(eventCard).join('') : `<div class="hint">${t('comp.nolinks',
       'Noch keine Events mit diesem Eintrag verknüpft.')}</div>`}`;
   document.getElementById('comp-back').addEventListener('click', () => loadCompendium(type));
+  // Anmerkung 129: „Im Zeitstrahl" gab es bisher nur bei Städten. Für eine
+  // Entity (Land, Tier, Künstler) gibt es keinen eigenen Zeitstrahl-Filter,
+  // deshalb über die Suche — die den Entity-Namen ohnehin mitdurchsucht.
+  document.getElementById('entity-timeline')
+    ?.addEventListener('click', () => tlSearchFor(name));
 
   // Karte mit den Orten der Events (eigene Leaflet-Instanz, alte entsorgen)
   if (compMapObj) { compMapObj.remove(); compMapObj = null; }
@@ -5481,6 +5553,16 @@ function tlFilterOnly(cat) {
 function tlFilterCity(city) {
   tl.city = city || null;
   tl.offset = 0; tl.done = false; tl.events = []; tl.autoPages = 0;
+  gotoView('timeline');
+  loadTimeline();
+}
+// Anmerkung 129: eine Entity im Zeitstrahl zeigen — über die Volltextsuche
+// (der Endpunkt durchsucht auch verknüpfte Entity-Namen). Das Suchfeld wird
+// mitgesetzt, damit sichtbar ist, wonach gefiltert wird.
+function tlSearchFor(term) {
+  const box = document.getElementById('global-search');
+  if (box) box.value = term;
+  tl.query = (term || '').trim();
   gotoView('timeline');
   loadTimeline();
 }
@@ -5673,7 +5755,6 @@ async function loadStats() {
   // richtige Version; „ab v0.14" wäre hier eine Auskunft, nach der man
   // vergeblich sucht.
   const f12Hint = t('wx.newdata12', 'kommt mit neuen Wetter-Anreicherungen (ab v0.22)');
-  tempCard('stat-uv', ex.uv, '', f12Hint);
   tempCard('stat-gust', ex.gust, ' km/h', f12Hint);
   tempCard('stat-felt-hot', ex.felt_hot, ' °C', f12Hint);
   tempCard('stat-felt-cold', ex.felt_cold, ' °C', f12Hint);
@@ -6538,7 +6619,11 @@ document.querySelector('.content').addEventListener('click', ev => {
     if (!e || !e.group) return;
     const day = (e.date_start || '').slice(0, 10);
     gtog.classList.add('is-loading');
-    fetchEvents({ city: e.group.city, visits: 1,
+    // Anmerkung 134: nach der VERDICHTUNGSSTUFE auflösen, nicht immer nach Stadt.
+    // Bei „district" trägt group.city den Ortsteil („HafenCity"); ein Filter auf
+    // Location.city fände ihn nie und die Karte klappte ins Leere auf. `place` +
+    // `group` prüfen die Spalte der Stufe, die die Gruppe gebildet hat.
+    fetchEvents({ group: e.group.level || tl.level, place: e.group.city, visits: 1,
                   from: `${day}T00:00:00`, to: `${day}T23:59:59` })
       .then(rows => card.insertAdjacentHTML('afterend', `<div class="tl-children">${
         rows.map(r => eventCard(r)).join('')}</div>`))
@@ -7685,7 +7770,6 @@ function followLogs() {
   }, LOGS_REFRESH_MS);
 }
 document.getElementById('logs-level').addEventListener('change', loadLogs);
-document.getElementById('logs-refresh').addEventListener('click', loadLogs);
 
 // ---------- NUTZERVERWALTUNG (A6, nur Admin) ----------
 async function loadUsers() {
@@ -8299,8 +8383,7 @@ document.getElementById('btn-recompute-2').addEventListener('click', e =>
 // Wetter steht in „Meine Daten" (Anmerkung 115) — also bleibt der Reiter stehen.
 document.getElementById('btn-enrich').addEventListener('click', e =>
   startServerJob(e.target, 'weather', null, true));
-document.getElementById('btn-embed').addEventListener('click', e =>
-  startServerJob(e.target, 'embeddings'));
+// Anmerkung 131: „Embeddings berechnen" ist raus (semantische Suche entfernt).
 
 // ---------- EXPORT / IMPORT ----------
 // A8: Export mit Rückmeldung — vorher lud der Button still herunter.

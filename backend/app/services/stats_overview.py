@@ -58,7 +58,12 @@ _EXTREMES: tuple[tuple[str, tuple[str, ...], str, bool], ...] = (
     ("windy", ("wind_max_kmh",), "max", True),
     ("snowy", ("snow_cm",), "max", True),
     # --- neu (F12-Werte, Anmerkung 114) ---
-    ("uv", ("uv_max",), "max", True),
+    # Anmerkung 123 (2026-07-24): "uv" ("Stärkste Sonne") ist raus. Open-Meteos
+    # Archiv (ERA5) liefert `uv_index_max` für historische Tage grundsätzlich
+    # `null` (live geprüft) — die Kachel konnte nie füllen. UV gibt es nur über
+    # die historical-forecast-API und nur ab ~2022; das wäre ein zweiter
+    # Endpunkt mit eigenen Fehlerpfaden, kein Kachelwert. "Sonnigster Tag"
+    # (Sonnenstunden, oben) deckt "Sonne" ab und steht IM Archiv.
     ("gust", ("gust_max_kmh",), "max", True),
     ("felt_hot", ("apparent_temp_max_c",), "max", False),
     ("felt_cold", ("apparent_temp_min_c",), "min", False),

@@ -87,6 +87,32 @@ def test_city_is_the_default_and_condenses_per_city(db, user, berlin):
     assert {r.group.count for r in rows if r.group} == {4, 2}
 
 
+def test_the_group_carries_its_level(db, user, berlin):
+    """Anmerkung 134: Ohne die Ebene fragte das Aufklappen immer nach
+    `Location.city` — und fand einen Ortsteil-Wert nie."""
+    rows = _rows(db, user, "district")
+    assert all(r.group.level == "district" for r in rows if r.group)
+    assert all(r.group.level == "city"
+               for r in _rows(db, user, "city") if r.group)
+
+
+def test_expanding_a_district_group_by_place_returns_its_visits(db, user, berlin):
+    """Anmerkung 134: „HafenCity · 3 Besuche" klappte ins Leere auf. Der
+    Chip löst die Gruppe über `place` + `group` (die Stufe) auf, nicht über
+    `city` — sonst prüft der Filter `Location.city` gegen einen Ortsteil."""
+    # Aufklappen: dieselbe Stufe, ohne Verdichtung, nach dem Gruppenwert.
+    rows = list_events(db=db, user=user, slim=True, visits=True,
+                       group="district", place="Mitte")
+    assert len(rows) == 2
+    assert all(r.source.value == "google_timeline" for r in rows)
+    # Beide hängen am Mitte-Ort (die zwei Rosenthaler-Str.-Besuche der Fixture).
+    assert all(r.location.name == "Rosenthaler Str." for r in rows)
+    # Der alte Weg (immer nach Stadt) findet den Ortsteil NICHT — genau der Bug.
+    by_city = list_events(db=db, user=user, slim=True, visits=True,
+                          group="district", city="Mitte")
+    assert by_city == []
+
+
 def test_country_merges_both_cities(db, user, berlin):
     rows = _rows(db, user, "country")
     assert len(rows) == 1

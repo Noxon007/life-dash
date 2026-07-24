@@ -16,6 +16,19 @@ any `MINOR`.
 ## [Unreleased]
 
 ### Added
+- **A greeting on the Today page.** A short line at the top now greets you by
+  time of day and name and shows today's date, above the “on this day” look-back.
+- **“In the timeline” button on every collection entry, not just cities.**
+  Opening a country, animal or artist in the collection now offers the same jump
+  into the timeline that city pages already had.
+- **System tab: links to the API docs and the health page.** A small
+  “Diagnostics & links” block points to the interactive API (`/docs`) and the
+  one-line status page (`/health`) — the latter is the right target for an
+  uptime monitor.
+- **“My data”: each section now says what it does to your data.** Every step
+  carries a small coloured badge — *setting*, *creates proposals*, *enriches*,
+  *changes confirmed data*, *read only*, *writes*, *deletes for good* — the same
+  idea the Immich block already used, now across the whole page.
 - **“All years” for both Immich runs.** Locating photos and suggesting entries
   could only be done one year at a time, which for a twenty-year library meant
   twenty rounds of the same handful of clicks. Both now offer *All years* as an
@@ -37,6 +50,28 @@ any `MINOR`.
   instead of passing one of the values off as “the” weather.
 
 ### Fixed
+- **Grouped location visits by district now expand again.** When the timeline
+  condenses imported visits by district, a card like “HafenCity · 3 visits” did
+  nothing when you tried to open it — it was looking up the group by *city*
+  (“Hamburg”), which never matches a district name, so it opened onto nothing.
+  It now resolves the group at the level it was grouped by, so the individual
+  visits appear.
+- **A finer world map.** The country outlines were coarse. They have been
+  replaced with a higher-resolution set — and, as a side effect, 29 countries
+  that the app knew about but the old map could not draw now show up (they were
+  grey even after you had been there). The finer map is only loaded when you open
+  the World tab.
+- **Search no longer reports itself as “unavailable”.** Search does two things:
+  a plain text match over titles, descriptions, places and linked items, and an
+  AI-based “similar meaning” match. When the AI part could not be reached, it
+  took the whole search down and you saw “server search unavailable” — even
+  though the text matches were already found. The AI-based part has been removed
+  entirely (it also did not scale to large libraries); search is now a fast,
+  dependable text search that is always available.
+- **Achievements just above the top tier are ordered sensibly.** Among platinum
+  achievements, one that has passed further marks now ranks above one that has
+  merely reached platinum — previously the plain “top tier reached” one sorted
+  first, which read as if it were the greater feat.
 - **The raw database view is hidden on phones.** It is a wide table meant for
   horizontal scrolling — unusable on a small screen, and working directly on the
   raw tables is a desk job anyway. On narrow screens both the tab and its
@@ -90,6 +125,22 @@ any `MINOR`.
   of your life vanished while the map still looked full.
 
 ### Changed
+- **Vague dates in moderation are one block now.** The heading and a separate
+  bordered box were merged into a single header with a plain sub-line.
+- **Logs are clearer.** The manual “refresh” button is gone (the view already
+  updates on its own every few seconds), and the text now distinguishes the two
+  controls: the dropdown filters only what is *shown*, while `LOG_LEVEL` in the
+  `.env` decides what the server records at all — set to `INFO`, there are no
+  `DEBUG` lines for the dropdown to reveal.
+- **Photo strips in the timeline now show at most twelve pictures — at every
+  zoom level.** Previously a single day or a single week showed *all* of its
+  photos, so a photo-heavy day could draw hundreds of thumbnails and the
+  timeline stuttered. Every strip now shows up to twelve, spread evenly across
+  the day or week, and says how many there are in total when it has left some
+  out. Tap any of them to browse.
+- **The “Delete all my data” button is easier to see.** It was a plain link
+  with no background; it now sits on a red-tinted background with a red border,
+  matching the seriousness of what it does.
 - **The Immich section is now a numbered flow instead of one stacked panel.**
   Its three runs — attaching photos to entries you already have, proposing new
   entries from photo days, and placing photo points on the map — did different
@@ -137,6 +188,16 @@ any `MINOR`.
   timeline”) and additionally names how many points were already there and
   unchanged — without that number a second run over the same year reads like a
   failed first one.
+
+### Removed
+- **The “Strongest sun” (UV) statistics tile.** It could never fill: the weather
+  archive used for past dates carries no UV values at all, so the tile stayed
+  empty no matter how much weather you added. “Sunniest day” (sunshine hours,
+  which the archive does provide) remains and covers the same ground.
+- **The “Build embeddings” button in the System tab.** With the AI-based search
+  gone (see above), it had nothing left to do.
+- **The “Go to the timeline” tile on the Today page.** It was a navigation
+  shortcut dressed up as a statistic; the bottom navigation already goes there.
 
 ## [0.39.0] – 2026-07-23
 

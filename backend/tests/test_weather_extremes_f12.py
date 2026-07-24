@@ -44,14 +44,16 @@ def test_f12_values_become_extremes(db, user):
     db.commit()
 
     ex = compute_overview(db, user.id, today=NOW)["extremes"]
-    assert ex["uv"]["value"] == 8.4 and ex["uv"]["title"] == "Strandtag"
+    # Anmerkung 123: die UV-Kachel ist raus (ERA5 liefert nie UV) — es gibt
+    # keinen "uv"-Extremwert mehr.
+    assert "uv" not in ex
     assert ex["gust"]["value"] == 112.0 and ex["gust"]["title"] == "Novembersturm"
     assert ex["felt_hot"]["value"] == 38.2
     assert ex["felt_cold"]["value"] == -11.4
     assert ex["longest_day"]["value"] == 16.3
     assert ex["shortest_day"]["value"] == 9.1
     # Ort und Datum kommen mit, wie bei den älteren Kacheln
-    assert ex["uv"]["place"] == "Ort Strandtag"
+    assert ex["gust"]["place"] == "Ort Novembersturm"
     assert ex["gust"]["date_start"].date() == datetime(2024, 11, 3).date()
 
 
@@ -87,6 +89,7 @@ def test_missing_f12_values_leave_the_tiles_empty(db, user):
 
     ex = compute_overview(db, user.id, today=NOW)["extremes"]
     assert ex["hot"] is not None            # das Tagesmittel gibt es
-    for key in ("uv", "gust", "felt_hot", "felt_cold",
+    for key in ("gust", "felt_hot", "felt_cold",
                 "longest_day", "shortest_day"):
         assert ex[key] is None, key
+    assert "uv" not in ex                    # Anmerkung 123: UV-Kachel entfernt

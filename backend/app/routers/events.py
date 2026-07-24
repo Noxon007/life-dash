@@ -462,6 +462,11 @@ def list_events(
     city: Annotated[str | None, Query(
         description="A39: nur Ereignisse in dieser Stadt — löst eine "
                     "zusammengefasste Gruppe wieder auf")] = None,
+    place: Annotated[str | None, Query(
+        description="Anmerkung 134: nur Ereignisse mit diesem Wert auf der Stufe "
+                    "`group` (country|city|district) — löst eine auf DIESER "
+                    "Stufe zusammengefasste Gruppe wieder auf, auch beim "
+                    "Ortsteil, wo `city` den falschen Wert prüfen würde.")] = None,
 ) -> list[EventRead]:
     """Liste der eigenen Events, optional gefiltert (für Timeline & Karte).
 
@@ -517,6 +522,17 @@ def list_events(
     # eine plausible Antwort auf eine andere Frage.
     if group not in GROUP_LEVELS:
         raise HTTPException(400, f"Unbekannte Verdichtungsstufe: {group}")
+    # Anmerkung 134: eine auf `group` verdichtete Gruppe wieder auflösen. `city`
+    # oben prüft immer `Location.city` und fand einen Ortsteil-Wert deshalb nie —
+    # „HafenCity · 3 Besuche" klappte nicht auf. `place` prüft die Spalte DIESER
+    # Stufe (Land/Stadt/Ortsteil), also denselben Ausdruck, der die Gruppe
+    # gebildet hat.
+    if place:
+        column = _level_column(group)
+        if column is not None:
+            query = query.filter(Event.location_id.in_(
+                db.query(Location.id).filter(Location.user_id == user.id,
+                                             column == place)))
     if condense and group != "point":
         query = query.filter(Event.id.in_(_visit_group_reps(db, user.id, group))
                              | Event.id.notin_(_condensable_visits(db, user.id, group)))
@@ -689,7 +705,7 @@ def _visit_group_info(db: Session, user_id: str, events: list[Event],
         if not row or row[4] < 2:
             continue
         out[e.id] = {"city": place, "count": row[4],
-                     "first": row[5], "last": row[6]}
+                     "first": row[5], "last": row[6], "level": level}
     return out
 
 

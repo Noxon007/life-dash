@@ -203,6 +203,11 @@ class EventGroup(BaseModel):
     count: int
     first: datetime | None = None
     last: datetime | None = None
+    # A47/Anmerkung 134: auf welcher Ebene verdichtet wurde (country|city|
+    # district). Das Feld `city` trägt den Wert DIESER Ebene — bei „district"
+    # also den Ortsteil („HafenCity"), nicht die Stadt. Ohne die Ebene fragte das
+    # Aufklappen immer nach `Location.city` und fand einen Ortsteil-Wert nie.
+    level: str = "city"
 
 
 # --------------------------------------------------------------------------- #

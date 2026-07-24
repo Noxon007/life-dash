@@ -53,15 +53,16 @@ Full server deployment (GHCR image, reverse proxy, OIDC, data migration):
 
 ## Search
 
-`GET /api/search?q=…` — hybrid:
-- **Full text** across title, description, place name, item names (always on).
-- **Semantic** across event embeddings (cosine) — active as soon as
-  `OPENAI_EMBED_MODEL` is set; the model is served by the same OpenAI-compatible
-  endpoint as the chat (or a separate one, see `OPENAI_EMBED_BASE_URL`).
-  Without embeddings: full text only. `SEMANTIC_MIN_SIMILARITY` depends on the
-  model and wants recalibrating.
-  After a model change: Settings → “🧠 Build embeddings” (or
-  `POST /api/admin/reindex-embeddings?force=true`).
+`GET /api/search?q=…` — server-side full-text search across title,
+description, place name, and linked item names, scoped to the calling user,
+newest first.
+
+Semantic (embedding) search was removed on 2026-07-24: it required an AI
+service, loaded every embedded event into the app process, and computed cosine
+in pure Python — the only path that did not scale past ~20k events, and it took
+the whole response down (500) when the embed service was unavailable. If it ever
+returns, it belongs in the database as a layer-4 derivation with a vector index
+(pgvector), not in the process (see KONZEPT ch. 15).
 
 ## Interface language (F10)
 
