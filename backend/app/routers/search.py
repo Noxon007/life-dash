@@ -26,6 +26,35 @@ from app.schemas import EventRead
 router = APIRouter(prefix="/api/search", tags=["Suche"])
 
 
+def _match_ids(db: Session, user_id: str, q: str):
+    """Subquery der Treffer-IDs (Titel/Beschreibung/Ort/Entity), eindeutig.
+
+    DISTINCT NUR auf `Event.id` — nicht auf der ganzen Zeile. `Event` trägt
+    JSON-Spalten (`embedding` u. a.), und PostgreSQL hat für den Typ `json`
+    keinen Gleichheitsoperator: `SELECT DISTINCT event.*` bricht dort mit
+    „could not identify an equality operator for type json". Auf SQLite (JSON =
+    Text) fällt das nicht auf — genau die A37-Dialekt-Fehlerklasse. `test_search`
+    kompiliert das für PostgreSQL und stellt sicher, dass keine JSON-Spalte unter
+    DISTINCT gerät.
+    """
+    like = f"%{q}%"
+    return (
+        db.query(Event.id)
+        .outerjoin(Location, Event.location_id == Location.id)
+        .outerjoin(EventEntityLink, EventEntityLink.event_id == Event.id)
+        .outerjoin(Entity, EventEntityLink.entity_id == Entity.id)
+        .filter(Event.user_id == user_id)
+        .filter(
+            Event.title.ilike(like)
+            | Event.description.ilike(like)
+            | Location.name.ilike(like)
+            | Entity.name.ilike(like)
+        )
+        .distinct()
+        .subquery()
+    )
+
+
 @router.get("", response_model=list[EventRead])
 def search(
     q: str = Query(..., min_length=1),
@@ -34,22 +63,14 @@ def search(
     user: User = Depends(get_current_user),
 ) -> list[EventRead]:
     """Volltextsuche über die eigenen Events."""
-    like = f"%{q}%"
-
-    # Volltext: Titel/Beschreibung ODER Ortsname ODER Entity-Name
+    # Erst die Treffer-IDs eindeutig machen (siehe `_match_ids`), dann die vollen
+    # Zeilen dazu holen und sortieren. Das äußere Query hat KEIN DISTINCT, darf
+    # also gefahrlos die JSON-Spalten mitführen und nach Datum sortieren
+    # (ORDER BY unter DISTINCT verlangte die Spalte in der Auswahl — PostgreSQL).
+    match = _match_ids(db, user.id, q)
     hits = (
         db.query(Event)
-        .outerjoin(Location, Event.location_id == Location.id)
-        .outerjoin(EventEntityLink, EventEntityLink.event_id == Event.id)
-        .outerjoin(Entity, EventEntityLink.entity_id == Entity.id)
-        .filter(Event.user_id == user.id)
-        .filter(
-            Event.title.ilike(like)
-            | Event.description.ilike(like)
-            | Location.name.ilike(like)
-            | Entity.name.ilike(like)
-        )
-        .distinct()
+        .join(match, Event.id == match.c.id)
         .order_by(Event.date_start.desc())
         .limit(limit)
         .all()

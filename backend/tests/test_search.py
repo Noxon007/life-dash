@@ -87,3 +87,23 @@ def test_newest_first(db, user):
     new = _event(db, user, "Konzert neu", day=28)
     hits = search(q="konzert", limit=50, db=db, user=user)
     assert [h.id for h in hits][:2] == [new.id, old.id]
+
+
+def test_distinct_is_only_on_id_for_postgres(db, user):
+    """A37-Dialektklasse: `Event` trägt JSON-Spalten (`embedding`). Ein
+    `SELECT DISTINCT event.*` bricht auf PostgreSQL („no equality operator for
+    type json"), auf SQLite nicht — deshalb hier gegen den PostgreSQL-Dialekt
+    kompiliert. Der DISTINCT darf NUR über `event.id` gehen; keine JSON-Spalte
+    darf darunter geraten. (Genau dieser Defekt lag im ersten Anlauf vor und
+    fiel erst auf dem PostgreSQL-Lauf der CI auf.)"""
+    from sqlalchemy.dialects import postgresql
+
+    from app.routers.search import _match_ids
+
+    sub = _match_ids(db, user.id, "x")
+    sql = str(sub.compile(dialect=postgresql.dialect(),
+                          compile_kwargs={"literal_binds": True})).lower()
+    assert "distinct" in sql
+    under_distinct = sql.split("distinct", 1)[1].split("from", 1)[0]
+    assert "embedding" not in under_distinct, "JSON-Spalte unter DISTINCT"
+    assert "events.id" in under_distinct
