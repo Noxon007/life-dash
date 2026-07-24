@@ -1144,6 +1144,13 @@
                 data-i18n-title="tl.city.tip"
                 title="Zeitstrahl auf diese Stadt eingeschränkt — klicken, um wieder alles zu zeigen"></span>
           <span class="filter-chip off" id="tl-visits-toggle" data-i18n-title="tl.visits.tip" title="Importierte Timeline-Besuche (Google) im Zeitstrahl anzeigen — auf der Karte sind sie immer sichtbar" data-i18n="tl.visits.chip">🛰️ Besuche</span>
+          <!-- Anmerkung 135: unbestätigte Google-/Immich-Vorschläge sind
+               Beleg, kein Ereignis — sie stehen nicht mehr zwischen den
+               bestätigten Karten. Dieser Hinweis sagt, dass es sie gibt, und
+               führt zu ihrer Liste (Moderation), statt es zu verschweigen. -->
+          <span class="filter-chip" id="tl-pending-hint" style="display:none"
+                data-i18n-title="tl.pending.tip"
+                title="Unbestätigte Vorschläge aus Google/Immich — sie werden erst nach der Prüfung in der Moderation zu Ereignissen"></span>
           <!-- A45: Fotopunkte als eigene, ausblendbare Ebene — genau wie die
                importierten Besuche daneben, und aus demselben Grund: es sind
                zu viele, um sie ungefragt in den Zeitstrahl zu kippen. -->
@@ -1612,7 +1619,7 @@
                  da, ihre Ereignisse blieben ohne Wetter. Jetzt in „Meine
                  Daten", Schritt 5, und der Lauf bleibt beim eigenen Konto. -->
             <!-- Anmerkung 131 (2026-07-24): „Embeddings berechnen" stand hier.
-                 Mit dem Wegfall der semantischen Suche (Anmerkung 121) hat der
+                 Mit dem Wegfall der semantischen Suche (Anmerkung 135) hat der
                  Lauf keinen Abnehmer mehr — ein Knopf ohne Wirkung ist genau die
                  Stille, gegen die A40 gebaut ist. Der Job bleibt im Backend
                  erhalten (für eine mögliche pgvector-Suche später), nur der
@@ -2642,6 +2649,11 @@ const I18N_EN = {
   'map.fs.tip': "Map in fullscreen (Esc exits)",
   'tl.visits.chip': "🛰️ Visits",
   'tl.visits.n': "visits",
+  'tl.pending.tip': "Unconfirmed proposals from Google/Immich — they only become events once reviewed in moderation",
+  'tl.pending.chip': "{n} proposals waiting",
+  'tl.agg.tip': "Click to expand",
+  'tl.agg.events': "events",
+  'tl.agg.days': "days",
   'tl.journal': "📖 Write journal",
   'tl.print': "🖨️ Print",
   'map.group': "🔁 Merge points",
@@ -4219,6 +4231,7 @@ async function loadTimeline(more = false) {
     fetchIndex().then(idx => {
       BIRTH_DATE = idx.birth ? new Date(idx.birth.date_start) : null;
       TL_VISIT_COUNT = idx.visits || 0;
+      TL_PENDING_COUNT = idx.machine_proposals || 0;
       // A47: Die Stufe „Ortsteil" liest `Location.address`, und die gibt es
       // erst seit 0.38. Ein Auswahlfeld, das man anklickt und bei dem nichts
       // passiert, ist genau der stille Defekt, den A40 abgeschafft hat —
@@ -4254,6 +4267,13 @@ async function loadTimeline(more = false) {
       // Sammelkarte je Tag).
       const cityMode = !!tl.city;
       const page = await fetchEvents({ limit: TL_PAGE, offset: tl.offset,
+                                       // Anmerkung 135: unbestätigte Google-/
+                                       // Immich-Vorschläge sind Beleg, kein
+                                       // Ereignis — sie tauchen nicht zwischen
+                                       // den bestätigten Karten auf, egal
+                                       // welcher Schalter steht. Erst nach der
+                                       // Moderation werden sie zu Ereignissen.
+                                       machine_proposals: 0,
                                        visits: (cityMode || tl.showVisits) ? 1 : 0,
                                        // A47: Die Stufe geht IMMER mit, auch
                                        // wenn gerade nicht verdichtet wird —
@@ -4533,6 +4553,10 @@ function renderTimelineList() {
   const toggle = document.getElementById('tl-visits-toggle');
   toggle.style.display = TL_VISIT_COUNT ? '' : 'none';
   toggle.textContent = `🛰️ ${TL_VISIT_COUNT.toLocaleString(LOC())} ${t('tl.visits.n', 'Besuche')}`;
+  const pending = document.getElementById('tl-pending-hint');
+  pending.style.display = TL_PENDING_COUNT ? '' : 'none';
+  pending.textContent = `💡 ${t('tl.pending.chip', '{n} Vorschläge warten')
+    .replace('{n}', TL_PENDING_COUNT.toLocaleString(LOC()))}`;
   if (!filtered.length) {
     // A37: Leer heißt nur dann „nichts da", wenn auch nichts mehr kommt.
     // Sonst: Fuß mit Nachlade-Knopf, damit der Filter keine Sackgasse ist.
@@ -4558,6 +4582,17 @@ function renderTimelineList() {
   const dayOf = x => x.date_start ? x.date_start.slice(0, 10) : '';
   const jr = x => (x.dayMedia || x.photoGroup) ? 2 : x.category === 'journal' ? 1 : 0;
   Object.values(groups).forEach(g => {
+    // Anmerkung 135: Jahr und Jahrzehnt zeigen keine flache Kartenliste mehr,
+    // sondern aufklappbare Sammelzeilen — sonst zerreißt eine über Monate
+    // gebündelte Besuchskarte (compressVisits) die Chronologie: „Zeit
+    // sortieren" und „Ort zusammenfassen" widersprechen sich, sobald „Ort"
+    // mehr als einen Tag umfasst. Jahrzehnt bündelt nach Jahr, Jahr nach
+    // Monat; F18/A45/compressVisits laufen erst beim Aufklappen — auf dieser
+    // Ebene reicht die Zahl, nicht die Karte.
+    if ((tl.zoom === 'year' || tl.zoom === 'decade') && g.key !== 'unbekannt') {
+      g.agg = tlAggBuckets(g.items, tl.zoom === 'year' ? 'month' : 'year');
+      return;
+    }
     g.items = compressVisits(g.items);
     // F18: Bilder, die an einem TAG hängen statt an einem Ereignis, treten als
     // eigene Zeile in den Tag ein — oben, wie der Tagebuch-Kopf. Kein neues
@@ -4633,9 +4668,10 @@ function renderTimelineList() {
   const ordered = Object.values(groups).sort((a,b) => b.sort - a.sort);
   el.innerHTML = ordered.map((g, gi) => `
     <div class="tl-year">
-      <div class="tl-year-label">${esc(g.label)}${g.items.length > TL_GROUP_CAP ? ` <span class="stat-label">(${g.items.length})</span>` : ''}${tlGroupWeather(g)}</div>
-      ${g.items.slice(0, TL_GROUP_CAP).map(renderItem).join('')}
-      ${g.items.length > TL_GROUP_CAP
+      <div class="tl-year-label">${esc(g.label)}${!g.agg && g.items.length > TL_GROUP_CAP ? ` <span class="stat-label">(${g.items.length})</span>` : ''}${tlGroupWeather(g)}</div>
+      ${g.agg ? g.agg.map(aggRowCard).join('')
+              : g.items.slice(0, TL_GROUP_CAP).map(renderItem).join('')}
+      ${!g.agg && g.items.length > TL_GROUP_CAP
         ? `<div class="hint" data-tl-more="${gi}" style="cursor:pointer">▼ ${
             t('tl.showmore', '{n} weitere anzeigen').replace('{n}', g.items.length - TL_GROUP_CAP)}</div>`
         : ''}
@@ -4649,6 +4685,100 @@ function renderTimelineList() {
   el.insertAdjacentHTML('beforeend', tlFooter());
   tlBindFooter(el);
 }
+// Anmerkung 135: eine Sammelzeile (Jahr in einem Jahrzehnt, Monat in einem
+// Jahr) klappt an Ort und Stelle auf — kein Sprung, kein Neuladen, denn die
+// Ereignisse sind bereits geladen (`tl.events`). Ein Jahres-Eimer klappt zu
+// Monats-Zeilen auf (dieselbe aggRowCard, eine Ebene feiner), ein Monats-
+// Eimer zur gewohnten Detailansicht — EIN Foto-Streifen für die ganze Spanne,
+// wie im echten Monats-Zoom.
+const TL_AGG_GROUPS = [];   // Index -> { items, unit, label }
+function tlAggBuckets(items, unit) {
+  const buckets = new Map();
+  const pad = n => String(n).padStart(2, '0');
+  items.forEach(e => {
+    if (!e.date_start) return;
+    const d = new Date(e.date_start);
+    if (isNaN(d)) return;
+    const y = d.getFullYear(), m = d.getMonth();
+    const key = unit === 'month' ? `${y}-${pad(m+1)}` : `${y}`;
+    if (!buckets.has(key)) buckets.set(key, {
+      key, unit, items: [],
+      label: unit === 'month' ? `${monthLong(m)} ${y}` : `${y}`,
+      sort: unit === 'month' ? y * 100 + m : y,
+    });
+    buckets.get(key).items.push(e);
+  });
+  return [...buckets.values()].sort((a, b) => b.sort - a.sort);
+}
+function tlAggTopPlace(items) {
+  const counts = new Map();
+  items.forEach(e => {
+    const p = e.location && (e.location.city || e.location.name);
+    if (p) counts.set(p, (counts.get(p) || 0) + 1);
+  });
+  let best = null;
+  counts.forEach((n, p) => { if (!best || n > best[1]) best = [p, n]; });
+  return best ? best[0] : null;
+}
+function aggRowCard(bucket) {
+  const idx = TL_AGG_GROUPS.push(bucket) - 1;
+  const days = new Set(bucket.items.map(e => (e.date_start || '').slice(0, 10))).size;
+  const place = tlAggTopPlace(bucket.items);
+  return `
+    <div class="event-card" data-agg-group="${idx}" title="${esc(t('tl.agg.tip', 'Klicken zum Aufklappen'))}">
+      <div class="ev-head">
+        <span class="ev-title">▸ ${esc(bucket.label)}</span>
+      </div>
+      <div class="ev-meta">
+        <span class="chip">${bucket.items.length.toLocaleString(LOC())} ${esc(t('tl.agg.events', 'Ereignisse'))}</span>
+        <span class="chip">${days.toLocaleString(LOC())} ${esc(t('tl.agg.days', 'Tage'))}</span>
+        ${place ? `<span class="chip">📍 ${esc(place)}</span>` : ''}
+      </div>
+    </div>`;
+}
+// Dieselbe Aufbereitung wie eine „Monat"-Gruppe im normalen Zeitstrahl: EINE
+// Foto-Leiste für die ganze Spanne, Besuche gebündelt, Tagebuch vor den
+// Ereignissen des Tages. Ohne TL_GROUP_CAP — eine aufgeklappte Sammelzeile
+// ist bereits eine bewusste, begrenzte Auswahl (ein Monat, kein Jahr).
+function tlAggDetailHtml(items) {
+  const dayOf = x => x.date_start ? x.date_start.slice(0, 10) : '';
+  const jr = x => (x.dayMedia || x.photoGroup) ? 2 : x.category === 'journal' ? 1 : 0;
+  let rows = compressVisits(items);
+  const days = [...new Set(items.map(dayOf).filter(Boolean))].sort();
+  if (tl.showPhotos) {
+    const byDay = new Map();
+    tl.photoGroups.forEach(pg => {
+      if (!byDay.has(pg.day)) byDay.set(pg.day, []);
+      byDay.get(pg.day).push(pg);
+    });
+    days.forEach(d => (byDay.get(d) || []).forEach(pg => {
+      const at = rows.findIndex(x => dayOf(x) === d);
+      const row = { photoGroup: pg, date_start: `${d}T00:00:00` };
+      if (at < 0) rows.push(row); else rows.splice(at, 0, row);
+    }));
+  }
+  const strip = [];
+  days.forEach(d => (tlStripFor(d) || []).forEach(m => strip.push(m)));
+  if (strip.length) {
+    rows.unshift({ dayMedia: spreadPick(strip, TL_PERIOD_PHOTOS), day: days[0],
+                   total: strip.length, span: 'month', date_start: `${days[0]}T00:00:00` });
+  }
+  rows.sort((a, b) => dayOf(a) === dayOf(b) ? jr(b) - jr(a) : 0);
+  const renderItem = x => x.photoGroup ? photoGroupCard(x.photoGroup)
+    : x.dayMedia ? dayMediaCard(x)
+    : x.visitGroup ? visitGroupCard(x)
+    : (x.category === 'journal' ? journalCard(x) : eventCard(x));
+  return rows.map(renderItem).join('');
+}
+document.getElementById('timeline-list').addEventListener('click', ev => {
+  const row = ev.target.closest('[data-agg-group]');
+  if (!row) return;
+  const bucket = TL_AGG_GROUPS[+row.dataset.aggGroup];
+  if (!bucket) return;
+  row.outerHTML = bucket.unit === 'year'
+    ? tlAggBuckets(bucket.items, 'month').map(aggRowCard).join('')
+    : tlAggDetailHtml(bucket.items);
+});
 // Anmerkung 119: Das Wetter gehört an den TAGESKOPF, nicht an eine Karte.
 //
 // Nur im Tages-Zoom, denn nur dort IST die Gruppe ein Tag — eine Woche hat
@@ -4760,6 +4890,10 @@ let BIRTH_DATE = null;
 // A37: Zahl der importierten Besuche im GESAMTEN Bestand (aus dem Index) —
 // der Schalter „🛰️ N Besuche" nannte vorher die der geladenen Liste.
 let TL_VISIT_COUNT = 0;
+// Anmerkung 135: Zahl der unbestätigten Google-/Immich-Vorschläge — sie
+// stehen nicht mehr zwischen den bestätigten Karten, der Hinweis-Chip sagt
+// stattdessen, dass und wie viele es sind, und verlinkt in die Moderation.
+let TL_PENDING_COUNT = 0;
 // A47: Orte ohne gespeicherte Adress-Bausteine — trägt den Hinweis unter der
 // Stufen-Auswahl.
 let TL_NO_ADDRESS = 0, TL_LOC_TOTAL = 0;
@@ -4948,6 +5082,12 @@ document.getElementById('tl-visits-toggle').addEventListener('click', function (
   this.classList.toggle('active', tl.showVisits);
   this.classList.toggle('off', !tl.showVisits);
   loadTimeline();   // A37: der Schalter ändert die Abfrage, nicht die Anzeige
+});
+// Anmerkung 135: kein Schalter — ein Vorschlag entscheidet sich nur in der
+// Moderation, der Chip führt nur dorthin.
+document.getElementById('tl-pending-hint').addEventListener('click', () => {
+  gotoView('admin');
+  showAdminTab('moderation');
 });
 // A45: Foto-Ebene im Zeitstrahl. Wie bei den Besuchen ändert der Schalter die
 // ABFRAGE (die Gruppen kommen verdichtet vom Server), nicht nur die Anzeige.
@@ -6989,7 +7129,9 @@ async function mpEnsureWeather(key, items) {
 async function openMapView() {
   // A37: eigener schlanker Endpunkt statt der Zeitstrahl-Liste — und erst
   // jetzt, beim Öffnen des Reiters, statt beim Start der App.
-  mp.located = await api('/api/events/map').catch(() => []);
+  // Anmerkung 135: wie im Zeitstrahl — unbestätigte Google-/Immich-Vorschläge
+  // sind Beleg, kein Ereignis, und tauchen erst nach der Moderation auf.
+  mp.located = await api('/api/events/map?machine_proposals=0').catch(() => []);
   // A45: Wie viele Fotos es ÜBERHAUPT gibt — das entscheidet, ob der
   // Foto-Schalter etwas bewirken kann (A40). Ein eigener, winziger Abruf:
   // scheitert er, bleibt die Karte vollständig, nur ohne Fotos.

@@ -19,9 +19,10 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.models import Entity, Event, EventEntityLink, Location, User
+from app.models import ConfirmState, Entity, Event, EventEntityLink, Location, User
 from app.routers._serialize import event_to_read
 from app.schemas import EventRead
+from app.services.immich_link import MACHINE_SOURCES
 
 router = APIRouter(prefix="/api/search", tags=["Suche"])
 
@@ -68,9 +69,16 @@ def search(
     # also gefahrlos die JSON-Spalten mitführen und nach Datum sortieren
     # (ORDER BY unter DISTINCT verlangte die Spalte in der Auswahl — PostgreSQL).
     match = _match_ids(db, user.id, q)
+    # Anmerkung 135: unbestätigte Google-/Immich-Vorschläge sind Beleg, kein
+    # Ereignis — die Suche ist der einzige Aufrufer dieses Ergebnisses im
+    # Zeitstrahl (die Karten rendern es dort wie jedes andere Event), also
+    # gilt dieselbe Regel wie bei /api/events: erst nach der Moderation
+    # taucht ein Treffer auf.
     hits = (
         db.query(Event)
         .join(match, Event.id == match.c.id)
+        .filter(~((Event.confirmed != ConfirmState.confirmed)
+                 & Event.source.in_(MACHINE_SOURCES)))
         .order_by(Event.date_start.desc())
         .limit(limit)
         .all()

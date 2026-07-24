@@ -831,12 +831,13 @@ installing.
 ## 15. Open questions & decisions to sharpen
 
 **Feedback round 2026-07-24 — from use, collecting on `main` for 0.40 (notes 121–136).**
-*Handled in two passes on 2026-07-24: everything below except note 135 is now
-implemented on `main`. **Note 135 is the one open item** — before the demo mode,
-map and timeline get one deliberate, shared display model, because the author is
-not yet satisfied with how imported (Google), photo (Immich) and hand-entered
-material appear side by side. Demo mode does not start until that is settled,
-however long it takes (no deadline, note 58). The 597-test suite and all 27
+*Handled in three passes on 2026-07-24: everything below, including note 135, is
+now implemented on `main`. Note 135 needed its own discussion first — before the
+demo mode, map and timeline get one deliberate, shared display model, because
+the author was not satisfied with how imported (Google), photo (Immich) and
+hand-entered material appeared side by side. Demo mode does not start until the
+author is satisfied, however long it takes (no deadline, note 58); this round
+cleared the one item standing in its way. The 602-test suite and all 27
 guardians are green.*
 
 **Done in this round (small, direct):**
@@ -857,27 +858,19 @@ guardians are green.*
 133. ✅ **“My data” — the Immich effect-badges applied to every section.** The sections were already numbered; what the Immich cards had and the others lacked were the coloured “what this does to your data” badges. **→ Done:** every section now carries one — *setting* (tracking, basemap), *creates proposals* (imports), *enriches* (place names, weather), *changes confirmed data* (day-split), *read only* / *writes* (export / restore), *deletes for good* (wipe). Two new badge colours (`write` = danger, `read` = accent). Badges sit beside the title, never inside a `data-i18n` container (note 71).
 134. ✅ **Bug: the city visit-collective card wouldn’t expand.** Confirmed the hypothesis: the group value is stored in a field named `city`, but for the **district** level (A47) it holds a district (“HafenCity”), while the expand handler always refetched by `city=` (→ `Location.city` = “Hamburg”), so it filtered to nothing and inserted an empty container. **→ Done:** the group now carries its `level`; the endpoint gained a level-aware `place` filter (`_level_column(group) == place`); the handler refetches by `place` + `group`, not `city`. Tests in `test_a47_levels.py` (district expand returns its visits; the old `city=` way returns nothing); the A39 guardian updated.
 
-**The main topic — to discuss, then decide:**
-135. **Map & timeline: one deliberate model for what shows, how, and when — per source.** The author is not satisfied with the current mix; hand-entered material is clear, imported (Google) and photo (Immich) material are not, and the two views disagree. This note records the **current state** as the shared basis; the decision follows in a later round.
+**The main topic — discussed, then decided and built:**
+135. ✅ **Map & timeline: one deliberate model for what shows, how, and when — per source.** Discussed against the actual code (not from memory) before any change — the resolved tensions map directly onto the open questions this note used to list.
 
-    *Current behaviour, by source:*
+    *What was decided:*
+    - **Two axes, one view each.** The timeline is the *time* axis, the map the *place* axis; each source is only condensed on the axis where condensing it makes sense. Google visits stay a place-native, map concept — condensing them across days *in the timeline* was exactly what broke chronological order under year/decade zoom (the “sorting” complaint): a bundled card spanning months has no single point in time, so it sorted at its most-recent visit while claiming the whole span.
+    - **Evidence vs. proof, made visible as a difference, not just a rule.** A photo or an imported visit is *evidence* — proof of where you were, never proof that “this was an event”. Confirming it into the life database is a separate, deliberate act that only happens in moderation. Concretely: unconfirmed Google/Immich proposals (`Source` in `MACHINE_SOURCES`) no longer render as `unconfirmed`-badged cards inside the timeline or the map (`machine_proposals=0` on `/api/events`, `/api/events/map`, `/api/search`); a small “N proposals waiting” hint links to moderation instead. This answers “what a ‘N Fotos in Hamburg’ entry promises”: it no longer promises a pending decision it cannot show.
+    - **A photo without an event is correct, not a defect** — restated because the author asked directly whether it was wrong. The day is already its container (note 87); an event is what you additionally *decide* it was.
+    - **Year/decade zoom aggregates instead of listing.** Year groups by month, decade by year — one row per bucket (event count, day count, main place), click to expand: a decade’s year-row expands to its months, a month’s row to the familiar day-by-day view with its single photo strip. This is what actually fixes the sorting complaint (the aggregate row has one unambiguous position; the flat list of arbitrarily-spanning bundled cards did not).
+    - **Map bundling (A40) already answered its own question and stays as built** — a deliberate, tested, zoom-independent toggle driven by the selected period, not by raw pixel zoom (which today only sizes photo dots). Replacing it with a pixel-zoom-driven administrative ladder (country/city/district/point) would duplicate, not simplify — recorded as a considered and declined alternative, not an oversight.
 
-    | Source | Timeline (default) | Timeline (shown) | Map |
-    |---|---|---|---|
-    | **Manual** event | always visible, one card | — | marker if located; always shown |
-    | **Google** visit (`google_timeline`) | **hidden**; “🛰️ Besuche” toggle | condensed per (day, city) into one “City · N Besuche” card (server, A39); expandable (note 134) | **always visible** as markers; grouping toggle “Punkte zusammenfassen” |
-    | **Google** route | — (not in the timeline) | — | own `Track` layer; two path modes (measured vs. connect-order, A40) |
-    | **Immich** photo | **hidden**; “📷 Fotos” toggle (needs prior locating) | photo strip per (day, place), capped 12, spread (note 124) | separate `photo_points` layer (A45), toggleable |
-    | **Immich** day/album proposal (P2.1 st. 2/3) | appears as `unconfirmed` event once generated | as an event card | as an event marker |
+    *Implemented:* `MACHINE_SOURCES`-scoped `machine_proposals` filter (events router + search), `EventsIndex.machine_proposals` counter, timeline hint chip linking to moderation, `tlAggBuckets`/`aggRowCard`/`tlAggDetailHtml` for the year/decade aggregation. Tests: `test_anm135_machine_proposals.py`; guardians `check-a37-window.js` and `check-photo-layer.js` updated for the new default zoom behaviour (both pinned an explicit zoom level rather than relying on flat-card rendering at the default “year” zoom).
 
-    *The tensions the author is reacting to (open questions for the discussion):*
-    - **Defaults disagree with the map.** Google visits and Immich photos are *off* by default in the timeline but *on* by default (visits) / a separate layer (photos) on the map. Is “hidden in the timeline, visible on the map” the right split, or should each source have one consistent presence?
-    - **What a “N Fotos in Hamburg” entry promises.** Reported: an entry reading “5 Fotos in Hamburg” signals that photos are shown there when they are not (and should not be). Either it shows the photos or it should not look like a photo entry — decide which, per zoom level.
-    - **Condensation rules differ by source and view.** Google visits condense per (day, city) in the timeline but stay individual on the map; photos condense per (day, place) capped at 12; manual events never condense. Is there one condensation model, or are three justified? (Note 134’s expand bug lives here.)
-    - **Sorting under year/decade zoom** feels wrong and “bites with grouping/clustering” (author). Define the intended order at each zoom level and how it interacts with condensation.
-    - **Clickability.** A condensed card is not an event and must not open the editor (A39); a photo strip opens the viewer; a manual card opens the editor. Confirm this is the intended, teachable rule across all three sources.
-
-    *Constraints that stay fixed regardless of the outcome* (so the discussion does not reopen settled invariants): confirmed manual data is the life database and is never rewritten by machines; imported visits/photos are additive; a photo is never promoted to an event on its own (note 87); condensation happens **before** paging, server-side (A37/A39); a control that can do nothing must say so (A40).
+    *Constraints that stayed fixed throughout* (never reopened): confirmed manual data is the life database and is never rewritten by machines; imported visits/photos are additive; condensation happens **before** paging, server-side (A37/A39); a control that can do nothing must say so (A40).
 
 **Answer to a general question (note 136):**
 136. **“Why doesn’t Postgres perform better at ~20k entries, and where is the bottleneck?”** Postgres is not the bottleneck. Timeline, map and statistics have been server-side windowed since A37 and carry 20k+ comfortably (measured start 12.7 MB/1.49 s → 0.31 MB/0.08 s at 12k). The one path that did **not** scale was semantic search — it pulled every embedded event into the app process and computed cosine in pure Python — which is why note 121 removes it; that also removes the bottleneck. The other felt slowdown was the uncapped photo strips (note 124). What is genuinely missing for the future, and only if semantic search returns, is a vector index (**pgvector**) so similarity is computed in the database, not the process. For plain growth, the next things to add when the row count climbs are ordinary B-tree indexes on the hot filters (`Event.user_id, date_start`, `Metric.event_id`) — cheap, and unrelated to the engine choice.

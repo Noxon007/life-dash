@@ -253,6 +253,10 @@ class EventsIndex(BaseModel):
     # Importierte Standort-Besuche — der Zeitstrahl blendet sie aus und nennt
     # ihre Zahl auf dem Schalter
     visits: int = 0
+    # Anmerkung 135: unbestätigte Vorschläge aus Google/Immich (MACHINE_
+    # SOURCES) — Zeitstrahl und Karte blenden sie aus, dieser Zähler trägt
+    # den Hinweis „N Vorschläge warten" mit Link in die Moderation.
+    machine_proposals: int = 0
     # Anmerkung 110: unscharf datierte Einträge (Monat/Jahreszeit/Jahr/Jahrzehnt
     # oder ganz ohne Datum). Ein eigener Rückstand neben `unconfirmed`, nicht
     # dieselbe Frage: „stimmt das?" gegen „wann war das?".

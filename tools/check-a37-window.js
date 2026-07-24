@@ -84,7 +84,14 @@ setTimeout(async () => {
   // 4. F17: Das Geburtsdatum stammt aus dem Index — in der geladenen Seite
   //    steht kein Meilenstein „Geburt", die Alters-Chips müssen trotzdem da
   //    sein. Geprüft wird das Sichtbare: Geburt 1990, Einträge 2024 → „mit 34".
+  //    Anmerkung 135: der Standard-Zoom ist „Jahr", und der zeigt seit dieser
+  //    Anmerkung keine Karten mehr direkt, sondern Monats-Sammelzeilen — erst
+  //    ein Klick klappt sie zur gewohnten Detailansicht auf. Der Test klickt
+  //    also erst auf, bevor er das Alter sucht.
   w.renderTimeline();
+  const aggRow = d.querySelector('[data-agg-group]');
+  ok('Jahr zeigt Monats-Sammelzeilen statt einzelner Karten', !!aggRow);
+  if (aggRow) aggRow.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   const list = d.getElementById('timeline-list').textContent;
   ok('Alters-Chips überleben das Zeitfenster (Geburt kommt aus dem Index)',
      /🎂/.test(list) && /34/.test(list));

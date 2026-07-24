@@ -204,6 +204,12 @@ setTimeout(async () => {
   w.eval('__zoom = 6');
 
   // --- 4. Zeitstrahl: Gruppen statt doppelter Leisten --------------------- //
+  // Anmerkung 135: Jahr/Jahrzehnt zeigen seit dieser Anmerkung Monats-/Jahres-
+  // Sammelzeilen statt Karten — das ist der Standard-Zoom, hier geht es aber
+  // um die Detailansicht selbst (A45/F18), nicht um die Granularität. Ein
+  // Zoom, der weiter direkt rendert, hält den Test bei seiner eigentlichen
+  // Frage.
+  w.eval("tl.zoom = 'month';");
   calls.length = 0;
   tlChip.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   await wait(220);

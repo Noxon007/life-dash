@@ -19,6 +19,7 @@ from app.routers._serialize import EAGER, EAGER_SLIM, event_to_read
 from app.schemas import (EventGeo, EventManualCreate, EventRead, EventsIndex,
                          LocationGeo, OnThisDayGroup, YearCount)
 from app.services import visitsplit
+from app.services.immich_link import MACHINE_SOURCES
 from app.services.ingestion import create_manual_event
 from app.services.stats_overview import find_birth
 from app.sqlutil import DISTRICT_KEYS, addr_part, day_parts
@@ -452,6 +453,15 @@ def list_events(
         description="A37: importierte Standort-Besuche einschließen (Default: "
                     "alles). visits=0 lässt sie weg — der Zeitstrahl blendet "
                     "sie standardmäßig aus.")] = None,
+    machine_proposals: Annotated[bool | None, Query(
+        description="Unbestätigte Vorschläge maschineller Quellen (Google/"
+                    "Immich, MACHINE_SOURCES) einschließen (Default: alles, "
+                    "API-Konsumenten/Export bleiben unverändert). "
+                    "machine_proposals=0 lässt sie weg — sie werden erst nach "
+                    "Bestätigung in der Moderation zu Ereignissen und tauchen "
+                    "vorher nicht als unbestätigte Karte im Zeitstrahl auf; "
+                    "die belegende Foto-/Besuchs-Ebene bleibt davon "
+                    "unberührt, die zeigt sich unabhängig davon.")] = None,
     condense: Annotated[bool, Query(
         description="A39: importierte Besuche desselben Tages und desselben "
                     "Ortes zu einem Eintrag zusammenfassen")] = False,
@@ -487,8 +497,6 @@ def list_events(
     if category:
         query = query.filter(Event.category == category)
     if confirmed_only:
-        from app.models import ConfirmState
-
         query = query.filter(Event.confirmed == ConfirmState.confirmed)
     if q:
         like = f"%{q}%"
@@ -508,6 +516,16 @@ def list_events(
     # nachgeladen für ein paar sichtbare Karten. Also hier filtern.
     if visits is False:
         query = query.filter(Event.source != Source.google_timeline)
+    # Anmerkung 135: unbestätigte Vorschläge maschineller Quellen sind Beleg,
+    # kein Ereignis — sie tauchen erst nach dem bewussten Schritt in der
+    # Moderation zwischen den bestätigten Karten auf. Bewusst nur diese
+    # beiden Quellen (MACHINE_SOURCES): unbestätigte Einträge aus P5.1/F1
+    # (KI-Erfassung aus eigenem Text) bleiben inline sichtbar, das ist eine
+    # andere Frage („stimmt das, was ich diktiert habe?" statt „ist das
+    # überhaupt ein Ereignis?").
+    if machine_proposals is False:
+        query = query.filter(~((Event.confirmed != ConfirmState.confirmed)
+                               & Event.source.in_(MACHINE_SOURCES)))
     if city:
         query = query.filter(Event.location_id.in_(
             db.query(Location.id).filter(Location.user_id == user.id,
@@ -886,6 +904,13 @@ def events_index(
     visits = (db.query(func.count(Event.id))
               .filter(Event.user_id == user.id,
                       Event.source == Source.google_timeline).scalar() or 0)
+    # Anmerkung 135: wie viele unbestätigte Vorschläge aus Google/Immich gerade
+    # ausgeblendet sind — der Hinweis, der stattdessen in die Moderation
+    # verlinkt, braucht diese Zahl.
+    machine_proposals = (db.query(func.count(Event.id))
+                         .filter(Event.user_id == user.id,
+                                 Event.confirmed != ConfirmState.confirmed,
+                                 Event.source.in_(MACHINE_SOURCES)).scalar() or 0)
     # Anmerkung 110: Unscharf datierte Einträge sind ein ZWEITER Rückstand
     # neben den unbestätigten — und er lebte bisher nur im Verwaltungs-Reiter,
     # wo ihn niemand sucht. Bewusst eine eigene Zahl und nicht in `unconfirmed`
@@ -909,7 +934,7 @@ def events_index(
                         Location.address.is_(None)).scalar() or 0)
     return EventsIndex(
         total=total, dated=dated, undated=total - dated, unconfirmed=unconfirmed,
-        visits=visits, fuzzy=fuzzy,
+        visits=visits, machine_proposals=machine_proposals, fuzzy=fuzzy,
         locations_no_address=loc_open, locations_total=loc_total,
         year_min=years[0].year if years else None,
         year_max=years[-1].year if years else None,
@@ -929,6 +954,9 @@ def list_map_events(
     date_to: Annotated[datetime | None, Query(alias="to")] = None,
     weather: Annotated[bool, Query(
         description="Wetter mitschicken — nur für den angezeigten Zeitraum")] = False,
+    machine_proposals: Annotated[bool | None, Query(
+        description="Anmerkung 135: wie beim Zeitstrahl — machine_proposals=0 "
+                    "lässt unbestätigte Google-/Immich-Vorschläge weg.")] = None,
 ) -> list[EventGeo]:
     """Nur verortete eigene Events (mit Koordinaten) — für die Karte.
 
@@ -949,6 +977,9 @@ def list_map_events(
         query = query.filter(Event.date_start >= date_from)
     if date_to is not None:
         query = query.filter(Event.date_start <= date_to)
+    if machine_proposals is False:
+        query = query.filter(~((Event.confirmed != ConfirmState.confirmed)
+                               & Event.source.in_(MACHINE_SOURCES)))
     events = query.order_by(Event.date_start.asc(), Event.id.asc()).all()
     wx = _weather_for(db, user.id, events) if weather else [None] * len(events)
     return [

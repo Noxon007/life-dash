@@ -16,6 +16,23 @@ any `MINOR`.
 ## [Unreleased]
 
 ### Added
+- **Timeline and map: what evidence and what is proven now look different.**
+  Photos and visits found by Google or Immich are evidence — they used to
+  appear as “unconfirmed” cards mixed in among your confirmed entries. They no
+  longer do: a proposal only joins the timeline once you have actually
+  confirmed it in moderation. Until then, a small hint (“N proposals waiting”)
+  links there instead of showing the card itself. The photo and visit layers
+  themselves (toggled on/off) are unaffected — they were never proposals to
+  begin with, just evidence of where you were and what was photographed.
+- **Year and decade view now group by month and year instead of listing every
+  card.** A year used to list every single entry — and once a repeated
+  location visit spans more than a single day, sorting it purely by time
+  and bundling it by place pull in different directions, so the more a year
+  or decade condensed imported visits, the less the order actually held. Year
+  view now shows one row per month (event count, day count, main place),
+  decade view one row per year; clicking a row expands it — a year's row into
+  its months, a month's row into the familiar day-by-day view with its photo
+  strip.
 - **A greeting on the Today page.** A short line at the top now greets you by
   time of day and name and shows today's date, above the “on this day” look-back.
 - **“In the timeline” button on every collection entry, not just cities.**
