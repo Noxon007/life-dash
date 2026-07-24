@@ -5,6 +5,10 @@ backend/.env
 
 # Datenbanken & Backups
 *.db
+# SQLite-WAL-Modus legt Sidecar-Dateien neben die .db — die matcht *.db NICHT,
+# deshalb wurden _smoke_a45.db-shm/-wal einmal versehentlich eingecheckt.
+*.db-shm
+*.db-wal
 *.db.bak*
 *.sqlite3
 # Compose-Bind-Mounts (App-Daten + PostgreSQL-Datenverzeichnis)

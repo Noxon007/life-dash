@@ -37,6 +37,11 @@ any `MINOR`.
   instead of passing one of the values off as “the” weather.
 
 ### Fixed
+- **The raw database view is hidden on phones.** It is a wide table meant for
+  horizontal scrolling — unusable on a small screen, and working directly on the
+  raw tables is a desk job anyway. On narrow screens both the tab and its
+  content are now hidden (it was already admin-only); everything else stays
+  reachable on mobile.
 - **The “check” buttons looked like they did nothing.** Their result was written
   to the end of the description column beside the button — on a wide screen, the
   other half of the display — and nothing at all happened while the check was

@@ -703,6 +703,13 @@
       flex-shrink: 0;
     }
     .logo, .sidebar-foot { display: none; }
+    /* Feedback Punkt 1: die Datenbank-Rohansicht ist eine breite Tabelle mit
+       horizontalem Scrollen — auf dem Handy unbrauchbar, und Datenarbeit an
+       den rohen Tabellen ist ohnehin PC-Sache. Reiter UND Inhalt raus. Der
+       Reiter ist admin-only; adminTab startet bei 'moderation' und wird nicht
+       gemerkt, es gibt also keinen Weg, den ausgeblendeten Inhalt zu treffen. */
+    #admin-tabs [data-atab="db"],
+    [data-tabpane="db"] { display: none !important; }
     /* Toasts über der Bottom-Navigation einblenden */
     .toast-wrap { left: 8px; right: 8px; bottom: calc(74px + env(safe-area-inset-bottom)); max-width: none; }
     /* A38: nur die vier Hauptziele plus „Mehr“ — neun Einträge ergaben je
