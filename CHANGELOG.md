@@ -90,6 +90,21 @@ any `MINOR`.
   of your life vanished while the map still looked full.
 
 ### Changed
+- **The Immich section is now a numbered flow instead of one stacked panel.**
+  Its three runs — attaching photos to entries you already have, proposing new
+  entries from photo days, and placing photo points on the map — did different
+  things but looked like one block, and two near-identical year pickers made it
+  worse. Each run is now its own card in the order you use them (connect → attach
+  → propose → locate), and each card carries a small badge in its header saying
+  what it does to your data: *attaches* (changes nothing), *creates proposals*
+  (goes to moderation), *map only* (a layer you can discard). Only one year
+  picker is on show now — on “propose”, where the preview needs it; locating
+  photos simply runs over all years, with the single-year choice tucked under
+  *Advanced*. No run, setting or key changed — only the layout.
+- **Clearer button labels.** “Start run” for resolving place names is now
+  “Resolve place names”, and the two “Take a look” preview buttons now say
+  “Show preview”, so each button names what it does. The *Advanced* expanders in
+  “My data” also got more room to breathe.
 - **“My data” reads more calmly.** Each of the seven steps kept a full paragraph
   of explanation next to its button — accurate, but a wall of text. The buttons
   now carry a single sentence of what they do; the detailed how-and-why has moved
