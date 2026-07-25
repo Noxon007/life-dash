@@ -830,17 +830,20 @@ installing.
 
 ## 15. Open questions & decisions to sharpen
 
-**Feedback round 2026-07-24/25 — from use, collecting on `main` for 0.40 (notes 121–136, plus 138).**
-*Handled in four passes: everything below, including notes 135 and 138, is
-now implemented on `main`. Note 135 needed its own discussion first — before the
-demo mode, map and timeline get one deliberate, shared display model, because
-the author was not satisfied with how imported (Google), photo (Immich) and
+**Feedback round 2026-07-24/25 — from use, collecting on `main` for 0.40 (notes 121–136, plus 138–139).**
+*Handled in four passes; notes 121–136 and 138 are implemented on `main`.
+**Note 139 is the one open item** — decided, not yet built, weekly budget ran
+out mid-round. Note 135 needed its own discussion first — before the demo
+mode, map and timeline get one deliberate, shared display model, because the
+author was not satisfied with how imported (Google), photo (Immich) and
 hand-entered material appeared side by side. Note 138 followed directly from
 using that result: once the two evidence sources were told apart honestly, the
 author wanted them treated *alike*, not just distinctly — Immich photo-day
 clusters now confirm themselves exactly the way a Google visit always has.
-Demo mode does not start until the author is satisfied, however long it takes
-(no deadline, note 58); this round cleared the items standing in its way. The
+Note 139 pushed further the same day: fold the day-cluster mechanism into the
+photo-points layer entirely, one photo one event, with its own toggle
+alongside (not merged into) the Google one. Demo mode does not start until the
+author is satisfied, however long it takes (no deadline, note 58). The
 574-test suite and all 27
 guardians are green.*
 
@@ -885,6 +888,18 @@ guardians are green.*
     **Consequence that reaches beyond Immich: `MACHINE_SOURCES` now governs the shared timeline/map treatment, not just `google_timeline`.** Hiding-by-default in the timeline, A39 condensation (per day+place), the “🛰️ N” visit counter and toggle (relabelled “Automatically detected” — it no longer names a single source), the export's “exclude imported” checkbox — every one of these was hardcoded to `Source.google_timeline` and is now `Event.source.in_(MACHINE_SOURCES)` (backend) or a `MACHINE_SOURCES` JS array mirroring it (frontend), one definition per language, not duplicated per call site. Without this the auto-confirmed photo events would have shown up as flat, ungrouped cards in the timeline by default — reintroducing exactly the clutter the whole map/timeline discussion (note 135) set out to remove, just from a different source. The map needed no change: its bundling (A40) already grouped by location regardless of source.
 
     *Implemented:* `services/immich_source.py` (album code removed, `create_confirmed_visits`), `routers/immich.py` (album endpoints removed, `/preview` simplified), `routers/jobs.py` (`_run_immich_source` simplified), `services/immich.py` (`album.read` permission and probe removed, `albums()` client function removed — dead, nothing called it anymore). Tests: `test_p21_stage2.py` and `test_p21_stage2_silence.py` rewritten around the new behaviour (auto-confirm, no albums); `test_p21_stage3_albums.py` deleted outright rather than left disabled. Guardian `check-p21-preview.js` rewritten — the mandatory-preview mechanic it protects matters *more* now, not less, since there is no moderation step left to catch a bad run.
+
+139. 🔲 **Follow-up to note 138, immediately after building it: “no — go further”, refined over three rounds of restatement.** Note 138 kept two separate mechanisms (a day-cluster-to-event run, “create events from photo days”, plus the pre-existing per-photo map layer, `PhotoPoint`/`services/photo_points.py`, A45) and only changed the first to auto-confirm. The author's reaction: that is still two answers to one question. **Decided, not yet built** (weekly budget ran out mid-round — recorded precisely so the shape does not have to be rediscovered; this entry was itself revised twice as the requirement sharpened, which is exactly why it was written down instead of built on the first, looser understanding).
+
+    **Two independent jobs, not one merged into the other — the final, corrected shape:**
+
+    - **Job 1 — “Photo points” (Step C), redefined.** Every geotagged photo becomes its **own confirmed event** (`source=immich`, `confirmed_by="import"`, no `MIN_CLUSTER_PHOTOS` floor — one photo is enough, unlike note 138's four; “create events from photo days”, note 138's version of stage 2, is removed outright, not simplified — `services/immich_source.py`, its router, its job type, the “Step B” card all go). **On the map:** a point *with* its thumbnail (the popup already does this for today's `PhotoPoint`s — carries over). **In the timeline: the event itself, with NO photo** — plain text, “Photo taken in Detmold”, not a thumbnail. Same-day-same-place events still condense via the existing A39/`MACHINE_SOURCES` bundling (already generalised in note 138, no new code) into one collapsible row — also text-only when expanded, “12× photo taken in Detmold”, never a photo grid. The map is where the *image* lives; the timeline only gets the *fact*.
+    - **Job 2 — “Link photos” (Step A), essentially unchanged, already exists as F18/`day_candidates`.** For a day that carries an event, check whether Immich has photos from that day and show them **in the timeline only**, as the existing day-strip under the day header — capped at twelve, spread across the day (F18, notes 110/114). Creates no events, changes nothing about confirmed data — pure display, same as today. Keeps working for hand-entered events exactly as before; a day with a new Job-1 photo-event now also qualifies, the same way a Google-visit day already does.
+    - **Two separate toggles, not one shared one.** “🛰️” stays Google-only; Immich photo-events get their **own** switch (📷, distinct control, distinct count) — corrected from an earlier draft of this note that had them share the Google toggle.
+    - **Technical consequence that falls out of “timeline shows no photo”:** the normal event-card photo rendering (`eventPhotos()`, driven by `Event.media`) must not fire for `source=immich` events in the timeline — a deliberate suppression, not an oversight, since the map needs the same event's photo and the timeline explicitly must not show it. Whether the created event still carries a `MediaRef` to its own photo (for the map to join through) or the map gets the thumbnail through a different reference is an implementation choice for the build round, not decided here.
+    - **Consequence: the old `PhotoPoint` apparatus is replaced, not kept alongside.** Two mechanisms drawing the same photos — one disposable layer, one confirmed-event pipeline — is the exact duplication this project's own notes (106 and others) keep finding and removing; keeping both would recreate it on purpose. `PhotoPoint`, `services/photo_points.py`, `/api/photos/*`, `photoGroupCard`'s evidence-only rendering: all fold into the event pipeline once built. This is the one part of the decision that touches an existing model/table, so it gets built carefully, not reflexively.
+
+    **Why recorded now instead of built now:** weekly usage budget ran out mid-round, and the requirement changed shape twice under questioning (first “count photos like visits”, then “no photo-per-event precision needed, just see photos in the timeline”, then the final split above) — proof that restating before building, not just before the *first* attempt, was the right call here.
 
 **Answer to a general question (note 136):**
 136. **“Why doesn’t Postgres perform better at ~20k entries, and where is the bottleneck?”** Postgres is not the bottleneck. Timeline, map and statistics have been server-side windowed since A37 and carry 20k+ comfortably (measured start 12.7 MB/1.49 s → 0.31 MB/0.08 s at 12k). The one path that did **not** scale was semantic search — it pulled every embedded event into the app process and computed cosine in pure Python — which is why note 121 removes it; that also removes the bottleneck. The other felt slowdown was the uncapped photo strips (note 124). What is genuinely missing for the future, and only if semantic search returns, is a vector index (**pgvector**) so similarity is computed in the database, not the process. For plain growth, the next things to add when the row count climbs are ordinary B-tree indexes on the hot filters (`Event.user_id, date_start`, `Metric.event_id`) — cheap, and unrelated to the engine choice.
