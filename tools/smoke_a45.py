@@ -85,13 +85,20 @@ with TestClient(app):
     db.commit()
     ok("Das Jahr gilt als durchsucht", 2024 in pp.scanned_years(user))
 
-    # --- P2.1 Stufe 3: Alben nur auf Nachfrage ------------------------------ #
-    quiet = source.scan_year(db, user, 2024, URL, KEY)
-    ok("Ohne Nachfrage keine Album-Vorschläge",
-       all(p.kind == "day" for p in quiet), str([p.kind for p in quiet][:5]))
-    loud = source.scan_year(db, user, 2024, URL, KEY, albums=True)
-    ok("Mit Nachfrage kommt das Album", any(p.kind == "album" for p in loud),
-       str([p.kind for p in loud][:5]))
+    # --- Anmerkung 138: Fotocluster werden direkt bestätigt (wie Google) --- #
+    from app.models import ConfirmState, Event, Source as SourceEnum
+
+    clusters = source.scan_year(db, user, 2024, URL, KEY)
+    created = source.create_confirmed_visits(db, user, clusters)
+    db.commit()
+    confirmed_rows = (db.query(Event)
+                      .filter(Event.user_id == user.id,
+                              Event.source == SourceEnum.immich).all())
+    ok("Fotocluster wurden angelegt", created == len(confirmed_rows) and created > 0,
+       f"created={created}, rows={len(confirmed_rows)}")
+    ok("…und direkt bestätigt, wie ein Google-Besuch",
+       all(e.confirmed == ConfirmState.confirmed for e in confirmed_rows),
+       str([e.confirmed for e in confirmed_rows]))
 
     some_asset = points[0].asset_id
     point_total = len(points)

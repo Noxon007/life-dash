@@ -77,7 +77,6 @@ PERMISSIONS: dict[str, tuple[str, str]] = {
     "/users/me": ("user.read", "eigene von fremden Fotos unterscheiden"),
     "/search/metadata": ("asset.read", "Fotos nach Zeit finden"),
     "/timeline/buckets": ("asset.read", "welche Jahre sich lohnen"),
-    "/albums": ("album.read", "Alben als Reisen vorschlagen"),
     "/assets/": ("asset.view", "Vorschaubilder durchreichen"),
 }
 
@@ -179,10 +178,16 @@ def check(url: str, key: str) -> dict:
     **Und aus demselben Grund prüft er jetzt ALLE Rechte, die der Konnektor
     benutzt** (Anmerkung 113). Genau dieser Test hat grün gemeldet, während
     die Vorschau an einem 403 scheiterte: er fragte `server.about`, die
-    Funktion braucht fünf Rechte. *Ein Verbindungstest, der weniger prüft als
-    die Funktion benutzt, ist keine Entwarnung — er ist eine falsche.* Die
-    Rechte werden einzeln genannt, denn „irgendetwas fehlt" schickt zum
-    Neuanlegen; „`album.read` fehlt" schickt zu einem Häkchen.
+    Funktion braucht mehr. *Ein Verbindungstest, der weniger prüft als die
+    Funktion benutzt, ist keine Entwarnung — er ist eine falsche.* Die Rechte
+    werden einzeln genannt, denn „irgendetwas fehlt" schickt zum Neuanlegen;
+    ein benannter Name schickt zu einem Häkchen.
+
+    **Anmerkung 138: `album.read` ist raus** — mit den Album-Vorschlägen ist
+    auch der einzige Aufruf verschwunden, der es brauchte (`GET /albums`).
+    Ein Schlüssel mit weniger Rechten anzulegen als die Funktion verlangt, ist
+    korrekt; mehr zu verlangen als sie braucht, ist derselbe Fehler nur
+    andersherum.
     """
     url = url.rstrip("/")
     info = _request(url, key, "/server/about")   # scheitert -> URL/Schlüssel
@@ -202,7 +207,6 @@ def check(url: str, key: str) -> dict:
     rights.append({"right": "server.about", "for": PERMISSIONS["/server/about"][1],
                    "ok": True})
     _probe("/users/me", lambda: _request(url, key, "/users/me"))
-    _probe("/albums", lambda: _request(url, key, "/albums?isOwned=true"))
     # `asset.view` lässt sich nur an einem echten Bild prüfen — also eins
     # suchen und genau den Weg gehen, den die Bildanzeige später geht. Ein
     # Recht, das erst beim ersten angezeigten Foto auffällt, ist genau die
@@ -472,19 +476,6 @@ def photo_years(url: str, key: str, my_id: str | None) -> dict[int, int]:
             years[int(stamp)] = years.get(int(stamp), 0) + int(bucket.get("count") or 0)
         return years
     raise last or ImmichError("Immich liefert keine Zeitachse")
-
-
-def albums(url: str, key: str, *, owned: bool | None = None) -> list[dict]:
-    """Alben. `owned=True` nur eigene, `owned=False` nur mit mir geteilte.
-
-    Hier filtert der Server (`isOwned`), anders als bei den Assets — das ist
-    keine Inkonsequenz von Life-Dash, sondern der Stand der Immich-API.
-    """
-    path = "/albums"
-    if owned is not None:
-        path += f"?isOwned={'true' if owned else 'false'}"
-    data = _request(url, key, path)
-    return [a for a in (data or []) if a.get("id")]
 
 
 # --------------------------------------------------------------------------- #

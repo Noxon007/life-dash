@@ -1143,7 +1143,7 @@
           <span class="filter-chip active" id="tl-city-chip" style="display:none"
                 data-i18n-title="tl.city.tip"
                 title="Zeitstrahl auf diese Stadt eingeschränkt — klicken, um wieder alles zu zeigen"></span>
-          <span class="filter-chip off" id="tl-visits-toggle" data-i18n-title="tl.visits.tip" title="Importierte Timeline-Besuche (Google) im Zeitstrahl anzeigen — auf der Karte sind sie immer sichtbar" data-i18n="tl.visits.chip">🛰️ Besuche</span>
+          <span class="filter-chip off" id="tl-visits-toggle" data-i18n-title="tl.visits.tip" title="Automatisch erfasste Einträge (Google-Besuche, Immich-Fototage) im Zeitstrahl anzeigen — auf der Karte sind sie immer sichtbar" data-i18n="tl.visits.chip">🛰️ Automatisch erfasst</span>
           <!-- Anmerkung 135: unbestätigte Google-/Immich-Vorschläge sind
                Beleg, kein Ereignis — sie stehen nicht mehr zwischen den
                bestätigten Karten. Dieser Hinweis sagt, dass es sie gibt, und
@@ -1863,8 +1863,8 @@
                 <input type="password" id="im-key" class="mf-select" style="width:100%; max-width:520px"
                        data-i18n-ph="im.key.ph" placeholder="API-Schlüssel (Immich → Konto → API-Schlüssel)"><br>
                 <span class="hint" id="im-state" style="display:block; margin-top:8px" data-i18n="im.state.none">Noch kein Schlüssel hinterlegt.</span>
-                <span class="hint" style="display:block; margin-top:8px" data-i18n="im.perms"><b>Der Schlüssel braucht fünf lesende Rechte:</b>
-                <code>asset.read</code>, <code>asset.view</code>, <code>album.read</code>, <code>user.read</code>,
+                <span class="hint" style="display:block; margin-top:8px" data-i18n="im.perms"><b>Der Schlüssel braucht vier lesende Rechte:</b>
+                <code>asset.read</code>, <code>asset.view</code>, <code>user.read</code>,
                 <code>server.about</code> — so beschränkt kann er in Immich <b>nichts löschen und nichts
                 hochladen</b>. Anlegen unter Immich → Konto → API-Schlüssel; der Testknopf prüft jedes einzeln
                 und nennt das fehlende. Was jedes Recht tut, steht in der README-Anleitung (Schritt 4).</span>
@@ -1901,52 +1901,36 @@
             </div>
           </div>
 
-          <!-- Schritt B: neue Einträge vorschlagen (P2.1 Stufe 2/3). Landet in
-               der Moderation, deshalb Pflicht-Vorschau und das einzige sichtbare
-               Jahr-Dropdown. -->
+          <!-- Schritt B: Ereignisse aus Fototagen anlegen (P2.1 Stufe 2).
+               Anmerkung 138: direkt bestätigt, wie ein Google-Besuch — keine
+               Moderation mehr danach, deshalb bleibt die Pflicht-Vorschau die
+               einzige Bremse und wird wichtiger, nicht unwichtiger. Alben
+               (vormals Stufe 3) sind komplett raus. -->
           <div class="im-card">
             <div class="im-head">
-              <div><span class="im-step" data-i18n="im.step.b">Schritt B</span> <h4 data-i18n="im.b.title">Neue Einträge vorschlagen</h4></div>
-              <span class="eff mod" data-i18n="im.eff.mod">legt Vorschläge an</span>
+              <div><span class="im-step" data-i18n="im.step.b">Schritt B</span> <h4 data-i18n="im.b.title">Ereignisse aus Fototagen anlegen</h4></div>
+              <span class="eff write" data-i18n="eff.write">ändert Bestätigtes</span>
             </div>
             <div class="action-row has-result">
               <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
                 <select id="ims-year" class="mf-select" data-i18n-title="ims.year.tip" title="Ein Jahr je Lauf — oder „Alle Jahre“: die Vorschau geht sie dann einzeln durch, damit jedes Jahr wirklich angesehen wird"></select>
                 <button class="btn secondary" id="ims-preview" style="text-align:left" data-i18n="ims.preview">🔍 Vorschau für dieses Jahr</button>
-                <button class="btn" id="ims-run" style="text-align:left" disabled data-i18n="ims.run">✚ Vorschläge anlegen</button>
-                <!-- P2.1 Stufe 3: Alben sind eine ausdrückliche Frage. Der
-                     Haken entwertet die Vorschau genauso wie ein Jahreswechsel —
-                     sonst legte ein Lauf Alben an, die nie jemand gesehen hat. -->
-                <label class="stat-label" style="display:flex; align-items:center; gap:6px">
-                  <input type="checkbox" id="ims-albums">
-                  <span data-i18n="ims.albums">Alben mit ansehen</span>
-                </label>
-                <!-- Wer den Alben-Zweig abschaltet, hat die Alben von gestern
-                     noch in der Warteschlange stehen. -->
-                <details class="adv">
-                  <summary data-i18n="im.adv.albums">Erweitert: Album-Vorschläge aufräumen</summary>
-                  <div class="adv-body" id="ims-cleanup-row">
-                    <button class="btn secondary" id="ims-drop" style="text-align:left; width:100%" data-i18n="ims.drop">🗑️ Album-Vorschläge verwerfen</button>
-                    <span class="hint" data-i18n="ims.drop.desc"><b>Alle offenen Album-Vorschläge auf einmal verwerfen.</b>
-                    Nur <b>unbestätigte</b> aus Alben — bestätigte Einträge und Fototage bleiben. Verworfene kommen
-                    nicht wieder.</span>
-                    <div id="ims-drop-result" class="hint action-result" style="display:none"></div>
-                  </div>
-                </details>
+                <button class="btn" id="ims-run" style="text-align:left" disabled data-i18n="ims.run">✚ Ereignisse anlegen</button>
               </div>
               <div class="action-desc">
-                <span data-i18n="ims.desc"><b>Aus Fotos werden Vorschläge.</b> Ein Tag mit vielen Bildern an einem Ort
-                („34 Fotos am 12. Juli in Detmold") wird zu einem <b>unbestätigten</b> Eintrag in der
-                Moderation — bestätigt wird nichts von allein. Geclustert werden nur <b>eigene</b> Fotos <b>mit
-                Koordinaten</b>, die in deinem Immich-Zeitstrahl stehen; Archiviertes und Gesperrtes bleibt außen vor.</span>
+                <span data-i18n="ims.desc"><b>Aus Fotos werden Ereignisse — direkt bestätigt, wie ein importierter
+                Google-Besuch.</b> Ein Tag mit vielen Bildern an einem Ort („34 Fotos am 12. Juli in Detmold") wird zu
+                einem Eintrag in deiner Lebensdatenbank, keinem Vorschlag in der Moderation. Geclustert werden nur
+                <b>eigene</b> Fotos <b>mit Koordinaten</b>, die in deinem Immich-Zeitstrahl stehen; Archiviertes und
+                Gesperrtes bleibt außen vor. Titel und Kategorie lassen sich wie bei jedem Ereignis nachträglich
+                ändern.</span>
                 <span class="hint" style="display:block; margin-top:8px" data-i18n="ims.hint">Erst die Vorschau, dann das
-                Anlegen — der Knopf bleibt bis dahin gesperrt. Ein Jahr kann hunderte Vorschläge ergeben, und
-                die will man vorher gesehen haben.</span>
-                <span class="hint" style="display:block; margin-top:8px" data-i18n="ims.albums.why"><b>Alben sind
-                standardmäßig aus.</b> Ein Album würde <i>ein</i> mehrtägiger Vorschlag mit einem Kartenpunkt — der
-                Zwilling deiner selbst erfassten Reise. Besser herum: <b>Reisen legst du an, die Fotos hängen sich
-                daran</b> („Fotos verknüpfen" oben). Wer trotzdem nachsehen will, setzt den Haken. Warum, in der
-                README-Anleitung (Schritt 4).</span>
+                Anlegen — der Knopf bleibt bis dahin gesperrt. Ein Jahr kann hunderte Ereignisse ergeben, und die
+                will man vorher gesehen haben, gerade weil sie direkt bestätigt werden.</span>
+                <span class="hint" style="display:block; margin-top:8px" data-i18n="ims.albums.why"><b>Alben werden
+                nicht als Quelle benutzt.</b> Ein Album würde <i>ein</i> mehrtägiger Eintrag mit einem Kartenpunkt —
+                der Zwilling deiner selbst erfassten Reise. Besser herum: <b>Reisen legst du an, die Fotos hängen sich
+                daran</b> („Fotos verknüpfen" oben).</span>
               </div>
               <div id="ims-result" class="hint action-result" style="display:none"></div>
             </div>
@@ -2049,7 +2033,7 @@
               </label>
               <label class="stat-label" style="display:flex; align-items:center; gap:6px; margin-top:4px">
                 <input type="checkbox" id="exp-with-timeline" checked>
-                <span data-i18n="exp.opt.timeline">Importierte Google-Timeline-Daten einschließen (Besuche, Routen und deren Roh-Belege)</span>
+                <span data-i18n="exp.opt.timeline">Automatisch erfasste Einträge einschließen (Google-Besuche, Routen und deren Roh-Belege, Immich-Fototage)</span>
               </label>
               <span class="hint" style="display:block; margin-top:6px" data-i18n="exp.media.hint">Ohne dieses Häkchen
               bekommst du reines JSON: klein, lesbar, diffbar — aber <b>ohne deine Bilddateien</b>. Die stecken nur
@@ -2627,7 +2611,7 @@ const I18N_EN = {
   'zoom.year': "Year",
   'zoom.decade': "Decade",
   'zoom.all': "All",
-  'tl.visits.tip': "Show imported timeline visits (Google) in the timeline — on the map they are always visible",
+  'tl.visits.tip': "Show automatically detected entries (Google visits, Immich photo days) in the timeline — on the map they are always visible",
   // A41 — Stadtfilter
   'tl.city.tip': "Timeline limited to this city — click to show everything again",
   'comp.cities.empty': "No cities yet — they are filled in by the place-name run (“Resolve place names” in the settings).",
@@ -2647,8 +2631,8 @@ const I18N_EN = {
   'map.tracks.tip': "The paths you actually travelled, from the timeline import — real recordings, coloured by how you moved.",
   'map.group.tip': "Merges points that sit close together: per place from month view up (“59× Home”), by proximity in day and week view. Off means every visit on its own.",
   'map.fs.tip': "Map in fullscreen (Esc exits)",
-  'tl.visits.chip': "🛰️ Visits",
-  'tl.visits.n': "visits",
+  'tl.visits.chip': "🛰️ Auto-detected",
+  'tl.visits.n': "auto-detected",
   'tl.pending.tip': "Unconfirmed proposals from Google/Immich — they only become events once reviewed in moderation",
   'tl.pending.chip': "{n} proposals waiting",
   'tl.agg.tip': "Click to expand",
@@ -2818,8 +2802,8 @@ const I18N_EN = {
   'adm.format.desc2': "Named places (restaurant, museum …) always keep their own name in front. The selection applies immediately to all new lookups; existing data is brought onto the chosen pattern by the run above.",
   'adm.users.hint2': "Here you can change roles and delete users <b>together with all their data</b>. Your own account is protected — so there is always at least one admin left.",
   'exp.opt.media': "<b>Include photos</b> (produces a ZIP file — the complete backup)",
-  'exp.opt.timeline': "Include imported Google timeline data (visits, routes and their raw records)",
-  'im.perms': "<b>The key needs five read-only permissions:</b> <code>asset.read</code>, <code>asset.view</code>, <code>album.read</code>, <code>user.read</code>, <code>server.about</code> — so limited it <b>cannot delete or upload anything</b> in Immich. Create it under Immich → Account → API Keys; the test button checks each one and names the one that is missing. What each permission is for is in the README guide (step 4).",
+  'exp.opt.timeline': "Include automatically detected entries (Google visits, routes and their raw records, Immich photo days)",
+  'im.perms': "<b>The key needs four read-only permissions:</b> <code>asset.read</code>, <code>asset.view</code>, <code>user.read</code>, <code>server.about</code> — so limited it <b>cannot delete or upload anything</b> in Immich. Create it under Immich → Account → API Keys; the test button checks each one and names the one that is missing. What each permission is for is in the README guide (step 4).",
   'exp.media.hint': "Without this tick you get plain JSON: small, readable, diffable — but <b>without your image files</b>. Those are only in the ZIP. Immich pictures are in neither: they live in Immich and are backed up there.",
   'exp.zip.started': "📦 Building the full backup — the download starts shortly. With many photos this can take a moment.",
   'imp.rows': "new rows",
@@ -2828,14 +2812,8 @@ const I18N_EN = {
   'imp.thumbs': "previews rebuilt",
   'adm.immich': "4 · Immich (photos)",
   // P2.1 stage 2 (0.37.0) — Immich as an event source
-  'ims.desc': "<b>Photos become proposals.</b> A day with many pictures in one place (“34 photos on 12 July in Detmold”) becomes an <b>unconfirmed</b> entry in moderation — nothing is confirmed on its own. Only <b>your own</b> photos <b>with coordinates</b> that sit in your Immich timeline are clustered; archived and locked ones stay out.",
-  'ims.albums': "Look at albums too",
-  'ims.albums.why': "<b>Albums are off by default.</b> An album would become <i>one</i> multi-day proposal with a single point on the map — the twin of the trip you enter yourself. The better way round: <b>you create the trips, the photos attach themselves</b> (“Link photos” above). Tick the box if you want to look anyway. Why, in the README guide (step 4).",
-  'ims.drop': "🗑️ Discard album proposals",
-  'ims.drop.desc': "<b>Discard all open album proposals at once.</b> Only <b>unconfirmed</b> ones that came from an album — confirmed entries and photo days stay. Discarded ones do not come back.",
-  'ims.drop.count': "{n} open album proposals",
-  'ims.drop.empty': "No open album proposal.",
-  'ims.drop.done': "✓ {n} album proposals discarded.",
+  'ims.desc': "<b>Photos become events — confirmed right away, the same way an imported Google visit is.</b> A day with many pictures in one place (“34 photos on 12 July in Detmold”) becomes an entry in your life database, not a proposal in moderation. Only <b>your own</b> photos <b>with coordinates</b> that sit in your Immich timeline are clustered; archived and locked ones stay out. Title and category can be changed afterwards like any event.",
+  'ims.albums.why': "<b>Albums are not used as a source.</b> An album would become <i>one</i> multi-day entry with a single point on the map — the twin of the trip you enter yourself. The better way round: <b>you create the trips, the photos attach themselves</b> (“Link photos” above).",
   // A45 — locating photos
   'pp.run': "📍 Locate photos",
   'pp.reset': "🗑️ Discard points",
@@ -2854,17 +2832,15 @@ const I18N_EN = {
   'im.step.b': "Step B",
   'im.step.c': "Step C",
   'im.a.title': "Attach to entries",
-  'im.b.title': "Propose new entries",
+  'im.b.title': "Create events from photo days",
   'im.c.title': "Photo points on the map",
   'im.eff.add': "attaches",
-  'im.eff.mod': "creates proposals",
   'im.eff.layer': "map only",
   // Anmerkung 133: Effekt-Badges für die übrigen „Meine Daten"-Abschnitte
   'eff.setting': "setting", 'eff.propose': "creates proposals", 'eff.enrich': "enriches",
   'eff.write': "changes confirmed data", 'eff.read': "read only",
   'eff.restore': "writes", 'eff.delete': "deletes for good",
   'im.adv.reset': "Advanced: discard links",
-  'im.adv.albums': "Advanced: clean up album proposals",
   'map.photos': "📷 Photos",
   'map.photos.tip': "Every photo with coordinates as its own point — where it was taken. Has to be located first under “My data → Immich”.",
   'map.photos.none': "No photo located yet — the run is under “My data → Immich → Locate photos”.",
@@ -2883,21 +2859,17 @@ const I18N_EN = {
   'tl.level.point': "Exact point",
   'tl.level.thin': "No district is known for {n} of {t} places — they stay on their own. Catch up under “My data → Place names”.",
   'ims.preview': "🔍 Preview this year",
-  'ims.run': "✚ Create proposals",
+  'ims.run': "✚ Create events",
   'ims.busy': "🔍 looking …",
-  'ims.year.tip': "One year per run — a whole library at once would mean thousands of proposals",
-  'ims.hint': "Preview first, then create — the button stays locked until then. A year can yield hundreds of proposals, and you want to have seen them.",
-  'ims.head': "{y}: {n} proposals ({d} photo days, {a} albums) from {p} photos",
-  'ims.none': "nothing new to propose.",
-  'ims.none.why': "Either there are no own photos with coordinates in that year, or everything has been proposed already — rejected proposals do not come back either.",
+  'ims.year.tip': "One year per run — a whole library at once would mean hundreds of events",
+  'ims.hint': "Preview first, then create — the button stays locked until then. A year can yield hundreds of events, and you want to have seen them, especially since they are confirmed right away.",
+  'ims.head': "{y}: {n} events from {p} photos",
+  'ims.none': "nothing new to create.",
+  'ims.none.why': "Either there are no own photos with coordinates in that year, or everything has been created already — or deleted, and deleted ones do not come back.",
   'ims.photos': "photos",
-  'ims.shared': "shared album",
   'ims.more': "more",
   'ims.years.fail': "The year list could not be fetched from Immich ({e}) — the picker shows the last few years. A run still works.",
   'ims.failed': "Immich did not answer.",
-  'ims.place.title': "(from the name)",
-  'ims.covered': "{n} album(s) not proposed — there is already an entry for them:",
-  'ims.partial': "Stopped after {s}s: {n} albums were not looked at. The run itself looks at all of them — it is not keeping anyone waiting.",
   'ims.years.own': "The years come from your own data, not from Immich ({e}). The years before the smartphone are missing from that list — a run still works for every year shown.",
   'ims.needpreview': "Look at the preview first — then create.",
   'im.test': "🔌 Test connection",
@@ -3106,11 +3078,11 @@ const I18N_EN = {
   'pp.open': "{n} left",
   'ims.busy.all': "Cancel — {y} ({i}/{n})",
   'ims.running': "{i} of {n} years checked ({y})",
-  'ims.running.sum': "so far {n} proposals from {p} photos",
-  'ims.seenonly': "Only {y} was checked — that is why “Create proposals” stays locked.",
+  'ims.running.sum': "so far {n} events from {p} photos",
+  'ims.seenonly': "Only {y} was checked — that is why “Create events” stays locked.",
   'ims.stopped': "Preview cancelled.",
   'ims.stopped.why': "{i} of {n} years had been checked ({y}) — a run needs a complete preview.",
-  'ims.head.short': "{y}: {n} proposals — the list is below the button.",
+  'ims.head.short': "{y}: {n} events — the list is below the button.",
   'nodate': "no date",
   'track.walk': "🚶 Walking",
   'track.run': "🏃 Running",
@@ -3298,7 +3270,7 @@ const I18N_EN = {
   'tl.empty': "No events. Add one under „Input“ — or reset search and filters.",
   'tl.showmore': "show {n} more",
   'tl.edit.tip': "Click to edit", 'tl.expand.tip': "Click to expand",
-  'tl.visits.bundled': "visits bundled", 'tl.show.single': "show individually",
+  'tl.visits.bundled': "auto-detected, bundled", 'tl.show.single': "show individually",
   'tl.daychild': "Day entry", 'tl.daychildren': "day entries",
   'tl.kids.tip': "Expand/collapse day entries",
   // Anmerkung 119: Wetter je Kalendertag
@@ -4298,6 +4270,13 @@ async function loadTimeline(more = false) {
   tlEnsureVisible();
 }
 
+// Anmerkung 138: dieselbe Liste wie MACHINE_SOURCES im Backend
+// (services/immich_link.py) — Google-Besuche und Immich-Fototage sind
+// dieselbe Sorte automatisch bestätigter Beleg und werden überall gleich
+// behandelt (versteckt, gebündelt, gezählt). Eine Regel an mehreren Stellen
+// widerspricht sich sonst still (Anmerkung 106).
+const MACHINE_SOURCES = ['google_timeline', 'immich'];
+
 // A41: EINE Antwort auf „werden importierte Besuche gezeigt?" — der Schalter
 // sagt es, und ein gesetzter Stadtfilter sagt es auch. Stünde die Bedingung
 // weiter an zwei Stellen einzeln, zeigte der Server die Besuche einer Stadt und
@@ -4308,7 +4287,7 @@ function tlShowsVisits() { return tl.showVisits || !!tl.city; }
 function tlVisibleCount() {
   return tl.events.filter(e => passesFilter(e, tl.catFilter)
     && (tl.zoom === 'day' || !e.parent_event_id)
-    && (tlShowsVisits() || e.source !== 'google_timeline')).length;
+    && (tlShowsVisits() || !MACHINE_SOURCES.includes(e.source))).length;
 }
 
 // A37: Ein enger Filter kann eine ganze Seite wegfiltern — „Konzerte" trifft
@@ -4547,12 +4526,12 @@ function renderTimelineList() {
   // A37: Ausgeblendet wird im Server; das hier fängt nur noch die Fälle ohne
   // Server-Filter ab (Suchtreffer). Die Zahl auf dem Schalter kommt aus dem
   // Index — in der geladenen Liste wäre sie eine beliebige Teilmenge.
-  if (!tlShowsVisits()) filtered = filtered.filter(e => e.source !== 'google_timeline');
+  if (!tlShowsVisits()) filtered = filtered.filter(e => !MACHINE_SOURCES.includes(e.source));
   renderCityChip();
   ensurePhotoIndex();      // A45: entscheidet, ob der Foto-Schalter etwas kann
   const toggle = document.getElementById('tl-visits-toggle');
   toggle.style.display = TL_VISIT_COUNT ? '' : 'none';
-  toggle.textContent = `🛰️ ${TL_VISIT_COUNT.toLocaleString(LOC())} ${t('tl.visits.n', 'Besuche')}`;
+  toggle.textContent = `🛰️ ${TL_VISIT_COUNT.toLocaleString(LOC())} ${t('tl.visits.n', 'automatisch erfasst')}`;
   const pending = document.getElementById('tl-pending-hint');
   pending.style.display = TL_PENDING_COUNT ? '' : 'none';
   pending.textContent = `💡 ${t('tl.pending.chip', '{n} Vorschläge warten')
@@ -4813,12 +4792,13 @@ function tlFooter() {
   return `<div class="hint" id="tl-load-more" style="text-align:center; cursor:pointer">${
     tl.loading ? t('tl.loading', 'Lade …') : t('tl.more', '▼ Ältere Einträge laden')}</div>`;
 }
-// Besuchs-Verdichtung (A5): gleiche Besuchs-Titel (google_timeline) einer
-// Zeitgruppe zusammenfassen; andere Events bleiben einzeln in ihrer Position.
+// Besuchs-Verdichtung (A5): gleiche Besuchs-Titel automatisch bestätigter
+// Quellen (MACHINE_SOURCES) einer Zeitgruppe zusammenfassen; andere Events
+// bleiben einzeln in ihrer Position.
 function compressVisits(items) {
   const out = [], byTitle = new Map();
   items.forEach(e => {
-    if (e.source !== 'google_timeline') { out.push(e); return; }
+    if (!MACHINE_SOURCES.includes(e.source)) { out.push(e); return; }
     let g = byTitle.get(e.title);
     if (!g) { g = { visitGroup: true, items: [] }; byTitle.set(e.title, g); out.push(g); }
     g.items.push(e);
@@ -4850,7 +4830,7 @@ function visitGroupCard(g) {
         <span class="ev-date">${range}</span>
       </div>
       <div class="ev-meta">
-        <span class="chip">🛰️ ${esc(t('tl.visits.bundled', 'Besuche gebündelt'))}</span>
+        <span class="chip">🛰️ ${esc(t('tl.visits.bundled', 'Automatisch erfasst, gebündelt'))}</span>
         ${wx ? `<span class="chip">🌤️ ${esc(wx.line)}${
           wx.note ? ` · ⚠ ${esc(wx.note)}` : ''}</span>` : ''}
         <span class="chip">▼ ${esc(t('tl.show.single', 'einzeln anzeigen'))}</span>
@@ -5250,7 +5230,7 @@ async function prSelected() {
   const events = await fetchEvents(params).catch(() => []);
   return events.filter(e => {
     if (!e.date_start) return false;
-    if (!withVisits && e.source === 'google_timeline') return false;
+    if (!withVisits && MACHINE_SOURCES.includes(e.source)) return false;
     if (!withUnconfirmed && e.confirmed !== 'confirmed') return false;
     return true;
   }).sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
@@ -8534,7 +8514,7 @@ document.getElementById('btn-export').addEventListener('click', async ev => {
   // Auswahl-Export (Anm. 35). A32: Das Häkchen bedeutet „einschließen" —
   // ausgeschlossen wird also, wenn es NICHT gesetzt ist.
   const withTl = document.getElementById('exp-with-timeline').checked;
-  const q = withTl ? '' : '?exclude_source=google_timeline';
+  const q = withTl ? '' : `?exclude_source=${MACHINE_SOURCES.join(',')}`;
 
   // A29: vollständiges Backup. Bewusst als normaler Download-Link statt über
   // fetch+Blob — so streamt der Browser das Archiv direkt auf die Platte.
@@ -9010,10 +8990,6 @@ function renderImmichState(s) {
     : t('im.state.none', 'Noch kein Schlüssel hinterlegt.');
   // Stufe 2: Jahresauswahl füllen, sobald klar ist, dass es Immich gibt.
   loadImmichYears();
-  // Stufe 3: Die offenen Album-Vorschläge stehen in der EIGENEN Datenbank —
-  // die Zahl gibt es also auch dann, wenn Immich gerade nicht antwortet.
-  // Deshalb ein eigener Aufruf und kein Anhängsel des Jahres-Abrufs.
-  imsLoadDrop();
   ppLoadIndex();       // A45: Stand der Fotopunkte (ebenfalls eigene Daten)
 }
 async function saveImmich() {
@@ -9133,9 +9109,6 @@ let imsPreviewedYear = null;
 // Jahr ist das eine Wiederholung von `imsPreviewedYear`; bei „Alle Jahre" ist
 // es die einzige ehrliche Angabe, und der Lauf bekommt sie statt der Auswahl.
 let imsPreviewedYears = [];
-// P2.1 Stufe 3: unter WELCHER Alben-Einstellung die Vorschau entstanden ist.
-// Das Jahr allein reicht nicht mehr — siehe `imsLock()`.
-let imsPreviewedAlbums = false;
 // Das Auswahlfeld hat IMMER etwas anzubieten — auch ohne Server, ohne Immich
 // und ohne dass vorher irgendetwas anderes geklappt hat.
 //
@@ -9307,17 +9280,10 @@ function imsNote(text) {
   box.dataset.note = '1';
   box.textContent = '⚠️ ' + text;
 }
-function imsAlbums() { return !!document.getElementById('ims-albums')?.checked; }
 function imsLock() {
   // Jahr gewechselt = die Vorschau gilt nicht mehr. Ein Knopf, der nach dem
-  // Umschalten noch offen steht, legt Vorschläge für ein Jahr an, das nie
+  // Umschalten noch offen steht, legt Ereignisse für ein Jahr an, das nie
   // jemand gesehen hat.
-  //
-  // P2.1 Stufe 3: Für den Alben-Haken gilt derselbe Satz — und zwar in BEIDE
-  // Richtungen. Ohne Haken ansehen und mit Haken laufen lassen legt Alben an,
-  // die keine Vorschau gezeigt hat; umgekehrt verspricht die Vorschau Alben,
-  // die der Lauf dann nicht anlegt. Eine Vorschau gilt für die Einstellung,
-  // unter der sie entstanden ist.
   const sel = document.getElementById('ims-year');
   const run = document.getElementById('ims-run');
   // `imsPreviewedYears` ist der eigentliche Riegel (Anmerkung 120): der Lauf
@@ -9326,13 +9292,11 @@ function imsLock() {
   // gab; bei „Alle Jahre" sind es zwei Angaben über dieselbe Sache, und die
   // laufen auseinander (Anmerkung 106).
   const stale = !imsPreviewedYear || !imsPreviewedYears.length
-    || String(imsPreviewedYear) !== sel.value
-    || imsPreviewedAlbums !== imsAlbums();
+    || String(imsPreviewedYear) !== sel.value;
   run.disabled = stale;
   if (stale) document.getElementById('ims-result').style.display = 'none';
 }
 document.getElementById('ims-year')?.addEventListener('change', imsLock);
-document.getElementById('ims-albums')?.addEventListener('change', imsLock);
 // --------------------------------------------------------------------------- //
 // Vorschau über EIN Jahr oder über ALLE (Anmerkung 120)
 // --------------------------------------------------------------------------- //
@@ -9345,19 +9309,13 @@ document.getElementById('ims-albums')?.addEventListener('change', imsLock);
 // dasteht, ist wirklich angesehen worden.
 let imsBusy = false, imsCancel = false;
 function imsBlank() {
-  return { total: 0, days: 0, albums: 0, photos: 0, proposals: [], covered: [],
-           partial: false, albums_open: 0, seconds: 0, albums_denied: null,
-           albums_asked: false };
+  return { total: 0, photos: 0, proposals: [], seconds: 0 };
 }
 function imsMerge(acc, r) {
-  acc.total += r.total; acc.days += r.days; acc.albums += r.albums;
+  acc.total += r.total;
   acc.photos += r.photos;
   acc.proposals.push(...(r.proposals || []));
-  acc.covered.push(...(r.covered || []));
-  if (r.partial) { acc.partial = true; acc.albums_open += r.albums_open || 0; }
   acc.seconds += r.seconds || 0;
-  if (r.albums_denied) acc.albums_denied = r.albums_denied;
-  acc.albums_asked = acc.albums_asked || !!r.albums_asked;
   return acc;
 }
 // „2024" bzw. „2003–2024 (14 Jahre)" — dieselbe Form wie `_year_span` im
@@ -9382,16 +9340,15 @@ document.getElementById('ims-preview')?.addEventListener('click', async ev => {
   const years = all ? yearsOf(sel)
     : [parseInt(sel.value, 10) || new Date().getFullYear()];
   const box = document.getElementById('ims-result');
-  const wantAlbums = imsAlbums();
   imsBusy = true; imsCancel = false;
   // Bei einem Jahr ist der Knopf gesperrt — es gibt nichts abzubrechen, die
   // eine Anfrage läuft schon. Über alle Jahre IST er der Abbruch.
   btn.disabled = !all;
-  // Anmerkung 113: Eine große Bibliothek braucht Minuten — Immich wird je
-  // Album einmal gefragt. Ein Knopf, auf dem unverändert „sehe nach …" steht,
-  // ist von einem hängenden Knopf nicht zu unterscheiden, und im Server-Log
-  // steht bis zur Antwort nichts. Also eine laufende Uhr: sie beantwortet die
-  // einzige Frage, die man in dieser Minute hat.
+  // Anmerkung 113: Eine große Bibliothek braucht Minuten. Ein Knopf, auf dem
+  // unverändert „sehe nach …" steht, ist von einem hängenden Knopf nicht zu
+  // unterscheiden, und im Server-Log steht bis zur Antwort nichts. Also eine
+  // laufende Uhr: sie beantwortet die einzige Frage, die man in dieser
+  // Minute hat.
   const began = Date.now();
   const acc = imsBlank();
   const seen = [];
@@ -9409,8 +9366,7 @@ document.getElementById('ims-preview')?.addEventListener('click', async ev => {
   try {
     for (; at < years.length; at++) {
       if (imsCancel) break;
-      const r = await api(`/api/immich/preview?year=${years[at]}${wantAlbums ? '&albums=1' : ''}`,
-                          { method: 'POST' });
+      const r = await api(`/api/immich/preview?year=${years[at]}`, { method: 'POST' });
       // Anmerkung 113: Immich-Ausfälle kommen jetzt mit 200 und `error` im
       // Rumpf. Ein 502 wäre unterwegs von Cloudflare durch eine HTML-Seite
       // ersetzt worden — die Auskunft, warum es klemmt, kam nie an.
@@ -9425,7 +9381,7 @@ document.getElementById('ims-preview')?.addEventListener('click', async ev => {
         box.innerHTML = `<b>🔍 ${esc(t('ims.running', '{i} von {n} Jahren angesehen ({y})')
             .replace('{i}', seen.length).replace('{n}', years.length)
             .replace('{y}', years[at]))}</b><br>`
-          + esc(t('ims.running.sum', 'bisher {n} Vorschläge aus {p} Fotos')
+          + esc(t('ims.running.sum', 'bisher {n} Ereignisse aus {p} Fotos')
               .replace('{n}', acc.total).replace('{p}', acc.photos));
       }
     }
@@ -9445,7 +9401,7 @@ document.getElementById('ims-preview')?.addEventListener('click', async ev => {
     box.innerHTML = `<b>${esc(t('ims.failed', 'Immich hat nicht geantwortet.'))}</b><br>`
       + `${esc(String(failed.year))}: ${esc(failed.error)}`
       + (seen.length ? `<div class="stat-label" style="margin-top:8px">⏹ ${
-          esc(t('ims.seenonly', 'Angesehen wurden nur {y} — deshalb bleibt „Vorschläge anlegen" gesperrt.')
+          esc(t('ims.seenonly', 'Angesehen wurden nur {y} — deshalb bleibt „Ereignisse anlegen" gesperrt.')
             .replace('{y}', yearSpan(seen)))}</div>` : '');
     imsPreviewedYear = null; imsPreviewedYears = [];
     imsLock();
@@ -9469,51 +9425,23 @@ document.getElementById('ims-preview')?.addEventListener('click', async ev => {
   imsPreviewedYear = all ? YEAR_ALL : seen[0];
   imsPreviewedYears = seen;
   {
-    // Was der SERVER gemacht hat, nicht was das Häkchen gerade sagt: hakt
-    // jemand während der Vorschau um, gilt trotzdem der Lauf, den er gesehen
-    // hat.
-    imsPreviewedAlbums = !!r.albums_asked;
-    // Die drei Nachsätze gelten in BEIDEN Fällen. „Nichts Neues" plus ein
-    // übersprungenes Album ist die häufigste Lage nach dem ersten Lauf —
-    // stünde der Grund nur beim Erfolg, fehlte er genau dann, wenn er
-    // gebraucht wird (Anmerkung 113).
-    const dup = (r.covered || []).length
-      ? `<div class="stat-label" style="margin-top:8px">🔗 ${esc(t('ims.covered', '{n} Album/Alben nicht vorgeschlagen — dafür gibt es schon einen Eintrag:').replace('{n}', r.covered.length))}<br>`
-        + r.covered.map(c => `· ${esc(c.album)} → <b>${esc(c.event)}</b>`).join('<br>') + '</div>'
-      : '';
-    const denied = r.albums_denied
-      ? `<div class="stat-label" style="margin-top:8px">⚠️ ${esc(r.albums_denied)}</div>`
-      : '';
-    // Eine abgebrochene Vorschau sagt es — sonst liest sich ein Ausschnitt
-    // wie eine Gesamtaussage.
-    const cut = r.partial
-      ? `<div class="stat-label" style="margin-top:8px">⏳ ${esc(t('ims.partial', 'Nach {s}s abgebrochen: {n} Alben wurden nicht mehr angesehen. Der Lauf selbst sieht alle an — er wartet auf niemanden.')
-          .replace('{s}', r.seconds).replace('{n}', r.albums_open))}</div>`
-      : '';
     if (!r.total) {
-      box.innerHTML = `<b>${esc(label)}: ${esc(t('ims.none', 'nichts Neues vorzuschlagen.'))}</b><br>`
-        + esc(t('ims.none.why', 'Entweder gibt es keine eigenen Fotos mit Koordinaten in diesem Jahr, oder alles wurde schon vorgeschlagen — auch abgelehnte Vorschläge kommen nicht wieder.'))
-        + dup + denied + cut;
+      box.innerHTML = `<b>${esc(label)}: ${esc(t('ims.none', 'nichts Neues anzulegen.'))}</b><br>`
+        + esc(t('ims.none.why', 'Entweder gibt es keine eigenen Fotos mit Koordinaten in diesem Jahr, oder alles wurde schon angelegt oder gelöscht — Gelöschtes kommt nicht wieder.'));
     } else {
-      // Die Vorschau NENNT die Vorschläge. Eine Zahl ist keine
-      // Entscheidungsgrundlage (P2.5).
+      // Die Vorschau NENNT die Ereignisse. Eine Zahl ist keine
+      // Entscheidungsgrundlage (P2.5) — hier erst recht nicht, weil das
+      // Anlegen sofort bestätigt (Anmerkung 138).
       const rows = r.proposals.slice(0, 40).map(p => `
         <div style="padding:3px 0">
-          ${p.kind === 'album' ? '📗' : '📅'} <b>${esc(p.title)}</b>
-          <span class="stat-label">· ${esc(p.start.slice(0, 10))}${p.place ? ' · ' + esc(p.place) : ''}${
-            // Anmerkung 113: gemessen und geraten dürfen nicht gleich
-            // aussehen. Der Ort aus dem Albumnamen ist eine Vermutung —
-            // sie steht dran, bevor jemand sie bestätigt.
-            p.place_source === 'title' ? ' ' + esc(t('ims.place.title', '(aus dem Namen)')) : ''
-          } · ${p.photos} ${esc(t('ims.photos', 'Fotos'))}</span>
-          ${p.shared ? `<span class="chip badge-unconfirmed">${esc(t('ims.shared', 'geteiltes Album'))}</span>` : ''}
+          📅 <b>${esc(p.title)}</b>
+          <span class="stat-label">· ${esc(p.start.slice(0, 10))}${p.place ? ' · ' + esc(p.place) : ''}
+          · ${p.photos} ${esc(t('ims.photos', 'Fotos'))}</span>
         </div>`).join('');
-      box.innerHTML = `<b>${esc(t('ims.head', '{y}: {n} Vorschläge ({d} Fototage, {a} Alben) aus {p} Fotos')
-          .replace('{y}', label).replace('{n}', r.total).replace('{d}', r.days)
-          .replace('{a}', r.albums).replace('{p}', r.photos))}</b>
+      box.innerHTML = `<b>${esc(t('ims.head', '{y}: {n} Ereignisse aus {p} Fotos')
+          .replace('{y}', label).replace('{n}', r.total).replace('{p}', r.photos))}</b>
         <div style="margin-top:6px">${rows}</div>
-        ${r.total > 40 ? `<div class="stat-label">… ${r.total - 40} ${esc(t('ims.more', 'weitere'))}</div>` : ''}
-        ${dup}${denied}${cut}`;
+        ${r.total > 40 ? `<div class="stat-label">… ${r.total - 40} ${esc(t('ims.more', 'weitere'))}</div>` : ''}`;
     }
     imsLock();
     // Anmerkung 120: Auch die Vorschau meldet sich unten rechts. Sie schreibt
@@ -9521,9 +9449,9 @@ document.getElementById('ims-preview')?.addEventListener('click', async ev => {
     // Minuten weitergescrollt hat, sieht davon nichts — und ein Lauf ohne
     // erkennbares Ende ist von einem hängenden nicht zu unterscheiden.
     toast(r.total
-      ? `🔍 ${t('ims.head.short', '{y}: {n} Vorschläge — die Liste steht unter dem Knopf.')
+      ? `🔍 ${t('ims.head.short', '{y}: {n} Ereignisse — die Liste steht unter dem Knopf.')
           .replace('{y}', label).replace('{n}', r.total)}`
-      : `🔍 ${label}: ${t('ims.none', 'nichts Neues vorzuschlagen.')}`, 'ok', 7000);
+      : `🔍 ${label}: ${t('ims.none', 'nichts Neues anzulegen.')}`, 'ok', 7000);
   }
 });
 document.getElementById('ims-run')?.addEventListener('click', ev => {
@@ -9534,56 +9462,16 @@ document.getElementById('ims-run')?.addEventListener('click', ev => {
     toast(t('ims.needpreview', 'Erst die Vorschau ansehen — dann anlegen.'), 'warn');
     return;
   }
-  // Der Lauf bekommt dieselbe Alben-Einstellung, unter der die Vorschau
-  // entstanden ist — nicht die, die das Häkchen JETZT zeigt. `imsLock()`
-  // hält beide zwar zusammen, aber der Wert, der hier rausgeht, darf nicht
-  // von einem zweiten Ort abhängen.
-  //
-  // Und er bekommt die Jahre der VORSCHAU, nicht die der Auswahl: das ist
-  // derselbe Satz eine Ebene tiefer (Anmerkung 120). Steht im Feld „Alle
-  // Jahre", während die Vorschau vier Jahre gesehen hat, sind vier Jahre die
-  // Wahrheit — die Sperre sorgt dafür, dass beides ohnehin zusammenpasst.
-  startServerJob(ev.target, 'immich_source',
-                 { years: imsPreviewedYears, albums: imsPreviewedAlbums }, true);
+  // Er bekommt die Jahre der VORSCHAU, nicht die der Auswahl (Anmerkung 120).
+  // Steht im Feld „Alle Jahre", während die Vorschau vier Jahre gesehen hat,
+  // sind vier Jahre die Wahrheit — die Sperre sorgt dafür, dass beides
+  // ohnehin zusammenpasst.
+  startServerJob(ev.target, 'immich_source', { years: imsPreviewedYears }, true);
   // Die Vorschau ist verbraucht: nach dem Lauf ist der Bestand ein anderer,
   // und der Knopf darf nicht offen stehen bleiben.
   imsPreviewedYear = null;
   imsPreviewedYears = [];
   imsLock();
-});
-
-// P2.1 Stufe 3 — offene Album-Vorschläge in einem Zug verwerfen.
-async function imsLoadDrop() {
-  const box = document.getElementById('ims-drop-result');
-  const btn = document.getElementById('ims-drop');
-  if (!box || !btn) return;
-  try {
-    const r = await api('/api/immich/albums/proposals');
-    // Nichts da = nichts zu tun, und der Knopf sagt es (A40): ein
-    // Bedienelement, das gerade nichts bewirken kann, muss das ZEIGEN.
-    btn.disabled = !r.events;
-    btn.classList.toggle('inert', !r.events);
-    btn.title = r.events ? '' : t('ims.drop.empty', 'Kein offener Album-Vorschlag.');
-    box.style.display = '';
-    box.innerHTML = r.events
-      ? `<b>${esc(t('ims.drop.count', '{n} offene Album-Vorschläge').replace('{n}', r.events))}</b>`
-        + (r.list.length ? `<div style="margin-top:6px">${
-            r.list.map(x => `<div style="padding:2px 0">📗 ${esc(x)}</div>`).join('')}</div>` : '')
-      : esc(t('ims.drop.empty', 'Kein offener Album-Vorschlag.'));
-  } catch (err) {
-    box.style.display = ''; box.textContent = err.message;
-  }
-}
-document.getElementById('ims-drop')?.addEventListener('click', async ev => {
-  const btn = ev.target;
-  btn.disabled = true;
-  try {
-    const r = await api('/api/immich/albums/discard', { method: 'POST' });
-    toast(t('ims.drop.done', '✓ {n} Album-Vorschläge verworfen.').replace('{n}', r.deleted),
-          'ok', 6000);
-    await imsLoadDrop();
-    if (typeof loadTimeline === 'function') loadTimeline();
-  } catch (err) { toast(err.message, 'error', 8000); btn.disabled = false; }
 });
 
 // F13: eigene Kachelquelle — bewusst nur lokal (kein Server-Setting), weil die

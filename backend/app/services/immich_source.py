@@ -1,50 +1,63 @@
 """P2.1 Stufe 2 — Immich als EREIGNIS-Quelle, nicht nur als Bilderlieferant.
 
 Stufe 1 (0.25.0) hängt Fotos an Ereignisse, die es schon gibt. Diese Stufe
-dreht die Richtung um: aus den Fotos selbst entstehen **Vorschläge**. Zwei
-Zweige, beide `unconfirmed`, keiner je automatisch bestätigt (Anmerkung 30):
+dreht die Richtung um: aus den Fotos selbst entstehen Ereignisse — georef-
+erenzierte eigene Fotos eines Tages an einem Ort werden zu einem Ereignis
+(„34 Fotos in Detmold").
 
-* **Fotocluster** — georeferenzierte eigene Fotos eines Tages an einem Ort
-  werden zu einem Vorschlag („34 Fotos am 12. Juli in Detmold").
-* **Alben** — Name, Zeitraum und Orte eines Albums werden zu einem
-  `trip`-Vorschlag („Dänemark 2024").
+**Anmerkung 138: direkt bestätigt, wie ein Google-Besuch — nicht mehr als
+Vorschlag in der Moderation.** Bis 0.39 lief das über einen Umweg
+(„Vorschlag" → Moderation → Bestätigen), begründet mit Anmerkung 30 („nichts
+bestätigt sich automatisch"). Der Umweg widersprach sich mit dem eigenen
+Vorbild: ein Google-Besuch — dieselbe Sorte Beleg, dieselbe Automatik beim
+Import — wird seit jeher SOFORT bestätigt (`tracks.py`, `confirmed_by=
+"import"`). Zwei Konnektoren mit derselben Beleglage, zwei verschiedene
+Antworten auf „wird das Ereignis?" — das war Anmerkung 106 in genau dem Code,
+der sie an anderer Stelle zitiert. Jetzt gilt für beide dieselbe Regel:
+ein Fotocluster ist so viel Beleg wie ein GPS-Stopp, also wird er genauso
+behandelt. Die Sicherheitsmarge bleibt woanders erhalten — `MIN_CLUSTER_
+PHOTOS` hält Einzelbilder draußen, die Vorschau (`/api/immich/preview`) zeigt
+vor jedem Lauf, was er anlegen würde, und `Event.external_id` verhindert eine
+Wiederauferstehung nach dem Löschen (siehe `create_confirmed_visits`).
+
+**Alben sind komplett raus** (waren P2.1 Stufe 3, Anmerkung 116). Ein Album
+war ohnehin schon standardmäßig aus und ein mehrdeutigerer Fall als ein
+Tagescluster — eine Reise ist eine größere Behauptung als „hier waren an
+diesem Tag Fotos". Statt sie auch zu automatisieren, wurde der ganze Zweig
+gestrichen: **Reisen legt der Mensch an, die Fotos hängen sich daran**
+(Stufe 1 tut das bereits über „An Einträge hängen").
 
 Die teure Hälfte ist nicht das Clustern, sondern jeder Fall, in dem Life-Dash
 den Tag schon kennt (Anmerkung 107). Die Antworten stehen weiter unten bei
-`_existing_slots` und `create_proposals`.
+`_proposed_slots`/`_owned_slots` und `create_confirmed_visits`.
 
 **Identität ist der PLATZ, nicht der Inhalt.** `external_id` trägt
-`immich:day:<datum>:<ort>` bzw. `immich:album:<id>` — niemals einen Hash über
-die Asset-IDs. Ein nachgeladenes Foto machte aus demselben Tag sonst einen
-zweiten Vorschlag. Dieselbe Überlegung wie bei A39s Gruppenvertreter: stabil
-schlägt clever.
+`immich:day:<datum>:<ort>` — niemals einen Hash über die Asset-IDs. Ein
+nachgeladenes Foto machte aus demselben Tag sonst ein zweites Ereignis.
+Dieselbe Überlegung wie bei A39s Gruppenvertreter: stabil schlägt clever.
 
-**Kein Schema.** Der Grabstein für abgelehnte Vorschläge existiert bereits:
-jedes Ereignis entsteht aus einem `Fragment`, Fragmente werden nie automatisch
-gelöscht, `FragmentStatus.discarded` gibt es, und `_TEXT_SOURCES` hält
-`immich` aus der KI-Neuberechnung heraus. Gefragt wird deshalb nach den
-FRAGMENTEN — „habe ich diesen Platz je vorgeschlagen?" —, nicht nach den
-Ereignissen, denn `discard_event` löscht die Ereigniszeile.
+**Kein Schema.** Der Grabstein gegen eine Wiederauferstehung nach dem Löschen
+existiert bereits: jedes Ereignis entsteht aus einem `Fragment`, Fragmente
+werden nie automatisch gelöscht, und `_TEXT_SOURCES` hält `immich` aus der
+KI-Neuberechnung heraus. Gefragt wird deshalb nach den FRAGMENTEN — „habe ich
+diesen Platz je angelegt?" —, nicht nach den Ereignissen, denn ein manuell
+gelöschtes Ereignis nimmt nur die Ereigniszeile mit.
 """
 from __future__ import annotations
 
 import json
 import logging
-import re
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.models import (ConfirmState, DatePrecision, Event, Fragment,
                         FragmentStatus, Location, MediaRef, Source)
-from app.services import geocode
 from app.services import immich as api
-from app.services.immich_link import MACHINE_SOURCES, PROVIDER
+from app.services.immich_link import PROVIDER
 
 log = logging.getLogger("lifedash.immich")
 
@@ -53,19 +66,15 @@ SLOT_PREFIX = "immich:"
 # Zeichen, für den Ort bleiben 42. Abgeschnitten wird DETERMINISTISCH — ein
 # Platz, der sich beim zweiten Lauf anders abkürzt, wäre kein Platz mehr.
 _EXTERNAL_ID_MAX = 64
-# Ab wie vielen Fotos ein Tag/Ort ein Vorschlag wird. Zwei Bilder sind ein
-# Schnappschuss, kein Ereignis; die Zahl darf klein sein, weil nichts
-# automatisch bestätigt wird — sie hält nur die Warteschlange lesbar.
+# Ab wie vielen Fotos ein Tag/Ort ein Ereignis wird. Zwei Bilder sind ein
+# Schnappschuss, kein Ereignis — die Zahl hält jetzt die Lebensdatenbank
+# sauber, nicht mehr nur eine Warteschlange lesbar (Anmerkung 138: seit dem
+# Wegfall der Moderation ist sie die einzige verbliebene Bremse).
 MIN_CLUSTER_PHOTOS = 4
 # Spannt ein Cluster nur wenige Stunden, ist der Zeitpunkt eine Aussage;
 # über den Tag verteilt ist es der Tag (Kap. 3.1: Genauigkeit nie
 # überzeichnen).
 EXACT_MAX_HOURS = 4
-# Ein Album wird ohne Zeitfenster abgefragt (siehe `scan_year`); Immich
-# verlangt aber laut Spezifikation Zeitstempel MIT Zone, also zwei weite
-# Grenzen statt gar keiner.
-_WIDE_START = datetime(1900, 1, 1)
-_WIDE_END = datetime(2100, 12, 31, 23, 59, 59)
 
 
 def _short(text: str, limit: int) -> str:
@@ -77,17 +86,11 @@ def slot_day(day: date, place: str) -> str:
     return head + _short(place, _EXTERNAL_ID_MAX - len(head))
 
 
-def slot_album(album_id: str) -> str:
-    head = f"{SLOT_PREFIX}album:"
-    return head + _short(album_id, _EXTERNAL_ID_MAX - len(head))
-
-
 @dataclass
 class Proposal:
-    """Ein Vorschlag, bevor er existiert — die Vorschau zeigt genau das."""
+    """Ein Tagescluster, bevor er existiert — die Vorschau zeigt genau das."""
 
     slot: str
-    kind: str                     # "day" | "album"
     title: str
     start: datetime
     end: datetime
@@ -95,36 +98,27 @@ class Proposal:
     place: str | None = None
     country: str | None = None
     photos: int = 0
-    shared: bool = False          # aus einem GETEILTEN Album (Fall 7c)
     lat: float | None = None
     lng: float | None = None
-    # Woher der Ort stammt: „exif" ist gemessen, „title" ist GERATEN (aus dem
-    # Albumnamen). Der Unterschied steht auf der Karte und im Text, weil
-    # Genauigkeit in diesem Projekt nie überzeichnet wird (Kap. 3.1) — und
-    # weil beim Bestätigen jemand entscheiden muss, wie viel er dem glaubt.
-    place_source: str = "exif"
-    place_type: str | None = None
 
     def as_dict(self) -> dict:
         return {
-            "slot": self.slot, "kind": self.kind, "title": self.title,
+            "slot": self.slot, "title": self.title,
             "start": self.start.isoformat(), "end": self.end.isoformat(),
             "precision": self.precision.value, "place": self.place,
-            "photos": self.photos, "shared": self.shared,
-            "place_source": self.place_source,
+            "photos": self.photos,
         }
 
 
 # --------------------------------------------------------------------------- #
-# Die sieben Fälle „es gibt schon einen Eintrag" (Anmerkung 107)
+# Schon bekannte Plätze (Anmerkung 107)
 # --------------------------------------------------------------------------- #
 def _proposed_slots(db: Session, user_id: str) -> set[str]:
-    """Jeder Platz, der je vorgeschlagen wurde — **auch die abgelehnten**.
+    """Jeder Platz, der je angelegt wurde — **auch die gelöschten**.
 
-    Fall (2), der wichtigste: Ein abgelehnter Vorschlag darf nicht
-    wiederkommen. `discard_event` löscht das Ereignis, das Fragment aber
-    nicht — und genau deshalb ist das Fragment der Grabstein. Gefragt wird
-    also hier und nicht bei den Ereignissen.
+    Der wichtigste Fall: ein gelöschtes Ereignis darf nicht wiederkommen. Das
+    Löschen nimmt nur die Ereigniszeile mit, das Fragment (der Grabstein)
+    bleibt — genau deshalb wird hier das Fragment gefragt, nicht das Ereignis.
 
     Das ist das vierte Auftreten derselben Falle: F12 `weather_rev`, A39s
     Leerstring, A42s „kein Artikel", jetzt hier. Wer eine Quelle wiederholt
@@ -143,77 +137,16 @@ def _proposed_slots(db: Session, user_id: str) -> set[str]:
 
 
 def _owned_slots(db: Session, user_id: str) -> set[str]:
-    """Plätze, zu denen es ein Ereignis GIBT — bestätigt oder nicht.
+    """Plätze, zu denen es ein Ereignis GIBT.
 
-    Fälle (3) und (4): einmal bestätigt und dann umbenannt oder umdatiert,
-    bleibt das Ereignis über `external_id` erkennbar und ab da unantastbar;
-    ein gewachsenes Album belegt denselben Platz und bekommt keinen zweiten
-    Vorschlag.
+    Einmal angelegt und dann umbenannt oder umdatiert, bleibt das Ereignis
+    über `external_id` erkennbar und ab da unantastbar — ein zweiter Lauf legt
+    denselben Platz nicht doppelt an.
     """
     rows = (db.query(Event.external_id)
             .filter(Event.user_id == user_id,
                     Event.external_id.like(f"{SLOT_PREFIX}%")).all())
     return {r[0] for r in rows if r[0]}
-
-
-# Ab welchem GEGENSEITIGEN Anteil ein vorhandener Eintrag und ein Album
-# dasselbe meinen. Gegenseitig ist der Kern der Regel: „Mallorca_2005"
-# (23.07.–05.08.) und „Urlaub auf Mallorca" (23.07.–05.08.) decken einander zu
-# 100 % — dieselbe Reise. Ein dreitägiges Album INNERHALB eines
-# „Auslandsjahres" deckt sich zu 100 % mit dem Jahr, das Jahr aber nur zu
-# 0,8 % mit dem Album: verschiedene Dinge, und der Vorschlag ist berechtigt.
-# Eine einseitige Prüfung („liegt drin") würde genau den Fall verschlucken.
-_SAME_TRIP_COVERAGE = 0.5
-
-
-def covering_event(db: Session, user_id: str, prop: Proposal):
-    """Der eigene Eintrag, der dieses Album schon IST — oder None.
-
-    Der achte Fall, den Anmerkung 107 nicht hatte (Anmerkung 113): Sie hat die
-    Kollisionen von der Seite der **Tage** her durchgespielt, weil dort die
-    importierten Besuche liegen. Ein Album kollidiert aber mit etwas anderem —
-    mit der von Hand erfassten Reise. Gemeldet als „Mallorca_2005, 140 Fotos
-    aus Immich" direkt neben „Urlaub auf Mallorca, 23.07.–05.08.2005": zweimal
-    dieselbe Reise in der Lebensdatenbank, und die eine Hälfte weiß nichts von
-    der anderen.
-
-    Gefragt wird nur nach EIGENEN Einträgen (`MACHINE_SOURCES` bleibt außen
-    vor): ein importierter Besuch ist kein Reise-Eintrag, und ein früherer
-    Immich-Vorschlag ist über seinen Platz schon abgedeckt. Das ist dieselbe
-    Liste, die auch Stufe 1 liest — eine Regel an zwei Orten widerspricht sich
-    still (Anmerkung 106/111).
-
-    **Kein Grabstein.** Ein übersprungenes Album ist nicht abgelehnt, sondern
-    nur überflüssig, solange es den anderen Eintrag gibt. Wird der gelöscht,
-    darf das Album wieder vorgeschlagen werden — anders als bei einem
-    verworfenen Vorschlag, dessen Fragment bewusst bleibt.
-    """
-    a_start, a_end = prop.start.date(), prop.end.date()
-    ends = func.coalesce(Event.date_end, Event.date_start)
-    rows = (db.query(Event)
-            .filter(Event.user_id == user_id,
-                    Event.date_start.isnot(None),
-                    Event.source.notin_(MACHINE_SOURCES),
-                    Event.date_start <= prop.end,
-                    ends >= prop.start)
-            .all())
-    best, best_score = None, 0.0
-    for event in rows:
-        e_start = event.date_start.date()
-        e_end = (event.date_end or event.date_start).date()
-        if e_end < e_start:
-            e_start, e_end = e_end, e_start
-        overlap = (min(e_end, a_end) - max(e_start, a_start)).days + 1
-        if overlap <= 0:
-            continue
-        mine = overlap / ((a_end - a_start).days + 1)
-        theirs = overlap / ((e_end - e_start).days + 1)
-        if mine < _SAME_TRIP_COVERAGE or theirs < _SAME_TRIP_COVERAGE:
-            continue
-        score = min(mine, theirs)
-        if score > best_score:
-            best, best_score = event, score
-    return best
 
 
 def _days_with_owning_events(db: Session, user_id: str,
@@ -222,7 +155,7 @@ def _days_with_owning_events(db: Session, user_id: str,
 
     Nicht „Tage mit Ereignissen": Es geht nicht um Besuche, sondern darum,
     dass die Fotos schon ein Zuhause haben. Ein selbst erfasstes „Konzert"
-    mit angehängten Bildern braucht keinen Vorschlag „12 Fotos in Köln";
+    mit angehängten Bildern braucht kein zweites Ereignis „12 Fotos in Köln";
     ein Tag, an dem nur ein Google-Besuch steht, sehr wohl (Fall 7).
     """
     rows = (db.query(Event.date_start)
@@ -254,7 +187,7 @@ def cluster_assets(assets: list[dict], my_id: str | None) -> list[Proposal]:
 
     Gruppiert wird nach Immichs eigenem Ortsnamen, nicht nach einem
     Koordinatenraster: eine Rasterzelle kann mitten durch eine Stadt laufen
-    und denselben Tag zweimal vorschlagen.
+    und denselben Tag zweimal anlegen.
     """
     buckets: dict[tuple[date, str], list[dict]] = defaultdict(list)
     for asset in assets:
@@ -277,7 +210,7 @@ def cluster_assets(assets: list[dict], my_id: str | None) -> list[Proposal]:
         span_h = (times[-1] - times[0]).total_seconds() / 3600.0
         exact = span_h <= EXACT_MAX_HOURS
         out.append(Proposal(
-            slot=slot_day(day, place), kind="day",
+            slot=slot_day(day, place),
             title=f"{len(group)} Fotos in {place}"[:255],
             start=times[0] if exact else datetime(day.year, day.month, day.day),
             end=times[-1] if exact else datetime(day.year, day.month, day.day,
@@ -291,184 +224,25 @@ def cluster_assets(assets: list[dict], my_id: str | None) -> list[Proposal]:
     return out
 
 
-def album_proposal(album: dict, assets: list[dict], *, shared: bool) -> Proposal | None:
-    """Ein Album → ein `trip`-Vorschlag.
-
-    Geteilte Alben sind hier ausdrücklich willkommen (Fall 7c): Ein Album ist
-    ein von Menschen benannter, begrenzter Behälter — der Behälter selbst ist
-    der Beleg, und bestätigt wird ohnehin von Hand. Dass es ein geteiltes ist,
-    steht auf der Karte; wer je eine Reise geteilt bekommt, auf der er nicht
-    war, entscheidet dann informiert statt still.
-
-    Der Zeitraum kommt aus den Fotos und nicht aus `startDate`/`endDate` des
-    Albums: die beiden Felder sind laut Spezifikation **optional**, und ein
-    Vorschlag ohne Datum wäre keiner.
-    """
-    times = sorted(t for t in (api.asset_time(a) for a in assets) if t)
-    if not times:
-        return None
-    places: dict[str, int] = defaultdict(int)
-    per_place: dict[str, list] = defaultdict(list)
-    geos = []
-    for asset in assets:
-        place = api.asset_place(asset)
-        geo = api.asset_geo(asset)
-        if place:
-            places[place] += 1
-            if geo:
-                per_place[place].append(geo)
-        if geo:
-            geos.append(geo)
-    top = max(places.items(), key=lambda kv: kv[1])[0] if places else None
-    # Der Punkt gehört zum NAMEN, nicht zum Album. Gemittelt wurde vorher über
-    # ALLE Fotos, während der Name vom häufigsten Ort kam — bei einem Album,
-    # das zwei Gegenden umspannt, zeigte die Karte damit auf einen Punkt
-    # dazwischen, an dem nie jemand war, und schrieb den Namen des einen Ortes
-    # daran. Jetzt der Durchschnitt genau der Fotos, die an diesem Ort
-    # entstanden sind.
-    if top and per_place.get(top):
-        geos = per_place[top]
-    # Ein Album ist eine Spanne von TAGEN, kein Zeitpunkt — also Tagesgrenzen,
-    # auch wenn alle Bilder aus einer Stunde stammen. Uhrzeiten stehen zu
-    # lassen und daneben `day` zu behaupten, wäre eine Genauigkeit, die die
-    # Angabe selbst dementiert (aufgefallen im Smoke-Lauf).
-    first, last = times[0], times[-1]
-    return Proposal(
-        slot=slot_album(album["id"]), kind="album",
-        title=(album.get("albumName") or "Album")[:255],
-        start=datetime(first.year, first.month, first.day),
-        end=datetime(last.year, last.month, last.day, 23, 59, 59),
-        precision=DatePrecision.day,
-        place=top, country=next((api.asset_country(a) for a in assets
-                                 if api.asset_country(a)), None),
-        photos=len(assets), shared=shared,
-        lat=round(sum(g[0] for g in geos) / len(geos), 6) if geos else None,
-        lng=round(sum(g[1] for g in geos) / len(geos), 6) if geos else None,
-    )
-
-
-# --------------------------------------------------------------------------- #
-# Der Ort eines Albums, wenn die Fotos keinen haben
-# --------------------------------------------------------------------------- #
-# Genau der Fall, für den dieses Paket gebaut wurde: „Mallorca_2005", 140
-# Fotos, **kein einziges mit GPS** — 2005 hatte keine Kamera einen Empfänger.
-# Immichs Rückwärts-Geokodierung liefert dann nichts, und der Vorschlag stand
-# ohne Ort da, während der Ort im Titel steht. Ein Mensch liest ihn dort sofort.
-#
-# Geraten wird trotzdem nicht: **der Geocoder ist der Prüfer**. „Mallorca" ist
-# eine Insel und wird angenommen; „Beste Bilder" findet nichts oder etwas, das
-# kein Ort ist, und wird verworfen. Eine Liste verbotener Wörter („Urlaub",
-# „Fotos") wäre der schlechtere Weg — sie wäre deutsch, unvollständig und
-# müsste ewig gepflegt werden.
-#
-# Und der Aufruf ist erlaubt: Anmerkung 100 verlangt, dass ein ausgehender
-# Abruf einer GESPEICHERTEN eigenen Tatsache dient. Der Albumname ist eine.
-_TITLE_SPLIT = re.compile(r"[_\-.,;+/\\]+")
-# Was Nominatim als `type` liefern muss, damit der Treffer als Ort durchgeht.
-_PLACE_TYPES = {
-    "island", "islet", "archipelago", "peninsula", "city", "town", "village",
-    "hamlet", "municipality", "borough", "suburb", "quarter", "locality",
-    "county", "state", "province", "region", "district", "country",
-    "administrative", "national_park", "protected_area", "isolated_dwelling",
-}
-
-
-def title_query(title: str) -> str | None:
-    """Der ortsverdächtige Teil eines Albumnamens — Jahre und Zahlen raus."""
-    words = [w for w in _TITLE_SPLIT.sub(" ", title).split()
-             if len(w) >= 3 and not w.isdigit()]
-    return " ".join(words) or None
-
-
-def place_from_title(db: Session, user_id: str, title: str) -> dict | None:
-    """{name, lat, lng, country, type} aus dem Albumnamen — oder None.
-
-    Erst der eigene Bestand, dann das Netz: Wer schon einmal in »Mallorca«
-    war, hat den Ort hier stehen, und dann ist die Frage beantwortet, ohne
-    jemanden zu fragen. Das ist nicht nur billiger, es hält auch die eigene
-    Schreibweise.
-    """
-    query = title_query(title)
-    if not query:
-        return None
-    own = (db.query(Location)
-           .filter(Location.user_id == user_id,
-                   func.lower(Location.name) == query.lower(),
-                   Location.lat.isnot(None), Location.lng.isnot(None))
-           .first())
-    if own:
-        return {"name": own.name, "lat": own.lat, "lng": own.lng,
-                "country": None, "type": own.type or "poi"}
-    if not settings.geocoding_enabled:
-        return None
-    hit = geocode.geocode(query)
-    if not hit or hit.get("type") not in _PLACE_TYPES:
-        if hit:
-            log.info("Albumname %r ergab %r (%s) — kein Ort, verworfen",
-                     query, hit.get("name"), hit.get("type"))
-        return None
-    return {
-        "name": hit.get("poi") or geocode.city_of(hit) or query,
-        "lat": hit["lat"], "lng": hit["lng"],
-        "country": (hit.get("address") or {}).get("country"),
-        "type": hit.get("type"),
-    }
-
-
-def _drop_clusters_inside_albums(clusters: list[Proposal],
-                                 albums: list[Proposal]) -> list[Proposal]:
-    """Fall (5): Liegt ein Cluster in der Spanne eines Albums, gewinnt das Album.
-
-    Es ist der größere Zusammenhang — „Dänemark 2024" sagt mehr über den
-    17. Juli als „23 Fotos in Aarhus", und beides nebeneinander wäre derselbe
-    Tag zweimal in der Warteschlange.
-    """
-    if not albums:
-        return clusters
-    spans = [(a.start, a.end) for a in albums]
-    return [c for c in clusters
-            if not any(lo <= c.start <= hi or lo <= c.end <= hi for lo, hi in spans)]
-
-
 # --------------------------------------------------------------------------- #
 # Vorschau (P2.5-Muster) und Anlegen
 # --------------------------------------------------------------------------- #
 def scan_year(db: Session, user, year: int, url: str, key: str,
               heartbeat=None, budget_s: float | None = None,
-              report: dict | None = None, albums: bool = False) -> list[Proposal]:
-    """Was dieses Jahr an Vorschlägen ergäbe — **ohne irgendetwas anzulegen**.
-
-    **`albums` ist seit Stufe 3 standardmäßig AUS** (Anmerkung 116). Aus dem
-    Betrieb: Ein Album wird EIN Vorschlag — „London, 1200 Bilder" — und damit
-    ein mehrtägiger Eintrag mit genau einem Punkt auf der Karte, obwohl die
-    1200 Bilder einzeln wissen, wo sie entstanden sind. Dazu kommt es der von
-    Hand erfassten Reise in die Quere: `covering_event` fängt den Fall zwar ab,
-    aber nur, wenn die Reise VORHER dasteht.
-    Die Richtung ist damit umgedreht: **Reisen legt der Mensch an, die Fotos
-    hängen sich daran** (Stufe 1 tut genau das). Alben bleiben abrufbar — der
-    Weg ist ein ausdrücklicher Knopf, kein Nachtlauf.
+              report: dict | None = None) -> list[Proposal]:
+    """Was dieses Jahr an Tagesclustern ergäbe — **ohne irgendetwas anzulegen**.
 
     Genau dieselbe Funktion füttert die Vorschau und den Lauf. Zwei getrennte
     Wege wären zwei Regeln, und die widersprechen sich still (Anmerkung 106).
 
-    `budget_s` deckelt die Zeit, `report` nimmt auf, was dabei liegen blieb.
+    `budget_s` deckelt die Zeit, `report` nimmt auf, was dabei gemessen wurde.
     Beides braucht nur die **Vorschau** (Anmerkung 113): sie hängt an einer
     einzelnen HTTP-Anfrage, und dazwischen steht bei einer Fernnutzung ein
     umgekehrter Vertreter mit einer festen Geduld — gemeldet als **502 Bad
-    Gateway**. Ein Lauf über eine gewachsene Bibliothek fragt Immich einmal je
-    Album; das kann diese Geduld überschreiten, und dann ist das Ergebnis
-    nicht etwa spät, sondern **weg**.
-
-    Der Job braucht das nicht: er läuft im Hintergrund, hat einen Herzschlag
-    und niemanden, der auf eine Antwort wartet — er bekommt deshalb kein
-    Budget und sieht weiterhin alles an. Eine halbe Vorschau ist brauchbar
-    (man sieht, was für ein Jahr zu erwarten ist), ein halber Lauf wäre es
-    nicht.
+    Gateway**. Der Job braucht das nicht: er läuft im Hintergrund, hat einen
+    Herzschlag und niemanden, der auf eine Antwort wartet.
     """
     began = time.monotonic()
-
-    def _spent() -> bool:
-        return budget_s is not None and (time.monotonic() - began) > budget_s
 
     def _note(**kw) -> None:
         if report is not None:
@@ -477,14 +251,9 @@ def scan_year(db: Session, user, year: int, url: str, key: str,
     start = datetime(year, 1, 1)
     end = datetime(year, 12, 31, 23, 59, 59)
 
-    # Das eigene Wissen steht am ANFANG, nicht am Ende (Anmerkung 113). Es
-    # kostet drei billige Abfragen und entscheidet, welche teuren Netzabfragen
-    # überhaupt nötig sind. Vorher wurde erst alles geholt und dann gefiltert:
-    # jedes Album, das dieses Jahr berührt, wurde bei JEDEM Lauf vollständig
-    # heruntergeladen — auch die längst bestätigten und die abgelehnten — nur
-    # um am Ende weggeworfen zu werden. Bei einer gewachsenen Bibliothek ist
-    # das der Löwenanteil der Laufzeit, und beim zweiten Lauf ist er komplett
-    # umsonst.
+    # Das eigene Wissen steht am ANFANG, nicht am Ende (Anmerkung 113): zwei
+    # billige Abfragen entscheiden, welche Cluster überhaupt zählen, bevor die
+    # teure Foto-Abfrage läuft.
     known = _proposed_slots(db, user.id) | _owned_slots(db, user.id)
     housed = _days_with_owning_events(db, user.id, start, end)
 
@@ -497,156 +266,35 @@ def scan_year(db: Session, user, year: int, url: str, key: str,
     clusters = cluster_assets(assets, my_id)
     log.info("Immich %d: %d Fotos gelesen, %d Tagescluster", year,
              len(assets), len(clusters))
+    _note(seconds=round(time.monotonic() - began, 1))
 
-    album_props: list[Proposal] = []
-    covered: list[dict] = []
-    skipped = 0
-    looked_at = 0
-    open_albums = 0
-    # Der ganze Alben-Zweig hängt an EINER Bedingung, und zwar hier oben.
-    # Nicht am Ende zu filtern ist der Punkt: die teuren Abrufe (ein
-    # `search_assets_paged` je Album) finden dann gar nicht erst statt.
-    for owned in ((True, False) if albums else ()):
-        try:
-            found = api.albums(url, key, owned=owned)
-        except api.ImmichError as exc:
-            # Fehlt dem Schlüssel `album.read`, sind die Fototage trotzdem zu
-            # haben — ein fehlendes Häkchen darf nicht die ganze Funktion
-            # umbringen. Verschwiegen wird es aber nicht: sonst fehlten die
-            # Alben, und niemand wüsste warum (Anmerkung 113).
-            if exc.status != 403:
-                raise
-            log.warning("Immich: Alben übersprungen — %s", exc)
-            _note(albums_denied=str(exc))
-            break
-        for album in found:
-            if not _album_touches_year(album, year):
-                continue
-            if _spent():
-                # Abgebrochen, nicht abgeschnitten: die Vorschau SAGT, wie
-                # viele Alben sie nicht mehr angesehen hat. Eine Zahl, die
-                # aussieht wie „alles", ist hier der teurere Fehler
-                # (Anmerkung 110: was eine Ansicht nicht zeigen kann, muss sie
-                # sagen — und zwar dort, wo hingeschaut wird).
-                open_albums += 1
-                continue
-            if slot_album(album["id"]) in known:
-                # Fälle (2)/(3)/(4): schon vorgeschlagen, schon bestätigt oder
-                # abgelehnt. Der Platz ist vergeben — die Fotos dazu braucht
-                # niemand mehr.
-                skipped += 1
-                continue
-            # **Nicht** auf das Jahr eingegrenzt: Ein Album ist ein begrenzter
-            # Behälter mit einer eigenen Spanne. Fragte man nur nach den Fotos
-            # dieses Jahres, bekäme eine Silvesterreise (28.12.–3.1.) einen
-            # Vorschlag über die halbe Reise — und weil der Platz derselbe ist,
-            # würde der Lauf im anderen Jahr ihn stillschweigend überspringen
-            # statt ihn zu vervollständigen. Das Jahr entscheidet, OB das Album
-            # angeboten wird, nicht was drin ist.
-            items = api.search_assets_paged(url, key, _WIDE_START, _WIDE_END,
-                                            album_id=album["id"],
-                                            heartbeat=heartbeat)
-            looked_at += 1
-            if not items:
-                continue
-            prop = album_proposal(album, items, shared=not owned)
-            if not prop:
-                continue
-            if not prop.place:
-                # Kein Foto mit Koordinaten — dann steht der Ort vielleicht im
-                # Namen. Genau der Fall, für den es dieses Paket gibt: vor dem
-                # Smartphone gibt es kein GPS, und „Mallorca_2005" sagt einem
-                # Menschen trotzdem sofort, wo er war.
-                guess = place_from_title(db, user.id, prop.title)
-                if guess:
-                    prop.place = guess["name"]
-                    prop.country = guess["country"]
-                    prop.lat, prop.lng = guess["lat"], guess["lng"]
-                    prop.place_source = "title"
-                    prop.place_type = guess["type"]
-                    log.info("Album »%s«: Ort aus dem Namen — %s (%s)",
-                             prop.title, guess["name"], guess["type"])
-            twin = covering_event(db, user.id, prop)
-            if twin:
-                # Kein zweiter Eintrag für dieselbe Reise — aber auch kein
-                # stilles Verschwinden: die Vorschau nennt beide Titel, sonst
-                # wundert sich jemand, warum sein Album nie auftaucht.
-                covered.append({"album": prop.title, "event": twin.title,
-                                "event_id": twin.id})
-                log.info("Immich: Album »%s« übersprungen — »%s« deckt den "
-                         "Zeitraum bereits ab", prop.title, twin.title)
-                continue
-            album_props.append(prop)
-    log.info("Immich %d: %d Alben vorgeschlagen, %d schon vergeben, "
-             "%d nicht mehr angesehen (%.1fs)", year, len(album_props),
-             skipped, open_albums, time.monotonic() - began)
-    _note(partial=bool(open_albums), albums_open=open_albums,
-          albums_checked=looked_at, covered=covered,
-          # Ohne diese Zeile sähe ein Lauf ohne Alben genauso aus wie einer,
-          # der keine gefunden hat — die Oberfläche könnte den Unterschied
-          # nicht benennen, und „wo sind meine Alben?" bliebe unbeantwortet.
-          albums_asked=albums,
-          seconds=round(time.monotonic() - began, 1))
-
-    clusters = _drop_clusters_inside_albums(clusters, album_props)
-
-    # Fall (1): Fotos, die schon ein Zuhause haben, brauchen keinen Vorschlag.
+    # Fall (1): Fotos, die schon ein Zuhause haben, brauchen kein Ereignis.
     clusters = [c for c in clusters if c.start.date() not in housed]
 
-    # Fälle (2), (3), (4) für die Tage — die Alben sind oben schon durch.
-    return [p for p in (album_props + clusters) if p.slot not in known]
+    # Fälle (2)/(3)/(4): schon angelegt oder gelöscht — der Platz ist vergeben.
+    return [p for p in clusters if p.slot not in known]
 
 
-def _album_touches_year(album: dict, year: int) -> bool:
-    """Grober Vorfilter über die (optionalen) Album-Daten.
+def create_confirmed_visits(db: Session, user, proposals: list[Proposal]) -> int:
+    """Legt Ereignisse an — direkt bestätigt, wie ein Google-Besuch (Anm. 138).
 
-    Fehlen sie, wird das Album NICHT ausgeschlossen — ein fehlendes Datum ist
-    keine Auskunft über das Jahr, und lieber eine Abfrage zu viel als ein
-    Album, das nie vorgeschlagen wird.
-    """
-    lo, hi = album.get("startDate"), album.get("endDate")
-    if not lo and not hi:
-        return True
-    for value in (lo, hi):
-        if not value:
-            continue
-        try:
-            if datetime.fromisoformat(str(value).replace("Z", "+00:00")).year == year:
-                return True
-        except ValueError:
-            return True
-    # Beide Daten da und beide in anderen Jahren — kann das Jahr trotzdem
-    # überspannen (Silvesterreise), deshalb der Bereichsvergleich.
-    try:
-        a = datetime.fromisoformat(str(lo).replace("Z", "+00:00")).year
-        b = datetime.fromisoformat(str(hi).replace("Z", "+00:00")).year
-        return a <= year <= b
-    except (ValueError, TypeError):
-        return True
+    Je ein `Fragment` (Grabstein) + ein sofort `confirmed`-es Ereignis. Der
+    Grabstein bleibt auch nach einer manuellen Löschung stehen: ohne ihn
+    fände `scan_year` denselben Platz beim nächsten Lauf wieder frei und legte
+    ihn erneut an — eine Wiederauferstehung, die eine bewusste Löschung
+    rückgängig macht.
 
-
-def create_proposals(db: Session, user, proposals: list[Proposal]) -> int:
-    """Legt Vorschläge an: je einer ein `Fragment` (Grabstein) + ein Ereignis.
-
-    Alles `unconfirmed` — nichts wird je automatisch bestätigt (Anmerkung 30).
-    Das Fragment trägt den Platz im Klartext; es ist die Antwort auf „habe ich
-    das schon einmal vorgeschlagen?", auch nachdem das Ereignis abgelehnt und
-    damit gelöscht wurde.
-
-    Fall (6): Die Fotos werden hier **nicht** umgehängt. Ein Vorschlag ZEIGT
-    die Bilder seines Fensters (sie hängen weiter am Tag, F18/Anmerkung 106),
-    besitzt sie aber erst, wenn ein Mensch bestätigt. Eine Ablehnung hat
-    deshalb nichts rückgängig zu machen — und hochgeladene Dateien wandern
-    ohnehin nie (Anmerkung 57).
+    Fall (6): Die Fotos werden hier **nicht** umgehängt. Das Ereignis ZEIGT
+    die Bilder seines Fensters (sie hängen weiter am Tag, F18/Anmerkung 106).
     """
     created = 0
     for prop in proposals:
         fragment = Fragment(
             user_id=user.id,
             raw_text=json.dumps({
-                "type": "immich_source", "slot": prop.slot, "kind": prop.kind,
+                "type": "immich_source", "slot": prop.slot,
                 "title": prop.title, "photos": prop.photos,
-                "place": prop.place, "shared": prop.shared,
+                "place": prop.place,
                 "range": [prop.start.isoformat(), prop.end.isoformat()],
             }, ensure_ascii=False),
             source=Source.immich,
@@ -654,18 +302,20 @@ def create_proposals(db: Session, user, proposals: list[Proposal]) -> int:
         )
         db.add(fragment)
         db.flush()
+        now = datetime.now(timezone.utc)
         db.add(Event(
             user_id=user.id,
             title=prop.title,
             description=_describe(prop),
             date_start=prop.start, date_end=prop.end,
             date_precision=prop.precision,
-            category="trip" if prop.kind == "album" else "event",
-            # Ein Vorschlag ist ein Vorschlag: die Zuversicht ist mittelhoch,
-            # weil Foto-GPS ein Beleg ist — aber nie 1.0, denn was der Tag
-            # BEDEUTETE, weiß nur der Mensch.
+            category="event",
+            # Foto-GPS ist ein Beleg, kein Geständnis — dieselbe mittelhohe
+            # Zuversicht wie bei einem Google-Besuch (`tracks.py`).
             confidence=0.6,
-            confirmed=ConfirmState.unconfirmed,
+            confirmed=ConfirmState.confirmed,
+            confirmed_at=now,
+            confirmed_by="import",
             source=Source.immich,
             location=_location_for(db, user, prop),
             origin_fragment=fragment,
@@ -679,21 +329,11 @@ def _describe(prop: Proposal) -> str:
     bits = [f"{prop.photos} Fotos aus Immich"]
     if prop.place:
         bits.append(f"in {prop.place}")
-        if prop.place_source == "title":
-            # Gemessen und geraten dürfen nicht gleich aussehen. Wer den
-            # Vorschlag später liest, sieht sonst einen Ort und hält ihn für
-            # eine Angabe aus den Fotos — die haben aber gar keine.
-            bits.append("(Ort aus dem Albumnamen, die Fotos haben keine "
-                        "Koordinaten)")
-    if prop.shared:
-        # Steht bewusst IM Text und nicht nur in einem Feld: wer den Vorschlag
-        # sieht, muss wissen, dass die Bilder von jemand anderem stammen.
-        bits.append("— aus einem geteilten Album")
     return " ".join(bits)
 
 
 def _location_for(db: Session, user, prop: Proposal) -> Location | None:
-    """Ort des Vorschlags — vorhandene Orte wiederverwenden, sonst anlegen.
+    """Ort des Ereignisses — vorhandene Orte wiederverwenden, sonst anlegen.
 
     `external_ref` bekommt einen eigenen Namensraum (`immich:place:…`), damit
     ein zweiter Lauf denselben Ort findet, statt Detmold ein zweites Mal
@@ -711,13 +351,9 @@ def _location_for(db: Session, user, prop: Proposal) -> Location | None:
                 .first())
     if existing:
         return existing
-    # Der Typ ist die zweite Stelle, an der „gemessen" und „geraten"
-    # auseinandergehalten wird: eine Insel ist kein Punkt, und `poi` würde
-    # genau das behaupten. Was der Geocoder sagt, steht drin.
     loc = Location(user_id=user.id, name=prop.place[:255], lat=prop.lat,
-                   lng=prop.lng, type=(prop.place_type or "poi")[:32],
-                   city=prop.place[:128] if prop.place_source == "exif" else None,
-                   external_ref=ref)
+                   lng=prop.lng, type="poi",
+                   city=prop.place[:128], external_ref=ref)
     db.add(loc)
     db.flush()
     return loc

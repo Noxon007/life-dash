@@ -1,16 +1,19 @@
 // P2.1 Stufe 2 — die Vorschau ist Pflicht, nicht Empfehlung.
 //
 // Anmerkung 107 begründet die jahresweisen Läufe mit einer Zahl: eine zwanzig
-// Jahre alte Bibliothek ergibt vierstellig viele Vorschläge in einer
-// Warteschlange, die für Dutzende gebaut ist. Der Schutz davor ist ein
-// einziges Verhalten der Oberfläche — **anlegen geht erst nach ansehen** —,
-// und das ist genau die Sorte Eigenschaft, die beim Bauen aus Versehen
-// verschwindet: der Knopf funktioniert ja, er tut nur zu viel.
+// Jahre alte Bibliothek ergibt vierstellig viele Ereignisse in einem Rutsch.
+// Der Schutz davor ist ein einziges Verhalten der Oberfläche — **anlegen geht
+// erst nach ansehen** —, und das ist genau die Sorte Eigenschaft, die beim
+// Bauen aus Versehen verschwindet: der Knopf funktioniert ja, er tut nur zu
+// viel. Anmerkung 138: seit dem Wegfall der Moderation (Fotocluster werden
+// direkt bestätigt, wie ein Google-Besuch) ist die Vorschau die EINZIGE Bremse
+// — wichtiger, nicht unwichtiger, als vorher. Alben (vormals Stufe 3) sind
+// komplett raus.
 //
 // Geprüft wird deshalb der Zustand, den es GEBEN MUSS (die Regel aus
 // `check-a41-cities.js`): der Knopf ist anfangs gesperrt, geht erst nach einer
 // Vorschau auf, und schließt wieder, sobald das Jahr gewechselt wird — sonst
-// legt er Vorschläge für ein Jahr an, das niemand gesehen hat.
+// legt er Ereignisse für ein Jahr an, das niemand gesehen hat.
 //
 // Aufruf aus dem Repo-Wurzelverzeichnis: node tools/check-p21-preview.js
 const fs = require('fs');
@@ -19,17 +22,14 @@ const { JSDOM } = require('jsdom');
 const html = fs.readFileSync(process.argv[2] || 'frontend/index.html', 'utf8');
 const calls = [];
 let preview = {
-  year: 2024, total: 3, days: 2, albums: 1, photos: 61, shared: 1,
+  year: 2024, total: 2, photos: 24,
   proposals: [
-    { slot: 'immich:album:a1', kind: 'album', title: 'Dänemark 2024',
-      start: '2024-08-03T00:00:00', end: '2024-08-09T23:59:59',
-      precision: 'day', place: 'Aarhus', photos: 40, shared: false },
-    { slot: 'immich:day:2024-07-12:Detmold', kind: 'day', title: '15 Fotos in Detmold',
+    { slot: 'immich:day:2024-07-12:Detmold', title: '15 Fotos in Detmold',
       start: '2024-07-12T00:00:00', end: '2024-07-12T23:59:59',
-      precision: 'day', place: 'Detmold', photos: 15, shared: false },
-    { slot: 'immich:album:a2', kind: 'album', title: 'Kreta mit Jan',
-      start: '2024-06-05T00:00:00', end: '2024-06-12T23:59:59',
-      precision: 'day', place: 'Chania', photos: 6, shared: true },
+      precision: 'day', place: 'Detmold', photos: 15 },
+    { slot: 'immich:day:2024-06-05:Chania', title: '9 Fotos in Chania',
+      start: '2024-06-05T00:00:00', end: '2024-06-05T23:59:59',
+      precision: 'day', place: 'Chania', photos: 9 },
   ],
 };
 
@@ -59,7 +59,7 @@ const dom = new JSDOM(html, {
       else if (/auth\/me\/settings/.test(path)) body = { immich: { url: 'http://immich.local', has_key: true }, tracked_modules: null, place_name_parts: ['road', 'city', 'country'] };
       else if (/auth\/me$/.test(path)) body = { id: 'u1', display_name: 'T', role: 'admin' };
       else if (/\/api\/modules/.test(path)) body = [];
-      else if (/\/health/.test(path)) body = { version: '0.38.0', display_version: '0.38.0-dev', channel: 'dev' };
+      else if (/\/health/.test(path)) body = { version: '0.39.0', display_version: '0.39.0-dev', channel: 'dev' };
       else if (/events\/index/.test(path)) body = { total: 0, dated: 0, undated: 0, unconfirmed: 0, fuzzy: 0, years: [] };
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body) });
     };
@@ -84,7 +84,7 @@ setTimeout(async () => {
 
   // --- 1. Ohne Vorschau geht nichts -------------------------------------- //
   ok('Der Anlegen-Knopf ist von Anfang an gesperrt', run.disabled,
-     'ein Klick ohne Vorschau legt hunderte Vorschläge an');
+     'ein Klick ohne Vorschau legt hunderte Ereignisse direkt bestätigt an');
 
   // Anmerkung 112: Hier stand `await w.loadImmichYears()` — der Wächter hat
   // sich die Jahre SELBST geholt und damit genau den Schritt übersprungen, an
@@ -130,13 +130,10 @@ setTimeout(async () => {
   ok('Der Kasten ist sichtbar', box.style.display !== 'none');
 
   const text = box.textContent;
-  ok('Sie nennt die Gesamtzahl', /3/.test(text), text.slice(0, 160));
-  ok('Sie NENNT die Vorschläge, statt nur zu zählen',
-     /Dänemark 2024/.test(text) && /Detmold/.test(text),
-     'eine Zahl ist keine Entscheidungsgrundlage (P2.5)');
-  ok('Ein geteiltes Album sagt, dass es geteilt ist',
-     /geteilt|shared/i.test(text),
-     'sonst wandert eine fremde Reise still in die eigene Lebensdatenbank');
+  ok('Sie nennt die Gesamtzahl', /2/.test(text), text.slice(0, 160));
+  ok('Sie NENNT die Ereignisse, statt nur zu zählen',
+     /Detmold/.test(text) && /Chania/.test(text),
+     'eine Zahl ist keine Entscheidungsgrundlage (P2.5) — hier erst recht nicht, weil direkt bestätigt wird');
 
   // --- 3. Erst jetzt darf angelegt werden -------------------------------- //
   ok('Nach der Vorschau ist der Knopf offen', !run.disabled);
@@ -154,10 +151,10 @@ setTimeout(async () => {
 
   // --- 4. Jahreswechsel entwertet die Vorschau --------------------------- //
   // Der teuerste stille Fehler dieser Oberfläche: Vorschau für 2024 ansehen,
-  // auf 2019 umschalten, anlegen — und 2019 hat nie jemand gesehen.
+  // auf 2019 umschalten, anlegen — und 2019 hat nie jemand gesehen. Jetzt
+  // schreibt das direkt bestätigte Ereignisse an, die niemand kontrolliert hat.
   calls.length = 0;
-  preview = { year: 2024, total: 1, days: 1, albums: 0, photos: 9, shared: 0,
-              proposals: [preview.proposals[1]] };
+  preview = { year: 2024, total: 1, photos: 9, proposals: [preview.proposals[1]] };
   d.getElementById('ims-preview').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   await wait(40);
   ok('Vorschau erneut gelaufen', !run.disabled);
@@ -170,67 +167,6 @@ setTimeout(async () => {
   ok('…und räumt die alte Vorschau weg', box.style.display === 'none',
      'die Zahlen von 2024 stünden unter dem Jahr 2022');
 
-  // --- 4b. P2.1 Stufe 3: der Alben-Haken ist derselbe Fall --------------- //
-  // Alben laufen seit Anmerkung 116 nur noch auf ausdrückliche Nachfrage —
-  // und damit gilt für den Haken exakt der Satz von oben: Eine Vorschau gilt
-  // für die Einstellung, unter der sie entstanden ist. Ohne Haken ansehen und
-  // mit Haken laufen lassen legt Alben an, die keine Vorschau gezeigt hat.
-  const albumBox = d.getElementById('ims-albums');
-  ok('Es gibt einen Alben-Haken', !!albumBox);
-  ok('…und er ist von Haus aus AUS', albumBox && !albumBox.checked,
-     'ein Album wird EIN Vorschlag mit einem Kartenpunkt für 1200 Bilder');
-
-  sel.value = '2024';
-  sel.dispatchEvent(new w.Event('change', { bubbles: true }));
-  calls.length = 0;
-  preview = { year: 2024, total: 1, days: 1, albums: 0, photos: 9, shared: 0,
-              albums_asked: false, proposals: [preview.proposals[0]] };
-  d.getElementById('ims-preview').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
-  await wait(40);
-  ok('Ohne Haken fragt die Vorschau NICHT nach Alben',
-     calls.some(([, p]) => /immich\/preview/.test(p) && !/albums=1/.test(p)),
-     JSON.stringify(calls.filter(([, p]) => /preview/.test(p))));
-  ok('Vorschau ohne Alben gibt den Lauf frei', !run.disabled);
-
-  albumBox.checked = true;
-  albumBox.dispatchEvent(new w.Event('change', { bubbles: true }));
-  await wait(20);
-  ok('Der Haken entwertet die Vorschau', run.disabled,
-     'sonst legt der Lauf Alben an, die keine Vorschau gezeigt hat');
-
-  calls.length = 0;
-  preview = { year: 2024, total: 2, days: 1, albums: 1, photos: 49, shared: 0,
-              albums_asked: true,
-              proposals: [preview.proposals[0]] };
-  d.getElementById('ims-preview').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
-  await wait(40);
-  ok('Mit Haken fragt die Vorschau nach Alben',
-     calls.some(([, p]) => /immich\/preview/.test(p) && /albums=1/.test(p)),
-     JSON.stringify(calls.filter(([, p]) => /preview/.test(p))));
-  ok('…und gibt den Lauf wieder frei', !run.disabled);
-
-  calls.length = 0;
-  run.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
-  await wait(30);
-  const albumRun = JSON.parse(started().slice(-1)[0][2] || '{}');
-  ok('Der Lauf trägt die Alben-Entscheidung mit',
-     albumRun.params && albumRun.params.albums === true,
-     JSON.stringify(albumRun.params));
-
-  // Und andersherum: der Haken wieder weg, die alte Vorschau darf nicht
-  // gelten. Die Richtung ist die unauffälligere von beiden — sie verspricht
-  // Alben, die der Lauf dann nicht anlegt.
-  preview = { year: 2024, total: 2, days: 1, albums: 1, photos: 49, shared: 0,
-              albums_asked: true, proposals: [preview.proposals[0]] };
-  d.getElementById('ims-preview').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
-  await wait(40);
-  ok('Vorschau mit Alben gilt', !run.disabled);
-  albumBox.checked = false;
-  albumBox.dispatchEvent(new w.Event('change', { bubbles: true }));
-  await wait(20);
-  ok('Haken zurückgenommen entwertet sie ebenfalls', run.disabled,
-     'die Vorschau hätte Alben versprochen, die der Lauf nicht anlegt');
-
   // --- 5. Immich fällt aus: der Grund muss ANKOMMEN ---------------------- //
   // Anmerkung 113, dritte Runde. Der Endpunkt hat einen Immich-Ausfall als
   // `502` gemeldet — semantisch passend, im Betrieb fatal: ein umgekehrter
@@ -239,9 +175,10 @@ setTimeout(async () => {
   // damit nie an; die Seite bekam HTML statt JSON und zeigte „502 Bad
   // Gateway". Deshalb: 200 mit `error` im Rumpf — und der Wächter stellt genau
   // diesen Zustand her.
+  sel.value = '2022';
+  sel.dispatchEvent(new w.Event('change', { bubbles: true }));
   preview = { year: 2022, error: 'Immich lehnt den API-Schlüssel ab (401/403)',
-              total: 0, days: 0, albums: 0, photos: 0, shared: 0,
-              partial: false, albums_open: 0, seconds: 0.2, proposals: [] };
+              total: 0, photos: 0, seconds: 0.2, proposals: [] };
   d.getElementById('ims-preview').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   await wait(40);
   ok('Ein Immich-Ausfall wird im Klartext gezeigt',
@@ -257,13 +194,11 @@ setTimeout(async () => {
   // Jahre bekommt. Die naheliegende Abkürzung (eine Anfrage ohne Jahr, der
   // Server nimmt sich 25 Sekunden und antwortet mit einem Ausschnitt) wäre
   // „ein Zwanzigstel sehen, alles anlegen".
-  albumBox.checked = false;
-  preview = { year: 2024, total: 1, days: 1, albums: 0, photos: 9, shared: 0,
-              albums_asked: false, partial: false, albums_open: 0, seconds: 0.4,
-              proposals: [{ slot: 'immich:day:2024-05-01:Kiel', kind: 'day',
+  preview = { year: 2024, total: 1, photos: 9,
+              proposals: [{ slot: 'immich:day:2024-05-01:Kiel',
                             title: '9 Fotos in Kiel', start: '2024-05-01T00:00:00',
                             end: '2024-05-01T23:59:59', precision: 'day',
-                            place: 'Kiel', photos: 9, shared: false }] };
+                            place: 'Kiel', photos: 9 }] };
   sel.value = 'all';
   sel.dispatchEvent(new w.Event('change', { bubbles: true }));
   await wait(20);
@@ -277,7 +212,7 @@ setTimeout(async () => {
   ok('Die Vorschau fragt JEDES Jahr einzeln',
      asked.join(',') === '2004,2023,2024', asked.join(',') || 'keine Anfrage');
   ok('…und keine Sammel-Anfrage ohne Jahr',
-     !calls.some(([m, p]) => m === 'POST' && /immich\/preview(\?albums)?(?!.*year=)/.test(p)),
+     !calls.some(([m, p]) => m === 'POST' && /immich\/preview(?!.*year=)/.test(p)),
      JSON.stringify(calls.map(c => c[1])));
   ok('Nach der Vorschau über alle Jahre ist der Knopf offen', !run.disabled);
   ok('Die Überschrift nennt die Spanne, nicht ein Jahr',
@@ -343,7 +278,7 @@ function scenario(broken) {
         if (/immich\/years/.test(p)) {
           if (broken === 'years') { ok2 = false; status = 502; body = { detail: 'Immich nicht erreichbar' }; }
           else body = { current: 2024, source: 'immich', years: [{ year: 2024, photos: 61 }] };
-        } else if (/immich\/preview/.test(p)) body = { year: 2024, total: 0, days: 0, albums: 0, photos: 0, shared: 0, proposals: [] };
+        } else if (/immich\/preview/.test(p)) body = { year: 2024, total: 0, photos: 0, proposals: [] };
         else if (/auth\/config/.test(p)) body = { mode: 'dev' };
         else if (/auth\/me\/settings/.test(p)) {
           // `place_name_parts` fehlt: der ursprüngliche Auslöser — ein
@@ -353,7 +288,7 @@ function scenario(broken) {
             : { immich: { url: 'http://immich.local', has_key: true }, tracked_modules: null, place_name_parts: ['city'] };
         } else if (/auth\/me$/.test(p)) body = { id: 'u1', display_name: 'T', role: 'admin' };
         else if (/\/api\/modules/.test(p)) body = [];
-        else if (/\/health/.test(p)) body = { version: '0.38.0', display_version: '0.38.0-dev', channel: 'dev' };
+        else if (/\/health/.test(p)) body = { version: '0.39.0', display_version: '0.39.0-dev', channel: 'dev' };
         else if (/events\/index/.test(p)) body = { total: 0, dated: 0, undated: 0, unconfirmed: 0, fuzzy: 0, years: [] };
         return Promise.resolve({ ok: ok2, status, json: () => Promise.resolve(body) });
       };

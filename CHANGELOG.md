@@ -33,6 +33,18 @@ any `MINOR`.
   decade view one row per year; clicking a row expands it — a year's row into
   its months, a month's row into the familiar day-by-day view with its photo
   strip.
+- **Immich: a day with enough photos in one place becomes a confirmed entry
+  directly — the same way an imported Google visit always has.** Until now it
+  became an unconfirmed proposal that needed a separate trip to Moderation,
+  even though the two connectors are the same kind of evidence (a machine
+  measuring where you were). The mandatory preview before creating anything is
+  unchanged — if anything it matters more now, since there is no review step
+  left afterwards. Everywhere Google visits were hidden by default, bundled per
+  day and place, and counted (“🛰️ N automatically detected”), Immich photo-day
+  entries now are too, so this does not flood the timeline with individual
+  cards. Albums are no longer offered as a source at all (they were off by
+  default already); the Immich API key this connector asks for now needs four
+  read-only permissions instead of five.
 - **A greeting on the Today page.** A short line at the top now greets you by
   time of day and name and shows today's date, above the “on this day” look-back.
 - **“In the timeline” button on every collection entry, not just cities.**

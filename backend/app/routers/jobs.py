@@ -42,7 +42,7 @@ JOB_TYPES = {
     "embeddings": "Embeddings berechnen",
     "resolve_names": "Ortsnamen auflösen/formatieren",
     "immich": "Fotos aus Immich verknüpfen",
-    "immich_source": "Ereignisse aus Immich vorschlagen",
+    "immich_source": "Ereignisse aus Immich anlegen",
     "photo_points": "Fotos auf der Karte verorten",
     "timeline_import": "Google-Timeline-Import",
     "data_import": "Daten-Import (JSON)",
@@ -498,11 +498,16 @@ def _run_immich(db: Session, job: Job) -> tuple[str, str]:
 
 
 def _run_immich_source(db: Session, job: Job) -> tuple[str, str]:
-    """P2.1 Stufe 2: aus Immich-Fotos Ereignis-VORSCHLÄGE machen.
+    """P2.1 Stufe 2: aus Immich-Fototagen direkt bestätigte Ereignisse anlegen.
 
     Jahresweise, weil eine zwanzig Jahre alte Bibliothek sonst vierstellig
-    viele Vorschläge in eine Warteschlange kippt, die für Dutzende gebaut ist
-    (Anmerkung 107). Die Jahre stehen in `params` — ohne Jahr kein Lauf.
+    viele Ereignisse in einem Rutsch anlegen würde (Anmerkung 107). Die Jahre
+    stehen in `params` — ohne Jahr kein Lauf.
+
+    **Anmerkung 138: seit dem Wegfall der Moderation gibt es kein „unbestätigt
+    liegen lassen" mehr** — was dieser Lauf anlegt, ist sofort Lebensdatenbank,
+    wie bei einem Google-Besuch. Die Vorschau davor ist deshalb wichtiger, nicht
+    weniger wichtig, als vorher.
 
     **„Alle Jahre" ist erlaubt, seit die Vorschau sie alle abdeckt**
     (Anmerkung 120). Der Riegel war nie „ein Jahr", sondern „nichts anlegen,
@@ -512,8 +517,8 @@ def _run_immich_source(db: Session, job: Job) -> tuple[str, str]:
     nicht (`SCHED_TYPES` im Frontend).
 
     Der Lauf scannt NEU statt die Vorschau zu übernehmen. Zwischen Ansehen und
-    Bestätigen kann sich etwas geändert haben, und `scan_year` ist die eine
-    Stelle, an der die sieben Fälle geprüft werden.
+    Anlegen kann sich etwas geändert haben, und `scan_year` ist die eine
+    Stelle, an der die vier Fälle geprüft werden.
     """
     from app.services import immich as immich_api
     from app.services import immich_source as source
@@ -529,9 +534,9 @@ def _run_immich_source(db: Session, job: Job) -> tuple[str, str]:
     url, key = cfg
     multi = len(years) > 1
 
-    job.unit = "Vorschläge angelegt"
+    job.unit = "Ereignisse angelegt"
     db.commit()
-    created = total = days = 0
+    created = total = 0
     scanned: list[int] = []
     stopped = False
     fail: str | None = None
@@ -542,13 +547,7 @@ def _run_immich_source(db: Session, job: Job) -> tuple[str, str]:
         # gemacht, um danach „gestoppt" zu melden. `_tick(…, 0, None)` schlägt
         # den Puls, ohne einen Fortschritt zu behaupten, den es noch nicht gibt.
         try:
-            # P2.1 Stufe 3: Alben nur, wenn ausdrücklich angefordert. Der
-            # Nachtplan fragt damit NIE danach — und das ist der Punkt: ein
-            # Album ist ein von Hand benannter Behälter, sein Gegenstück in
-            # Life-Dash ist die von Hand erfasste Reise. Beide automatisch
-            # entstehen zu lassen erzeugt Zwillinge (Anmerkung 116).
             proposals = source.scan_year(db, user, year, url, key,
-                                         albums=bool((job.params or {}).get("albums")),
                                          heartbeat=lambda: _tick(db, job.id, 0, None))
         except immich_api.ScanAborted:
             stopped = True
@@ -560,12 +559,12 @@ def _run_immich_source(db: Session, job: Job) -> tuple[str, str]:
         n = len(proposals)
         # In Blöcken anlegen und festschreiben: bricht der Lauf ab, ist das
         # Angelegte da und der Rest kommt beim nächsten Mal — die Plätze sind
-        # stabil, ein zweiter Lauf schlägt nichts doppelt vor. Über mehrere
-        # Jahre gilt dasselbe je Jahr: ein Abbruch in 2011 lässt 2024 bis 2012
+        # stabil, ein zweiter Lauf legt nichts doppelt an. Über mehrere Jahre
+        # gilt dasselbe je Jahr: ein Abbruch in 2011 lässt 2024 bis 2012
         # angelegt stehen.
         for i in range(0, n, 20):
             block = proposals[i:i + 20]
-            created += source.create_proposals(db, user, block)
+            created += source.create_confirmed_visits(db, user, block)
             db.commit()
             # **Über mehrere Jahre gibt es kein „noch ~N"**, und eine Zahl, die
             # nur das laufende Jahr meint, wäre schlimmer als keine: „noch ~5"
@@ -575,22 +574,20 @@ def _run_immich_source(db: Session, job: Job) -> tuple[str, str]:
                 stopped = True
                 break
         total += n
-        days += sum(1 for p in proposals if p.kind == "day")
         if stopped:
             break
         scanned.append(year)
 
     span = _year_span(scanned or years[:1])
     if fail:
-        done_note = f" {created} Vorschläge aus {span} sind angelegt." if created else ""
+        done_note = f" {created} Ereignisse aus {span} sind angelegt." if created else ""
         return "stopped", f"Immich antwortet nicht: {fail}.{done_note}"
     if stopped:
-        return "stopped", (f"{span}: Suche abgebrochen — {created} Vorschläge "
+        return "stopped", (f"{span}: Suche abgebrochen — {created} Ereignisse "
                            f"angelegt.")
     if not total:
-        return "done", f"{_year_span(scanned)}: nichts Neues vorzuschlagen."
-    return "done", (f"{_year_span(scanned)}: {created} Vorschläge angelegt "
-                    f"({days} Fototage, {total - days} Alben) — alle unbestätigt.")
+        return "done", f"{_year_span(scanned)}: nichts Neues anzulegen."
+    return "done", f"{_year_span(scanned)}: {created} Ereignisse angelegt."
 
 
 def _run_photo_points(db: Session, job: Job) -> tuple[str, str]:

@@ -514,8 +514,13 @@ def list_events(
     # erst der Browser, besteht eine Seite nach einem Timeline-Import fast nur
     # aus Unsichtbarem — gemessen an einer 12.000er-Datenbank: sechs Seiten
     # nachgeladen für ein paar sichtbare Karten. Also hier filtern.
+    # Anmerkung 138: MACHINE_SOURCES statt nur google_timeline — seitdem
+    # Immich-Fototage genauso automatisch bestätigt werden wie Google-Besuche,
+    # gilt für sie dieselbe Regel. Zwei Quellen mit derselben Beleglage
+    # brauchen dieselbe Behandlung, sonst läuft sie still auseinander
+    # (Anmerkung 106).
     if visits is False:
-        query = query.filter(Event.source != Source.google_timeline)
+        query = query.filter(Event.source.notin_(MACHINE_SOURCES))
     # Anmerkung 135: unbestätigte Vorschläge maschineller Quellen sind Beleg,
     # kein Ereignis — sie tauchen erst nach dem bewussten Schritt in der
     # Moderation zwischen den bestätigten Karten auf. Bewusst nur diese
@@ -658,7 +663,11 @@ def _condensable_base(db: Session, user_id: str, level: str = "city"):
     query = (db.query(Event)
              .join(Location, Event.location_id == Location.id)
              .filter(Event.user_id == user_id,
-                     Event.source == Source.google_timeline,
+                     # Anmerkung 138: MACHINE_SOURCES statt nur
+                     # google_timeline — ein Immich-Fototag ist seitdem
+                     # dieselbe Sorte automatisch bestätigter Beleg wie ein
+                     # Google-Besuch und wird deshalb genauso gebündelt.
+                     Event.source.in_(MACHINE_SOURCES),
                      Event.date_start.isnot(None)))
     if column is None:
         # Stufe „point": es gibt nichts zu gruppieren. Die leere Menge ist die
@@ -697,7 +706,7 @@ def _visit_group_info(db: Session, user_id: str, events: list[Event],
     column = _level_column(level)
     if column is None:
         return {}
-    reps = [e for e in events if e.date_start and e.source == Source.google_timeline]
+    reps = [e for e in events if e.date_start and e.source in MACHINE_SOURCES]
     if not reps:
         return {}
     lo = min(e.date_start for e in reps)
@@ -822,7 +831,9 @@ def on_this_day(
                      Event.date_start.isnot(None),
                      Event.date_precision.in_(_ON_THIS_DAY_PRECISIONS)))
     if not include_imported:
-        query = query.filter(Event.source != Source.google_timeline)
+        # Anmerkung 138: MACHINE_SOURCES statt nur google_timeline (siehe
+        # dieselbe Begründung bei `visits` oben).
+        query = query.filter(Event.source.notin_(MACHINE_SOURCES))
     # A37 (zweite Runde): Vorauswahl in SQL statt „alles laden und in Python
     # aussieben". Gemessen bei 3.000 eigenen Einträgen: 660 ms — auf der
     # STARTANSICHT, und mit dem Bestand wachsend. Ursache war dieselbe wie in
@@ -898,12 +909,14 @@ def events_index(
     unconfirmed = (db.query(func.count(Event.id))
                    .filter(Event.user_id == user.id,
                            Event.confirmed != ConfirmState.confirmed).scalar() or 0)
-    # Der Schalter „🛰️ N Besuche" nannte die Zahl der Besuche in der geladenen
-    # Liste. Mit dem Zeitfenster wäre das eine beliebige Zahl gewesen — hier
-    # steht die echte.
+    # Der Schalter „🛰️ N automatisch erfasst" nannte die Zahl der Besuche in
+    # der geladenen Liste. Mit dem Zeitfenster wäre das eine beliebige Zahl
+    # gewesen — hier steht die echte. Anmerkung 138: MACHINE_SOURCES statt nur
+    # google_timeline — Google-Besuche und Immich-Fototage sind dieselbe
+    # Sorte automatisch bestätigter Beleg und zählen deshalb zusammen.
     visits = (db.query(func.count(Event.id))
               .filter(Event.user_id == user.id,
-                      Event.source == Source.google_timeline).scalar() or 0)
+                      Event.source.in_(MACHINE_SOURCES)).scalar() or 0)
     # Anmerkung 135: wie viele unbestätigte Vorschläge aus Google/Immich gerade
     # ausgeblendet sind — der Hinweis, der stattdessen in die Moderation
     # verlinkt, braucht diese Zahl.
@@ -917,10 +930,11 @@ def events_index(
     # gemischt: „unbestätigt" heißt „stimmt das?", „unscharf" heißt „wann war
     # das?". Zwei Fragen, zwei Kacheln.
     # Importierte Besuche zählen nicht mit — sie sind immer exakt datiert und
-    # würden die Zahl nur verwässern.
+    # würden die Zahl nur verwässern. Anmerkung 138: MACHINE_SOURCES statt nur
+    # google_timeline.
     fuzzy = (db.query(func.count(Event.id))
              .filter(Event.user_id == user.id,
-                     Event.source != Source.google_timeline,
+                     Event.source.notin_(MACHINE_SOURCES),
                      Event.date_start.is_(None)
                      | Event.date_precision.in_(_VAGUE_PRECISIONS)).scalar() or 0)
     # A47: Wie viele Orte noch nie nach ihren Adress-Bausteinen gefragt wurden.

@@ -182,21 +182,20 @@ def test_immich_source_walks_every_year(db, user, immich_cfg, monkeypatch):
     from app.services import immich_source as source
 
     class _P:
-        def __init__(self, kind):
-            self.kind = kind
+        pass
 
     asked: list[int] = []
 
-    def fake_scan(db_, user_, year, url, key, albums=False, heartbeat=None, **kw):
+    def fake_scan(db_, user_, year, url, key, heartbeat=None, **kw):
         asked.append(year)
-        return [_P("day"), _P("album")] if albums else [_P("day")]
+        return [_P(), _P()]
 
     monkeypatch.setattr(source, "scan_year", fake_scan)
-    monkeypatch.setattr(source, "create_proposals",
+    monkeypatch.setattr(source, "create_confirmed_visits",
                         lambda db_, user_, block: len(block))
     monkeypatch.setattr(jobs_mod, "_tick", lambda *a, **kw: True)
     job = Job(user_id=user.id, type="immich_source",
-              params={"years": [2004, 2024], "albums": True})
+              params={"years": [2004, 2024]})
     db.add(job)
     db.commit()
 
@@ -205,8 +204,7 @@ def test_immich_source_walks_every_year(db, user, immich_cfg, monkeypatch):
     assert state == "done"
     assert asked == [2024, 2004]
     assert "2004–2024 (2 Jahre)" in msg
-    assert "4 Vorschläge angelegt" in msg
-    assert "2 Fototage, 2 Alben" in msg
+    assert "4 Ereignisse angelegt" in msg
 
 
 def test_immich_source_without_a_year_refuses(db, user, immich_cfg):

@@ -830,14 +830,18 @@ installing.
 
 ## 15. Open questions & decisions to sharpen
 
-**Feedback round 2026-07-24 — from use, collecting on `main` for 0.40 (notes 121–136).**
-*Handled in three passes on 2026-07-24: everything below, including note 135, is
+**Feedback round 2026-07-24/25 — from use, collecting on `main` for 0.40 (notes 121–136, plus 138).**
+*Handled in four passes: everything below, including notes 135 and 138, is
 now implemented on `main`. Note 135 needed its own discussion first — before the
 demo mode, map and timeline get one deliberate, shared display model, because
 the author was not satisfied with how imported (Google), photo (Immich) and
-hand-entered material appeared side by side. Demo mode does not start until the
-author is satisfied, however long it takes (no deadline, note 58); this round
-cleared the one item standing in its way. The 602-test suite and all 27
+hand-entered material appeared side by side. Note 138 followed directly from
+using that result: once the two evidence sources were told apart honestly, the
+author wanted them treated *alike*, not just distinctly — Immich photo-day
+clusters now confirm themselves exactly the way a Google visit always has.
+Demo mode does not start until the author is satisfied, however long it takes
+(no deadline, note 58); this round cleared the items standing in its way. The
+574-test suite and all 27
 guardians are green.*
 
 **Done in this round (small, direct):**
@@ -871,6 +875,16 @@ guardians are green.*
     *Implemented:* `MACHINE_SOURCES`-scoped `machine_proposals` filter (events router + search), `EventsIndex.machine_proposals` counter, timeline hint chip linking to moderation, `tlAggBuckets`/`aggRowCard`/`tlAggDetailHtml` for the year/decade aggregation. Tests: `test_anm135_machine_proposals.py`; guardians `check-a37-window.js` and `check-photo-layer.js` updated for the new default zoom behaviour (both pinned an explicit zoom level rather than relying on flat-card rendering at the default “year” zoom).
 
     *Constraints that stayed fixed throughout* (never reopened): confirmed manual data is the life database and is never rewritten by machines; imported visits/photos are additive; condensation happens **before** paging, server-side (A37/A39); a control that can do nothing must say so (A40).
+
+138. ✅ **Follow-up to note 135, in the same round: “I want photo points counted the same way as Google visits.”** A direct consequence of the evidence/proof line note 135 drew — the author noticed the asymmetry it left behind: Google visits are confirmed *automatically* on import (`tracks.py`, `confirmed_by="import"`), while an Immich photo cluster needed a proposal, then a manual confirmation in moderation, even though both are the same *kind* of belief — a machine measurement of presence, not a human's account of what it meant. Two connectors, same evidentiary weight, two different rules — Anmerkung 106 in the exact code that already cites it elsewhere.
+
+    **Decided and built:** a photo-day cluster is now confirmed the moment it is created, exactly like a Google visit (`confirmed_by="import"`, same confidence convention). `create_confirmed_visits` (was `create_proposals`) writes `confirmed=confirmed` directly; the Fragment tombstone still guards against resurrection after a manual delete (deleting the *unconfirmed* row used to be enough — now the same guard has to hold for deleting a *confirmed* one, which it already did, since it was never keyed on confirmation state). The `machine_proposals` filter and hint chip from note 135 stay — Immich day-clusters simply stop producing anything for them to hide; any *existing* unconfirmed rows from before this change still go through moderation as before, since no migration retroactively confirmed them.
+
+    **Albums (P2.1 stage 3, note 116) are removed outright, not auto-confirmed.** Asked directly whether to auto-confirm them too, the author said no — take them out completely. The reasoning fits the rest of this note: a day-cluster is a measurement (GPS says you were there), an album is a human's *label* on a set of photos, which is a bigger, more interpretive claim, and Life-Dash's own stance was already "trips are entered by hand, photos attach themselves" (note 107's stage 1). Automating what the project had already decided humans should author would have been the wrong direction to extend the automation into, not merely an inconsistency to leave alone. Removed: `album_proposal`, `covering_event`, `place_from_title`/`title_query` and the Nominatim-guessing they did, `_drop_clusters_inside_albums`, the `/albums` and `/albums/discard` endpoints, the “look at albums too” checkbox and its cleanup UI. The connector's read-only API key permission requirement shrank from five rights to **four** — `album.read` was only ever needed for the endpoint that no longer exists, and asking for a permission a feature does not use is the same defect as the one note 68/113 already fixed in the other direction (asking for too *few*).
+
+    **Consequence that reaches beyond Immich: `MACHINE_SOURCES` now governs the shared timeline/map treatment, not just `google_timeline`.** Hiding-by-default in the timeline, A39 condensation (per day+place), the “🛰️ N” visit counter and toggle (relabelled “Automatically detected” — it no longer names a single source), the export's “exclude imported” checkbox — every one of these was hardcoded to `Source.google_timeline` and is now `Event.source.in_(MACHINE_SOURCES)` (backend) or a `MACHINE_SOURCES` JS array mirroring it (frontend), one definition per language, not duplicated per call site. Without this the auto-confirmed photo events would have shown up as flat, ungrouped cards in the timeline by default — reintroducing exactly the clutter the whole map/timeline discussion (note 135) set out to remove, just from a different source. The map needed no change: its bundling (A40) already grouped by location regardless of source.
+
+    *Implemented:* `services/immich_source.py` (album code removed, `create_confirmed_visits`), `routers/immich.py` (album endpoints removed, `/preview` simplified), `routers/jobs.py` (`_run_immich_source` simplified), `services/immich.py` (`album.read` permission and probe removed, `albums()` client function removed — dead, nothing called it anymore). Tests: `test_p21_stage2.py` and `test_p21_stage2_silence.py` rewritten around the new behaviour (auto-confirm, no albums); `test_p21_stage3_albums.py` deleted outright rather than left disabled. Guardian `check-p21-preview.js` rewritten — the mandatory-preview mechanic it protects matters *more* now, not less, since there is no moderation step left to catch a bad run.
 
 **Answer to a general question (note 136):**
 136. **“Why doesn’t Postgres perform better at ~20k entries, and where is the bottleneck?”** Postgres is not the bottleneck. Timeline, map and statistics have been server-side windowed since A37 and carry 20k+ comfortably (measured start 12.7 MB/1.49 s → 0.31 MB/0.08 s at 12k). The one path that did **not** scale was semantic search — it pulled every embedded event into the app process and computed cosine in pure Python — which is why note 121 removes it; that also removes the bottleneck. The other felt slowdown was the uncapped photo strips (note 124). What is genuinely missing for the future, and only if semantic search returns, is a vector index (**pgvector**) so similarity is computed in the database, not the process. For plain growth, the next things to add when the row count climbs are ordinary B-tree indexes on the hot filters (`Event.user_id, date_start`, `Metric.event_id`) — cheap, and unrelated to the engine choice.

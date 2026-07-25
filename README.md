@@ -60,24 +60,24 @@ confirmed record — and it makes the imports below much easier to judge.
    whose name is fine but whose individual address parts were never stored are
    backfilled once, so the timeline can group them by district.
 4. **Connect Immich**, if you have it. Four things, in this order: *test the
-   connection*, then **propose entries from photos** (one year at a time, with a
-   mandatory preview) and confirm what you want in *Moderation*, then **link
-   photos**, which attaches pictures to the entries that now exist, and finally
-   **locate photos** — that one puts every geotagged picture on the map as its
-   own point and creates no entries at all. Photos stay in Immich; Life-Dash
-   stores references, and the API key it needs is read-only. It needs exactly
-   five read-only permissions — `asset.read` (find photos by time), `asset.view`
-   (fetch previews), `album.read` (propose albums as trips), `user.read` (tell
-   your own photos from other people's) and `server.about` (the connection
-   test) — so it can neither delete nor upload anything in Immich. Create it
-   under Immich → Account → API Keys; the *test connection* button checks each
-   permission separately and names any that is missing.
+   connection*, then **create entries from photos** (one year at a time, with a
+   mandatory preview — a day with enough pictures in one place becomes a
+   confirmed entry directly, the same way an imported Google visit does), then
+   **link photos**, which attaches pictures to the entries that now exist, and
+   finally **locate photos** — that one puts every geotagged picture on the map
+   as its own point and creates no entries at all. Photos stay in Immich;
+   Life-Dash stores references, and the API key it needs is read-only. It needs
+   exactly four read-only permissions — `asset.read` (find photos by time),
+   `asset.view` (fetch previews), `user.read` (tell your own photos from other
+   people's) and `server.about` (the connection test) — so it can neither
+   delete nor upload anything in Immich. Create it under Immich → Account →
+   API Keys; the *test connection* button checks each permission separately
+   and names any that is missing.
 
-   Albums are *not* proposed automatically. An album would become one multi-day
-   entry with a single point on the map, and the twin of the trip you enter
-   yourself — better the other way round: you create the trip, and the photos
-   attach themselves to it. If you want to look at your albums anyway, there is
-   a tick box next to the run.
+   Albums are not used as a source — an album would become one multi-day entry
+   with a single point on the map, and the twin of the trip you enter yourself.
+   Better the other way round: you create the trip, and the photos attach
+   themselves to it.
 5. **Split multi-day entries into days**, if trips and albums have produced
    them. Each day becomes its own entry, so each day can carry its own weather
    and its own photos.
