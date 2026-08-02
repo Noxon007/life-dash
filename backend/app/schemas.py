@@ -249,6 +249,11 @@ class EventsIndex(BaseModel):
 
     Trägt die Jahresüberschriften und die Scroll-Länge des Zeitstrahls sowie
     die Kacheln des Heute-Reiters (Gesamtzahl, Unbestätigte, Zeitspanne)."""
+    # Anmerkung 140: Kennung des Bestands. Ändert sie sich nicht, hat sich an
+    # den Ereignissen nichts geändert — eine Ansicht darf dann ihren teuren
+    # Abruf überspringen (die Karte kostet bei 20.000 Punkten 630 ms und 6 MB,
+    # gemessen, und zwar bei JEDEM Öffnen des Reiters).
+    revision: str = ""
     total: int
     dated: int
     undated: int

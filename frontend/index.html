@@ -7053,7 +7053,8 @@ const mp = { mode: 'day', periods: [], index: 0, showRoute: true, showTracks: tr
   // liefern ihre Zeiträume selbst. `mapTotal`/`mapShown` tragen den Hinweis,
   // wenn die Karte deckelt.
   showPhotos: false, photoTotal: 0, photoScanned: [],
-  mapTotal: 0, mapShown: 0 };
+  // Anmerkung 140: für welchen Bestand die Punkte in `located` gelten.
+  mapTotal: 0, mapShown: 0, loadedFor: null };
 // A18: Cluster-Schwelle — vom Nutzer einstellbar (10–300, in User.settings)
 const SETTINGS = { map_cluster_min: 50 };
 function mpClusterMin() { return SETTINGS.map_cluster_min || 50; }
@@ -7211,16 +7212,40 @@ async function mpEnsureWeather(key, items) {
 // Holt die Kartenpunkte. Anmerkung 139: der Foto-Schalter geht MIT — ein
 // ausgeschalteter Schalter soll zehntausende Punkte gar nicht erst über die
 // Leitung schicken, und ein eingeschalteter braucht sie vollständig.
-async function mpLoadPoints() {
+// **Anmerkung 140: derselbe Stand wird nicht zweimal geholt.**
+//
+// Gemeldet als „Warum muss er beim Starten alles laden und alles neu
+// anzeigen?". Gemessen an 20.000 Ereignissen ist der START längst schlank
+// (9 Anfragen, 86 ms, 11 kB — das ist A37, und daran war nichts zu
+// verbessern). Teuer ist die KARTE: 631 ms und 6,1 MB, und zwar bei jedem
+// Öffnen des Reiters, auch wenn sich seit dem letzten Mal nichts geändert hat.
+//
+// Der Riegel ist deshalb kein Zeit-Cache, sondern eine Kennung des Bestands
+// (`revision` aus `/api/events/index`). Ein Cache mit Ablaufdatum zeigt eine
+// Weile etwas Falsches und danach etwas Richtiges, beides ohne Anlass; diese
+// Kennung ist entweder gleich oder nicht. In den Schlüssel gehört auch der
+// Foto-Schalter — er ändert die ANFRAGE, nicht nur die Anzeige.
+async function mpLoadPoints(force) {
   const qs = new URLSearchParams({ machine_proposals: '0' });
   if (!mp.showPhotos) qs.set('photos', '0');
+  let stamp = null;
+  try {
+    const idx = await fetchIndex(true);
+    stamp = `${idx.revision || ''}|${mp.showPhotos ? 1 : 0}`;
+  } catch (_) { /* ohne Kennung wird geholt — lieber zu viel als veraltet */ }
+  if (!force && stamp && stamp === mp.loadedFor && mp.located.length) return;
   try {
     const r = await api(`/api/events/map?${qs}`);
     mp.located = r.events || [];
     mp.mapTotal = r.total || 0;
     mp.mapShown = r.shown || 0;
+    mp.loadedFor = stamp;
   } catch (_) {
     mp.located = []; mp.mapTotal = mp.mapShown = 0;
+    // **Ein Fehlschlag wird NICHT gemerkt.** Sonst gälte eine leere Karte als
+    // „dieser Stand ist schon geladen", und der nächste Versuch fände sie
+    // gültig — die Endlos-Falle in ihrer Umkehrung.
+    mp.loadedFor = null;
   }
 }
 
@@ -9484,7 +9509,7 @@ document.getElementById('pp-reset')?.addEventListener('click', async ev => {
     toast(t('pp.reset.done', '✓ {n} Foto-Ereignisse verworfen.').replace('{n}', r.deleted), 'ok', 6000);
     // Der Kartenzustand ist ein anderer: neu holen, sonst zeichnet die Karte
     // weiter die Punkte, die es nicht mehr gibt.
-    if (mapObj) { await mpLoadPoints(); rebuildPeriods(); renderPeriod(); }
+    if (mapObj) { await mpLoadPoints(true); rebuildPeriods(); renderPeriod(); }
     await ppLoadIndex();
   } catch (err) { toast(err.message, 'error', 8000); }
   finally { btn.disabled = false; }
@@ -9554,7 +9579,7 @@ document.getElementById('dc-run')?.addEventListener('click', async ev => {
     toast(t('dc.done', '✓ {n} Sammeleinträge entfernt.').replace('{n}', r.removed), 'ok', 6000);
     dcSeen = false;
     await dcCheck(false);
-    if (mapObj) { await mpLoadPoints(); rebuildPeriods(); renderPeriod(); }
+    if (mapObj) { await mpLoadPoints(true); rebuildPeriods(); renderPeriod(); }
   } catch (err) { toast(err.message, 'error', 8000); }
   finally { btn.disabled = !dcSeen; }
 });

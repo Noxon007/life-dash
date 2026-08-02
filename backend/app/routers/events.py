@@ -997,7 +997,25 @@ def events_index(
     loc_open = (db.query(func.count(Location.id))
                 .filter(Location.user_id == user.id,
                         Location.address.is_(None)).scalar() or 0)
+    # Anmerkung 140: EINE Zeichenkette, die sich ändert, sobald sich am Bestand
+    # etwas ändert. Damit kann eine Ansicht sagen „ich habe genau diesen Stand
+    # schon gezeichnet" und einen teuren Abruf ganz weglassen.
+    #
+    # `total` allein reichte nicht: eine Änderung an einem Titel oder Ort ließe
+    # die Zahl gleich, und die Karte zeigte den alten Text weiter. `max(
+    # updated_at)` fängt genau das — beide zusammen fangen auch den Fall
+    # „gelöscht und neu angelegt in derselben Sekunde", weil sich dann die Zahl
+    # bewegt hat.
+    #
+    # **Bewusst kein Zeitstempel als Ablaufdatum.** Ein Cache, der nach fünf
+    # Minuten verfällt, zeigt fünf Minuten lang etwas Falsches und danach etwas
+    # Richtiges — beides ohne Anlass. Diese Kennung ist entweder gleich oder
+    # nicht.
+    touched = (db.query(func.max(Event.updated_at))
+               .filter(Event.user_id == user.id).scalar())
+    revision = f"{total}:{touched.isoformat() if touched else '-'}"
     return EventsIndex(
+        revision=revision,
         total=total, dated=dated, undated=total - dated, unconfirmed=unconfirmed,
         visits=visits, photo_events=photo_events,
         machine_proposals=machine_proposals, fuzzy=fuzzy,
