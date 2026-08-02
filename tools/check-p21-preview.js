@@ -21,16 +21,15 @@ const { JSDOM } = require('jsdom');
 
 const html = fs.readFileSync(process.argv[2] || 'frontend/index.html', 'utf8');
 const calls = [];
+// Anmerkung 139: Die Vorschau verdichtet auf ORTE — ein Foto ist ein Ereignis,
+// und zwanzigtausend Zeilen aufzuzaehlen ist selbst keine
+// Entscheidungsgrundlage mehr. Genannt wird die Ebene, auf der man „ja, das
+// war so" oder „nein, das sind fremde Bilder" sagen kann.
 let preview = {
-  year: 2024, total: 2, photos: 24,
-  proposals: [
-    { slot: 'immich:day:2024-07-12:Detmold', title: '15 Fotos in Detmold',
-      start: '2024-07-12T00:00:00', end: '2024-07-12T23:59:59',
-      precision: 'day', place: 'Detmold', photos: 15 },
-    { slot: 'immich:day:2024-06-05:Chania', title: '9 Fotos in Chania',
-      start: '2024-06-05T00:00:00', end: '2024-06-05T23:59:59',
-      precision: 'day', place: 'Chania', photos: 9 },
-  ],
+  year: 2024, total: 24, days: 2, seen: 40, truncated: false, skipped: [],
+  places: [{ place: 'Detmold', photos: 15 }, { place: 'Chania', photos: 9 }],
+  sample: [{ slot: 'immich:photo:a1', title: 'Foto in Detmold',
+             at: '2024-07-12T10:00:00', place: 'Detmold' }],
 };
 
 const dom = new JSDOM(html, {
@@ -51,7 +50,7 @@ const dom = new JSDOM(html, {
           { year: 2004, photos: 412 }] };
       }
       else if (/\/api\/immich\/preview/.test(path)) body = preview;
-      else if (/\/api\/jobs\/start/.test(path)) body = { id: 'j1', type: 'immich_source', status: 'running', done: 0, started_at: '2026-07-22T10:00:00', updated_at: '2026-07-22T10:00:00' };
+      else if (/\/api\/jobs\/start/.test(path)) body = { id: 'j1', type: 'photo_points', status: 'running', done: 0, started_at: '2026-07-22T10:00:00', updated_at: '2026-07-22T10:00:00' };
       else if (/\/api\/jobs/.test(path)) body = [];
       // Der ECHTE Startweg — ohne ihn kommt die Seite nie bis zu der Zeile,
       // die die Jahre lädt (Anmerkung 112).
@@ -130,8 +129,8 @@ setTimeout(async () => {
   ok('Der Kasten ist sichtbar', box.style.display !== 'none');
 
   const text = box.textContent;
-  ok('Sie nennt die Gesamtzahl', /2/.test(text), text.slice(0, 160));
-  ok('Sie NENNT die Ereignisse, statt nur zu zählen',
+  ok('Sie nennt die Gesamtzahl', /24/.test(text), text.slice(0, 200));
+  ok('Sie NENNT die Orte, statt nur zu zählen',
      /Detmold/.test(text) && /Chania/.test(text),
      'eine Zahl ist keine Entscheidungsgrundlage (P2.5) — hier erst recht nicht, weil direkt bestätigt wird');
 
@@ -141,7 +140,9 @@ setTimeout(async () => {
   await wait(30);
   ok('Der Lauf startet als Job', started().length === 1, `${started().length} Starts`);
   const body = JSON.parse(started()[0][2] || '{}');
-  ok('…vom Typ immich_source', body.type === 'immich_source', JSON.stringify(body));
+  // Anmerkung 139: Der Lauf heisst jetzt `photo_points` — der frueher getrennte
+  // Verorten-Lauf und das Anlegen sind EIN Lauf geworden.
+  ok('…vom Typ photo_points', body.type === 'photo_points', JSON.stringify(body));
   // Anmerkung 120: Der Lauf bekommt die Jahre der VORSCHAU, nicht die der
   // Auswahl — bei einem Jahr ist das dasselbe, bei „Alle Jahre" nicht.
   ok('…und mit dem Jahr im Gepäck',
@@ -154,7 +155,8 @@ setTimeout(async () => {
   // auf 2019 umschalten, anlegen — und 2019 hat nie jemand gesehen. Jetzt
   // schreibt das direkt bestätigte Ereignisse an, die niemand kontrolliert hat.
   calls.length = 0;
-  preview = { year: 2024, total: 1, photos: 9, proposals: [preview.proposals[1]] };
+  preview = { year: 2024, total: 9, days: 1, seen: 12, truncated: false,
+              skipped: [], places: [{ place: 'Chania', photos: 9 }], sample: [] };
   d.getElementById('ims-preview').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   await wait(40);
   ok('Vorschau erneut gelaufen', !run.disabled);
@@ -178,7 +180,7 @@ setTimeout(async () => {
   sel.value = '2022';
   sel.dispatchEvent(new w.Event('change', { bubbles: true }));
   preview = { year: 2022, error: 'Immich lehnt den API-Schlüssel ab (401/403)',
-              total: 0, photos: 0, seconds: 0.2, proposals: [] };
+              total: 0, days: 0, seconds: 0.2, places: [], sample: [], skipped: [] };
   d.getElementById('ims-preview').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   await wait(40);
   ok('Ein Immich-Ausfall wird im Klartext gezeigt',
@@ -194,11 +196,8 @@ setTimeout(async () => {
   // Jahre bekommt. Die naheliegende Abkürzung (eine Anfrage ohne Jahr, der
   // Server nimmt sich 25 Sekunden und antwortet mit einem Ausschnitt) wäre
   // „ein Zwanzigstel sehen, alles anlegen".
-  preview = { year: 2024, total: 1, photos: 9,
-              proposals: [{ slot: 'immich:day:2024-05-01:Kiel',
-                            title: '9 Fotos in Kiel', start: '2024-05-01T00:00:00',
-                            end: '2024-05-01T23:59:59', precision: 'day',
-                            place: 'Kiel', photos: 9 }] };
+  preview = { year: 2024, total: 9, days: 1, seen: 9, truncated: false,
+              skipped: [], places: [{ place: 'Kiel', photos: 9 }], sample: [] };
   sel.value = 'all';
   sel.dispatchEvent(new w.Event('change', { bubbles: true }));
   await wait(20);
@@ -278,7 +277,7 @@ function scenario(broken) {
         if (/immich\/years/.test(p)) {
           if (broken === 'years') { ok2 = false; status = 502; body = { detail: 'Immich nicht erreichbar' }; }
           else body = { current: 2024, source: 'immich', years: [{ year: 2024, photos: 61 }] };
-        } else if (/immich\/preview/.test(p)) body = { year: 2024, total: 0, photos: 0, proposals: [] };
+        } else if (/immich\/preview/.test(p)) body = { year: 2024, total: 0, days: 0, places: [], sample: [], skipped: [] };
         else if (/auth\/config/.test(p)) body = { mode: 'dev' };
         else if (/auth\/me\/settings/.test(p)) {
           // `place_name_parts` fehlt: der ursprüngliche Auslöser — ein

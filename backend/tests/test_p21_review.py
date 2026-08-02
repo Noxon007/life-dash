@@ -68,17 +68,23 @@ def test_an_asset_without_any_time_has_none():
 def test_the_day_bucket_follows_the_local_day(db, user):
     """Warum die Zeitzone hier überhaupt zählt: der Behälter IST das Datum.
     Eine Stunde daneben ist harmlos, ein Tag daneben legt das Foto unter den
-    falschen Tageskopf — und bei einem Fotovorschlag unter den falschen Platz."""
-    from app.services.immich_source import cluster_assets
+    falschen Tageskopf — und bei einem Fotovorschlag unter den falschen Platz.
+
+    Anmerkung 139 hat den Tagescluster abgelöst; die Frage bleibt dieselbe,
+    nur hängt der Tag jetzt am Ereignis statt am Platz. Genau deshalb steht
+    dieser Test weiter hier: die Zone abzuschneiden statt sie anzuwenden wäre
+    heute so falsch wie in Anmerkung 111.
+    """
+    from app.services.photo_points import photo_proposals
 
     assets = [{"id": f"a{i}", "ownerId": "me", "visibility": "timeline",
                "localDateTime": f"2024-05-13T0{i}:30:00.000Z",
                "fileCreatedAt": f"2024-05-12T2{i}:30:00.000Z",
                "exifInfo": {"latitude": 52.5, "longitude": 13.4, "city": "Berlin"}}
               for i in range(1, 5)]
-    props = cluster_assets(assets, "me")
-    assert len(props) == 1
-    assert props[0].slot == "immich:day:2024-05-13:Berlin"
+    props = photo_proposals(assets, "me")
+    assert len(props) == 4
+    assert {p.taken_at.date().isoformat() for p in props} == {"2024-05-13"}
 
 
 # --------------------------------------------------------------------------- #

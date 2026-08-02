@@ -32,7 +32,6 @@ from app.models import (
     Fragment,
     Location,
     MediaRef,
-    PhotoPoint,
     Metric,
     Track,
     User,
@@ -121,13 +120,10 @@ def export_data(
                                if m.event_id is None or m.event_id in event_ids])
     metrics = _loaded("Messwerte", [m for m in db.query(Metric).all()
                                     if m.event_id in event_ids])
-    # A45: Fotopunkte sind eine Ableitung und ließen sich neu berechnen — aber
-    # nur, solange Immich existiert und dieselben Bilder noch hält. Wer auf
-    # einer frischen Instanz zurückspielt, hätte eine leere Karte und keinen
-    # Weg zurück. Ein Backup, das etwas auslässt, sieht vollständig aus (F18);
-    # die Zeile ist 150 Byte, der Neuaufbau ein Vollscan über zwanzig Jahre.
-    points = _loaded("Fotopunkte", db.query(PhotoPoint)
-                     .filter(PhotoPoint.user_id == user.id).all())
+    # Anmerkung 139: Die Fotopunkte hatten hier bis 0.39 einen eigenen Block —
+    # sie hingen an keinem Ereignis und wären sonst still aus dem Backup
+    # gefallen. Seit sie EREIGNISSE sind, deckt `events` sie ab. Ein zweiter
+    # Block wäre dieselbe Zeile zweimal im Export.
     _loaded("Verknüpfungen", links)
     # F15/Anmerkung 57: Ab hier ist der JSON-Export KEIN vollständiges Backup
     # mehr. Bilddateien passen nicht hinein; ihre Metadaten schon. Wer das
@@ -136,7 +132,7 @@ def export_data(
     # der Doku. Das schließt A29 (ZIP-Export mit Dateien) später sauber ab.
     uploads = sum(1 for m in media if m.provider == "local")
     total = sum(len(x) for x in (fragments, locations, entities, events,
-                                 links, media, metrics, tracks, points))
+                                 links, media, metrics, tracks))
     log.info("Export fertig: %d Zeilen, davon %d Bilder als Verweis "
              "(Dateien liegen nicht im JSON)", total, uploads)
     return {
@@ -158,7 +154,6 @@ def export_data(
         "media_refs": [_row_to_dict(x) for x in media],
         "metrics": [_row_to_dict(x) for x in metrics],
         "tracks": [_row_to_dict(x) for x in tracks],
-        "photo_points": [_row_to_dict(x) for x in points],
     }
 
 
@@ -281,9 +276,7 @@ def wipe_my_data(
                             .filter(model.event_id.in_(event_ids))
                             .delete(synchronize_session=False))
             log.info("  %s: %d Zeilen gelöscht", key, deleted[key])
-    # A45: `PhotoPoint` hängt an keinem Ereignis und ist nur über `user_id`
-    # erreichbar — dieselbe Falle wie bei den Tages-Bildern (F18/Anm. 106).
-    for model, key in ((PhotoPoint, "photo_points"), (Track, "tracks"),
+    for model, key in ((Track, "tracks"),
                        (Event, "events"), (Entity, "entities"),
                        (Location, "locations"), (Fragment, "fragments")):
         deleted[key] = (db.query(model).filter(model.user_id == user.id)
@@ -323,9 +316,6 @@ def import_data(
         ("media_refs", MediaRef, True),
         ("metrics", Metric, False),
         ("tracks", Track, True),
-        # A45: wie media_refs auf den importierenden Nutzer umschreiben —
-        # sonst gehören die Punkte nach einer Wiederherstellung niemandem.
-        ("photo_points", PhotoPoint, True),
     ]
     imported: dict[str, int] = {}
     skipped = 0

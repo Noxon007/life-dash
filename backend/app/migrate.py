@@ -67,6 +67,39 @@ _BACKFILLS: dict[str, str] = {
 # Neubau der Tabelle. Deshalb steht das nicht in `_MISSING_COLUMNS`.
 _DROP_NOT_NULL: dict[str, tuple[str, ...]] = {"media_refs": ("event_id",)}
 
+# Anmerkung 139: Tabellen, die es NICHT MEHR GIBT. Erste Migration, die etwas
+# WEGNIMMT — deshalb steht hier ausdrücklich, warum das erlaubt ist.
+#
+# `photo_points` war Schicht 4: eine Ableitung, die vollständig auch in Immich
+# steht (Anmerkung 57 — verwerfen und neu berechnen ist bei Ableitungen
+# jederzeit erlaubt). Was in ihr stand, entsteht seit Anmerkung 139 als
+# Ereignis; die Zeilen sind damit nicht verloren, sondern der Lauf legt sie neu
+# an — an einem Ort, an dem sie zählen, gefiltert und exportiert werden.
+#
+# **Eine Tabelle mit Lebensdatenbank stünde hier nie.** Der Unterschied ist
+# nicht der Aufwand, sondern die Frage, ob jemand die Zeile wiederherstellen
+# kann, wenn das hier ein Fehler war. Bei einer Ableitung kann er das immer.
+_DROPPED_TABLES: tuple[str, ...] = ("photo_points",)
+
+
+def _drop_obsolete(engine: Engine, insp) -> list[str]:
+    """Entfernt die Tabellen aus `_DROPPED_TABLES` — idempotent.
+
+    Ohne diesen Schritt bliebe eine verwaiste Tabelle für immer in der
+    betriebenen Datenbank stehen: `create_all` legt nur an, was fehlt, und
+    löscht nie. Sie fiele bei jedem Backup, jedem `TRUNCATE`-Durchlauf und
+    jedem `\\dt` auf und niemand wüsste mehr, wozu sie gehörte.
+    """
+    applied: list[str] = []
+    tables = set(insp.get_table_names())
+    for table in _DROPPED_TABLES:
+        if table not in tables:
+            continue
+        with engine.begin() as conn:
+            conn.execute(text(f'DROP TABLE IF EXISTS "{table}"'))
+        applied.append(f"{table} (entfernt)")
+    return applied
+
 
 def _copy_expr(column) -> str:
     """Der SELECT-Ausdruck für eine Spalte beim Tabellen-Neubau.
@@ -157,6 +190,7 @@ def ensure_schema(engine: Engine) -> list[str]:
     # F18: erst die Spalten, dann die Lockerung — der Neubau kopiert sonst ein
     # Schema, dem gerade hinzugefügte Spalten noch fehlen.
     applied += _relax_not_null(engine, inspect(engine))
+    applied += _drop_obsolete(engine, inspect(engine))
     if "metrics" in existing_tables:
         ensure_weather_unique_index(engine)
     if "locations" in existing_tables:

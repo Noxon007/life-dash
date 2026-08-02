@@ -1,68 +1,141 @@
-"""A45 — wo fotografiert wurde. Ein Punkt je verortetem Foto.
+"""Anmerkung 139 — ein verortetes Foto ist EIN bestätigtes Ereignis.
 
-Gemeldet aus dem Betrieb: Immich hinterließ einen Sammeleintrag „London, 1200
-Bilder", und auf der Karte war das **ein** Punkt. Die 1200 Bilder wissen
-einzeln, wo sie entstanden sind — Life-Dash hat es nur nie aufgeschrieben.
+**Was sich gegenüber A45/Anmerkung 138 geändert hat, und warum.**
 
-**Warum eine eigene Tabelle.** `MediaRef` ist auf zwölf Bilder je Tag gedeckelt
-(`immich_link.MAX_PER_EVENT`), und das ist richtig: es beantwortet „welche
-Bilder stehen neben diesem Eintrag?", und eine Fotoleiste mit 1200 Vorschauen
-ist keine. Hier lautet die Frage „wo wurde fotografiert?", und da ist jede
-Auslassung ein Loch in der Karte. Zwei Fragen, zwei Deckelungen — zusammen in
-einer Tabelle wären es zwei Bedeutungen in derselben Zeile (Anmerkung 106).
+Bis 0.39 gab es hierfür *zwei* Mechanismen nebeneinander: eine verwerfbare
+Kartenebene (`PhotoPoint`, ein Punkt je Foto) und einen Lauf, der aus
+Fototagen Ereignisse machte (`immich_source`, ein Ereignis je Tag+Ort ab vier
+Fotos). Beide zeichneten dieselben Fotos auf dieselbe Karte, mit zwei
+verschiedenen Deckelungen und zwei verschiedenen Antworten auf „was ist das
+hier eigentlich?". Genau die Doppelung, die Anmerkung 106 in diesem Projekt
+immer wieder findet — hier war sie ausnahmsweise mit Absicht gebaut worden.
 
-**Schicht 4.** Alles hier steht auch in Immich; verwerfen und neu berechnen ist
-jederzeit erlaubt. Die Medien-Invariante (Anmerkung 57) bleibt unberührt, weil
-hier grundsätzlich keine hochgeladenen Dateien landen.
+Jetzt gibt es **einen** Weg: jedes eigene, verortete, im Immich-Zeitstrahl
+sichtbare Foto wird ein Ereignis, sofort bestätigt, wie ein Google-Besuch
+(`confirmed_by="import"`, Anmerkung 138). Keine Mindestzahl mehr — ein
+einzelnes Foto ist genauso viel Beleg dafür, dort gewesen zu sein, wie vier.
 
-**Der Ort kommt aus `exifInfo`, nicht aus Nominatim** (Anmerkung 109): Immich
-hat schon rückwärts geokodiert, das kostet keinen fremden Abruf und ist
-stabiler als ein Koordinatenraster, dessen Zellenrand mitten durch eine Stadt
-läuft.
+**Wo die Koordinate liegt, und warum nicht auf dem Ereignis.**
+
+Ein Ereignis hat keine eigenen Koordinaten; es hat einen `Location`. Die
+naheliegende Abkürzung wäre gewesen, `Event.lat`/`Event.lng` einzuführen —
+zwei Spalten im Kern des Modells für einen einzelnen Konnektor. Nicht nötig:
+`PhotoPoint` war der Sache nach ohnehin ein Ort plus ein Zeitstempel plus eine
+Asset-Kennung, und alle drei haben im Ereignis-Modell längst ihren Platz (der
+Ort im `Location`, die Zeit im `date_start`, die Kennung in der `external_id`).
+Das ist das eigentliche „Auflösen in die Ereignis-Pipeline": nicht die Tabelle
+woanders hinschieben, sondern feststellen, dass es sie nicht braucht.
+
+**Der Ort wird über die KOORDINATE entdoppelt, nicht über den Stadtnamen.**
+Ein Ort je Stadt hieße, 1200 Bilder aus London wären wieder EIN Kartenpunkt —
+also genau der gemeldete Defekt, der A45 ausgelöst hat. Ein Ort je Foto hieße
+20.000 Ortszeilen. Der Schlüssel ist deshalb die auf fünf Nachkommastellen
+(≈ 1 m) gerundete Koordinate: Serienaufnahmen vom selben GPS-Fix fallen
+zusammen, alles, was wirklich woanders war, bleibt getrennt.
+
+**Diese Orte fragen NIEMALS bei Nominatim nach.** Immich hat sie bereits
+rückwärts geokodiert (`exifInfo` liefert city/state/country, Anmerkung 109),
+und 20.000 gedrosselte Abrufe wären knapp sieben Stunden Lauf für eine Auskunft,
+die schon vorliegt. Sie tragen deshalb `type="photo"` und eine gesetzte
+`address` — die Marke, an der `resolve_names` sie erkennt und stehen lässt
+(Anmerkung 139 in Verbindung mit der Endlos-Abruf-Falle: ein Ort ohne Marke
+wird ewig neu gefragt).
+
+**Schicht.** Was hier entsteht, ist Lebensdatenbank — anders als bei A45, wo
+die Punkte Schicht 4 waren. Deshalb legt `reset()` nicht mehr einfach eine
+Tabelle leer, sondern löscht ausdrücklich nur, was dieser Lauf angelegt hat
+(`external_id LIKE 'immich:photo:%'`), samt Grabsteinen.
 """
 from __future__ import annotations
 
+import json
 import logging
-from datetime import date, datetime
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import date, datetime, timezone
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import PhotoPoint
+from app.models import (ConfirmState, DatePrecision, Event, Fragment,
+                        FragmentStatus, Location, MediaRef, Source)
 from app.services import immich as api
 from app.services.immich_link import PROVIDER
 
 log = logging.getLogger("lifedash.immich")
 
-# Wie viele Punkte höchstens in EINE Antwort gehen — ein **Sicherheitsnetz**,
-# keine Betriebsgrenze.
-#
-# Bis hier stand 5.000 da, und schon eine gewöhnliche Sammlung von 8.120
-# verorteten Fotos lief dagegen: die Karte verdichtete im Alltag, obwohl nichts
-# eng war. Eine Grenze, die im Normalfall greift, erzieht dazu, ihre Meldung zu
-# überlesen — und dann ist sie auch dann unsichtbar, wenn sie etwas Wichtiges
-# sagt. Gedeckelt wird deshalb erst dort, wo es dem Browser wirklich weh tut;
-# die Zeichenlast trägt seit A45 die Leinwand statt einzelner SVG-Knoten
-# (`L.canvas` im Frontend), und das verschiebt diese Schwelle um eine
-# Größenordnung.
-#
-# Überschritten wird sie nie stillschweigend: `points_for` gibt die WAHRE Zahl
-# mit zurück, greift gleichmäßig über den Zeitraum statt vorne abzuschneiden,
-# und die Karte sagt beides (Anmerkung 110).
-MAX_POINTS = 50000
+# `Event.external_id` ist String(64). „immich:photo:" sind 13 Zeichen, eine
+# Immich-Asset-UUID 36 — es bleibt Luft. Der Platz ist die ASSET-KENNUNG und
+# nicht Tag+Ort: ein Foto, das in Immich nachträglich einen Ort bekommt, ist
+# dasselbe Foto und darf nicht als zweites Ereignis wiederkommen.
+SLOT_PREFIX = "immich:photo:"
+# Der alte Platz aus Anmerkung 138 (ein Ereignis je Tag+Ort). Steht hier, weil
+# der Aufräum-Lauf ihn braucht — und weil er sonst niemandem mehr begegnet und
+# beim nächsten Lesen wie ein Tippfehler aussieht.
+DAY_SLOT_PREFIX = "immich:day:"
+# Namensraum der Orte, die dieser Lauf anlegt.
+PLACE_PREFIX = "immich:pt:"
+# Auf wie viele Nachkommastellen die Koordinate für den Ortsschlüssel gerundet
+# wird. Fünf sind ≈ 1,1 m — feiner als jedes Telefon-GPS, also fallen nur
+# Aufnahmen vom IDENTISCHEN Fix zusammen. Gröber wäre bequemer und falsch:
+# bei 0,001° (≈ 110 m) verschmölzen zwei Seiten eines Marktplatzes.
+PLACE_ROUND = 5
 
 
-# A47 — Ortsteil eines Fotos.
-#
-# `exifInfo` hat kein Feld dafür: Immichs Rückwärts-Geokodierung liefert
-# city/state/country und sonst nichts. Geraten wird trotzdem nicht — gefragt
-# wird der EIGENE Ortsbestand, der seine Roh-Bausteine seit Anmerkung 110
-# aufbewahrt. Ein Foto, das 200 m von einem bekannten Ort entstand, liegt im
-# selben Ortsteil; eines mitten in der Wildnis bekommt keinen und landet in
-# einer eigenen, benannten Gruppe.
-#
-# Und es kostet keinen Abruf: Anmerkung 100 verlangt, dass ein ausgehender
-# Abruf einer gespeicherten eigenen Tatsache dient — hier geht gar keiner raus.
+def slot_photo(asset_id: str) -> str:
+    return f"{SLOT_PREFIX}{asset_id}"[:64]
+
+
+def asset_of(external_id: str | None) -> str | None:
+    """Die Asset-Kennung aus dem Platz zurücklesen — für das Vorschaubild.
+
+    Die Karte braucht zu jedem Fotopunkt sein Bild. Sie holt es NICHT über
+    `MediaRef`: dessen Deckelung von zwölf je Tag beantwortet eine andere Frage
+    („welche Bilder stehen neben diesem Eintrag?"), und zwei Fragen mit zwei
+    Deckelungen teilen sich keine Tabelle (Anmerkung 116/A45). Die Kennung
+    steht ohnehin schon im Platz; sie ein zweites Mal zu speichern hieße, zwei
+    Angaben über dieselbe Sache zu führen (Anmerkung 106).
+    """
+    if external_id and external_id.startswith(SLOT_PREFIX):
+        return external_id[len(SLOT_PREFIX):] or None
+    return None
+
+
+@dataclass
+class PhotoProposal:
+    """Ein Foto, bevor es ein Ereignis ist — die Vorschau zeigt genau das."""
+
+    slot: str
+    asset_id: str
+    taken_at: datetime
+    lat: float
+    lng: float
+    place: str | None = None
+    city: str | None = None
+    state: str | None = None
+    country: str | None = None
+    district: str | None = None
+
+    @property
+    def title(self) -> str:
+        """Was im Zeitstrahl steht — **Text, nie ein Bild** (Anmerkung 139).
+
+        Die Karte ist der Ort für das BILD, der Zeitstrahl der für die
+        TATSACHE. Verdichtet werden gleichartige Fotos desselben Tages am
+        selben Ort zu „12× Foto in Detmold" (A39-Bündelung, kein neuer Code).
+        """
+        wo = self.district or self.city or self.state or self.country
+        return (f"Foto in {wo}" if wo else "Foto")[:255]
+
+    def as_dict(self) -> dict:
+        return {"slot": self.slot, "title": self.title,
+                "at": self.taken_at.isoformat(), "place": self.place,
+                "lat": self.lat, "lng": self.lng}
+
+
+# --------------------------------------------------------------------------- #
+# Ortsteil aus dem eigenen Bestand (A47) — ohne einen einzigen Abruf
+# --------------------------------------------------------------------------- #
 DISTRICT_RADIUS_KM = 0.6
 
 
@@ -71,14 +144,19 @@ def district_index(db: Session, user_id: str) -> list[tuple[float, float, str]]:
 
     Einmal je Lauf geladen, nicht je Foto: bei 20.000 Bildern wären das sonst
     20.000 Abfragen für eine Frage, deren Antwort sich nicht ändert.
+
+    **Die eigenen Foto-Orte bleiben draußen.** Sie tragen ihren Ortsteil selbst
+    aus genau dieser Quelle; sie wieder hineinzulassen hieße, die Ableitung als
+    ihre eigene Grundlage zu benutzen — beim zweiten Lauf breitete sich ein
+    einmal geratener Ortsteil über die halbe Stadt aus.
     """
-    from app.models import Location
     from app.sqlutil import DISTRICT_KEYS
 
     out: list[tuple[float, float, str]] = []
     rows = (db.query(Location)
             .filter(Location.user_id == user_id,
-                    Location.lat.isnot(None), Location.address.isnot(None))
+                    Location.lat.isnot(None), Location.address.isnot(None),
+                    (Location.type.is_(None)) | (Location.type != "photo"))
             .all())
     for loc in rows:
         address = loc.address or {}
@@ -92,7 +170,6 @@ def district_index(db: Session, user_id: str) -> list[tuple[float, float, str]]:
 
 def _district(geo: tuple[float, float],
               index: list[tuple[float, float, str]]) -> str | None:
-    """Der Ortsteil des nächstgelegenen eigenen Ortes — oder None."""
     if not index:
         return None
     best, best_km = None, DISTRICT_RADIUS_KM
@@ -103,28 +180,30 @@ def _district(geo: tuple[float, float],
     return best
 
 
-# Warum ein Foto KEINEN Punkt bekommen hat — in der Reihenfolge, in der
-# geprüft wird. Gezählt wird der ERSTE Grund, damit die Zahlen sich zur
-# gelesenen Menge addieren statt sie zu überzeichnen: ein fremdes Foto ohne
-# Koordinaten ist ein Ausschluss, nicht zwei.
+# --------------------------------------------------------------------------- #
+# Warum ein Foto kein Ereignis wurde
+# --------------------------------------------------------------------------- #
+# In der Reihenfolge, in der geprüft wird. Gezählt wird der ERSTE Grund, damit
+# die Zahlen sich zur gelesenen Menge addieren statt sie zu überzeichnen: ein
+# fremdes Foto ohne Koordinaten ist ein Ausschluss, nicht zwei.
 DROP_REASONS = {
     "foreign": "{n} von jemand anderem",
     "hidden": "{n} nicht im Immich-Zeitstrahl (archiviert, versteckt oder gesperrt)",
     "no_geo": "{n} ohne Koordinaten",
     "no_time": "{n} ohne verwertbare Aufnahmezeit",
     "no_id": "{n} ohne Kennung",
+    "known": "{n} schon angelegt oder bewusst gelöscht",
 }
 
 
 def drop_reasons(report: dict) -> list[str]:
     """Die Ausschlussgründe als lesbare Teilsätze, der größte zuerst.
 
-    **Die Summe allein ist keine Auskunft.** „2016 Fotos gelesen, 17 neu
-    verortet" lässt genau die Frage offen, die man beim Lesen stellt: Warum die
-    anderen 1999? Ob die Bibliothek schlicht kein GPS trägt oder ob der
-    API-Schlüssel auf ein fremdes Konto zeigt, sind zwei völlig verschiedene
-    Lagen — und sie sahen bis hier identisch aus. Das ist der wiederkehrende
-    Defekt dieses Projekts: nicht Kaputtheit, sondern Stille (Anmerkung 110).
+    **Die Summe allein ist keine Auskunft.** „2016 Fotos gelesen, 17 neu"
+    lässt genau die Frage offen, die man beim Lesen stellt: Warum die anderen
+    1999? Ob die Bibliothek schlicht kein GPS trägt oder ob der API-Schlüssel
+    auf ein fremdes Konto zeigt, sind zwei völlig verschiedene Lagen — und sie
+    sahen bis Anmerkung 120 identisch aus.
     """
     dropped = report.get("dropped") or {}
     out = [(n, DROP_REASONS[key].format(n=n))
@@ -133,28 +212,68 @@ def drop_reasons(report: dict) -> list[str]:
     return [text for _n, text in out]
 
 
-def upsert_assets(db: Session, user_id: str, assets: list[dict],
-                  my_id: str | None, report: dict | None = None) -> tuple[int, int]:
-    """Trägt die verorteten eigenen Fotos ein. Gibt (neu, aktualisiert) zurück.
+# --------------------------------------------------------------------------- #
+# Schon bekannte Plätze — die Endlos-Abruf-Falle, neunte Auflage
+# --------------------------------------------------------------------------- #
+def known_slots(db: Session, user_id: str) -> set[str]:
+    """Jeder Platz, der je angelegt wurde — **auch die gelöschten**.
 
-    Dieselben drei Filter wie `immich_source.cluster_assets` — und aus denselben
-    Gründen (Anmerkung 107): nur mit Koordinaten (ein Bildschirmfoto kann
-    keinen Ort erfinden), nur eigene (fremde Urlaubsfotos aus geteilten Alben
-    haben sehr wohl GPS), nur im Zeitstrahl (Archiviertes und Gesperrtes hat
-    der Nutzer bewusst herausgenommen).
+    Der wichtigste Fall ist der zweite: ein von Hand gelöschtes Foto-Ereignis
+    darf nicht beim nächsten Lauf wiederkommen. Das Löschen nimmt nur die
+    Ereigniszeile mit, das Fragment (der Grabstein) bleibt — genau deshalb wird
+    hier das Fragment gefragt UND das Ereignis, nicht nur eines von beidem.
 
-    Idempotent über `asset_id`: ein zweiter Lauf findet dasselbe Foto wieder.
-    Aktualisiert wird trotzdem — in Immich lässt sich ein Ort nachtragen, und
-    dann ist der alte Punkt schlicht falsch.
-
-    `report` nimmt auf, was dabei liegen blieb — dieselbe Bauform wie bei
-    `immich_source.scan_year`. Die drei Filter sind hier bewusst EINZELN
-    geprüft statt in einem `or`: verodert lässt sich nicht mehr sagen, welcher
-    von ihnen zugeschlagen hat, und genau das ist die Frage.
+    Das ist inzwischen das neunte Auftreten derselben Falle in diesem Projekt
+    (F12 `weather_rev`, A39-Leerstring, A42 „kein Artikel", P2.1-Grabstein,
+    Anmerkung 114 `_name_defect`, A45-Jahresliste, `Location.address`).
     """
-    districts = district_index(db, user_id)
+    slots: set[str] = set()
+    for (raw,) in (db.query(Fragment.raw_text)
+                   .filter(Fragment.user_id == user_id,
+                           Fragment.source == Source.immich).all()):
+        try:
+            slot = json.loads(raw).get("slot")
+        except (ValueError, TypeError, AttributeError):
+            continue
+        if slot:
+            slots.add(slot)
+    for (ext,) in (db.query(Event.external_id)
+                   .filter(Event.user_id == user_id,
+                           Event.external_id.like(f"{SLOT_PREFIX}%")).all()):
+        if ext:
+            slots.add(ext)
+    return slots
+
+
+# --------------------------------------------------------------------------- #
+# Erkennen
+# --------------------------------------------------------------------------- #
+def photo_proposals(assets: list[dict], my_id: str | None,
+                    districts: list[tuple[float, float, str]] | None = None,
+                    known: set[str] | None = None,
+                    report: dict | None = None) -> list[PhotoProposal]:
+    """Aus Immich-Assets die Fotos, die ein Ereignis werden.
+
+    Drei Filter, und jeder ersetzt ein Stück der Unterdrückungsregel, die der
+    Autor in Anmerkung 107 gekippt hat:
+
+    * **nur mit Koordinaten** — ein weitergeleitetes Bild, ein Bildschirmfoto,
+      ein Download trägt kein EXIF-GPS und kann deshalb keinen Ort erfinden.
+    * **nur eigene** (`ownerId`) — die eigentliche Gefahr waren nie
+      Screenshots, sondern **geteilte Alben**: fremde Urlaubsfotos haben sehr
+      wohl GPS und erfänden stillschweigend einen Tag.
+    * **nur im Zeitstrahl** — was im Archiv oder im gesperrten Ordner liegt,
+      hat der Nutzer bewusst herausgenommen.
+
+    Die drei sind bewusst EINZELN geprüft statt in einem `or`: verodert ließe
+    sich nicht mehr sagen, welcher zugeschlagen hat, und genau das ist die
+    Frage, die beim Lesen des Protokolls gestellt wird.
+    """
+    districts = districts or []
+    known = known or set()
     dropped = dict.fromkeys(DROP_REASONS, 0)
-    wanted: dict[str, dict] = {}
+    out: list[PhotoProposal] = []
+    seen: set[str] = set()
     for asset in assets:
         if not api.is_own(asset, my_id):
             dropped["foreign"] += 1
@@ -174,108 +293,211 @@ def upsert_assets(db: Session, user_id: str, assets: list[dict],
         if not asset_id:
             dropped["no_id"] += 1
             continue
+        slot = slot_photo(asset_id)
+        # `seen` fängt den Fall ab, dass Immich dasselbe Asset über eine
+        # Seitengrenze zweimal liefert — sonst legte ein Lauf es zweimal an
+        # und der Grabstein käme zu spät.
+        if slot in known or slot in seen:
+            dropped["known"] += 1
+            continue
+        seen.add(slot)
         exif = asset.get("exifInfo") or {}
-        wanted[asset_id] = {
-            "taken_at": when, "lat": geo[0], "lng": geo[1],
-            "district": _district(geo, districts),
-            "city": (exif.get("city") or "").strip() or None,
-            "state": (exif.get("state") or "").strip() or None,
-            "country": api.asset_country(asset),
-        }
+        city = (exif.get("city") or "").strip() or None
+        state = (exif.get("state") or "").strip() or None
+        out.append(PhotoProposal(
+            slot=slot, asset_id=asset_id, taken_at=when,
+            lat=geo[0], lng=geo[1],
+            place=api.asset_place(asset) or city or state,
+            city=city, state=state, country=api.asset_country(asset),
+            district=_district(geo, districts),
+        ))
     if report is not None:
         report["dropped"] = dropped
-        report["kept"] = len(wanted)
-        report["unchanged"] = 0
-    if not wanted:
-        return 0, 0
-
-    # EINE Abfrage für alle vorhandenen statt einer je Foto: bei einem
-    # Jahreslauf über 20.000 Bilder ist das der Unterschied zwischen Sekunden
-    # und Minuten.
-    existing = {p.asset_id: p for p in db.query(PhotoPoint).filter(
-        PhotoPoint.user_id == user_id, PhotoPoint.provider == PROVIDER,
-        PhotoPoint.asset_id.in_(list(wanted)))}
-
-    added = changed = 0
-    for asset_id, values in wanted.items():
-        point = existing.get(asset_id)
-        if point is None:
-            db.add(PhotoPoint(user_id=user_id, provider=PROVIDER,
-                              asset_id=asset_id, **values))
-            added += 1
-            continue
-        if any(getattr(point, field) != value for field, value in values.items()):
-            for field, value in values.items():
-                setattr(point, field, value)
-            changed += 1
-    if report is not None:
-        # **„Unverändert" ist die Zahl, die dem Lauf gefehlt hat.** Ohne sie
-        # liest sich der zweite Lauf über dasselbe Jahr wie ein gescheiterter
-        # erster: „2016 gelesen, 17 neu" — und die 800 Punkte, die längst da
-        # sind, kommen im Satz nicht vor.
-        report["unchanged"] = len(wanted) - added - changed
-    return added, changed
+        report["kept"] = len(out)
+    out.sort(key=lambda p: p.taken_at)
+    return out
 
 
 def scan_year(db: Session, user, year: int, url: str, key: str,
-              heartbeat=None, report: dict | None = None) -> tuple[int, int, int]:
-    """Ein Jahr Immich → Fotopunkte. Gibt (gesehen, neu, aktualisiert) zurück.
+              heartbeat=None, budget_s: float | None = None,
+              report: dict | None = None) -> list[PhotoProposal]:
+    """Was dieses Jahr an Foto-Ereignissen ergäbe — **ohne etwas anzulegen**.
 
-    Jahresweise wie `immich_source.scan_year`, und aus demselben Grund: eine
-    zwanzig Jahre alte Bibliothek in einem Zug ist kein Lauf, sondern ein
-    Zeitlimit.
+    Genau dieselbe Funktion füttert die Vorschau und den Lauf. Zwei getrennte
+    Wege wären zwei Regeln, und die widersprechen sich still (Anmerkung 106).
 
-    `report` nimmt die Aufschlüsselung auf (siehe `upsert_assets`). Der
-    Rückgabewert bleibt das Tripel: die Aufschlüsselung ist eine Auskunft über
-    den Lauf, kein Ergebnis von ihm.
+    Jahresweise, und der Grund ist derselbe wie bei P2.1: eine zwanzig Jahre
+    alte Bibliothek in einem Zug ist kein Lauf, sondern ein Zeitlimit.
     """
-    # Immer aufgeschlüsselt, auch wenn niemand danach fragt: das Protokoll
-    # braucht die Zahlen genauso wie die Oberfläche, und zwei Wege zu einer
-    # Auskunft laufen still auseinander (Anmerkung 106).
     report = report if report is not None else {}
     my_id = api.own_user_id(url, key)
     report["own_user_id"] = my_id
     if not my_id:
-        # Ohne eigene Kennung ließe sich ein fremdes Foto nicht erkennen —
-        # und ein geteiltes Album schriebe Punkte in die eigene Karte, an
+        # Ohne eigene Kennung ließe sich ein fremdes Foto nicht erkennen — und
+        # ein geteiltes Album schriebe Ereignisse in die Lebensdatenbank, an
         # denen man nie war. Lieber nichts (dieselbe Strenge wie `is_own`).
-        log.warning("Immich nennt keine eigene Nutzerkennung — Fotopunkte "
+        log.warning("Immich nennt keine eigene Nutzerkennung — Foto-Ereignisse "
                     "werden übersprungen")
-        return 0, 0, 0
+        report["seen"] = 0
+        return []
     start = datetime(year, 1, 1)
     end = datetime(year, 12, 31, 23, 59, 59)
-    assets = api.search_assets_paged(url, key, start, end, heartbeat=heartbeat)
-    added, changed = upsert_assets(db, user.id, assets, my_id, report=report)
+    assets = api.search_assets_paged(url, key, start, end, heartbeat=heartbeat,
+                                     budget_s=budget_s, report=report)
+    props = photo_proposals(assets, my_id, district_index(db, user.id),
+                            known_slots(db, user.id), report)
     report["seen"] = len(assets)
-    log.info("Fotopunkte %d: %d Fotos gelesen, %d neu, %d aktualisiert, "
-             "%d unverändert — ohne Punkt: %s", year, len(assets), added, changed,
-             report.get("unchanged", 0),
+    log.info("Foto-Ereignisse %d: %d Fotos gelesen, %d neu — ohne Ereignis: %s",
+             year, len(assets), len(props),
              "; ".join(drop_reasons(report)) or "keins")
-    return len(assets), added, changed
+    return props
 
 
+# --------------------------------------------------------------------------- #
+# Anlegen
+# --------------------------------------------------------------------------- #
+def create_photo_events(db: Session, user, props: list[PhotoProposal]) -> int:
+    """Legt je Foto ein sofort bestätigtes Ereignis an (Anmerkung 138/139).
+
+    Je ein `Fragment` (Grabstein) + ein `confirmed`-es Ereignis. Der Grabstein
+    bleibt auch nach einer manuellen Löschung stehen: ohne ihn fände der
+    nächste Lauf denselben Platz wieder frei und legte ihn erneut an — eine
+    Wiederauferstehung, die eine bewusste Löschung rückgängig macht.
+
+    **Die Fotos werden NICHT umgehängt.** Ein Foto-Ereignis bekommt keinen
+    `MediaRef`: die Karte holt das Bild über die Asset-Kennung in der
+    `external_id` (`asset_of`), und der Zeitstrahl soll bei diesen Ereignissen
+    ausdrücklich KEIN Bild zeigen. Die Tagesleisten aus Stufe 1 (F18) bleiben
+    davon unberührt — das ist der zweite, unveränderte Job aus Anmerkung 139.
+    """
+    places = _place_cache(db, user.id)
+    created = 0
+    now = datetime.now(timezone.utc)
+    for prop in props:
+        fragment = Fragment(
+            user_id=user.id,
+            raw_text=json.dumps({
+                "type": "photo_point", "slot": prop.slot,
+                "asset_id": prop.asset_id, "place": prop.place,
+                "at": prop.taken_at.isoformat(),
+            }, ensure_ascii=False),
+            source=Source.immich,
+            status=FragmentStatus.processed,
+        )
+        db.add(fragment)
+        db.flush()
+        db.add(Event(
+            user_id=user.id,
+            title=prop.title,
+            description=_describe(prop),
+            date_start=prop.taken_at, date_end=prop.taken_at,
+            # Ein Foto trägt seinen Zeitstempel — genauer wird es nicht.
+            date_precision=DatePrecision.exact,
+            category="event",
+            # Foto-GPS ist ein Beleg, kein Geständnis — dieselbe mittelhohe
+            # Zuversicht wie bei einem Google-Besuch (`tracks.py`).
+            confidence=0.6,
+            confirmed=ConfirmState.confirmed,
+            confirmed_at=now,
+            confirmed_by="import",
+            source=Source.immich,
+            location=_location_for(db, user, prop, places),
+            origin_fragment=fragment,
+            external_id=prop.slot,
+        ))
+        created += 1
+    return created
+
+
+def _describe(prop: PhotoProposal) -> str:
+    bits = ["Foto aus Immich"]
+    if prop.place:
+        bits.append(f"in {prop.place}")
+    bits.append(f"({prop.taken_at.strftime('%H:%M')})")
+    return " ".join(bits)
+
+
+def _place_key(lat: float, lng: float) -> str:
+    return f"{PLACE_PREFIX}{round(lat, PLACE_ROUND)},{round(lng, PLACE_ROUND)}"[:255]
+
+
+def _place_cache(db: Session, user_id: str) -> dict[str, Location]:
+    """Alle Foto-Orte dieses Kontos, einmal geladen.
+
+    Einer je Foto abzufragen wäre bei einem Jahreslauf über 20.000 Bilder der
+    Unterschied zwischen Sekunden und Minuten — dieselbe Überlegung wie beim
+    `district_index`, nur für die Schreibrichtung.
+    """
+    rows = (db.query(Location)
+            .filter(Location.user_id == user_id,
+                    Location.external_ref.like(f"{PLACE_PREFIX}%")).all())
+    return {loc.external_ref: loc for loc in rows if loc.external_ref}
+
+
+def _location_for(db: Session, user, prop: PhotoProposal,
+                  cache: dict[str, Location]) -> Location:
+    """Der Ort eines Fotos — je Koordinate einer, nicht je Stadt und nicht je Foto.
+
+    Je Stadt wäre der gemeldete Defekt aus A45 („London, 1200 Bilder" = EIN
+    Punkt). Je Foto wären 20.000 Ortszeilen für Aufnahmen, die zu Dritteln vom
+    identischen GPS-Fix stammen. Der Schlüssel ist deshalb die gerundete
+    Koordinate.
+
+    `address` wird ausdrücklich GESETZT, auch wenn wenig drinsteht: sie ist die
+    Marke „hier ist nichts mehr nachzuschlagen". Bliebe sie NULL, nähme der
+    A47-Rückfülllauf diese Zeilen für unaufgelöste Orte und schickte 20.000
+    gedrosselte Nominatim-Abrufe hinterher — die Endlos-Abruf-Falle in ihrer
+    teuersten Ausprägung, weil sie hier nicht nur wiederholt, sondern auch
+    fremde Kontingente verbrennt.
+    """
+    ref = _place_key(prop.lat, prop.lng)
+    existing = cache.get(ref)
+    if existing is not None:
+        return existing
+    name = prop.district or prop.city or prop.state or prop.country
+    loc = Location(
+        user_id=user.id,
+        name=(name or "Foto-Ort")[:255],
+        # Die Marke, an der jeder erkennt, woher diese Zeile kommt — und an der
+        # `resolve_names` sie in Ruhe lässt.
+        type="photo",
+        lat=prop.lat, lng=prop.lng,
+        city=(prop.city or None) and prop.city[:128],
+        country=(prop.country or None) and prop.country[:64],
+        address={k: v for k, v in (("city", prop.city), ("state", prop.state),
+                                   ("country", prop.country),
+                                   ("suburb", prop.district)) if v} or {"source": "immich"},
+        external_ref=ref,
+    )
+    db.add(loc)
+    db.flush()
+    cache[ref] = loc
+    return loc
+
+
+# --------------------------------------------------------------------------- #
+# Merkliste der durchsuchten Jahre
+# --------------------------------------------------------------------------- #
 def scanned_years(user) -> set[int]:
     """Jahre, die schon einmal durchsucht wurden.
 
-    **Der Unterschied zwischen „keine Fotos" und „nie nachgesehen"** — die
-    Falle, die dieses Projekt inzwischen zum sechsten Mal stellt (F12
-    `weather_rev`, A39-Leerstring, A42 „kein Artikel", P2.1-Grabstein,
-    Anmerkung 114 `_name_defect`). Ohne diese Liste zeigte die Karte für 2004
-    dasselbe wie für ein Jahr ohne Kamera: nichts, wortlos.
+    **Der Unterschied zwischen „keine Fotos" und „nie nachgesehen".** Ohne
+    diese Liste zeigte die Oberfläche für 2004 dasselbe wie für ein Jahr ohne
+    Kamera: nichts, wortlos.
 
-    Kein Schema: die Liste ist eine Notiz über einen Lauf, kein Datum über das
+    Kein Schema: die Liste ist eine Notiz über einen LAUF, kein Datum über das
     Leben — sie gehört in die Einstellungen, nicht in die Lebensdatenbank.
     """
     raw = ((user.settings or {}).get("photo_points") or {}).get("years") or []
-    return {int(y) for y in raw if str(y).isdigit() or isinstance(y, int)}
+    return {int(y) for y in raw if isinstance(y, int) or str(y).isdigit()}
 
 
 def mark_scanned(db: Session, user, year: int) -> None:
     """Merkt sich, dass dieses Jahr durchsucht wurde.
 
-    `user.settings` ist eine JSON-Spalte: neu ZUWEISEN, nicht an Ort und
-    Stelle ändern — SQLAlchemy bemerkt eine Mutation im Dict sonst nicht und
-    schreibt nichts.
+    `user.settings` ist eine JSON-Spalte: neu ZUWEISEN, nicht an Ort und Stelle
+    ändern — SQLAlchemy bemerkt eine Mutation im Dict sonst nicht und schreibt
+    nichts.
     """
     settings = dict(user.settings or {})
     block = dict(settings.get("photo_points") or {})
@@ -284,93 +506,146 @@ def mark_scanned(db: Session, user, year: int) -> None:
     user.settings = settings
 
 
+# --------------------------------------------------------------------------- #
+# Zurücknehmen
+# --------------------------------------------------------------------------- #
+def _slot_events(db: Session, user_id: str, prefix: str):
+    return (db.query(Event)
+            .filter(Event.user_id == user_id,
+                    Event.external_id.like(f"{prefix}%")))
+
+
+def count_photo_events(db: Session, user_id: str) -> int:
+    return (db.query(func.count(Event.id))
+            .filter(Event.user_id == user_id,
+                    Event.external_id.like(f"{SLOT_PREFIX}%")).scalar() or 0)
+
+
+def remove_slots(db: Session, user_id: str, prefix: str,
+                 drop_fragments: bool = True) -> int:
+    """Löscht alles, was ein Lauf unter diesem Platz-Präfix angelegt hat.
+
+    **Auch die Grabsteine**, und zwar mit Absicht: Dies ist „noch einmal von
+    vorn", nicht „das will ich nicht mehr sehen". Blieben die Fragmente stehen,
+    fände der nächste Lauf jeden Platz vergeben und legte nichts an — der
+    Zurücksetzen-Knopf hätte dann alles gelöscht und die Wiederherstellung
+    unmöglich gemacht. Ein einzeln gelöschtes Ereignis behält seinen Grabstein
+    dagegen sehr wohl; das ist der andere Fall und der Sinn der Sache.
+
+    Die Foto-Orte gehen mit, aber nur die eigenen (`immich:pt:`) und nur die,
+    an denen nichts mehr hängt.
+    """
+    events = _slot_events(db, user_id, prefix).all()
+    if not events:
+        return 0
+    frag_ids = {e.origin_fragment_id for e in events if e.origin_fragment_id}
+    loc_ids = {e.location_id for e in events if e.location_id}
+    ids = [e.id for e in events]
+    # Medien zuerst: ein `MediaRef` mit Fremdschlüssel auf ein gelöschtes
+    # Ereignis ist auf PostgreSQL ein Fehler und auf SQLite eine Waise.
+    (db.query(MediaRef).filter(MediaRef.event_id.in_(ids))
+     .delete(synchronize_session=False))
+    (db.query(Event).filter(Event.id.in_(ids)).delete(synchronize_session=False))
+    if drop_fragments and frag_ids:
+        (db.query(Fragment).filter(Fragment.id.in_(frag_ids))
+         .delete(synchronize_session=False))
+    db.flush()
+    if loc_ids:
+        used = {r[0] for r in db.query(Event.location_id)
+                .filter(Event.location_id.in_(loc_ids)).distinct()}
+        orphan = [i for i in loc_ids if i not in used]
+        if orphan:
+            (db.query(Location)
+             .filter(Location.id.in_(orphan),
+                     Location.external_ref.like(f"{PLACE_PREFIX}%"))
+             .delete(synchronize_session=False))
+    return len(ids)
+
+
 def reset(db: Session, user_id: str) -> int:
-    """Verwirft alle Fotopunkte dieses Kontos — Ableitung, jederzeit erlaubt."""
-    count = (db.query(PhotoPoint)
-             .filter(PhotoPoint.user_id == user_id).delete(synchronize_session=False))
-    return count
+    """Verwirft alle Foto-Ereignisse dieses Kontos."""
+    return remove_slots(db, user_id, SLOT_PREFIX)
 
 
-def points_for(db: Session, user_id: str, start: datetime | None = None,
-               end: datetime | None = None,
-               limit: int | None = None) -> tuple[list[PhotoPoint], int]:
-    """Punkte eines Zeitraums und die WAHRE Gesamtzahl.
+def count_day_clusters(db: Session, user_id: str) -> int:
+    """Wie viele Tagescluster aus Anmerkung 138 noch stehen — für die Vorschau."""
+    return (db.query(func.count(Event.id))
+            .filter(Event.user_id == user_id,
+                    Event.external_id.like(f"{DAY_SLOT_PREFIX}%")).scalar() or 0)
 
-    Beides zurückzugeben ist der Punkt: eine Liste, die stillschweigend bei
-    5.000 aufhört, sieht auf der Karte aus wie die ganze Wahrheit
-    (Anmerkung 110). Der Aufrufer muss den Unterschied nennen können.
 
-    `limit=None` liest `MAX_POINTS` zur AUFRUFZEIT. Als Default-Argument wäre
-    der Wert beim Import festgezurrt — die Konstante ließe sich dann weder in
-    einem Test noch zur Laufzeit ändern, und beim Schreiben des Tests fiel
-    genau das auf.
+def day_cluster_sample(db: Session, user_id: str, limit: int = 12) -> list[dict]:
+    """Ein paar der betroffenen Zeilen, NAMENTLICH.
 
-    **Und deckeln heißt hier NICHT abschneiden.** `ORDER BY taken_at LIMIT
-    5000` liefert die 5.000 ÄLTESTEN — über eine Bibliothek von 2009 bis heute
-    also die Jahre bis etwa 2016, und alles danach fehlt auf der Karte. Ein
-    Reisejahr in der Mitte verschwindet damit vollständig, während die Karte
-    voll aussieht. Gegriffen wird deshalb gleichmäßig über den Zeitraum: die
-    Form der Antwort bleibt erhalten, jede Gegend kommt vor, und die genaue
-    Zahl steht ohnehin in `total`.
-
-    **Und zwar so viele, wie hineinpassen.** Eine Verdichtung, die von 8.120
-    Punkten 4.060 liefert, obwohl 5.000 erlaubt sind, erklärt sich dem
-    Betrachter nicht: er liest eine Grenze und sieht eine Rechnung.
-
-    Das ist dieselbe Regel, die vierzig Zeilen weiter für die Vorschaubilder
-    einer Gruppe schon gilt (`GROUP_THUMBS`, Anmerkung 111: „gleichmäßig über
-    die Gruppe greifen statt vorne abschneiden"). Sie stand zweimal da und ist
-    genau an der zweiten Stelle nicht angewandt worden — der Anmerkung-106-Fall
-    in seiner leisesten Form.
+    „214 Ereignisse werden gelöscht" ist eine Zahl; „12. Juli 2018 — 34 Fotos
+    in Detmold, …" ist eine Entscheidungsgrundlage. Dieselbe Zusage wie bei
+    A46 und der F7-Serie: eine Vorschau, die nur zählt, ist keine.
     """
-    if limit is None:
-        limit = MAX_POINTS
-    query = db.query(PhotoPoint).filter(PhotoPoint.user_id == user_id)
-    if start is not None:
-        query = query.filter(PhotoPoint.taken_at >= start)
-    if end is not None:
-        query = query.filter(PhotoPoint.taken_at <= end)
-    total = query.count()
-    if total <= limit:
-        return query.order_by(PhotoPoint.taken_at).all(), total
-
-    # **Gleichmäßig heißt nicht „jede n-te".** Ein ganzzahliger Schritt trifft
-    # das Budget nur, wenn es aufgeht: bei 8.120 Punkten und Platz für 5.000
-    # ist `ceil(8120/5000)` gleich 2, also jeder zweite — 4.060 gezeigte
-    # Punkte und 940 Plätze verschenkt. Genau so gemeldet („warum diese
-    # Grenze?"), und die Antwort wäre eine Rechnung statt einer Grenze gewesen.
-    #
-    # Deshalb ein mitlaufender Zähler statt eines Schrittes: behalten wird die
-    # Zeile, bei der `rn · limit / total` über die nächste ganze Zahl springt.
-    # Das ergibt EXAKT `limit` Zeilen, gleichmäßig verteilt, für jedes
-    # Verhältnis. Gerechnet wird in der Datenbank — 8.000 Kennungen in ein
-    # `IN (…)` zu legen wäre die Sorte Abfrage, die je nach Übersetzung an
-    # einer Parametergrenze zerbricht.
-    numbered = (query.with_entities(
-        PhotoPoint.id.label("pid"),
-        func.row_number().over(order_by=PhotoPoint.taken_at).label("rn"))
-        .subquery())
-    # `* 1.0` erzwingt die Division mit Nachkommastellen: SQLite teilt zwei
-    # ganze Zahlen ganzzahlig, und dann stünde links wie rechts dasselbe.
-    scaled = lambda n: func.floor(n * limit * 1.0 / total)  # noqa: E731
-    rows = (db.query(PhotoPoint)
-            .join(numbered, numbered.c.pid == PhotoPoint.id)
-            .filter(scaled(numbered.c.rn - 1) < scaled(numbered.c.rn))
-            .order_by(PhotoPoint.taken_at)
-            .limit(limit).all())
-    return rows, total
+    rows = (_slot_events(db, user_id, DAY_SLOT_PREFIX)
+            .order_by(Event.date_start.desc()).limit(limit).all())
+    return [{"id": e.id, "title": e.title,
+             "date": e.date_start.isoformat() if e.date_start else None}
+            for e in rows]
 
 
-def day_index(db: Session, user_id: str) -> dict[date, int]:
-    """Wie viele Fotopunkte auf welchem Kalendertag liegen.
+def remove_day_clusters(db: Session, user_id: str) -> int:
+    """Räumt die Tagescluster aus Anmerkung 138 weg.
 
-    Der Zeitstrahl braucht das, BEVOR er eine Seite baut: eine Zahl, die erst
-    beim Aufklappen entsteht, ist keine, mit der man sich entscheidet.
+    **Nur auf Knopfdruck, nie im Nachtplan** — dieselbe Strenge wie beim
+    A46-Aufräum-Lauf, und aus demselben Grund: das hier fasst BESTÄTIGTES an.
+    Die Grabsteine gehen mit, denn sonst blockierten sie nichts (die neuen
+    Plätze heißen anders) und blieben als Datenmüll stehen.
     """
-    from app.sqlutil import day_parts
+    return remove_slots(db, user_id, DAY_SLOT_PREFIX)
 
-    y, m, d = day_parts(PhotoPoint.taken_at)
-    rows = (db.query(y, m, d, func.count(PhotoPoint.id))
-            .filter(PhotoPoint.user_id == user_id)
-            .group_by(y, m, d).all())
-    return {date(int(a), int(b), int(c)): int(n) for a, b, c, n in rows}
+
+# --------------------------------------------------------------------------- #
+# Jahresauswahl
+# --------------------------------------------------------------------------- #
+def years_with_photos(db: Session, user_id: str) -> list[int]:
+    """Jahre, die einen Lauf lohnen — der Notnagel für die Auswahl.
+
+    Bewusst aus den EIGENEN Daten (Ereignisse und Medien), nicht aus Immich:
+    die Frage „welche Jahre gibt es?" wäre dort ein Vollscan der Bibliothek,
+    nur um eine Auswahlliste zu füllen. Der reguläre Weg fragt Immichs
+    `/timeline/buckets` (siehe `routers/immich.py`); diese Liste greift nur,
+    wenn der Server das nicht kann — und sagt dann auch, dass sie es ist
+    (Anmerkung 113).
+    """
+    years: set[int] = set()
+    for (y,) in (db.query(func.extract("year", Event.date_start))
+                 .filter(Event.user_id == user_id, Event.date_start.isnot(None))
+                 .distinct().all()):
+        if y:
+            years.add(int(y))
+    for (y,) in (db.query(func.extract("year", MediaRef.captured_at))
+                 .filter(MediaRef.user_id == user_id,
+                         MediaRef.captured_at.isnot(None)).distinct().all()):
+        if y:
+            years.add(int(y))
+    years.add(date.today().year)
+    return sorted(years, reverse=True)
+
+
+def preview_summary(props: list[PhotoProposal], sample: int = 12) -> dict:
+    """Die Vorschau eines Jahres — verdichtet, nicht als Liste von 20.000.
+
+    Eine Vorschau muss NENNEN, was sie anlegt (A46, F7-Serie). Bei zwanzigtausend
+    Fotos ist die vollständige Liste aber selbst keine Entscheidungsgrundlage
+    mehr, sondern nur noch eine große Antwort. Genannt werden deshalb die ORTE
+    mit ihren Zahlen — das ist die Ebene, auf der man „ja, das war so" oder
+    „nein, das sind fremde Bilder" sagen kann — plus ein paar Beispiele.
+    """
+    by_place: dict[str, int] = defaultdict(int)
+    days: set[date] = set()
+    for p in props:
+        by_place[p.place or "ohne Ortsangabe"] += 1
+        days.add(p.taken_at.date())
+    places = sorted(by_place.items(), key=lambda kv: (-kv[1], kv[0]))
+    return {
+        "total": len(props),
+        "days": len(days),
+        "places": [{"place": name, "photos": n} for name, n in places[:40]],
+        "places_total": len(places),
+        "sample": [p.as_dict() for p in props[:sample]],
+    }

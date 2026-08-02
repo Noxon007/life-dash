@@ -42,15 +42,14 @@ JOB_TYPES = {
     "embeddings": "Embeddings berechnen",
     "resolve_names": "Ortsnamen auflösen/formatieren",
     "immich": "Fotos aus Immich verknüpfen",
-    "immich_source": "Ereignisse aus Immich anlegen",
-    "photo_points": "Fotos auf der Karte verorten",
+    "photo_points": "Ereignisse aus Fotos anlegen",
     "timeline_import": "Google-Timeline-Import",
     "data_import": "Daten-Import (JSON)",
 }
 # A22: Diese Typen laufen SERVERSEITIG als Background-Thread weiter, auch wenn
 # der Browser zu ist. Importe bleiben client-getrieben (die Datei liegt dort).
 SERVER_JOB_TYPES = ("weather", "embeddings", "resolve_names", "recompute",
-                    "immich", "immich_source", "photo_points")
+                    "immich", "photo_points")
 # Diese Läufe bearbeiten die Daten GENAU EINES Kontos (`job.user_id`) — sie
 # gehören in der Oberfläche unter „Meine Daten", nicht unter System. Der Rest
 # (`recompute`, `embeddings`) rechnet über den ganzen Bestand.
@@ -60,8 +59,7 @@ SERVER_JOB_TYPES = ("weather", "embeddings", "resolve_names", "recompute",
 # Nutzer allen anderen den Termin weg (Anmerkung 115). Die Sperre beim Start
 # bleibt trotzdem global — sie schützt nicht die Daten, sondern das Kontingent
 # bei Open-Meteo/Nominatim/Immich, und das hängt an der Instanz, nicht am Konto.
-USER_SCOPED_TYPES = ("weather", "resolve_names", "immich", "immich_source",
-                     "photo_points")
+USER_SCOPED_TYPES = ("weather", "resolve_names", "immich", "photo_points")
 # „Läuft gerade" — eine Liste statt derselben Aufzählung an vier Stellen.
 _ACTIVE_STATES = ("running", "stopping")
 # In Tests abgeschaltet (in-memory-DB verträgt keine fremden Threads)
@@ -497,113 +495,23 @@ def _run_immich(db: Session, job: Job) -> tuple[str, str]:
                     f"{n_days} Tage geprüft.")
 
 
-def _run_immich_source(db: Session, job: Job) -> tuple[str, str]:
-    """P2.1 Stufe 2: aus Immich-Fototagen direkt bestätigte Ereignisse anlegen.
-
-    Jahresweise, weil eine zwanzig Jahre alte Bibliothek sonst vierstellig
-    viele Ereignisse in einem Rutsch anlegen würde (Anmerkung 107). Die Jahre
-    stehen in `params` — ohne Jahr kein Lauf.
-
-    **Anmerkung 138: seit dem Wegfall der Moderation gibt es kein „unbestätigt
-    liegen lassen" mehr** — was dieser Lauf anlegt, ist sofort Lebensdatenbank,
-    wie bei einem Google-Besuch. Die Vorschau davor ist deshalb wichtiger, nicht
-    weniger wichtig, als vorher.
-
-    **„Alle Jahre" ist erlaubt, seit die Vorschau sie alle abdeckt**
-    (Anmerkung 120). Der Riegel war nie „ein Jahr", sondern „nichts anlegen,
-    was niemand gesehen hat"; ein Lauf über zwanzig Jahre nach einer Vorschau
-    über zwanzig Jahre verletzt ihn nicht. Was er verletzen WÜRDE: dieselbe
-    Liste über den Nachtplan — deshalb steht `immich_source` dort weiterhin
-    nicht (`SCHED_TYPES` im Frontend).
-
-    Der Lauf scannt NEU statt die Vorschau zu übernehmen. Zwischen Ansehen und
-    Anlegen kann sich etwas geändert haben, und `scan_year` ist die eine
-    Stelle, an der die vier Fälle geprüft werden.
-    """
-    from app.services import immich as immich_api
-    from app.services import immich_source as source
-
-    user = db.get(User, job.user_id)
-    cfg = immich_api.config_for(user)
-    if cfg is None:
-        return "stopped", ("Immich ist für dieses Konto nicht eingerichtet "
-                           "(Verwaltung → Meine Daten → Immich).")
-    years, bad = _job_years(job)
-    if bad:
-        return "error", bad
-    url, key = cfg
-    multi = len(years) > 1
-
-    job.unit = "Ereignisse angelegt"
-    db.commit()
-    created = total = 0
-    scanned: list[int] = []
-    stopped = False
-    fail: str | None = None
-    for year in years:
-        # Der Scan läuft, BEVOR es etwas zu zählen gibt — bei einer großen
-        # Bibliothek Minuten. Ohne Lebenszeichen dazwischen gilt der Job nach
-        # STALE_SECONDS als verwaist, und der Lauf hätte die ganze Arbeit
-        # gemacht, um danach „gestoppt" zu melden. `_tick(…, 0, None)` schlägt
-        # den Puls, ohne einen Fortschritt zu behaupten, den es noch nicht gibt.
-        try:
-            proposals = source.scan_year(db, user, year, url, key,
-                                         heartbeat=lambda: _tick(db, job.id, 0, None))
-        except immich_api.ScanAborted:
-            stopped = True
-            break
-        except immich_api.ImmichError as exc:
-            fail = str(exc)
-            break
-
-        n = len(proposals)
-        # In Blöcken anlegen und festschreiben: bricht der Lauf ab, ist das
-        # Angelegte da und der Rest kommt beim nächsten Mal — die Plätze sind
-        # stabil, ein zweiter Lauf legt nichts doppelt an. Über mehrere Jahre
-        # gilt dasselbe je Jahr: ein Abbruch in 2011 lässt 2024 bis 2012
-        # angelegt stehen.
-        for i in range(0, n, 20):
-            block = proposals[i:i + 20]
-            created += source.create_confirmed_visits(db, user, block)
-            db.commit()
-            # **Über mehrere Jahre gibt es kein „noch ~N"**, und eine Zahl, die
-            # nur das laufende Jahr meint, wäre schlimmer als keine: „noch ~5"
-            # liest sich als Ende des Laufs, während zwölf Jahre offen sind.
-            left = None if multi else n - (i + len(block))
-            if not _tick(db, job.id, len(block), left):
-                stopped = True
-                break
-        total += n
-        if stopped:
-            break
-        scanned.append(year)
-
-    span = _year_span(scanned or years[:1])
-    if fail:
-        done_note = f" {created} Ereignisse aus {span} sind angelegt." if created else ""
-        return "stopped", f"Immich antwortet nicht: {fail}.{done_note}"
-    if stopped:
-        return "stopped", (f"{span}: Suche abgebrochen — {created} Ereignisse "
-                           f"angelegt.")
-    if not total:
-        return "done", f"{_year_span(scanned)}: nichts Neues anzulegen."
-    return "done", f"{_year_span(scanned)}: {created} Ereignisse angelegt."
-
-
 def _run_photo_points(db: Session, job: Job) -> tuple[str, str]:
-    """A45: Immich → ein Punkt je verortetem Foto, ein Jahr oder alle.
+    """Anmerkung 139: Immich → EIN bestätigtes Ereignis je verortetem Foto.
 
-    Jahresweise wie `immich_source`, und der Grund war derselbe: eine zwanzig
-    Jahre alte Bibliothek in einem Zug ist kein Lauf, sondern ein Zeitlimit.
-    **Das gilt für eine ANFRAGE, nicht für einen Job** (Anmerkung 120) — ein
-    Hintergrund-Lauf wartet auf niemanden, hakt jedes Jahr einzeln ab und ist
-    jederzeit stoppbar. Die Auswahl bietet „Alle Jahre" deshalb an; die
-    Aufteilung bleibt, sie wird nur nicht mehr von Hand bedient.
+    Jahresweise, weil eine zwanzig Jahre alte Bibliothek in einem Zug kein
+    Lauf ist, sondern ein Zeitlimit. **Das gilt für eine ANFRAGE, nicht für
+    einen Job** (Anmerkung 120) — ein Hintergrund-Lauf wartet auf niemanden,
+    hakt jedes Jahr einzeln ab und ist jederzeit stoppbar. Die Auswahl bietet
+    „Alle Jahre" deshalb an.
 
-    Der Lauf legt **keine Ereignisse** an — er beantwortet nur „wo wurde
-    fotografiert?". Deshalb braucht er auch keine Vorschau: er schreibt nichts
-    in die Lebensdatenbank, und alles, was er anlegt, ist mit einem Knopf
-    wieder weg (`POST /api/photos/reset`).
+    **Was sich gegenüber A45 geändert hat, und was daraus folgt.** Bis 0.39
+    legte dieser Lauf verwerfbare Kartenpunkte an; deshalb brauchte er keine
+    Vorschau („alles mit einem Knopf wieder weg"). Seit Anmerkung 139 legt er
+    **Lebensdatenbank** an, sofort bestätigt wie ein Google-Besuch. Die
+    Vorschau ist damit keine Bequemlichkeit mehr, sondern die einzige Bremse
+    vor zehntausend bestätigten Zeilen — die Moderation gibt es für diese
+    Quelle seit Anmerkung 138 nicht mehr. Erzwungen wird sie in der Oberfläche
+    (`check-p21-preview.js`), weil nur dort bekannt ist, was jemand GESEHEN hat.
     """
     from app.services import immich as immich_api
     from app.services import photo_points as pp
@@ -618,9 +526,9 @@ def _run_photo_points(db: Session, job: Job) -> tuple[str, str]:
         return "error", bad
     url, key = cfg
 
-    job.unit = "Fotos verortet"
+    job.unit = "Ereignisse angelegt"
     db.commit()
-    seen = added = changed = unchanged = 0
+    seen = created = 0
     # Die Ausschlussgründe über alle Jahre aufaddiert — `drop_reasons` liest
     # genau diese Form, also wird sie zusammengeführt statt neu erfunden.
     total_report: dict = {"dropped": {}}
@@ -630,7 +538,7 @@ def _run_photo_points(db: Session, job: Job) -> tuple[str, str]:
     for year in years:
         report: dict = {}
         try:
-            y_seen, y_added, y_changed = pp.scan_year(
+            props = pp.scan_year(
                 db, user, year, url, key,
                 heartbeat=lambda: _tick(db, job.id, 0, None), report=report)
         except immich_api.ScanAborted:
@@ -640,47 +548,60 @@ def _run_photo_points(db: Session, job: Job) -> tuple[str, str]:
             fail = str(exc)
             break
 
+        # In Blöcken anlegen und festschreiben: bricht der Lauf ab, ist das
+        # Angelegte da und der Rest kommt beim nächsten Mal — die Plätze sind
+        # stabil (`immich:photo:<asset>`), ein zweiter Lauf legt nichts doppelt
+        # an. `left` bleibt bei mehreren Jahren `None`: eine Zahl, die nur das
+        # laufende Jahr meint, wäre schlimmer als keine — „noch ~5" liest sich
+        # als Ende des Laufs, während zwölf Jahre offen sind.
+        multi = len(years) > 1
+        n = len(props)
+        for i in range(0, n, 100):
+            block = props[i:i + 100]
+            created += pp.create_photo_events(db, user, block)
+            db.commit()
+            if not _tick(db, job.id, len(block), None if multi else n - (i + len(block))):
+                stopped = True
+                break
+
         # **Erst festschreiben, dann abhaken.** Andersherum stünde das Jahr als
-        # durchsucht da, während die Punkte noch nicht in der Datenbank sind —
-        # und ein Absturz dazwischen ließe ein leeres Jahr für immer als
+        # durchsucht da, während die Ereignisse noch nicht in der Datenbank
+        # sind — und ein Absturz dazwischen ließe ein leeres Jahr für immer als
         # „nachgesehen" gelten (dieselbe Falle wie beim F12-Wettermarker, nur in
         # der Reihenfolge statt im Wert). Über mehrere Jahre wird deshalb JEDES
         # Jahr einzeln abgehakt: ein Abbruch in 2011 darf 2024 bis 2012 nicht
         # wieder zu „nie nachgesehen" machen.
-        db.commit()
+        #
+        # Abgehakt wird nur ein VOLLSTÄNDIG gelaufenes Jahr: ein mittendrin
+        # gestopptes als „nachgesehen" zu markieren wäre dieselbe Falle noch
+        # einmal, nur mit einem halben Ergebnis darunter.
+        seen += report.get("seen", 0)
+        for reason, count in (report.get("dropped") or {}).items():
+            total_report["dropped"][reason] = total_report["dropped"].get(reason, 0) + count
+        if stopped:
+            break
         pp.mark_scanned(db, user, year)
         db.commit()
-        seen += y_seen
-        added += y_added
-        changed += y_changed
-        unchanged += report.get("unchanged", 0)
-        for reason, n in (report.get("dropped") or {}).items():
-            total_report["dropped"][reason] = total_report["dropped"].get(reason, 0) + n
         scanned.append(year)
-        if not _tick(db, job.id, y_added, None):
-            stopped = True
-            break
     _tick(db, job.id, 0, 0)
 
-    span = _year_span(scanned)
+    span = _year_span(scanned or years[:1])
     if fail:
-        done_note = f" {added} Fotos aus {span} sind verortet." if added else ""
+        done_note = f" {created} Ereignisse aus {span} sind angelegt." if created else ""
         return "stopped", f"Immich antwortet nicht: {fail}.{done_note}"
-    if stopped and not scanned:
-        return "stopped", f"{_year_span(years[:1])}: Suche abgebrochen — nichts geändert."
+    if stopped and not created:
+        return "stopped", f"{span}: Suche abgebrochen — nichts geändert."
     if not seen:
         return "done", f"{span}: keine Fotos in Immich."
     # **Die Meldung muss die Differenz erklären, nicht nur die Summe nennen.**
-    # „2016 gelesen, 17 neu verortet" ließ genau die Frage offen, die man beim
+    # „2016 gelesen, 17 angelegt" ließ genau die Frage offen, die man beim
     # Lesen stellt — und die beiden möglichen Antworten („meine Bibliothek hat
     # kein GPS" / „der Schlüssel zeigt auf ein fremdes Konto") verlangen völlig
-    # verschiedene Schritte. Dazu „unverändert": ohne die Zahl liest sich ein
-    # zweiter Lauf wie ein gescheiterter erster (Anmerkung 110).
-    msg = (f"{span}: {seen} Fotos gelesen, {added} neu verortet, "
-           f"{changed} aktualisiert, {unchanged} unverändert.")
+    # verschiedene Schritte.
+    msg = f"{span}: {seen} Fotos gelesen, {created} Ereignisse angelegt."
     reasons = pp.drop_reasons(total_report)
     if reasons:
-        msg += " Ohne Punkt: " + ", ".join(reasons) + "."
+        msg += " Ohne Ereignis: " + ", ".join(reasons) + "."
     if stopped:
         msg += " Gestoppt — die restlichen Jahre sind offen."
     return "done" if not stopped else "stopped", msg
@@ -689,7 +610,6 @@ def _run_photo_points(db: Session, job: Job) -> tuple[str, str]:
 _RUNNERS = {
     "weather": _run_weather,
     "immich": _run_immich,
-    "immich_source": _run_immich_source,
     "photo_points": _run_photo_points,
     "embeddings": _run_embeddings,
     "recompute": _run_recompute,

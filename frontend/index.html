@@ -1913,14 +1913,14 @@
             </div>
           </div>
 
-          <!-- Schritt B: Ereignisse aus Fototagen anlegen (P2.1 Stufe 2).
-               Anmerkung 138: direkt bestätigt, wie ein Google-Besuch — keine
-               Moderation mehr danach, deshalb bleibt die Pflicht-Vorschau die
-               einzige Bremse und wird wichtiger, nicht unwichtiger. Alben
-               (vormals Stufe 3) sind komplett raus. -->
+          <!-- Schritt B: Ereignisse aus Fotos anlegen (Anmerkung 139).
+               EIN Foto, EIN Ereignis — die Tagescluster aus Anmerkung 138 sind
+               abgelöst. Direkt bestätigt wie ein Google-Besuch, deshalb bleibt
+               die Pflicht-Vorschau die einzige Bremse und wird wichtiger, nicht
+               unwichtiger: hier entstehen zehntausende Zeilen, nicht hunderte. -->
           <div class="im-card">
             <div class="im-head">
-              <div><span class="im-step" data-i18n="im.step.b">Schritt B</span> <h4 data-i18n="im.b.title">Ereignisse aus Fototagen anlegen</h4></div>
+              <div><span class="im-step" data-i18n="im.step.b">Schritt B</span> <h4 data-i18n="im.b.title">Ereignisse aus Fotos anlegen</h4></div>
               <span class="eff write" data-i18n="eff.write">ändert Bestätigtes</span>
             </div>
             <div class="action-row has-result">
@@ -1928,16 +1928,22 @@
                 <select id="ims-year" class="mf-select" data-i18n-title="ims.year.tip" title="Ein Jahr je Lauf — oder „Alle Jahre“: die Vorschau geht sie dann einzeln durch, damit jedes Jahr wirklich angesehen wird"></select>
                 <button class="btn secondary" id="ims-preview" style="text-align:left" data-i18n="ims.preview">🔍 Vorschau für dieses Jahr</button>
                 <button class="btn" id="ims-run" style="text-align:left" disabled data-i18n="ims.run">✚ Ereignisse anlegen</button>
+                <details class="adv">
+                  <summary data-i18n="pp.adv">Erweitert: alles zurücknehmen</summary>
+                  <div class="adv-body">
+                    <button class="btn secondary" id="pp-reset" style="text-align:left; width:100%" data-i18n="pp.reset">🗑️ Foto-Ereignisse verwerfen</button>
+                  </div>
+                </details>
               </div>
               <div class="action-desc">
-                <span data-i18n="ims.desc"><b>Aus Fotos werden Ereignisse — direkt bestätigt, wie ein importierter
-                Google-Besuch.</b> Ein Tag mit vielen Bildern an einem Ort („34 Fotos am 12. Juli in Detmold") wird zu
-                einem Eintrag in deiner Lebensdatenbank, keinem Vorschlag in der Moderation. Geclustert werden nur
-                <b>eigene</b> Fotos <b>mit Koordinaten</b>, die in deinem Immich-Zeitstrahl stehen; Archiviertes und
-                Gesperrtes bleibt außen vor. Titel und Kategorie lassen sich wie bei jedem Ereignis nachträglich
-                ändern.</span>
+                <span data-i18n="ims.desc"><b>Jedes Foto mit Koordinaten wird ein Ereignis — direkt bestätigt, wie ein
+                importierter Google-Besuch.</b> Auf der <b>Karte</b> ein Punkt mit Vorschaubild, dort, wo das Bild
+                entstanden ist. Im <b>Zeitstrahl</b> eine Zeile <i>ohne</i> Bild („Foto in Detmold"), gleiche Tage am
+                gleichen Ort zu einer Zeile zusammengefasst — die Bilder eines Tages stehen ohnehin in der Fotoleiste
+                darüber. Angelegt werden nur <b>eigene</b> Fotos <b>mit Koordinaten</b>, die in deinem
+                Immich-Zeitstrahl stehen; Archiviertes und Gesperrtes bleibt außen vor.</span>
                 <span class="hint" style="display:block; margin-top:8px" data-i18n="ims.hint">Erst die Vorschau, dann das
-                Anlegen — der Knopf bleibt bis dahin gesperrt. Ein Jahr kann hunderte Ereignisse ergeben, und die
+                Anlegen — der Knopf bleibt bis dahin gesperrt. Ein Jahr kann zehntausend Ereignisse ergeben, und die
                 will man vorher gesehen haben, gerade weil sie direkt bestätigt werden.</span>
                 <span class="hint" style="display:block; margin-top:8px" data-i18n="ims.albums.why"><b>Alben werden
                 nicht als Quelle benutzt.</b> Ein Album würde <i>ein</i> mehrtägiger Eintrag mit einem Kartenpunkt —
@@ -1948,31 +1954,32 @@
             </div>
           </div>
 
-          <!-- Schritt C: Fotopunkte auf der Karte (A45). Jahr steht auf „Alle
-               Jahre" und liegt unter „Erweitert" — der Lauf ist folgenlos
-               (verwerfbare Ebene), also braucht die Jahr-Wahl keinen Platz vorn. -->
-          <div class="im-card">
+          <!-- Aufräumen: die Tagescluster aus Anmerkung 138 („34 Fotos in
+               Detmold" als EIN Ereignis). Sie sind durch Schritt B abgelöst;
+               nebeneinander stehen gelassen behaupten sie denselben Tag
+               zweimal. Der Knopf erscheint NUR, wenn es welche gibt — eine
+               Karte, die dauerhaft von einer Übergangsform erzählt, ist ein
+               Änderungsprotokoll, keine Anleitung (Anmerkung 115). -->
+          <div class="im-card" id="im-cleanup" style="display:none">
             <div class="im-head">
-              <div><span class="im-step" data-i18n="im.step.c">Schritt C</span> <h4 data-i18n="im.c.title">Fotopunkte auf der Karte</h4></div>
-              <span class="eff layer" data-i18n="im.eff.layer">nur Karte</span>
+              <div><span class="im-step" data-i18n="im.step.x">Aufräumen</span> <h4 data-i18n="im.x.title">Alte Fototag-Sammeleinträge entfernen</h4></div>
+              <span class="eff write" data-i18n="eff.write">ändert Bestätigtes</span>
             </div>
             <div class="action-row has-result">
               <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
-                <button class="btn" id="pp-run" style="text-align:left" data-i18n="pp.run">📍 Fotos verorten</button>
-                <details class="adv">
-                  <summary data-i18n="pp.adv">Erweitert: Jahr wählen &amp; Punkte verwerfen</summary>
-                  <div class="adv-body">
-                    <select id="pp-year" class="mf-select" data-i18n-title="pp.year.tip" title="Ein Jahr je Lauf — oder „Alle Jahre“: der Lauf arbeitet sie im Hintergrund nacheinander ab und hakt jedes einzeln ab"></select>
-                    <button class="btn secondary" id="pp-reset" style="text-align:left; width:100%" data-i18n="pp.reset">🗑️ Punkte verwerfen</button>
-                  </div>
-                </details>
+                <button class="btn secondary" id="dc-preview" style="text-align:left" data-i18n="dc.preview">🔍 Nachsehen, was betroffen ist</button>
+                <button class="btn" id="dc-run" style="text-align:left" disabled data-i18n="dc.run">🗑️ Sammeleinträge entfernen</button>
               </div>
               <div class="action-desc">
-                <span data-i18n="pp.desc"><b>Jedes Foto mit Koordinaten bekommt einen Punkt auf der Karte</b> — dort,
-                wo es aufgenommen wurde. Der Lauf legt <b>keine Ereignisse</b> an und ändert nichts an deinen
-                Einträgen. Sichtbar über den Schalter <b>„📷 Fotos"</b> auf Karte und Zeitstrahl (standardmäßig aus).</span>
+                <span data-i18n="dc.desc">Eine frühere Fassung legte je Tag und Ort <b>einen</b> Sammeleintrag an
+                („34 Fotos in Detmold"). Seit Schritt B jedes Foto einzeln anlegt, behaupten beide zusammen denselben
+                Tag zweimal. Dieser Knopf entfernt ausschließlich die alten Sammeleinträge — deine Foto-Ereignisse und
+                alles von Hand Erfasste bleiben unangetastet.</span>
+                <span class="hint" style="display:block; margin-top:8px" data-i18n="dc.hint">Erst nachsehen, dann
+                entfernen: der Knopf bleibt bis dahin gesperrt, und die Vorschau <b>nennt</b> die betroffenen Einträge,
+                statt sie nur zu zählen.</span>
               </div>
-              <div id="pp-result" class="hint action-result" style="display:none"></div>
+              <div id="dc-result" class="hint action-result" style="display:none"></div>
             </div>
           </div>
 
@@ -2825,44 +2832,54 @@ const I18N_EN = {
   'imp.thumbs': "previews rebuilt",
   'adm.immich': "4 · Immich (photos)",
   // P2.1 stage 2 (0.37.0) — Immich as an event source
-  'ims.desc': "<b>Photos become events — confirmed right away, the same way an imported Google visit is.</b> A day with many pictures in one place (“34 photos on 12 July in Detmold”) becomes an entry in your life database, not a proposal in moderation. Only <b>your own</b> photos <b>with coordinates</b> that sit in your Immich timeline are clustered; archived and locked ones stay out. Title and category can be changed afterwards like any event.",
+  'ims.desc': "<b>Every photo with coordinates becomes an event — confirmed straight away, like an imported Google visit.</b> On the <b>map</b> a dot with a thumbnail, where the picture was taken. In the <b>timeline</b> a line <i>without</i> a picture (“Photo in Detmold”), same day and same place folded into one row — the pictures of a day are in the photo strip above anyway. Only <b>your own</b> photos <b>with coordinates</b> that sit in your Immich timeline are used; archived and locked ones stay out.",
   'ims.albums.why': "<b>Albums are not used as a source.</b> An album would become <i>one</i> multi-day entry with a single point on the map — the twin of the trip you enter yourself. The better way round: <b>you create the trips, the photos attach themselves</b> (“Link photos” above).",
   // A45 — locating photos
-  'pp.run': "📍 Locate photos",
-  'pp.reset': "🗑️ Discard points",
-  'pp.year.tip': "One year per run — a whole library at once is not a run, it is a timeout",
-  'pp.desc': "<b>Every photo with coordinates gets a point on the map</b> — where it was taken. The run creates <b>no events</b> and changes nothing about your entries. It becomes visible through the <b>“📷 Photos”</b> switch on the map and in the timeline (off by default).",
-  'pp.have': "{n} photos located",
+  'pp.reset': "🗑️ Discard photo events",
+  'pp.have': "{n} photo events created",
   'pp.years': "Searched: {y}",
   'pp.none': "No year searched yet. Until then the photo layer on the map stays empty — that does not mean there are no photos.",
-  'pp.needyear': "Please pick a year.",
-  'pp.reset.done': "✓ {n} photo points discarded.",
-  'pp.adv': "Advanced: pick a year &amp; discard points",
+  'pp.reset.done': "✓ {n} photo events discarded.",
+  'pp.adv': "Advanced: take everything back",
   // Immich block, variant B — connection card, numbered steps, effect badges
   'im.conn': "Connection",
   'im.conn.desc': "<b>Server URL and API key.</b> Your photos stay in Immich — nothing is copied.",
   'im.step.a': "Step A",
   'im.step.b': "Step B",
-  'im.step.c': "Step C",
   'im.a.title': "Attach to entries",
-  'im.b.title': "Create events from photo days",
-  'im.c.title': "Photo points on the map",
+  'im.b.title': "Create events from photos",
   'im.eff.add': "attaches",
-  'im.eff.layer': "map only",
   // Anmerkung 133: Effekt-Badges für die übrigen „Meine Daten"-Abschnitte
   'eff.setting': "setting", 'eff.propose': "creates proposals", 'eff.enrich': "enriches",
   'eff.write': "changes confirmed data", 'eff.read': "read only",
   'eff.restore': "writes", 'eff.delete': "deletes for good",
   'im.adv.reset': "Advanced: discard links",
   'map.photos': "📷 Photos",
-  'map.photos.tip': "Every photo with coordinates as its own point — where it was taken. Has to be located first under “My data → Immich”.",
-  'map.photos.none': "No photo located yet — the run is under “My data → Immich → Locate photos”.",
-  'map.photos.cap': "{s} of {n} photos shown, spread evenly across the period — pick a smaller period for all of them.",
+  'map.photos.tip': "Every photo with coordinates becomes its own event — a dot with a thumbnail on the map, a line without a picture in the timeline.",
+  'map.photos.none': "No photo has been turned into an event yet — the run is under “My data → Immich → Events from photos”.",
+  'tl.photos.n2': "photos",
+  'map.points.cap': "{s} of {n} points shown, spread evenly across the period — pick a smaller period for all of them.",
+  'ims.moreplaces': "more places",
+  'ims.skipped': "Without an event: {r}",
+  'ims.truncated': "The preview had to stop (time budget) — the run will create more than shown here. Pick a single year for the full preview.",
+  'pp.reset.none': "There are no photo events to discard.",
+  'pp.reset.ask': "{n} photo events will be deleted. A new run can create them again. Continue?",
+  // Anmerkung 139 — Aufraeumen der alten Fototag-Sammeleintraege
+  'im.step.x': "Clean-up",
+  'im.x.title': "Remove old photo-day summary entries",
+  'dc.preview': "🔍 See what is affected",
+  'dc.run': "🗑️ Remove summary entries",
+  'dc.desc': "An earlier version created <b>one</b> summary entry per day and place (“34 photos in Detmold”). Now that step B creates every photo individually, the two together claim the same day twice. This button removes only the old summary entries — your photo events and everything entered by hand stay untouched.",
+  'dc.hint': "Look first, then remove: the button stays locked until then, and the preview <b>names</b> the affected entries instead of merely counting them.",
+  'dc.clean': "✓ There are no old summary entries left.",
+  'dc.found': "{n} summary entries will be removed",
+  'dc.more': "… and {n} more",
+  'dc.done': "✓ {n} summary entries removed.",
+  'dc.needpreview': "Look at what is affected first.",
   'map.tracks.cap': "{s} of {n} paths shown, spread evenly across the period — pick a smaller period for all of them.",
   'map.photos.nowhere': "no place given",
   'tl.photos': "📷 Photos",
   'tl.photos.tip': "Located photos as their own rows in the timeline, condensed per day and place — has to be located first under “My data → Immich”",
-  'tl.photos.n': "{n} photos",
   'tl.photos.of': "{n} of {total}",
   // A47 — how coarsely entries of a day are condensed
   'tl.level': "Condense by",
@@ -2876,8 +2893,8 @@ const I18N_EN = {
   'ims.run': "✚ Create events",
   'ims.busy': "🔍 looking …",
   'ims.year.tip': "One year per run — a whole library at once would mean hundreds of events",
-  'ims.hint': "Preview first, then create — the button stays locked until then. A year can yield hundreds of events, and you want to have seen them, especially since they are confirmed right away.",
-  'ims.head': "{y}: {n} events from {p} photos",
+  'ims.hint': "Preview first, then create — the button stays locked until then. One year can yield ten thousand events, and you want to have seen them beforehand, precisely because they are confirmed straight away.",
+  'ims.head': "{y}: {n} photo events on {d} days",
   'ims.none': "nothing new to create.",
   'ims.none.why': "Either there are no own photos with coordinates in that year, or everything has been created already — or deleted, and deleted ones do not come back.",
   'ims.photos': "photos",
@@ -3092,7 +3109,7 @@ const I18N_EN = {
   'pp.open': "{n} left",
   'ims.busy.all': "Cancel — {y} ({i}/{n})",
   'ims.running': "{i} of {n} years checked ({y})",
-  'ims.running.sum': "so far {n} events from {p} photos",
+  'ims.running.sum': "so far {n} events on {d} days",
   'ims.seenonly': "Only {y} was checked — that is why “Create events” stays locked.",
   'ims.stopped': "Preview cancelled.",
   'ims.stopped.why': "{i} of {n} years had been checked ({y}) — a run needs a complete preview.",
@@ -3365,7 +3382,6 @@ const I18N_EN = {
   'jobs.col.progress': "Progress", 'jobs.col.started': "Started",
   'jobs.col.result': "Result", 'jobs.left': "~{n} left", 'jobs.stop': "Stop",
   'job.immich': "🖼️ Link photos from Immich",
-  'job.immich_source': "🖼️ Propose events from Immich",
   'sched.at': "at", 'sched.oclock': "o’clock",
   // Verwaltungs-Läufe
   'adm.running': "… running", 'adm.preparing': "… preparing",
@@ -4031,10 +4047,14 @@ const tl = { zoom: 'year', query: '', events: [], catFilter: new Set(FILTER_CATS
              showVisits: false, offset: 0, done: false, loading: false, autoPages: 0,
              city: null,     // A41: Stadtfilter, serverseitig (siehe loadTimeline)
              day: null,      // Anm. 142: EIN Kalendertag (ISO), serverseitig
-             // A45: Foto-Ebene. `level` ist die Verdichtungsstufe (A47) und
-             // gilt für Fotos wie für Besuche — EINE Einstellung, nicht zwei
-             // nebeneinander.
-             showPhotos: false, photoGroups: [], level: 'city' };
+             // Anmerkung 139: `showPhotos` blendet die Immich-FOTO-EREIGNISSE
+             // ein — ein eigener Schalter neben „🛰️ Automatisch erfasst", weil
+             // es zwei Sorten Beleg mit zwei Größenordnungen sind (hunderte
+             // Google-Besuche gegen zehntausende Fotos). `photoGroups` gibt es
+             // nicht mehr: die Gruppen sind seitdem gewöhnliche verdichtete
+             // Ereignisse, und der Server bildet sie (A39/A47) — eine zweite
+             // Gruppierung daneben wären zwei Regeln für dieselbe Frage.
+             showPhotos: false, level: 'city' };
 
 function isoWeek(d) {
   const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -4120,20 +4140,21 @@ document.getElementById('tl-dayphoto-file')?.addEventListener('change', async ev
 // F18: Die Tages-Bilder der gerade geladenen Seite — EINE Abfrage für die
 // ganze Spanne. Eine je sichtbarem Tag wären beim Scrollen dutzende; das ist
 // dieselbe Regel, die A37 für Wetter und Kinder-Zählungen aufgestellt hat.
-// A45: Was die F18-Fotoleiste eines Tages noch zeigen soll.
+// Anmerkung 139, Job 2: Die Tagesleiste bleibt, wie sie war.
 //
-// Ist die Foto-Ebene an, steht die Zahl aus Immich schon in der Gruppe darüber
-// („34 Fotos in Detmold") — die Leiste daneben zeigte dieselben Bilder ein
-// zweites Mal, nur zwölf statt vierunddreißig. **Hochgeladene Dateien bleiben
-// trotzdem stehen:** sie sind Lebensdatenbank (Anmerkung 57) und stecken in
-// gar keinem Fotopunkt; sie durch eine Ableitung verschwinden zu lassen wäre
-// die schlimmere Doppelung — nämlich eine Auslassung.
+// Sie ist der zweite, UNVERÄNDERTE Job der Anmerkung: „an diesem Tag hat
+// Immich diese Bilder" — reine Anzeige, keine Ereignisse, gedeckelt auf zwölf
+// über den Tag verteilt (F18, Anm. 110/114).
+//
+// A45 filterte hier die Immich-Bilder weg, sobald die Foto-Ebene lief: die
+// Gruppe darüber („34 Fotos in Detmold") zeigte dieselben Bilder, nur zwölf
+// statt vierunddreißig. Diese Doppelung gibt es nicht mehr — ein
+// Foto-Ereignis zeigt im Zeitstrahl ausdrücklich KEIN Bild (siehe
+// `eventPhotos`), also ist die Leiste die einzige Stelle, an der die Bilder
+// eines Tages stehen. Sie hier zusätzlich zu filtern hieße, sie nirgends mehr
+// zu zeigen — und eine Auslassung ist die schlimmere Doppelung.
 function tlStripFor(day) {
-  const media = TL_DAY_MEDIA.get(day);
-  if (!media || !media.length) return media;
-  if (!tl.showPhotos) return media;
-  if (!tl.photoGroups.some(g => g.day === day)) return media;
-  return media.filter(m => m.provider !== 'immich');
+  return TL_DAY_MEDIA.get(day);
 }
 
 async function loadDayMedia(page) {
@@ -4181,31 +4202,6 @@ function dayWeatherLine(day) {
   const n = wx.regions || 1;
   return { line, regions: n,
            note: n > 1 ? t('tl.wx.regions', '{n} Wettergegenden').replace('{n}', n) : '' };
-}
-
-// A45: Die Foto-Gruppen zur geladenen Spanne. Verdichtet wird auf dem SERVER
-// (siehe /api/photos/groups) — der Zeitstrahl blättert, und eine Gruppierung
-// nach dem Blättern zerschneidet die Gruppe an der Seitengrenze; beide Hälften
-// zeigten dann eine zu kleine Zahl (A39/A37, dieselbe Regel wie bei den
-// Besuchen).
-async function loadPhotoGroups(page, more) {
-  if (!tl.showPhotos) { tl.photoGroups = []; return; }
-  const days = page.map(e => (e.date_start || '').slice(0, 10)).filter(Boolean).sort();
-  if (!days.length) return;
-  try {
-    const r = await api(`/api/photos/groups?${new URLSearchParams({
-      from: days[0] + 'T00:00:00', to: days[days.length - 1] + 'T23:59:59',
-      level: tl.level })}`);
-    const groups = r.groups || [];
-    // Beim Nachladen kommen Gruppen für einen ANDEREN Abschnitt dazu; ohne
-    // die Entdopplung stünde ein Tag, den beide Seiten berühren, zweimal da.
-    if (!more) tl.photoGroups = groups;
-    else {
-      const have = new Set(tl.photoGroups.map(g => `${g.day}|${g.place}`));
-      tl.photoGroups = tl.photoGroups.concat(
-        groups.filter(g => !have.has(`${g.day}|${g.place}`)));
-    }
-  } catch { /* Fotos sind eine Ebene, kein Fundament — der Zeitstrahl bleibt gültig */ }
 }
 
 async function loadTimeline(more = false) {
@@ -4271,6 +4267,13 @@ async function loadTimeline(more = false) {
                                        // Moderation werden sie zu Ereignissen.
                                        machine_proposals: 0,
                                        visits: (narrow || tl.showVisits) ? 1 : 0,
+                                       // Anmerkung 139: eigener Schalter, eigener
+                                       // Parameter. Serverseitig, aus demselben
+                                       // Grund wie bei `visits` (A37): sonst
+                                       // bestünde eine Seite fast nur aus
+                                       // Ausgeblendetem — bei zehntausenden
+                                       // Foto-Ereignissen wäre das jede Seite.
+                                       photos: (narrow || tl.showPhotos) ? 1 : 0,
                                        // A47: Die Stufe geht IMMER mit, auch
                                        // wenn gerade nicht verdichtet wird —
                                        // sonst hinge die Antwort davon ab, in
@@ -4291,7 +4294,6 @@ async function loadTimeline(more = false) {
       tl.offset += page.length;
       tl.done = page.length < TL_PAGE;
       await loadDayMedia(page);   // F18: Tages-Bilder derselben Spanne
-      await loadPhotoGroups(page, more);   // A45: Fotopunkte derselben Spanne
       await loadDayWeather(page);          // Anm. 119: Wetter derselben Spanne
     }
   } finally {
@@ -4313,13 +4315,26 @@ const MACHINE_SOURCES = ['google_timeline', 'immich'];
 // sagt es, und ein gesetzter Stadtfilter sagt es auch. Stünde die Bedingung
 // weiter an zwei Stellen einzeln, zeigte der Server die Besuche einer Stadt und
 // der Browser filterte sie gleich wieder weg: eine leere Liste ohne Grund.
-function tlShowsVisits() { return tl.showVisits || !!tl.city; }
+function tlShowsVisits() { return tl.showVisits || !!tl.city || !!tl.day; }
+
+// **Anmerkung 139: dieselbe Frage je QUELLE.** Der Rückfall-Filter im Browser
+// (für Suchtreffer, die kein Server-Fenster haben) prüfte bis hier
+// `MACHINE_SOURCES` als Ganzes — mit zwei getrennten Schaltern warf er damit
+// die Foto-Ereignisse weg, sobald der Google-Schalter aus stand. Der Server
+// hatte sie geschickt, der Browser filterte sie gleich wieder weg: genau die
+// leere Liste ohne Grund, gegen die A41 diese Funktion überhaupt gebaut hat,
+// nur eine Quelle weiter.
+function tlShowsSource(source) {
+  if (source === 'google_timeline') return tlShowsVisits();
+  if (source === 'immich') return tl.showPhotos || !!tl.city || !!tl.day;
+  return true;
+}
 
 // Wie viele Karten stehen nach den Filtern tatsächlich auf dem Schirm?
 function tlVisibleCount() {
   return tl.events.filter(e => passesFilter(e, tl.catFilter)
     && (tl.zoom === 'day' || !e.parent_event_id)
-    && (tlShowsVisits() || !MACHINE_SOURCES.includes(e.source))).length;
+    && tlShowsSource(e.source)).length;
 }
 
 // A37: Ein enger Filter kann eine ganze Seite wegfiltern — „Konzerte" trifft
@@ -4558,7 +4573,7 @@ function renderTimelineList() {
   // A37: Ausgeblendet wird im Server; das hier fängt nur noch die Fälle ohne
   // Server-Filter ab (Suchtreffer). Die Zahl auf dem Schalter kommt aus dem
   // Index — in der geladenen Liste wäre sie eine beliebige Teilmenge.
-  if (!tlShowsVisits()) filtered = filtered.filter(e => !MACHINE_SOURCES.includes(e.source));
+  filtered = filtered.filter(e => tlShowsSource(e.source));
   renderCityChip();
   renderDayChip();         // Anmerkung 142
   ensurePhotoIndex();      // A45: entscheidet, ob der Foto-Schalter etwas kann
@@ -4592,7 +4607,7 @@ function renderTimelineList() {
   // F1: Tagebuch-Einträge stehen als Tageskopf ÜBER den Ereignissen ihres
   // Tages (stabile Sortierung: nur innerhalb desselben Tages umsortieren).
   const dayOf = x => x.date_start ? x.date_start.slice(0, 10) : '';
-  const jr = x => (x.dayMedia || x.photoGroup) ? 2 : x.category === 'journal' ? 1 : 0;
+  const jr = x => x.dayMedia ? 2 : x.category === 'journal' ? 1 : 0;
   Object.values(groups).forEach(g => {
     // Anmerkung 135: Jahr und Jahrzehnt zeigen keine flache Kartenliste mehr,
     // sondern aufklappbare Sammelzeilen — sonst zerreißt eine über Monate
@@ -4614,23 +4629,10 @@ function renderTimelineList() {
     // untereinander, und ab dem Monat werden es dreißig Leisten mit hunderten
     // Bildern — dann ist es keine Erinnerung mehr, sondern eine Wand.
     const days = [...new Set(g.items.map(dayOf).filter(Boolean))].sort();
-    // A45: Foto-Gruppen als eigene Zeilen — VOR den F18-Leisten, weil sie
-    // dieselben Bilder meinen und dann entscheiden, was von den Leisten übrig
-    // bleibt (siehe `tlStripFor`). Angehängt statt eingefügt wären sie an
-    // genau den Tagen hinter „x weitere anzeigen" verschwunden, an denen
-    // fotografiert wurde — der Defekt aus Anmerkung 114, ein Paket später.
-    if (tl.showPhotos) {
-      const byDay = new Map();
-      tl.photoGroups.forEach(pg => {
-        if (!byDay.has(pg.day)) byDay.set(pg.day, []);
-        byDay.get(pg.day).push(pg);
-      });
-      days.forEach(d => (byDay.get(d) || []).forEach(pg => {
-        const at = g.items.findIndex(x => dayOf(x) === d);
-        const row = { photoGroup: pg, date_start: `${d}T00:00:00` };
-        if (at < 0) g.items.push(row); else g.items.splice(at, 0, row);
-      }));
-    }
+    // Anmerkung 139: Hier standen bis 0.39 die Foto-Gruppen als eigene Zeilen.
+    // Sie sind jetzt gewöhnliche Ereignisse und kommen über `g.items` herein —
+    // verdichtet vom Server, nach denselben Regeln wie die Google-Besuche
+    // daneben (A39/A47). Eine zweite Einspeisung wäre dieselbe Zeile zweimal.
     if (tl.zoom === 'day') {
       days.forEach(d => {
         const media = tlStripFor(d);
@@ -4673,8 +4675,7 @@ function renderTimelineList() {
     // wenn ein Tagebuch-Eintrag denselben Tag beansprucht.
     g.items.sort((a, b) => dayOf(a) === dayOf(b) ? jr(b) - jr(a) : 0);
   });
-  const renderItem = x => x.photoGroup ? photoGroupCard(x.photoGroup)
-    : x.dayMedia ? dayMediaCard(x)
+  const renderItem = x => x.dayMedia ? dayMediaCard(x)
     : x.visitGroup ? visitGroupCard(x)
     : (x.category === 'journal' ? journalCard(x) : eventCard(x));
   const ordered = Object.values(groups).sort((a,b) => b.sort - a.sort);
@@ -4754,21 +4755,9 @@ function aggRowCard(bucket) {
 // ist bereits eine bewusste, begrenzte Auswahl (ein Monat, kein Jahr).
 function tlAggDetailHtml(items) {
   const dayOf = x => x.date_start ? x.date_start.slice(0, 10) : '';
-  const jr = x => (x.dayMedia || x.photoGroup) ? 2 : x.category === 'journal' ? 1 : 0;
+  const jr = x => x.dayMedia ? 2 : x.category === 'journal' ? 1 : 0;
   let rows = compressVisits(items);
   const days = [...new Set(items.map(dayOf).filter(Boolean))].sort();
-  if (tl.showPhotos) {
-    const byDay = new Map();
-    tl.photoGroups.forEach(pg => {
-      if (!byDay.has(pg.day)) byDay.set(pg.day, []);
-      byDay.get(pg.day).push(pg);
-    });
-    days.forEach(d => (byDay.get(d) || []).forEach(pg => {
-      const at = rows.findIndex(x => dayOf(x) === d);
-      const row = { photoGroup: pg, date_start: `${d}T00:00:00` };
-      if (at < 0) rows.push(row); else rows.splice(at, 0, row);
-    }));
-  }
   const strip = [];
   days.forEach(d => (tlStripFor(d) || []).forEach(m => strip.push(m)));
   if (strip.length) {
@@ -4776,8 +4765,7 @@ function tlAggDetailHtml(items) {
                    total: strip.length, span: 'month', date_start: `${days[0]}T00:00:00` });
   }
   rows.sort((a, b) => dayOf(a) === dayOf(b) ? jr(b) - jr(a) : 0);
-  const renderItem = x => x.photoGroup ? photoGroupCard(x.photoGroup)
-    : x.dayMedia ? dayMediaCard(x)
+  const renderItem = x => x.dayMedia ? dayMediaCard(x)
     : x.visitGroup ? visitGroupCard(x)
     : (x.category === 'journal' ? journalCard(x) : eventCard(x));
   return rows.map(renderItem).join('');
@@ -4881,7 +4869,21 @@ document.getElementById('timeline-list').addEventListener('click', ev => {
 // ein Urlaubstag mit dreißig Bildern den Zeitstrahl nicht sprengt — der Rest
 // steht als „+N" daneben und ist im Betrachter erreichbar.
 const CARD_PHOTOS = 4;
+// **Anmerkung 139: Ein Foto-Ereignis zeigt im Zeitstrahl KEIN Bild.**
+//
+// Das ist eine bewusste Unterdrückung, kein Versehen — und sie sieht beim
+// Lesen falsch aus, deshalb steht sie hier ausgeschrieben. Die Karte ist der
+// Ort für das BILD (dort hängt das Vorschaubild im Popup), der Zeitstrahl der
+// für die TATSACHE („Foto in Detmold", verdichtet zu „12× Foto in Detmold").
+// Zwölf Vorschaubilder je Zeile über zwanzig Jahre wären eine Wand statt einer
+// Erinnerung, und die Bilder eines Tages stehen ohnehin schon in der
+// Tagesleiste darüber (F18, der zweite Job der Anmerkung).
+//
+// Geprüft wird die QUELLE, nicht das Vorhandensein von Medien: ein von Hand
+// erfasstes Ereignis mit angehängten Immich-Bildern ist etwas anderes als ein
+// Ereignis, das AUS einem Foto entstanden ist.
 function eventPhotos(e) {
+  if (e.source === 'immich') return '';
   const media = e.media || [];
   if (!media.length) return '';
   const shown = media.slice(0, CARD_PHOTOS);
@@ -5046,30 +5048,6 @@ function dayMediaCard(x) {
   return `<div class="day-media" data-day-media="${key}"${
       x.span ? ` data-span="${esc(x.span)}"` : ''}>
     <span class="day-media-label">📷 ${esc(label)}</span>
-    <div class="day-media-strip">${shots}</div>
-  </div>`;
-}
-// A45: Eine Foto-Gruppe im Zeitstrahl — (Tag, Ort) auf der gewählten Stufe.
-//
-// Bewusst dieselbe Bauform wie die Besuchs-Sammelkarte daneben: Zahl, Ort,
-// Zeitspanne. Sie ist KEIN Ereignis und lässt sich deshalb auch nicht
-// bearbeiten — ein Klick öffnet nichts, sondern zeigt die Bilder.
-function photoGroupCard(g) {
-  const time = iso => iso ? iso.slice(11, 16) : '';
-  const shots = (g.assets || []).map(id =>
-    `<img src="/api/photos/${encodeURIComponent(id)}/thumb" alt="" loading="lazy">`).join('');
-  // Die Beschriftung sagt, dass sie auswählt. „6 Bilder" über einer Gruppe von
-  // 300 behauptete Vollständigkeit — dieselbe Regel wie bei den Fotoleisten
-  // (Anmerkung 110).
-  const more = g.count > (g.assets || []).length
-    ? ` <span class="stat-label">${esc(t('tl.photos.of', '{n} von {total}')
-        .replace('{n}', (g.assets || []).length).replace('{total}', g.count))}</span>`
-    : '';
-  return `<div class="day-media" data-photo-group="${esc(g.day)}">
-    <span class="day-media-label">📷 ${esc(t('tl.photos.n', '{n} Fotos').replace('{n}', g.count))}${
-      g.place ? ' · ' + esc(g.place) : ' · ' + esc(t('map.photos.nowhere', 'ohne Ortsangabe'))}
-      <span class="stat-label">${esc(time(g.first))}${
-        time(g.last) && time(g.last) !== time(g.first) ? '–' + esc(time(g.last)) : ''}</span>${more}</span>
     <div class="day-media-strip">${shots}</div>
   </div>`;
 }
@@ -7062,7 +7040,11 @@ const mp = { mode: 'day', periods: [], index: 0, showRoute: true, showTracks: tr
   // öffnet, will zuerst seine Ereignisse sehen. `total` ist die Zahl aus dem
   // Index (der GESAMTE Bestand) — sie entscheidet, ob der Schalter überhaupt
   // etwas bewirken kann (A40).
-  showPhotos: false, photoTotal: 0, photoScanned: [], photoDays: {} };
+  // Anmerkung 139: `photoDays` gibt es nicht mehr — Fotos SIND Ereignisse und
+  // liefern ihre Zeiträume selbst. `mapTotal`/`mapShown` tragen den Hinweis,
+  // wenn die Karte deckelt.
+  showPhotos: false, photoTotal: 0, photoScanned: [],
+  mapTotal: 0, mapShown: 0 };
 // A18: Cluster-Schwelle — vom Nutzer einstellbar (10–300, in User.settings)
 const SETTINGS = { map_cluster_min: 50 };
 function mpClusterMin() { return SETTINGS.map_cluster_min || 50; }
@@ -7097,9 +7079,16 @@ function mpSyncPhotoChip() {
       chip.classList.toggle('inert', empty);
       chip.classList.toggle('active', !empty && on);
       chip.classList.toggle('off', !empty && !on);
+      // Anmerkung 139: Der Schalter nennt SEINE Zahl. Bis 0.39 zählte
+      // „🛰️ N automatisch erfasst" Google-Besuche und Immich zusammen — mit
+      // zwei getrennten Schaltern wäre das eine Zahl, die zu keinem von beiden
+      // passt (hunderte Besuche gegen zehntausende Fotos).
+      chip.textContent = empty
+        ? `📷 ${t('tl.photos', 'Fotos')}`
+        : `📷 ${mp.photoTotal.toLocaleString(LOC())} ${t('tl.photos.n2', 'Fotos')}`;
       chip.title = empty
-        ? t('map.photos.none', 'Noch kein Foto verortet — der Lauf steht unter „Meine Daten → Immich → Fotos verorten".')
-        : t('map.photos.tip', 'Jedes Foto mit Koordinaten als eigener Punkt — dort, wo es aufgenommen wurde. Muss zuerst unter „Meine Daten → Immich" verortet werden.');
+        ? t('map.photos.none', 'Noch kein Foto als Ereignis angelegt — der Lauf steht unter „Meine Daten → Immich → Ereignisse aus Fotos".')
+        : t('map.photos.tip', 'Jedes Foto mit Koordinaten als eigenes Ereignis — auf der Karte ein Punkt mit Vorschaubild, im Zeitstrahl eine Zeile ohne Bild.');
     });
 }
 // Der Fotozähler wird an drei Stellen gebraucht (Karte, Zeitstrahl,
@@ -7110,10 +7099,15 @@ async function ensurePhotoIndex(force) {
   if (PHOTO_INDEX_DONE && !force) return;
   PHOTO_INDEX_DONE = true;
   try {
-    const r = await api('/api/photos/index');
-    mp.photoTotal = r.total;
-    mp.photoScanned = r.years_scanned || [];
+    // Anmerkung 139: `/api/photos/index` gibt es nicht mehr. Die Zahl steht im
+    // EREIGNIS-Index, weil ein Foto ein Ereignis ist — ein eigener Endpunkt
+    // dafür wäre eine zweite Auskunft über denselben Bestand (Anm. 106).
+    const idx = await fetchIndex(force);
+    mp.photoTotal = idx.photo_events || 0;
   } catch (_) { mp.photoTotal = 0; }
+  // Die durchsuchten Jahre sind eine Notiz über einen LAUF und stehen deshalb
+  // in den Einstellungen, nicht im Ereignis-Index. Sie werden nur in „Meine
+  // Daten" gebraucht und dort geholt.
   mpSyncPhotoChip();
 }
 // Nur Events, die den aktiven Kategorie-Filter passieren
@@ -7158,14 +7152,13 @@ function keyForDate(dateStr) {
 }
 function rebuildPeriods(keepKey) {
   const keys = new Set(mpFiltered().map(periodKey));
-  // A45: Die Zeiträume kamen bisher NUR aus den Ereignissen — und genau die
-  // Jahre, für die die Foto-Ebene gemacht ist, haben Fotos und keine Besuche
-  // (vor dem Smartphone gibt es keine Timeline). Ohne diese Zeile ließe sich
-  // 2004 gar nicht ansteuern: der Schalter wäre an, die Karte leer, und
-  // nirgends stünde warum.
-  if (mp.showPhotos) {
-    Object.keys(mp.photoDays || {}).forEach(day => keys.add(keyForDate(day)));
-  }
+  // A45 musste hier die Fototage EINZELN dazuholen: die Zeiträume kamen aus
+  // den Ereignissen, und genau die Jahre, für die die Foto-Ebene gemacht ist,
+  // hatten Fotos und keine Besuche (vor dem Smartphone gibt es keine
+  // Timeline) — 2004 ließ sich sonst gar nicht ansteuern. Seit Anmerkung 139
+  // ein Foto ein Ereignis ist, bringt es seinen Zeitraum selbst mit. Die
+  // Sonderbehandlung fällt damit weg, und mit ihr eine zweite Quelle für
+  // dieselbe Frage.
   const sorted = [...keys].sort();
   mp.periods = sorted;
   mp.index = keepKey && sorted.includes(keepKey) ? sorted.indexOf(keepKey) : sorted.length - 1;
@@ -7206,15 +7199,30 @@ async function mpEnsureWeather(key, items) {
   } catch (_) { return false; }   // ohne Wetter bleibt die Karte vollständig
 }
 
+// Holt die Kartenpunkte. Anmerkung 139: der Foto-Schalter geht MIT — ein
+// ausgeschalteter Schalter soll zehntausende Punkte gar nicht erst über die
+// Leitung schicken, und ein eingeschalteter braucht sie vollständig.
+async function mpLoadPoints() {
+  const qs = new URLSearchParams({ machine_proposals: '0' });
+  if (!mp.showPhotos) qs.set('photos', '0');
+  try {
+    const r = await api(`/api/events/map?${qs}`);
+    mp.located = r.events || [];
+    mp.mapTotal = r.total || 0;
+    mp.mapShown = r.shown || 0;
+  } catch (_) {
+    mp.located = []; mp.mapTotal = mp.mapShown = 0;
+  }
+}
+
 async function openMapView() {
   // A37: eigener schlanker Endpunkt statt der Zeitstrahl-Liste — und erst
   // jetzt, beim Öffnen des Reiters, statt beim Start der App.
   // Anmerkung 135: wie im Zeitstrahl — unbestätigte Google-/Immich-Vorschläge
   // sind Beleg, kein Ereignis, und tauchen erst nach der Moderation auf.
-  mp.located = await api('/api/events/map?machine_proposals=0').catch(() => []);
-  // A45: Wie viele Fotos es ÜBERHAUPT gibt — das entscheidet, ob der
-  // Foto-Schalter etwas bewirken kann (A40). Ein eigener, winziger Abruf:
-  // scheitert er, bleibt die Karte vollständig, nur ohne Fotos.
+  await mpLoadPoints();
+  // Wie viele Foto-Ereignisse es ÜBERHAUPT gibt — das entscheidet, ob der
+  // Foto-Schalter etwas bewirken kann (A40).
   await ensurePhotoIndex();
   if (!mapObj) {
     mapObj = L.map('map').setView([50, 6], 4);
@@ -7381,16 +7389,29 @@ function renderPeriod() {
   const key = mp.periods[mp.index];
   setLabel(periodLabel(key));
   drawTracks(key); // async — zeichnet die Timeline-Routen, sobald geladen
-  const all = mpFiltered().filter(e => periodKey(e) === key)
+  const here = mpFiltered().filter(e => periodKey(e) === key)
     .sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
+  // **Anmerkung 139: Foto-Ereignisse gehen auf die Foto-EBENE, nicht unter die
+  // Pins.** Sie sind seit dieser Anmerkung gewöhnliche Ereignisse und kämen
+  // sonst als nummerierte Marker mit Stopp-Listen-Eintrag heraus — bei
+  // zehntausend Fotos eine unbedienbare Karte und eine Liste, in der kein
+  // einziger von Hand erfasster Eintrag mehr zu finden ist.
+  //
+  // Das ist bewusst eine ANZEIGE-Trennung und keine Daten-Trennung: dieselbe
+  // Zeile, zwei Darstellungen. Genau andersherum als in A45, wo es zwei
+  // Datenbestände mit einer Darstellungsregel waren.
+  const photos = here.filter(e => e.source === 'immich');
+  const all = here.filter(e => e.source !== 'immich');
   // A37: Wetter für genau diesen Zeitraum nachladen und neu zeichnen, sobald
   // es da ist. Die Karte steht sofort; das Wetter kommt in die Popups nach.
   mpEnsureWeather(key, all).then(got => { if (got) renderPeriod(); });
-  // A45: Die Foto-Ebene wird IMMER hier gezeichnet — vor jeder Verzweigung
-  // in Bündelung, Cluster oder Deckel. Sie hat mit alldem nichts zu tun, und
-  // ein Zeichenaufruf hinter einem `return` ist genau die Sorte Ebene, die
-  // in einer der drei Ansichten still fehlt.
-  mpDrawPhotos(key, all);
+  // Die Foto-Ebene wird IMMER hier gezeichnet — vor jeder Verzweigung in
+  // Bündelung, Cluster oder Deckel. Sie hat mit alldem nichts zu tun, und ein
+  // Zeichenaufruf hinter einem `return` ist genau die Sorte Ebene, die in
+  // einer der drei Ansichten still fehlt (A45).
+  mpDrawPhotos(photos);
+  mpPhotoNote(mp.mapTotal > mp.mapShown
+    ? { total: mp.mapTotal, shown: mp.mapShown } : null);
   // A5/A40 (Besuchs-Verdichtung): EIN Schalter, zwei Verfahren — welches
   // greift, entscheidet die Zoomstufe, nicht der Nutzer. Ab Monats-Ansicht
   // wird je Ort gebündelt („59× Zuhause"), in Tag/Woche nach Nähe geclustert.
@@ -7479,16 +7500,22 @@ function mpCapNote(hidden, total) {
 }
 
 // --------------------------------------------------------------------------- //
-// A45 — die Foto-Ebene
+// Anmerkung 139 — die Foto-EBENE über den Foto-EREIGNISSEN
 // --------------------------------------------------------------------------- //
-// Eigener Layer, eigener Abruf, eigener Hinweis. Bewusst NICHT in `mp.located`
-// gemischt: dort liegen Ereignisse, und ein Foto ist keins (Anmerkung 87 —
-// aus einem Beleg ein Objekt zu machen erzeugt Zeilen, die danach überall
-// wieder ausgefiltert werden müssen).
-const MP_PHOTOS = new Map();   // Zeitraum-Schlüssel -> {points, total, shown}
-// EINE Leinwand für alle Fotopunkte, erst beim ersten Bedarf angelegt. Je
-// Punkt eine eigene wäre schlimmer als gar keine, und beim Laden gibt es die
-// Karte noch nicht.
+// A45 hatte hier einen eigenen Layer MIT eigenem Abruf: die Fotopunkte lagen
+// bewusst nicht in `mp.located`, weil dort Ereignisse liegen und ein Foto
+// keins war (Anmerkung 87). Seit Anmerkung 139 ist es eines — der eigene
+// Abruf fällt damit weg, die eigene DARSTELLUNG bleibt.
+//
+// Und die bleibt aus einem handfesten Grund: ein Foto-Ereignis als Pin mit
+// Nummer und Stopp-Listen-Eintrag wäre bei zehntausend Fotos eine unbedienbare
+// Karte und eine Liste, in der kein einziger von Hand erfasster Eintrag mehr
+// zu finden ist. Fotos werden deshalb als Punkte auf die Leinwand gezeichnet,
+// unter den Pins — was oben liegt, sagt, was zählt.
+//
+// EINE Leinwand für alle Punkte, erst beim ersten Bedarf angelegt. Je Punkt
+// eine eigene wäre schlimmer als gar keine, und beim Laden gibt es die Karte
+// noch nicht.
 // Umbenannt von `mpPhotoCanvas`: die Leinwand ist keine Eigenschaft der
 // Foto-Ebene, sondern die Antwort auf „viele Formen auf einer Karte". Solange
 // sie nach den Fotos hieß, hat sie niemand für die Wege gesucht — und genau
@@ -7500,24 +7527,6 @@ function mpCanvas() {
     MP_CANVAS = L.canvas({ padding: 0.5 });
   }
   return MP_CANVAS || undefined;   // ohne Leinwand: Leaflets Standard
-}
-async function mpLoadPhotos(key, from, to) {
-  if (MP_PHOTOS.has(key)) return MP_PHOTOS.get(key);
-  try {
-    // Ohne Grenzen fragen heißt „alles" — bei `mp.mode === 'alle'` ist genau
-    // das gemeint. `new URLSearchParams({from: undefined})` schickt dagegen
-    // die Zeichenkette „undefined", und der Server nähme sie für ein Datum.
-    const qs = new URLSearchParams();
-    if (from) qs.set('from', from);
-    if (to) qs.set('to', to);
-    const r = await api(`/api/photos/map?${qs}`);
-    cacheKeep(MP_PHOTOS, key, r);
-    return r;
-  } catch (_) {
-    // Ohne Fotos bleibt die Karte vollständig — sie zeigt dann eben nur die
-    // Ereignisse, und der Rest der Ansicht funktioniert weiter.
-    return null;
-  }
 }
 // Anmerkung 120: Ein Punkt von 4 px mit 1 px Rand ging neben den Ereignis-Pins
 // und den Cluster-Blasen unter — und zwar gerade dort, wo viel passiert ist.
@@ -7539,37 +7548,39 @@ function mpPhotoResize() {
   MP_PHOTO_DOTS.radius = r;
   MP_PHOTO_DOTS.forEach(dot => dot.setRadius(r));
 }
-function mpDrawPhotos(key, all) {
+// Zeichnet die Foto-Ereignisse des Zeitraums als Punkte auf die Leinwand.
+//
+// Sie kommen aus derselben Liste wie alle anderen Punkte (`mp.located`) — der
+// eigene Abruf ist mit Anmerkung 139 weggefallen. Was bleibt, ist die eigene
+// DARSTELLUNG: Punkt statt Pin, Bild im Popup, unter den Pins.
+function mpDrawPhotos(photos) {
   if (!mapPhotos) return;
   mapPhotos.clearLayers();
   MP_PHOTO_DOTS.length = 0;
   MP_PHOTO_DOTS.radius = null;
-  if (!mp.showPhotos || !mp.photoTotal) { mpPhotoNote(null); return; }
-  // Zeitfenster = der angezeigte Zeitraum, und sonst nichts.
-  const span = mpPeriodSpan(key);
-  mpLoadPhotos(key, span && span[0], span && span[1]).then(r => {
-    if (!r || !mp.showPhotos) { mpPhotoNote(null); return; }
-    const radius = mpPhotoRadius();
-    MP_PHOTO_DOTS.radius = radius;
-    r.points.forEach(p => {
-      MP_PHOTO_DOTS.push(L.circleMarker([p.lat, p.lng], {
-        // Kräftiger Rand und volle Deckkraft: der Punkt muss sich gegen eine
-        // helle Kachel UND gegen eine dunkle behaupten, und der weiße Ring
-        // trennt ihn von seinen Nachbarn, wo viele dicht beieinanderliegen.
-        radius, fillColor: '#f5921b', color: '#fff', weight: 2, fillOpacity: 1,
-        // Auf die Leinwand statt in den DOM: Leaflet zeichnet Kreise sonst als
-        // je ein SVG-Element, und zehntausend davon sind zehntausend Knoten,
-        // die der Browser bei jedem Verschieben neu anfassen muss. Genau diese
-        // Zeichenlast war der Grund für die frühere Deckelung bei 5.000 —
-        // nicht die Datenmenge.
-        renderer: mpCanvas(),
-      }).addTo(mapPhotos).bindPopup(
-        `<img src="/api/photos/${encodeURIComponent(p.id)}/thumb" alt="" `
-        + `style="max-width:180px; border-radius:6px; display:block; margin-bottom:6px" loading="lazy">`
-        + `<b>${esc(p.place || t('map.photos.nowhere', 'ohne Ortsangabe'))}</b><br>`
-        + esc(new Date(p.at).toLocaleString(LOC()))));
-    });
-    mpPhotoNote(r);
+  if (!mp.showPhotos || !photos.length) return;
+  const radius = mpPhotoRadius();
+  MP_PHOTO_DOTS.radius = radius;
+  photos.forEach(e => {
+    MP_PHOTO_DOTS.push(L.circleMarker([e.location.lat, e.location.lng], {
+      // Kräftiger Rand und volle Deckkraft: der Punkt muss sich gegen eine
+      // helle Kachel UND gegen eine dunkle behaupten, und der weiße Ring
+      // trennt ihn von seinen Nachbarn, wo viele dicht beieinanderliegen.
+      radius, fillColor: '#f5921b', color: '#fff', weight: 2, fillOpacity: 1,
+      // Auf die Leinwand statt in den DOM: Leaflet zeichnet Kreise sonst als
+      // je ein SVG-Element, und zehntausend davon sind zehntausend Knoten,
+      // die der Browser bei jedem Verschieben neu anfassen muss.
+      renderer: mpCanvas(),
+    }).addTo(mapPhotos).bindPopup(
+      // **Hier hängt das Bild** — und nur hier. Der Zeitstrahl zeigt dasselbe
+      // Ereignis bewusst als Text (siehe `eventPhotos`): die Karte ist der Ort
+      // für das Bild, der Zeitstrahl der für die Tatsache (Anmerkung 139).
+      (e.photo
+        ? `<img src="/api/photos/${encodeURIComponent(e.photo)}/thumb" alt="" `
+          + `style="max-width:180px; border-radius:6px; display:block; margin-bottom:6px" loading="lazy">`
+        : '')
+      + `<b>${esc((e.location && e.location.name) || t('map.photos.nowhere', 'ohne Ortsangabe'))}</b><br>`
+      + esc(new Date(e.date_start).toLocaleString(LOC()))));
   });
 }
 // Der Zeitraum als ISO-Grenzen; `null` heißt „alles", also keine Eingrenzung.
@@ -7598,17 +7609,23 @@ function mpPeriodSpan(key) {
   return [range[0], `${end.getFullYear()}-${pad(end.getMonth()+1)}-${pad(end.getDate())}`
     + `T${pad(end.getHours())}:${pad(end.getMinutes())}:${pad(end.getSeconds())}`];
 }
-// Anmerkung 110 für die Foto-Ebene: Was die Karte nicht zeigen kann, sagt sie
-// — und zwar dort, wo hingeschaut wird. Ohne diesen Satz sähe ein gedeckelter
-// Ausschnitt aus wie die ganze Bibliothek.
+// Anmerkung 110: Was die Karte nicht zeigen kann, sagt sie — und zwar dort,
+// wo hingeschaut wird. Ohne diesen Satz sähe ein gedeckelter Ausschnitt aus
+// wie der ganze Bestand.
+//
+// Seit Anmerkung 139 gilt der Satz für die GANZE Karte und nicht mehr nur für
+// die Foto-Ebene: der Endpunkt liefert alle Punkte in EINER Antwort und
+// deckelt sie gemeinsam. Zwei Hinweise für zwei Deckelungen wären zwei
+// Antworten auf dieselbe Frage („ist das alles?").
 function mpPhotoNote(r) {
   const box = document.getElementById('mp-photo-note');
   if (!box) return;
-  if (!r || r.total <= r.shown) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  const known = r && typeof r.total === 'number' && typeof r.shown === 'number';
+  if (!known || r.total <= r.shown) { box.style.display = 'none'; box.innerHTML = ''; return; }
   box.style.display = '';
-  // Die Verteilung gehört in den Satz: „5.000 von 8.120" allein liest sich wie
-  // ein Ausschnitt vom Anfang — und genau das war es früher auch.
-  box.innerHTML = `📷 ${esc(t('map.photos.cap', '{s} von {n} Fotos gezeigt, gleichmäßig über den Zeitraum verteilt — kleineren Zeitraum wählen für alle.')
+  // Die Verteilung gehört in den Satz: „50.000 von 81.200" allein liest sich
+  // wie ein Ausschnitt vom Anfang — und genau das war es früher auch.
+  box.innerHTML = `📷 ${esc(t('map.points.cap', '{s} von {n} Punkten gezeigt, gleichmäßig über den Zeitraum verteilt — kleineren Zeitraum wählen für alle.')
     .replace('{s}', r.shown.toLocaleString(LOC()))
     .replace('{n}', r.total.toLocaleString(LOC())))}`;
 }
@@ -7707,13 +7724,13 @@ document.getElementById('mp-photos-toggle').addEventListener('click', function (
   }
   mp.showPhotos = !mp.showPhotos;
   mpSyncPhotoChip();
-  // Die Tageliste erst beim Einschalten holen — wer die Ebene nie benutzt,
-  // zahlt auch nichts dafür.
-  const after = () => { rebuildPeriods(mp.periods[mp.index]); renderPeriod(); };
-  if (mp.showPhotos && !Object.keys(mp.photoDays).length) {
-    api('/api/photos/days').then(r => { mp.photoDays = r.days || {}; after(); })
-      .catch(() => after());
-  } else after();
+  // **Neu holen, nicht nur ausblenden** (Anmerkung 139). Der Server filtert
+  // die Foto-Ereignisse, damit ein ausgeschalteter Schalter zehntausende
+  // Punkte gar nicht erst über die Leitung schickt — dann muss ein
+  // eingeschalteter sie auch anfordern. Ein Filter, der nur in eine Richtung
+  // wirkt, macht aus dem Einschalten eine Aktion ohne Wirkung.
+  const keep = mp.periods[mp.index];
+  mpLoadPoints().then(() => { rebuildPeriods(keep); renderPeriod(); });
 });
 // A24: Karte im Vollbild — nach dem Wechsel neu vermessen (Esc beendet)
 document.getElementById('mp-fullscreen').addEventListener('click', () => {
@@ -8372,8 +8389,7 @@ document.querySelectorAll('.example-chip').forEach(c =>
 const JOB_LABELS = { recompute: '🔄 KI-Vorschläge neu berechnen', weather: '🌤️ Wetter ergänzen',
                      embeddings: '🧠 Embeddings', resolve_names: '📍 Ortsnamen auflösen/formatieren',
                      immich: '🖼️ Fotos aus Immich verknüpfen',
-                     immich_source: '🖼️ Ereignisse aus Immich vorschlagen',
-                     photo_points: '📍 Fotos auf der Karte verorten',
+                     photo_points: '📷 Ereignisse aus Fotos anlegen',
                      timeline_import: '🛰️ Timeline-Import', data_import: '📥 Daten-Import' };
 const JOB_STATUS_DE = { running: '⏳ läuft', done: '✅ fertig', stopped: '⏹ gestoppt', error: '⚠️ Fehler' };
 // F10: Status in der aktiven Sprache
@@ -8439,10 +8455,10 @@ async function loadJobs() {
 }
 document.getElementById('jobs-refresh').addEventListener('click', loadJobs);
 // A22: Nachtplan-Einstellungen (pro Nutzer)
-// `immich_source` steht bewusst NICHT hier: der Lauf braucht ein Jahr und eine
-// gesehene Vorschau. Ein nächtlicher Lauf würde beides überspringen und morgens
-// hunderte Vorschläge in der Moderation ablegen — genau das, wogegen die
-// Jahres-Aufteilung gebaut ist (Anmerkung 107).
+// `photo_points` steht bewusst NICHT hier: der Lauf braucht ein Jahr und eine
+// gesehene Vorschau. Ein nächtlicher Lauf würde beides überspringen und legte
+// über Nacht zehntausende bestätigte Zeilen an — genau das, wogegen die
+// Vorschau-Pflicht gebaut ist (Anmerkung 107/139).
 const SCHED_TYPES = ['weather', 'embeddings', 'resolve_names', 'recompute', 'immich'];
 function renderSchedule() {
   const panel = document.getElementById('sched-panel');
@@ -9152,7 +9168,8 @@ function renderImmichState(s) {
     : t('im.state.none', 'Noch kein Schlüssel hinterlegt.');
   // Stufe 2: Jahresauswahl füllen, sobald klar ist, dass es Immich gibt.
   loadImmichYears();
-  ppLoadIndex();       // A45: Stand der Fotopunkte (ebenfalls eigene Daten)
+  ppLoadIndex();       // Stand der Foto-Ereignisse (ebenfalls eigene Daten)
+  dcCheck(true);       // Anm. 139: gibt es noch alte Sammeleinträge?
 }
 async function saveImmich() {
   const url = document.getElementById('im-url').value.trim();
@@ -9337,10 +9354,7 @@ async function loadImmichYears() {
     } else {
       imsNote('');
     }
-    // A45: Dieselbe Jahresliste für den Verorten-Lauf — sie beantwortet für
-    // beide dieselbe Frage („welches Jahr lohnt sich?"). Zwei Listen wären
-    // zwei Antworten darauf (Anmerkung 106).
-    ppFillYears(sel);
+    imsMarkScanned(sel);
   } catch (err) {
     // Nicht mehr verschlucken: Die Auswahl steht (Standardjahre), aber der
     // Nutzer soll wissen, dass die Empfehlung fehlt — sonst wundert er sich,
@@ -9348,92 +9362,157 @@ async function loadImmichYears() {
     imsDefaultYears();
     imsNote(t('ims.years.fail', 'Die Jahresliste konnte nicht aus Immich geholt werden ({e}) — die Auswahl zeigt die letzten Jahre. Ein Lauf geht trotzdem.')
       .replace('{e}', err.message));
-    ppFillYears(sel);
+    imsMarkScanned(sel);
   }
 }
 
-// --------------------------------------------------------------------------- //
-// A45 — Fotos verorten
-// --------------------------------------------------------------------------- //
-// Kein Vorschau-Riegel wie bei den Vorschlägen: dieser Lauf schreibt nichts in
-// die Lebensdatenbank. Er legt Punkte an, die eine reine Ableitung sind — und
-// „Punkte verwerfen" macht ihn vollständig rückgängig. Ein Riegel davor wäre
-// eine Hürde ohne Risiko dahinter.
-function ppFillYears(source) {
-  const sel = document.getElementById('pp-year');
-  if (!sel || !source) return;
-  const keep = sel.value;
-  sel.innerHTML = source.innerHTML;
-  // Was schon durchsucht wurde, steht dran — sonst weiß niemand, welches
-  // Jahr noch offen ist, und der Lauf wird zum Ratespiel.
+// Was schon durchsucht wurde, steht an der Jahresauswahl — sonst weiß niemand,
+// welches Jahr noch offen ist, und der Lauf wird zum Ratespiel (A40).
+//
+// Bis 0.39 hatte der Verorten-Lauf dafür eine EIGENE Auswahl neben dieser hier
+// (`ppFillYears`). Zwei Listen für dieselbe Frage („welches Jahr lohnt sich?")
+// waren schon damals eine zu viel; seit die beiden Läufe einer sind, gibt es
+// die zweite nicht mehr.
+function imsMarkScanned(sel) {
+  if (!sel) return;
   const done = new Set(mp.photoScanned || []);
+  if (!done.size) return;
   [...sel.options].forEach(o => {
-    if (done.has(+o.value)) o.textContent += ' ✓';
+    if (done.has(+o.value) && !o.textContent.endsWith(' ✓')) o.textContent += ' ✓';
   });
-  // Beim Sammeleintrag steht dran, wie viel er noch zu tun hat — sonst ist
-  // „Alle Jahre" nach dem zehnten Lauf dieselbe Beschriftung wie vor dem
-  // ersten und sagt nicht, ob überhaupt noch etwas offen ist (A40).
   const all = [...sel.options].find(o => o.value === YEAR_ALL);
   if (all) {
     const open = yearsOf(sel).filter(y => !done.has(y)).length;
     all.textContent = t('year.all', 'Alle Jahre')
-      + (open ? ` (${t('pp.open', '{n} offen').replace('{n}', open)})`
-              : ` ✓`);
+      + (open ? ` (${t('pp.open', '{n} offen').replace('{n}', open)})` : ' ✓');
   }
-  // Variante B: Verorten läuft standardmäßig über ALLE Jahre — der Lauf ist
-  // folgenlos (verwerfbare Ebene) und hakt die Jahre einzeln ab; ein einzelnes
-  // Jahr ist die Ausnahme unter „Erweitert", nicht der Normalfall.
-  if (keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
-  else sel.value = YEAR_ALL;
 }
+
+// --------------------------------------------------------------------------- //
+// Anmerkung 139 — Zustand und Rücknahme der Foto-Ereignisse
+// --------------------------------------------------------------------------- //
+// A45 hatte hier einen eigenen Lauf mit eigener Jahresauswahl („Schritt C"),
+// und er brauchte keine Vorschau: er legte verwerfbare Kartenpunkte an. Seit
+// Anmerkung 139 legt derselbe Lauf Lebensdatenbank an — er ist mit Schritt B
+// zusammengefallen und untersteht dessen Vorschau-Pflicht.
+//
+// Was hier bleibt: der ZUSTAND (wie viele Foto-Ereignisse gibt es, welche
+// Jahre wurden durchsucht) und die Rücknahme.
 async function ppLoadIndex() {
   const box = document.getElementById('pp-result');
   try {
-    const r = await api('/api/photos/index');
-    mp.photoTotal = r.total;
-    mp.photoScanned = r.years_scanned || [];
+    // Zwei Auskünfte aus zwei Quellen, und das ist hier richtig: die ZAHL ist
+    // eine Aussage über die Lebensdatenbank (Ereignis-Index), die durchsuchten
+    // JAHRE sind eine Notiz über einen Lauf und stehen in den Einstellungen.
+    const idx = await fetchIndex(true);
+    mp.photoTotal = idx.photo_events || 0;
     PHOTO_INDEX_DONE = true;
+    let scanned = [];
+    try {
+      const st = await api('/api/auth/me/settings');
+      scanned = ((st.photo_points || {}).years) || [];
+    } catch (_) { /* ohne Merkliste bleibt die Zahl trotzdem gültig */ }
+    mp.photoScanned = scanned;
     mpSyncPhotoChip();
-    ppFillYears(document.getElementById('ims-year'));
     if (!box) return;
     box.style.display = '';
-    box.innerHTML = r.total
-      ? `<b>${esc(t('pp.have', '{n} Fotos verortet').replace('{n}', r.total.toLocaleString(LOC())))}</b>`
-        + (r.first ? ` <span class="stat-label">· ${esc(r.first.slice(0, 10))} – ${esc((r.last || '').slice(0, 10))}</span>` : '')
-        + (r.years_scanned.length
-            ? `<div class="stat-label" style="margin-top:6px">${esc(t('pp.years', 'Durchsucht: {y}').replace('{y}', r.years_scanned.join(', ')))}</div>`
+    box.innerHTML = mp.photoTotal
+      ? `<b>${esc(t('pp.have', '{n} Foto-Ereignisse angelegt').replace('{n}', mp.photoTotal.toLocaleString(LOC())))}</b>`
+        + (scanned.length
+            ? `<div class="stat-label" style="margin-top:6px">${esc(t('pp.years', 'Durchsucht: {y}').replace('{y}', scanned.join(', ')))}</div>`
             : '')
       // „nie nachgesehen" ist nicht „keine Fotos" — der Unterschied gehört
       // dorthin, wo jemand ihn braucht.
       : esc(t('pp.none', 'Noch kein Jahr durchsucht. Bis dahin bleibt die Foto-Ebene auf der Karte leer — das heißt nicht, dass es keine Fotos gibt.'));
   } catch (_) { /* ohne Immich gibt es hier schlicht nichts zu zeigen */ }
 }
-document.getElementById('pp-run')?.addEventListener('click', ev => {
-  const sel = document.getElementById('pp-year');
-  // „Alle Jahre" braucht hier keine Vorschau und keine Warnung: der Lauf legt
-  // keine Ereignisse an, hakt jedes Jahr einzeln ab und ist mit „Punkte
-  // verwerfen" vollständig zurückzunehmen. Er ist lang, nicht folgenreich.
-  const years = sel.value === YEAR_ALL ? yearsOf(sel)
-    : [parseInt(sel.value, 10)].filter(Number.isFinite);
-  if (!years.length) {
-    toast(t('pp.needyear', 'Bitte ein Jahr wählen.'), 'warn');
-    return;
-  }
-  startServerJob(ev.target, 'photo_points', { years }, true);
-});
 document.getElementById('pp-reset')?.addEventListener('click', async ev => {
   const btn = ev.target;
+  // **Das löscht Bestätigtes** — anders als bei A45, wo eine Ableitung
+  // weggeworfen wurde. Deshalb wird gefragt, und zwar mit der Zahl.
+  const n = mp.photoTotal || 0;
+  if (!n) { toast(t('pp.reset.none', 'Es gibt keine Foto-Ereignisse zum Verwerfen.'), 'warn'); return; }
+  if (!confirm(t('pp.reset.ask', '{n} Foto-Ereignisse werden gelöscht. Sie lassen sich mit einem neuen Lauf wieder anlegen. Fortfahren?')
+      .replace('{n}', n.toLocaleString(LOC())))) return;
   btn.disabled = true;
   try {
     const r = await api('/api/photos/reset', { method: 'POST' });
-    toast(t('pp.reset.done', '✓ {n} Fotopunkte verworfen.').replace('{n}', r.deleted), 'ok', 6000);
-    // Der Kartenzustand ist ein anderer: Zwischenspeicher leeren, sonst
-    // zeichnet die Karte weiter die Punkte, die es nicht mehr gibt.
-    MP_PHOTOS.clear();
-    mp.photoDays = {};
+    toast(t('pp.reset.done', '✓ {n} Foto-Ereignisse verworfen.').replace('{n}', r.deleted), 'ok', 6000);
+    // Der Kartenzustand ist ein anderer: neu holen, sonst zeichnet die Karte
+    // weiter die Punkte, die es nicht mehr gibt.
+    if (mapObj) { await mpLoadPoints(); rebuildPeriods(); renderPeriod(); }
     await ppLoadIndex();
   } catch (err) { toast(err.message, 'error', 8000); }
   finally { btn.disabled = false; }
+});
+
+// --------------------------------------------------------------------------- //
+// Aufräumen: die Tagescluster aus Anmerkung 138
+// --------------------------------------------------------------------------- //
+// Dieselbe Bauform wie der A46-Besuchsschnitt und die F7-Serie, und aus
+// demselben Grund: die Aktion fasst BESTÄTIGTES an. Erst nachsehen, dann
+// löschen; der Knopf bleibt bis dahin gesperrt, und die Vorschau NENNT die
+// Zeilen, statt sie nur zu zählen.
+let dcSeen = false;
+async function dcCheck(silent) {
+  const card = document.getElementById('im-cleanup');
+  if (!card) return 0;
+  try {
+    const r = await api('/api/immich/day-clusters');
+    // **Die Karte gibt es nur, solange es etwas aufzuräumen gibt.** Eine
+    // Karte, die dauerhaft von einer Übergangsform erzählt, ist ein
+    // Änderungsprotokoll und keine Anleitung (Anmerkung 115).
+    card.style.display = r.total ? '' : 'none';
+    if (!silent) dcShow(r);
+    return r.total;
+  } catch (_) { return 0; }
+}
+function dcShow(r) {
+  const box = document.getElementById('dc-result');
+  const run = document.getElementById('dc-run');
+  if (!box) return;
+  box.style.display = '';
+  dcSeen = r.total > 0;
+  if (run) run.disabled = !dcSeen;
+  if (!r.total) {
+    box.innerHTML = esc(t('dc.clean', '✓ Es gibt keine alten Sammeleinträge mehr.'));
+    return;
+  }
+  const rows = (r.sample || []).map(x =>
+    `<div>· ${esc((x.date || '').slice(0, 10))} — ${esc(x.title)}</div>`).join('');
+  box.innerHTML = `<b>${esc(t('dc.found', '{n} Sammeleinträge werden entfernt')
+      .replace('{n}', r.total.toLocaleString(LOC())))}</b>`
+    + `<div class="stat-label" style="margin-top:6px">${rows}</div>`
+    + (r.total > (r.sample || []).length
+        ? `<div class="stat-label">${esc(t('dc.more', '… und {n} weitere')
+            .replace('{n}', (r.total - (r.sample || []).length).toLocaleString(LOC())))}</div>`
+        : '');
+}
+document.getElementById('dc-preview')?.addEventListener('click', async ev => {
+  const btn = ev.target;
+  btn.disabled = true;
+  try { dcShow(await api('/api/immich/day-clusters')); }
+  catch (err) { toast(err.message, 'error', 8000); }
+  finally { btn.disabled = false; }
+});
+document.getElementById('dc-run')?.addEventListener('click', async ev => {
+  // Der Riegel sitzt hier UND am Knopf: `disabled` allein wäre eine Sperre,
+  // die ein Klick aus dem Skript heraus nicht kennt (dieselbe Zusage wie bei
+  // der Immich-Vorschau, geprüft von check-p21-preview.js).
+  if (!dcSeen) {
+    toast(t('dc.needpreview', 'Erst nachsehen, was betroffen ist.'), 'warn');
+    return;
+  }
+  const btn = ev.target;
+  btn.disabled = true;
+  try {
+    const r = await api('/api/immich/day-clusters/remove', { method: 'POST' });
+    toast(t('dc.done', '✓ {n} Sammeleinträge entfernt.').replace('{n}', r.removed), 'ok', 6000);
+    dcSeen = false;
+    await dcCheck(false);
+    if (mapObj) { await mpLoadPoints(); rebuildPeriods(); renderPeriod(); }
+  } catch (err) { toast(err.message, 'error', 8000); }
+  finally { btn.disabled = !dcSeen; }
 });
 function imsNote(text) {
   const box = document.getElementById('ims-result');
@@ -9470,14 +9549,24 @@ document.getElementById('ims-year')?.addEventListener('change', imsLock);
 // Jahr für Jahr bekommt dagegen JEDES Jahr das volle Budget, und was am Ende
 // dasteht, ist wirklich angesehen worden.
 let imsBusy = false, imsCancel = false;
+// Anmerkung 139: Die Vorschau zaehlt jetzt FOTOS (ein Foto = ein Ereignis) und
+// verdichtet auf ORTE. Eine Liste von zwanzigtausend Zeilen waere selbst keine
+// Entscheidungsgrundlage mehr - die Orte mit ihren Zahlen sind die Ebene, auf
+// der man "ja, das war so" oder "nein, das sind fremde Bilder" sagen kann.
 function imsBlank() {
-  return { total: 0, photos: 0, proposals: [], seconds: 0 };
+  return { total: 0, days: 0, seen: 0, places: new Map(), sample: [],
+           seconds: 0, truncated: false, skipped: [] };
 }
 function imsMerge(acc, r) {
-  acc.total += r.total;
-  acc.photos += r.photos;
-  acc.proposals.push(...(r.proposals || []));
+  acc.total += r.total || 0;
+  acc.days += r.days || 0;
+  acc.seen += r.seen || 0;
   acc.seconds += r.seconds || 0;
+  acc.truncated = acc.truncated || !!r.truncated;
+  (r.places || []).forEach(x =>
+    acc.places.set(x.place, (acc.places.get(x.place) || 0) + x.photos));
+  if (acc.sample.length < 12) acc.sample.push(...(r.sample || []).slice(0, 4));
+  (r.skipped || []).forEach(x => { if (!acc.skipped.includes(x)) acc.skipped.push(x); });
   return acc;
 }
 // „2024" bzw. „2003–2024 (14 Jahre)" — dieselbe Form wie `_year_span` im
@@ -9543,8 +9632,9 @@ document.getElementById('ims-preview')?.addEventListener('click', async ev => {
         box.innerHTML = `<b>🔍 ${esc(t('ims.running', '{i} von {n} Jahren angesehen ({y})')
             .replace('{i}', seen.length).replace('{n}', years.length)
             .replace('{y}', years[at]))}</b><br>`
-          + esc(t('ims.running.sum', 'bisher {n} Ereignisse aus {p} Fotos')
-              .replace('{n}', acc.total).replace('{p}', acc.photos));
+          + esc(t('ims.running.sum', 'bisher {n} Ereignisse an {d} Tagen')
+              .replace('{n}', acc.total.toLocaleString(LOC()))
+              .replace('{d}', acc.days.toLocaleString(LOC())));
       }
     }
   } catch (err) {
@@ -9591,19 +9681,25 @@ document.getElementById('ims-preview')?.addEventListener('click', async ev => {
       box.innerHTML = `<b>${esc(label)}: ${esc(t('ims.none', 'nichts Neues anzulegen.'))}</b><br>`
         + esc(t('ims.none.why', 'Entweder gibt es keine eigenen Fotos mit Koordinaten in diesem Jahr, oder alles wurde schon angelegt oder gelöscht — Gelöschtes kommt nicht wieder.'));
     } else {
-      // Die Vorschau NENNT die Ereignisse. Eine Zahl ist keine
+      // Die Vorschau NENNT, was entsteht. Eine Zahl allein ist keine
       // Entscheidungsgrundlage (P2.5) — hier erst recht nicht, weil das
-      // Anlegen sofort bestätigt (Anmerkung 138).
-      const rows = r.proposals.slice(0, 40).map(p => `
+      // Anlegen sofort bestätigt (Anmerkung 138) und weil es seit Anmerkung 139
+      // um zehntausende Zeilen geht statt um hunderte.
+      const places = [...r.places.entries()].sort((a, b) => b[1] - a[1]);
+      const rows = places.slice(0, 40).map(([name, n]) => `
         <div style="padding:3px 0">
-          📅 <b>${esc(p.title)}</b>
-          <span class="stat-label">· ${esc(p.start.slice(0, 10))}${p.place ? ' · ' + esc(p.place) : ''}
-          · ${p.photos} ${esc(t('ims.photos', 'Fotos'))}</span>
+          📍 <b>${esc(name)}</b>
+          <span class="stat-label">· ${esc(n.toLocaleString(LOC()))} ${esc(t('ims.photos', 'Fotos'))}</span>
         </div>`).join('');
-      box.innerHTML = `<b>${esc(t('ims.head', '{y}: {n} Ereignisse aus {p} Fotos')
-          .replace('{y}', label).replace('{n}', r.total).replace('{p}', r.photos))}</b>
+      box.innerHTML = `<b>${esc(t('ims.head', '{y}: {n} Foto-Ereignisse an {d} Tagen')
+          .replace('{y}', label).replace('{n}', r.total.toLocaleString(LOC()))
+          .replace('{d}', r.days.toLocaleString(LOC())))}</b>
         <div style="margin-top:6px">${rows}</div>
-        ${r.total > 40 ? `<div class="stat-label">… ${r.total - 40} ${esc(t('ims.more', 'weitere'))}</div>` : ''}`;
+        ${places.length > 40 ? `<div class="stat-label">… ${places.length - 40} ${esc(t('ims.moreplaces', 'weitere Orte'))}</div>` : ''}
+        ${r.skipped.length ? `<div class="stat-label" style="margin-top:8px">${
+            esc(t('ims.skipped', 'Ohne Ereignis: {r}').replace('{r}', r.skipped.join(', ')))}</div>` : ''}
+        ${r.truncated ? `<div class="stat-label" style="margin-top:8px">⚠️ ${
+            esc(t('ims.truncated', 'Die Vorschau musste abbrechen (Zeitbudget) — der Lauf legt mehr an, als hier steht. Ein einzelnes Jahr wählen für die vollständige Vorschau.'))}</div>` : ''}`;
     }
     imsLock();
     // Anmerkung 120: Auch die Vorschau meldet sich unten rechts. Sie schreibt
@@ -9628,7 +9724,7 @@ document.getElementById('ims-run')?.addEventListener('click', ev => {
   // Steht im Feld „Alle Jahre", während die Vorschau vier Jahre gesehen hat,
   // sind vier Jahre die Wahrheit — die Sperre sorgt dafür, dass beides
   // ohnehin zusammenpasst.
-  startServerJob(ev.target, 'immich_source', { years: imsPreviewedYears }, true);
+  startServerJob(ev.target, 'photo_points', { years: imsPreviewedYears }, true);
   // Die Vorschau ist verbraucht: nach dem Lauf ist der Bestand ein anderer,
   // und der Knopf darf nicht offen stehen bleiben.
   imsPreviewedYear = null;

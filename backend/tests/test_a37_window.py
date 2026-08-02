@@ -155,16 +155,22 @@ def test_map_returns_only_located_events_in_thin_form(db, user):
     _weather(db, located, temperature_c=19.0)
     _event(db, user, "ohne Ort", when=datetime(2024, 6, 2))
 
-    points = list_map_events(db=db, user=user)
+    points = list_map_events(db=db, user=user)["events"]
     assert len(points) == 1
     p = points[0]
-    assert p.title == "mit Ort" and p.location.lat == 53.5
-    # Schlanke Form: was die Karte nicht zeichnet, wird nicht mitgeschickt
-    assert not hasattr(p, "description") and not hasattr(p, "media")
+    assert p["title"] == "mit Ort" and p["location"]["lat"] == 53.5
+    # Schlanke Form: was die Karte nicht zeichnet, wird nicht mitgeschickt.
+    #
+    # **Auf die SCHLÜSSEL prüfen, nicht mit `hasattr`.** Seit die Antwort ein
+    # Dict ist (Anmerkung 139: `{total, shown, events}` statt einer nackten
+    # Liste), ist `hasattr(p, "description")` immer falsch — die Zusicherung
+    # wäre auch dann grün, wenn die halbe Datenbank mitgeschickt würde.
+    # Vierte Zusicherung in dieser Runde, die aus dem falschen Grund grün war.
+    assert "description" not in p and "media" not in p
     # Gemessen: das Wetter macht aus 205 Byte je Punkt 799. Deshalb ist es im
     # Grundabruf AUS und kommt nur für den angezeigten Zeitraum dazu.
-    assert p.weather is None
-    assert list_map_events(db=db, user=user, weather=True)[0].weather == {
+    assert p["weather"] is None
+    assert list_map_events(db=db, user=user, weather=True)["events"][0]["weather"] == {
         "temperature_c": 19.0}
 
 
@@ -173,8 +179,9 @@ def test_map_accepts_a_time_window(db, user):
     _event(db, user, "alt", when=datetime(2019, 1, 1), loc=loc)
     _event(db, user, "neu", when=datetime(2024, 1, 1), loc=loc)
 
-    points = list_map_events(db=db, user=user, date_from=datetime(2020, 1, 1))
-    assert [p.title for p in points] == ["neu"]
+    points = list_map_events(db=db, user=user,
+                             date_from=datetime(2020, 1, 1))["events"]
+    assert [p["title"] for p in points] == ["neu"]
 
 
 def test_single_event_is_fetchable_and_scoped(db, user):
@@ -409,7 +416,7 @@ def test_empty_database_answers_everywhere(db, user):
     idx = events_index(db=db, user=user)
     assert idx.total == 0 and idx.years == [] and idx.birth is None
     assert idx.year_min is None and idx.visits == 0
-    assert list_map_events(db=db, user=user) == []
+    assert list_map_events(db=db, user=user) == {"total": 0, "shown": 0, "events": []}
     ov = compute_overview(db, user.id)
     assert ov["counts"]["events"] == 0 and ov["per_year"] == []
 

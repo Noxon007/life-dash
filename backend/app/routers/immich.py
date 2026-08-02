@@ -1,11 +1,24 @@
-"""P2.1 Stufe 2 — Endpunkte für „Immich als Ereignis-Quelle".
+"""Immich als Ereignis-Quelle — Endpunkte (Anmerkung 139).
 
 Zwei lesende Endpunkte (Jahre, Vorschau) und ein Lauf, der als **Job** läuft
-(`immich_source`, jahresweise über `params`). Die Trennung ist Absicht und
+(`photo_points`, jahresweise über `params`). Die Trennung ist Absicht und
 folgt dem P2.5-Muster: **erst sehen, dann anlegen.** Ohne die Vorschau
-schreibt eine zwanzig Jahre alte Bibliothek in einem Rutsch potenziell
-hunderte Ereignisse in die Lebensdatenbank — seit Anmerkung 138 direkt
-bestätigt, also ohne die Moderation als zweite Bremse danach.
+schreibt eine zwanzig Jahre alte Bibliothek in einem Rutsch zehntausende
+Ereignisse in die Lebensdatenbank — seit Anmerkung 138 direkt bestätigt, also
+ohne die Moderation als zweite Bremse danach.
+
+**Was die Vorschau seit Anmerkung 139 zeigt.** Bis 0.39 wurden Tagescluster
+vorgeschlagen („34 Fotos in Detmold" = ein Ereignis), und die Vorschau konnte
+sie einzeln aufzählen. Jetzt wird jedes Foto ein Ereignis; eine Liste von
+zwanzigtausend ist selbst keine Entscheidungsgrundlage mehr. Genannt werden
+deshalb die ORTE mit ihren Zahlen — die Ebene, auf der man „ja, das war so"
+oder „nein, das sind fremde Bilder" sagen kann — plus Beispiele. Die Zusage
+aus A46/F7 bleibt damit erfüllt: **eine Vorschau, die nur zählt, ist keine.**
+
+Dazu der Aufräum-Lauf für die Tagescluster aus Anmerkung 138. Er fasst
+BESTÄTIGTES an, und daraus folgen alle seine Grenzen (nur auf Knopfdruck, nie
+im Nachtplan, nur `immich:day:`, Vorschau nennt die Zeilen) — dieselbe Strenge
+wie beim A46-Besuchsschnitt.
 """
 from __future__ import annotations
 
@@ -20,7 +33,7 @@ from app.auth import get_current_user
 from app.database import get_db
 from app.models import User
 from app.services import immich as api
-from app.services import immich_source as source
+from app.services import photo_points as source
 
 router = APIRouter(prefix="/api/immich", tags=["Immich"])
 
@@ -119,22 +132,70 @@ def source_preview(
     began = time.monotonic()
     report: dict = {}
     try:
-        proposals = source.scan_year(db, user, year, url, key,
-                                     budget_s=PREVIEW_BUDGET_S, report=report)
+        props = source.scan_year(db, user, year, url, key,
+                                 budget_s=PREVIEW_BUDGET_S, report=report)
     except api.ImmichError as exc:
         log.warning("Immich-Vorschau %d abgebrochen nach %.1fs: %s",
                     year, time.monotonic() - began, exc)
-        return {"year": year, "error": str(exc), "total": 0, "photos": 0,
-                "seconds": round(time.monotonic() - began, 1), "proposals": []}
-    log.info("Immich-Vorschau %d fertig in %.1fs: %d Tagescluster",
-             year, time.monotonic() - began, len(proposals))
+        return {"year": year, "error": str(exc), "total": 0, "days": 0,
+                "seconds": round(time.monotonic() - began, 1),
+                "places": [], "sample": [], "skipped": []}
+    seconds = round(time.monotonic() - began, 1)
+    log.info("Immich-Vorschau %d fertig in %.1fs: %d Foto-Ereignisse",
+             year, seconds, len(props))
     return {
-        "year": year,
-        "total": len(proposals),
-        "photos": sum(p.photos for p in proposals),
-        "seconds": report.get("seconds"),
-        # Die Liste selbst, damit die Vorschau die Ereignisse NENNT statt nur
-        # zu zählen. „12 Tagescluster" ist eine Zahl; „12. Juli in Detmold, …"
-        # ist eine Entscheidungsgrundlage.
-        "proposals": [p.as_dict() for p in proposals],
+        "year": year, "seconds": seconds,
+        "seen": report.get("seen", 0),
+        # **Eine Teilvorschau muss sagen, dass sie eine ist.** Sonst liest sich
+        # „1.200 Fotos" wie das ganze Jahr, der Lauf legt danach 9.000 an, und
+        # niemand versteht warum (Anmerkung 113).
+        "truncated": bool(report.get("truncated")),
+        # **Warum die anderen nicht.** Ohne diese Zeile sind „2016 gelesen, 17
+        # neu" und „2016 gelesen, 17 neu, weil der Schlüssel auf ein fremdes
+        # Konto zeigt" dieselbe Auskunft (Anmerkung 120).
+        "skipped": source.drop_reasons(report),
+        **source.preview_summary(props),
     }
+
+
+# --------------------------------------------------------------------------- #
+# Aufräumen: die Tagescluster aus Anmerkung 138
+# --------------------------------------------------------------------------- #
+@router.get("/day-clusters")
+def day_clusters(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Was der Aufräum-Lauf löschen WÜRDE. Löscht nichts.
+
+    Anmerkung 138 hat für einen Tag mit Fotos EIN Ereignis angelegt („34 Fotos
+    in Detmold"). Anmerkung 139 ersetzt genau diesen Mechanismus durch ein
+    Ereignis je Foto. Beides nebeneinander stehen zu lassen hieße, denselben
+    Tag zweimal zu behaupten — einmal als Sammelzeile, einmal als 34 Punkte.
+
+    Die Vorschau NENNT die Zeilen (A46/F7-Zusage), statt nur zu zählen: ein
+    Knopf, der „214 bestätigte Einträge löschen" sagt und nicht welche, ist
+    keine Entscheidungsgrundlage.
+    """
+    total = source.count_day_clusters(db, user.id)
+    return {"total": total,
+            "sample": source.day_cluster_sample(db, user.id) if total else []}
+
+
+@router.post("/day-clusters/remove")
+def remove_day_clusters(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Räumt die Tagescluster aus Anmerkung 138 weg — **nur auf Knopfdruck**.
+
+    Kein Job, kein Nachtplan, kein Automatismus. Das hier fasst Bestätigtes an,
+    und daraus folgt jede Grenze: es passiert genau dann, wenn jemand nach
+    einer Vorschau darauf drückt. Dieselbe Strenge wie beim A46-Besuchsschnitt.
+
+    Idempotent: ein zweiter Klick findet nichts mehr und sagt das auch.
+    """
+    removed = source.remove_day_clusters(db, user.id)
+    db.commit()
+    log.info("Tagescluster (Anm. 138) entfernt für %s: %d", user.id[:8], removed)
+    return {"removed": removed}

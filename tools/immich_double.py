@@ -48,8 +48,20 @@ def _assets() -> list[dict]:
         }
         # Jedes zwanzigste Bild ohne Koordinaten (Screenshot, WhatsApp).
         if i % 20:
-            exif["latitude"] = round(lat + random.uniform(-0.02, 0.02), 6)
-            exif["longitude"] = round(lng + random.uniform(-0.02, 0.02), 6)
+            # **Jede fünfte Aufnahme teilt sich den Fix mit ihrer Vorgängerin.**
+            # Das ist keine Ausschmückung, sondern wie eine echte Bibliothek
+            # aussieht: eine Serie aus drei Sekunden trägt dreimal dieselbe
+            # Koordinate, weil das Telefon dazwischen nicht neu ortet. Ohne
+            # diesen Fall kann der Lauf hier gar nicht zeigen, ob er die
+            # Ortszeilen entdoppelt (Anmerkung 139) — und ein Doppel, das einen
+            # Fall auslässt, ist keine Vereinfachung, sondern eine andere
+            # Bibliothek (Anmerkung 116).
+            if i % 5 == 0 and out and out[-1]["exifInfo"].get("latitude"):
+                exif["latitude"] = out[-1]["exifInfo"]["latitude"]
+                exif["longitude"] = out[-1]["exifInfo"]["longitude"]
+            else:
+                exif["latitude"] = round(lat + random.uniform(-0.02, 0.02), 6)
+                exif["longitude"] = round(lng + random.uniform(-0.02, 0.02), 6)
         out.append({
             "id": f"asset-{i:05d}",
             "ownerId": OTHER if i % 37 == 0 else ME,       # fremde dazwischen

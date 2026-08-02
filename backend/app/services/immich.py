@@ -359,6 +359,8 @@ class ScanAborted(RuntimeError):
 def search_assets_paged(url: str, key: str, start: datetime, end: datetime, *,
                         album_id: str | None = None,
                         heartbeat=None,
+                        budget_s: float | None = None,
+                        report: dict | None = None,
                         max_items: int = 20000) -> list[dict]:
     """Alle Assets eines Zeitraums — über alle Seiten.
 
@@ -376,12 +378,33 @@ def search_assets_paged(url: str, key: str, start: datetime, end: datetime, *,
     für die dieses Paket gebaut ist, blättert länger als drei Minuten. Ohne
     den Schlag hier hätte der Lauf die ganze Arbeit gemacht und anschließend
     „gestoppt" gemeldet.
+
+    `budget_s` ist etwas anderes als der Abbruch über `heartbeat`: es hört auf
+    zu blättern und gibt zurück, **was bis dahin da ist** — für die VORSCHAU,
+    die an einer einzelnen HTTP-Anfrage hängt und zwischen sich und dem Browser
+    einen umgekehrten Vertreter mit fester Geduld hat (Anmerkung 113). Eine
+    Teilantwort ist dort immer noch eine Entscheidungsgrundlage; gar keine ist
+    ein 502. Ein JOB bekommt kein Budget — er wartet auf niemanden.
+
+    Beide Fälle setzen `report["truncated"]`, wenn abgeschnitten wurde. **Ohne
+    diese Marke sieht ein abgeschnittenes Jahr aus wie ein Jahr, das eben nicht
+    mehr hergibt** — der teuerste Defekt dieses Projekts ist nicht Kaputtheit,
+    sondern Stille.
     """
     out: list[dict] = []
     page = 1
+    began = time.monotonic()
+    if report is not None:
+        report["truncated"] = False
     while page and len(out) < max_items:
         if heartbeat is not None and heartbeat() is False:
             raise ScanAborted("Lauf gestoppt")
+        if budget_s is not None and out and time.monotonic() - began > budget_s:
+            if report is not None:
+                report["truncated"] = True
+            log.info("Immich: Vorschau-Budget von %.0fs erreicht — %d Assets "
+                     "gelesen, Rest steht aus", budget_s, len(out))
+            break
         body = {
             "takenAfter": _stamp(start),
             "takenBefore": _stamp(end),
@@ -406,6 +429,8 @@ def search_assets_paged(url: str, key: str, start: datetime, end: datetime, *,
         # Stille ist in diesem Projekt der teuerste Defekt: ein Jahr, das an
         # der Reißleine abgeschnitten wird, sähe sonst aus wie ein Jahr, das
         # eben nicht mehr hergibt.
+        if report is not None:
+            report["truncated"] = True
         log.warning("Immich: Grenze von %d Assets erreicht — dieses Fenster "
                     "wird nur teilweise ausgewertet (%s)", max_items,
                     f"Album {album_id}" if album_id else f"{start:%Y-%m-%d} bis {end:%Y-%m-%d}")

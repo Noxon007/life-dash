@@ -74,9 +74,10 @@ def test_map_filters_unconfirmed_machine_proposals_too(db, user):
     _event(db, user, "Konzert", when=datetime(2024, 6, 2), loc=loc,
            confirmed=True)
 
-    points = list_map_events(db=db, user=user, machine_proposals=False)
-    assert [p.title for p in points] == ["Konzert"]
-    assert len(list_map_events(db=db, user=user)) == 2
+    points = list_map_events(db=db, user=user,
+                             machine_proposals=False)["events"]
+    assert [p["title"] for p in points] == ["Konzert"]
+    assert list_map_events(db=db, user=user)["total"] == 2
 
 
 def test_index_counts_pending_machine_proposals(db, user):

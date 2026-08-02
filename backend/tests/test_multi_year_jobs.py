@@ -21,8 +21,8 @@ from datetime import datetime, timedelta
 import pytest
 
 from app.models import Job, User
-from app.routers.jobs import (_job_years, _run_immich_source,
-                              _run_photo_points, _year_span, list_jobs)
+from app.routers.jobs import (_job_years, _run_photo_points, _year_span,
+                              list_jobs)
 
 
 # --------------------------------------------------------------------------- #
@@ -75,20 +75,33 @@ def immich_cfg(user, db):
     return user
 
 
+def _props(n: int):
+    """`n` Foto-Vorschläge — der Rückgabewert von `scan_year` seit Anm. 139."""
+    from datetime import datetime as _dt
+
+    from app.services.photo_points import PhotoProposal
+    return [PhotoProposal(slot=f"immich:photo:a{i}", asset_id=f"a{i}",
+                          taken_at=_dt(2024, 7, 12, 10, i % 60),
+                          lat=51.93, lng=8.87, place="Detmold", city="Detmold")
+            for i in range(n)]
+
+
 def test_photo_points_walks_every_year_and_sums_up(db, user, immich_cfg, monkeypatch):
     from app.routers import jobs as jobs_mod
     from app.services import photo_points as pp
 
     seen_years: list[int] = []
 
-    def fake_scan(db_, user_, year, url, key, heartbeat=None, report=None):
+    def fake_scan(db_, user_, year, url, key, heartbeat=None, report=None, **kw):
         seen_years.append(year)
         if report is not None:
-            report["unchanged"] = 1
+            report["seen"] = 10
             report["dropped"] = {"no_geo": 2}
-        return 10, 3, 1
+        return _props(3)
 
     monkeypatch.setattr(pp, "scan_year", fake_scan)
+    monkeypatch.setattr(pp, "create_photo_events",
+                        lambda db_, user_, block: len(block))
     monkeypatch.setattr(jobs_mod, "_tick", lambda *a, **kw: True)
     job = Job(user_id=user.id, type="photo_points", params={"years": [2011, 2024]})
     db.add(job)
@@ -100,8 +113,7 @@ def test_photo_points_walks_every_year_and_sums_up(db, user, immich_cfg, monkeyp
     assert seen_years == [2024, 2011]              # jüngstes zuerst
     assert "2011–2024 (2 Jahre)" in msg
     # Summiert, nicht nur das letzte Jahr — und die Ausschlussgründe ebenso.
-    assert "20 Fotos gelesen" in msg and "6 neu verortet" in msg
-    assert "2 unverändert" in msg
+    assert "20 Fotos gelesen" in msg and "6 Ereignisse angelegt" in msg
     assert "4 ohne Koordinaten" in msg
 
 
@@ -117,14 +129,16 @@ def test_every_year_is_ticked_off_on_its_own(db, user, immich_cfg, monkeypatch):
     from app.services import immich as immich_api
     from app.services import photo_points as pp
 
-    def fake_scan(db_, user_, year, url, key, heartbeat=None, report=None):
+    def fake_scan(db_, user_, year, url, key, heartbeat=None, report=None, **kw):
         if year == 2011:
             raise immich_api.ImmichError("Immich weg")
         if report is not None:
-            report["unchanged"] = 0
-        return 4, 4, 0
+            report["seen"] = 4
+        return _props(4)
 
     monkeypatch.setattr(pp, "scan_year", fake_scan)
+    monkeypatch.setattr(pp, "create_photo_events",
+                        lambda db_, user_, block: len(block))
     monkeypatch.setattr(jobs_mod, "_tick", lambda *a, **kw: True)
     job = Job(user_id=user.id, type="photo_points",
               params={"years": [2011, 2018, 2024]})
@@ -143,12 +157,14 @@ def test_a_stop_between_years_keeps_what_is_done(db, user, immich_cfg, monkeypat
     from app.routers import jobs as jobs_mod
     from app.services import photo_points as pp
 
-    def fake_scan(db_, user_, year, url, key, heartbeat=None, report=None):
+    def fake_scan(db_, user_, year, url, key, heartbeat=None, report=None, **kw):
         if report is not None:
-            report["unchanged"] = 0
-        return 4, 4, 0
+            report["seen"] = 4
+        return _props(4)
 
     monkeypatch.setattr(pp, "scan_year", fake_scan)
+    monkeypatch.setattr(pp, "create_photo_events",
+                        lambda db_, user_, block: len(block))
     # Der Stopp-Wunsch kommt nach dem ersten Jahr an.
     ticks = {"n": 0}
 
@@ -166,52 +182,23 @@ def test_a_stop_between_years_keeps_what_is_done(db, user, immich_cfg, monkeypat
 
     assert state == "stopped"
     assert "Gestoppt" in msg
-    # **Der Stopp wirkt zwischen den Jahren, nicht mitten in einem.** Was fertig
-    # ist, bleibt abgehakt (2024, 2018); das noch nicht begonnene Jahr bleibt
-    # offen — und genau so findet ein zweiter Lauf die Arbeit wieder.
+    # **Ein mittendrin gestopptes Jahr wird NICHT abgehakt** (Anmerkung 139).
+    # Vorher hakte der Lauf jedes Jahr ab, sobald er es angefasst hatte — bei
+    # einem Abbruch mitten im Jahr stand es damit als „nachgesehen" da, obwohl
+    # nur die Hälfte angelegt war. Solange dieser Lauf Kartenpunkte anlegte,
+    # war das ärgerlich; seit er Lebensdatenbank anlegt, fehlten Ereignisse
+    # ohne einen Weg, sie je wiederzufinden.
     db.expire(user)
-    assert pp.scanned_years(user) == {2018, 2024}
-    assert "2018–2024 (2 Jahre)" in msg
+    assert pp.scanned_years(user) == {2024}
+    assert "2024" in msg
 
 
-# --------------------------------------------------------------------------- #
-# Vorschläge über mehrere Jahre — der Riegel bleibt, er wird nur breiter
-# --------------------------------------------------------------------------- #
-def test_immich_source_walks_every_year(db, user, immich_cfg, monkeypatch):
-    from app.routers import jobs as jobs_mod
-    from app.services import immich_source as source
-
-    class _P:
-        pass
-
-    asked: list[int] = []
-
-    def fake_scan(db_, user_, year, url, key, heartbeat=None, **kw):
-        asked.append(year)
-        return [_P(), _P()]
-
-    monkeypatch.setattr(source, "scan_year", fake_scan)
-    monkeypatch.setattr(source, "create_confirmed_visits",
-                        lambda db_, user_, block: len(block))
-    monkeypatch.setattr(jobs_mod, "_tick", lambda *a, **kw: True)
-    job = Job(user_id=user.id, type="immich_source",
-              params={"years": [2004, 2024]})
+def test_photo_points_without_a_year_refuses(db, user, immich_cfg):
+    """Der Riegel gilt weiter: ohne Jahr kein Lauf (Anmerkung 120)."""
+    job = Job(user_id=user.id, type="photo_points", params={})
     db.add(job)
     db.commit()
-
-    state, msg = _run_immich_source(db, job)
-
-    assert state == "done"
-    assert asked == [2024, 2004]
-    assert "2004–2024 (2 Jahre)" in msg
-    assert "4 Ereignisse angelegt" in msg
-
-
-def test_immich_source_without_a_year_refuses(db, user, immich_cfg):
-    job = Job(user_id=user.id, type="immich_source", params={})
-    db.add(job)
-    db.commit()
-    state, msg = _run_immich_source(db, job)
+    state, msg = _run_photo_points(db, job)
     assert state == "error"
     assert "Jahr" in msg
 

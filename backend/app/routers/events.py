@@ -20,9 +20,10 @@ from app.schemas import (EventGeo, EventManualCreate, EventRead, EventsIndex,
                          LocationGeo, OnThisDayGroup, YearCount)
 from app.services import visitsplit
 from app.services.immich_link import MACHINE_SOURCES
+from app.services.photo_points import asset_of as photo_asset_of
 from app.services.ingestion import create_manual_event
 from app.services.stats_overview import find_birth
-from app.sqlutil import DISTRICT_KEYS, addr_part, day_parts
+from app.sqlutil import DISTRICT_KEYS, addr_part, day_parts, even_spread
 
 router = APIRouter(prefix="/api/events", tags=["Events"])
 
@@ -450,9 +451,15 @@ def list_events(
     vague: Annotated[bool, Query(
         description="A37: nur undatierte und unscharf datierte Ereignisse")] = False,
     visits: Annotated[bool | None, Query(
-        description="A37: importierte Standort-Besuche einschließen (Default: "
-                    "alles). visits=0 lässt sie weg — der Zeitstrahl blendet "
-                    "sie standardmäßig aus.")] = None,
+        description="A37: importierte Standort-Besuche (Google Timeline) "
+                    "einschließen (Default: alles). visits=0 lässt sie weg — "
+                    "der Zeitstrahl blendet sie standardmäßig aus.")] = None,
+    photos: Annotated[bool | None, Query(
+        description="Anmerkung 139: Immich-Foto-Ereignisse einschließen "
+                    "(Default: alles). Ein EIGENER Schalter neben `visits`, "
+                    "weil es in der Oberfläche zwei Schalter sind — 🛰️ Google "
+                    "und 📷 Immich sind zwei Sorten Beleg mit zwei Mengen "
+                    "(hunderte gegen zehntausende).")] = None,
     machine_proposals: Annotated[bool | None, Query(
         description="Unbestätigte Vorschläge maschineller Quellen (Google/"
                     "Immich, MACHINE_SOURCES) einschließen (Default: alles, "
@@ -519,8 +526,9 @@ def list_events(
     # gilt für sie dieselbe Regel. Zwei Quellen mit derselben Beleglage
     # brauchen dieselbe Behandlung, sonst läuft sie still auseinander
     # (Anmerkung 106).
-    if visits is False:
-        query = query.filter(Event.source.notin_(MACHINE_SOURCES))
+    hidden = _hidden_sources(visits, photos)
+    if hidden:
+        query = query.filter(Event.source.notin_(hidden))
     # Anmerkung 135: unbestätigte Vorschläge maschineller Quellen sind Beleg,
     # kein Ereignis — sie tauchen erst nach dem bewussten Schritt in der
     # Moderation zwischen den bestätigten Karten auf. Bewusst nur diese
@@ -647,6 +655,27 @@ def _place_of(location, level: str) -> str | None:
     return None
 
 
+def _hidden_sources(visits: bool | None, photos: bool | None) -> list[Source]:
+    """Welche maschinellen Quellen gerade NICHT gezeigt werden (Anmerkung 139).
+
+    Bis 0.39 gab es hierfür einen Schalter für beide zusammen (`visits` gegen
+    `MACHINE_SOURCES`). Das war richtig, solange Immich Tagescluster lieferte —
+    dieselbe Größenordnung, dieselbe Sorte Zeile. Seit ein Foto ein Ereignis
+    ist, stehen hunderten Google-Besuchen zehntausende Foto-Ereignisse
+    gegenüber, und wer die Fotos ausblenden will, will die Besuche behalten.
+
+    **Eine Liste an EINER Stelle**, gelesen von Zeitstrahl und Karte. Stünde
+    die Bedingung an beiden Orten einzeln, blendete der eine Reiter aus, was
+    der andere zeigt — Anmerkung 106 in ihrer gewöhnlichsten Form.
+    """
+    hidden: list[Source] = []
+    if visits is False:
+        hidden.append(Source.google_timeline)
+    if photos is False:
+        hidden.append(Source.immich)
+    return hidden
+
+
 def _condensable_base(db: Session, user_id: str, level: str = "city"):
     """Die Menge, um die es geht: importierte Besuche mit bekanntem Ort.
 
@@ -683,18 +712,26 @@ def _condensable_visits(db: Session, user_id: str, level: str = "city"):
 
 
 def _visit_group_reps(db: Session, user_id: str, level: str = "city"):
-    """Je (Tag, Ort) genau eine ID — der Vertreter der Gruppe.
+    """Je (Tag, Ort, QUELLE) genau eine ID — der Vertreter der Gruppe.
 
     `min(id)` ist ein willkürlicher, aber stabiler Vertreter. Stabil ist das
     Entscheidende: derselbe Aufruf muss zweimal dieselbe Zeile liefern, sonst
     springen beim Blättern Einträge. Dass er nicht unbedingt der zeitlich
     erste Besuch ist, fällt nicht auf — Zeitspanne und Anzahl der Gruppe kommen
     aus dem Aggregat, nicht aus dem Vertreter.
+
+    **Die Quelle gehört seit Anmerkung 139 in den Schlüssel.** Vorher fielen
+    ein Google-Besuch und dreißig Fotos desselben Tages in dieselbe Gruppe, und
+    der Vertreter war eines von beidem — mit zwei getrennten Schaltern wird das
+    sofort falsch: „📷 aus" ließe eine Gruppe stehen, deren Vertreter ein Foto
+    ist, oder umgekehrt eine verschwinden, in der Besuche steckten. Zwei
+    Aussagen („dreimal hier gewesen", „dreißig Fotos gemacht") gehören ohnehin
+    nicht in eine Zeile.
     """
     y, m, d = _day_parts(Event.date_start)
     return (_condensable_base(db, user_id, level)
             .with_entities(func.min(Event.id))
-            .group_by(y, m, d, _level_column(level)))
+            .group_by(y, m, d, _level_column(level), Event.source))
 
 
 def _visit_group_info(db: Session, user_id: str, events: list[Event],
@@ -712,20 +749,26 @@ def _visit_group_info(db: Session, user_id: str, events: list[Event],
     lo = min(e.date_start for e in reps)
     hi = max(e.date_start for e in reps)
     y, m, d = _day_parts(Event.date_start)
+    # Die Quelle steht auch hier im Schlüssel — dieselbe Gruppierung wie in
+    # `_visit_group_reps`. Zwei verschiedene Gruppenschlüssel für dieselbe
+    # Gruppe wären eine Zahl, die zum Vertreter nicht passt: die Karte hieße
+    # „12× Foto in Detmold" und stünde für drei Fotos und neun Besuche.
     rows = (_condensable_base(db, user_id, level)
             .with_entities(y.label("y"), m.label("m"), d.label("d"),
                            column.label("place"), func.count(Event.id),
-                           func.min(Event.date_start), func.max(Event.date_start))
+                           func.min(Event.date_start), func.max(Event.date_start),
+                           Event.source.label("src"))
             .filter(Event.date_start >= lo.replace(hour=0, minute=0, second=0),
                     Event.date_start <= hi.replace(hour=23, minute=59, second=59))
-            .group_by(y, m, d, column).all())
-    by_key = {(int(r[0]), int(r[1]), int(r[2]), r[3]): r for r in rows}
+            .group_by(y, m, d, column, Event.source).all())
+    by_key = {(int(r[0]), int(r[1]), int(r[2]), r[3], r[7]): r for r in rows}
     out: dict[str, dict] = {}
     for e in reps:
         place = _place_of(e.location, level)
         if not place:
             continue
-        key = (e.date_start.year, e.date_start.month, e.date_start.day, place)
+        key = (e.date_start.year, e.date_start.month, e.date_start.day,
+               place, e.source)
         row = by_key.get(key)
         # Eine Gruppe von genau einem Besuch ist keine Gruppe — dann bleibt es
         # eine gewöhnliche Karte ohne Chip und ohne Aufklappen.
@@ -916,7 +959,15 @@ def events_index(
     # Sorte automatisch bestätigter Beleg und zählen deshalb zusammen.
     visits = (db.query(func.count(Event.id))
               .filter(Event.user_id == user.id,
-                      Event.source.in_(MACHINE_SOURCES)).scalar() or 0)
+                      Event.source == Source.google_timeline).scalar() or 0)
+    # Anmerkung 139: eine EIGENE Zahl für die Immich-Foto-Ereignisse, weil es
+    # dafür jetzt einen eigenen Schalter gibt. Sie zusammenzuzählen wäre die
+    # ältere Antwort auf eine Frage, die seitdem anders gestellt wird — der
+    # Schalter „📷 12.481" muss sagen, was ER einblendet, nicht was beide
+    # zusammen einblenden.
+    photo_events = (db.query(func.count(Event.id))
+                    .filter(Event.user_id == user.id,
+                            Event.source == Source.immich).scalar() or 0)
     # Anmerkung 135: wie viele unbestätigte Vorschläge aus Google/Immich gerade
     # ausgeblendet sind — der Hinweis, der stattdessen in die Moderation
     # verlinkt, braucht diese Zahl.
@@ -948,7 +999,8 @@ def events_index(
                         Location.address.is_(None)).scalar() or 0)
     return EventsIndex(
         total=total, dated=dated, undated=total - dated, unconfirmed=unconfirmed,
-        visits=visits, machine_proposals=machine_proposals, fuzzy=fuzzy,
+        visits=visits, photo_events=photo_events,
+        machine_proposals=machine_proposals, fuzzy=fuzzy,
         locations_no_address=loc_open, locations_total=loc_total,
         year_min=years[0].year if years else None,
         year_max=years[-1].year if years else None,
@@ -960,7 +1012,22 @@ def events_index(
     )
 
 
-@router.get("/map", response_model=list[EventGeo])
+# Wie viele Kartenpunkte höchstens in EINE Antwort gehen.
+#
+# Seit Anmerkung 139 ist jedes verortete Foto ein Ereignis — eine gewöhnliche
+# Sammlung bringt damit fünfstellig viele Punkte mit, und bis hier hatte dieser
+# Endpunkt gar keinen Deckel. Der Wert ist ein **Sicherheitsnetz**, keine
+# Betriebsgrenze: gedeckelt wird erst dort, wo es dem Browser weh tut (die
+# Zeichenlast trägt seit A45 die Leinwand statt einzelner SVG-Knoten, und das
+# verschiebt die Schwelle um eine Größenordnung).
+#
+# Überschritten wird er nie stillschweigend: die Antwort nennt `total` neben
+# `shown`, und gegriffen wird gleichmäßig über den Zeitraum statt vorne
+# abzuschneiden (`sqlutil.even_spread`).
+MAP_MAX_POINTS = 50000
+
+
+@router.get("/map")
 def list_map_events(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -971,7 +1038,13 @@ def list_map_events(
     machine_proposals: Annotated[bool | None, Query(
         description="Anmerkung 135: wie beim Zeitstrahl — machine_proposals=0 "
                     "lässt unbestätigte Google-/Immich-Vorschläge weg.")] = None,
-) -> list[EventGeo]:
+    visits: Annotated[bool | None, Query(
+        description="Anmerkung 139: Google-Besuche einschließen (Default: ja)")] = None,
+    photos: Annotated[bool | None, Query(
+        description="Anmerkung 139: Immich-Foto-Ereignisse einschließen "
+                    "(Default: ja)")] = None,
+    limit: Annotated[int | None, Query(ge=1, le=200000)] = None,
+) -> dict:
     """Nur verortete eigene Events (mit Koordinaten) — für die Karte.
 
     A37: Antwortet in der schlanken Geo-Form (siehe `EventGeo`) statt mit
@@ -982,7 +1055,14 @@ def list_map_events(
     12.000 Punkten macht es aus 205 Byte je Punkt 799 — es ist der größte
     Einzelposten der Antwort. Die Karte holt deshalb erst alle Punkte ohne
     Wetter (Zeitraum-Regler, Bündelung, Marker) und danach das Wetter nur für
-    den angezeigten Zeitraum, wo Popup und Stopp-Liste es wirklich zeigen."""
+    den angezeigten Zeitraum, wo Popup und Stopp-Liste es wirklich zeigen.
+
+    **Anmerkung 139 — zwei Schalter, zwei Filter, ein Deckel.** `visits` und
+    `photos` sind getrennt, weil sie in der Oberfläche getrennte Schalter sind
+    (🛰️ Google, 📷 Immich). Sie hier zu beantworten und nicht im Browser ist
+    nicht Bequemlichkeit: ein ausgeschalteter Foto-Schalter soll die 20.000
+    Punkte gar nicht erst über die Leitung schicken.
+    """
     query = (db.query(Event).options(selectinload(Event.location))
              .filter(Event.user_id == user.id, Event.location_id.isnot(None))
              .join(Event.location).filter(Location.lat.isnot(None),
@@ -994,16 +1074,42 @@ def list_map_events(
     if machine_proposals is False:
         query = query.filter(~((Event.confirmed != ConfirmState.confirmed)
                                & Event.source.in_(MACHINE_SOURCES)))
-    events = query.order_by(Event.date_start.asc(), Event.id.asc()).all()
+    hidden = _hidden_sources(visits, photos)
+    if hidden:
+        query = query.filter(Event.source.notin_(hidden))
+
+    cap = limit or MAP_MAX_POINTS
+    total = query.count()
+    if total <= cap:
+        events = query.order_by(Event.date_start.asc(), Event.id.asc()).all()
+    else:
+        # **Deckeln heißt nicht abschneiden.** `LIMIT 50000` über eine
+        # Bibliothek von 2009 bis heute lieferte die Jahre bis etwa 2019 und
+        # ließe alles danach von der Karte verschwinden, während sie voll
+        # aussieht (dieselbe Regel wie bei den Wegen und bei A45).
+        events = even_spread(db, Event, query, Event.id, Event.date_start,
+                             cap, total)
     wx = _weather_for(db, user.id, events) if weather else [None] * len(events)
-    return [
-        EventGeo(
-            id=e.id, title=e.title, category=e.category, date_start=e.date_start,
-            date_precision=e.date_precision, source=e.source,
-            location=LocationGeo.model_validate(e.location), weather=w,
-        )
-        for e, w in zip(events, wx)
-    ]
+    return {
+        "total": total,
+        "shown": len(events),
+        "events": [
+            {**EventGeo(
+                id=e.id, title=e.title, category=e.category,
+                date_start=e.date_start, date_precision=e.date_precision,
+                source=e.source,
+                location=LocationGeo.model_validate(e.location), weather=w,
+            ).model_dump(mode="json"),
+             # Anmerkung 139: die Asset-Kennung für das Vorschaubild im Popup.
+             # Sie steht ohnehin schon im Platz (`external_id`); ein zweites
+             # Feld in der Datenbank wären zwei Angaben über dieselbe Sache
+             # (Anmerkung 106). Bei allem, was kein Foto ist, fehlt sie —
+             # `null` ist hier die richtige Antwort und nicht ein leerer String,
+             # der wie eine Kennung aussieht.
+             "photo": photo_asset_of(e.external_id)}
+            for e, w in zip(events, wx)
+        ],
+    }
 
 
 @router.get("/{event_id}", response_model=EventRead)
