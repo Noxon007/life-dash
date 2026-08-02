@@ -59,13 +59,13 @@ confirmed record — and it makes the imports below much easier to judge.
    scripts (e.g. Greek) are re-resolved to a Latin transliteration; and places
    whose name is fine but whose individual address parts were never stored are
    backfilled once, so the timeline can group them by district.
-4. **Connect Immich**, if you have it. Four things, in this order: *test the
+4. **Connect Immich**, if you have it. Three things, in this order: *test the
    connection*, then **create entries from photos** (one year at a time, with a
-   mandatory preview — a day with enough pictures in one place becomes a
-   confirmed entry directly, the same way an imported Google visit does), then
-   **link photos**, which attaches pictures to the entries that now exist, and
-   finally **locate photos** — that one puts every geotagged picture on the map
-   as its own point and creates no entries at all. Photos stay in Immich;
+   mandatory preview — every geotagged picture becomes a confirmed entry, the
+   same way an imported Google visit does; on the map it is a dot with a
+   thumbnail, in the timeline a line without one, with same-day-same-place rows
+   folded together), and finally **link photos**, which attaches pictures to
+   the entries you keep by hand. Photos stay in Immich;
    Life-Dash stores references, and the API key it needs is read-only. It needs
    exactly four read-only permissions — `asset.read` (find photos by time),
    `asset.view` (fetch previews), `user.read` (tell your own photos from other

@@ -4,7 +4,8 @@
 Life-Dash: self-hosted „Lebensdatenbank" (FastAPI + SQLAlchemy/SQLite; Vanilla-JS-PWA
 komplett in `frontend/index.html`, wird vom Backend unter `/` ausgeliefert). AGPL-3.0.
 **Führendes Dokument: `docs/KONZEPT.md`** — Roadmap in Kap. 14.2 (Paket-Nummern A*/F*/P*),
-Entscheidungen/Anmerkungen in Kap. 15. Erst dort gezielt nachlesen statt Code raten.
+Entscheidungen/Anmerkungen in **`docs/DECISIONS.md`** (seit 2026-08-02 eigene
+Datei, Anm. 147). Erst dort gezielt nachlesen statt Code raten.
 
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
@@ -524,7 +525,7 @@ Ereignisse außerhalb des Fensters. Gemessen bei 12k über HTTP: Start
 Anmerkung 82.
 
 **Kein Ticket-System (Anmerkung 83):** Beobachtungen aus der Nutzung werden als
-nummerierte Anmerkung in KONZEPT Kap. 15 festgehalten, Pakete in 14.2/14.3 —
+nummerierte Anmerkung in `docs/DECISIONS.md` festgehalten, Pakete in KONZEPT 14.2/14.3 —
 nicht in Linear, Jira o. ä. Eine Wahrheit, und zwar die, die beim Arbeiten
 gelesen wird.
 

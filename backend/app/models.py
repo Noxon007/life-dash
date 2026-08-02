@@ -352,7 +352,7 @@ class MediaRef(Base):
 class Track(Base):
     """Routenverlauf (Stufe 3) — aus Google Timeline (später auch Workouts).
 
-    Punkte werden unvereinfacht gespeichert (Entscheidung KONZEPT Kap. 15);
+    Punkte werden unvereinfacht gespeichert (Entscheidung: docs/DECISIONS.md);
     `external_id` ist der Segment-Hash für idempotenten Re-Import.
     """
 

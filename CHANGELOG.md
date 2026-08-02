@@ -16,6 +16,65 @@ any `MINOR`.
 ## [Unreleased]
 
 ### Added
+- **Every geotagged photo now becomes an entry of its own — on the map with
+  its picture, in the timeline as plain text.** Until now a whole day with
+  photos in one place became a single summary entry (“34 photos in Detmold”),
+  while a separate, switchable layer drew the individual dots. Two mechanisms
+  for the same pictures, and the map could not decide which one it was showing.
+  Now there is one: “Events from photos” under *My data → Immich* creates one
+  confirmed entry per picture, exactly the way an imported Google visit has
+  always worked. **On the map** you get a dot where the picture was taken, with
+  a thumbnail in its popup. **In the timeline** you get the fact and not the
+  picture — “Photo in Detmold”, with same-day-same-place rows folded into one
+  (“12× Photo in Detmold”). That is deliberate: twelve thumbnails per row
+  across twenty years is a wall, not a memory, and the pictures of a day are
+  already in the photo strip above.
+- **The photo layer has its own switch now.** “🛰️ Auto-detected” covers Google
+  visits, “📷 Photos” covers Immich — with its own count each. They used to
+  share one switch, which made sense while both produced roughly the same
+  number of rows; with hundreds of visits against tens of thousands of photos
+  it no longer does.
+- **A clean-up button for the old photo-day summary entries.** It appears only
+  if you have any, shows you which entries it would remove before it removes
+  anything, and touches nothing else. Your photo entries and everything you
+  entered by hand stay exactly where they are.
+- **Days lead, entries stand beside them.** The world tab, top places, most
+  visited cities and the city pages now show *how many days* you were
+  somewhere, with the entry count in small type next to it. With mass imports
+  in the picture, “312 entries in France” had quietly become a statement about
+  the import rather than about France — thirty visits in one day are one day.
+  Both numbers stay, because “how many films did I watch” still wants entries.
+- **Clicking a weather record now takes you to that day.** The “hottest day”
+  tile and its siblings used to open the edit dialog for whichever single entry
+  happened to carry the reading. They now narrow the timeline to the whole day,
+  with a chip that names the date and the reason and can be clicked away again.
+
+### Fixed
+- **The week and month view no longer freezes the browser** (reported as
+  “everything crashes, no error in the log”). Travelled paths were sent up to a
+  thousand at a time with every recorded point, and each was drawn as a
+  separate element the browser had to reposition on every drag. With a vector
+  background map underneath, that was enough to lock the page up.
+- **The map stopped hiding paths without saying so.** Above a thousand paths in
+  a period it silently kept only the newest ones — in a busy month, the first
+  three weeks simply were not there, and the map looked complete. It now takes
+  a sample spread evenly across the period and says on the map how many of how
+  many it is showing, the same way the point and photo notices already did.
+- **Opening the map no longer refetches everything when nothing has changed.**
+  At twenty thousand entries that was six megabytes and two thirds of a second
+  on every visit to the tab. It now recognises an unchanged corpus — including
+  a renamed entry, which is the case a simple count would miss.
+- **The timeline no longer throws away photo entries when the Google switch is
+  off.** The two switches are separate now, and the browser-side filter had to
+  learn that.
+
+### Changed
+- **The concept document has been split.** `docs/KONZEPT.md` keeps what
+  Life-Dash is and where it is going; the numbered decisions with their
+  reasoning moved into **`docs/DECISIONS.md`**. Nothing was deleted and the
+  numbering is unbroken — two audiences, two documents.
+
+### Added (earlier this cycle)
 - **Timeline and map: what evidence and what is proven now look different.**
   Photos and visits found by Google or Immich are evidence — they used to
   appear as “unconfirmed” cards mixed in among your confirmed entries. They no
