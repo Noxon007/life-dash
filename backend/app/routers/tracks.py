@@ -45,6 +45,7 @@ from app.models import (
 from app.schemas import PlaceNameResolveResult, TimelineImportResult, TrackRead
 from app.services import geocode as geocode_svc
 from app.services import visitsplit
+from app.sqlutil import even_spread
 
 log = logging.getLogger("lifedash.timeline")
 
@@ -901,19 +902,32 @@ def resolve_names_batch(
 # --------------------------------------------------------------------------- #
 # Track-Abfrage (Karten-Layer)
 # --------------------------------------------------------------------------- #
-@router.get("/tracks", response_model=list[TrackRead])
+@router.get("/tracks")
 def list_tracks(
     start: datetime | None = None,
     end: datetime | None = None,
-    limit: int = 1000,
+    limit: int = 400,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-) -> list[TrackRead]:
+) -> dict:
     """Tracks des Nutzers, optional auf einen Zeitraum eingegrenzt (Überlappung).
 
-    `limit` (Default 1000, hart gedeckelt) schützt vor Riesen-Antworten bei
-    weiten Zeiträumen — nach einem Timeline-Import liegen schnell >20k Tracks
-    mit vollen Punktlisten in der DB. Neueste zuerst.
+    **Die Deckelung wird GENANNT, und sie schneidet nicht ab.** Bis hierher
+    lieferte dieser Endpunkt `ORDER BY date_start DESC LIMIT 1000` und eine
+    nackte Liste: in einem Monat mit 3.000 Wegen fehlten die ersten drei
+    Wochen, wortlos, und die Karte sah vollständig aus. Das ist Anmerkung 110
+    (`all.slice(0, 300)`) eine Ebene tiefer — derselbe Satz, dieselbe stille
+    Auslassung, nur in einer anderen Datei. Deshalb jetzt dieselbe Antwortform
+    wie überall sonst: `total` ist die wahre Zahl, `shown` die gelieferte, und
+    gegriffen wird gleichmäßig über den Zeitraum (`sqlutil.even_spread`).
+
+    **Und `limit` ist von 1000 auf 400 gefallen.** Der alte Wert war eine
+    Datenbank-Grenze und keine Zeichen-Grenze: 1.000 Wege mit voller Punktliste
+    sind mehrere Megabyte je Zeitraumwechsel und, im Browser als Linienzug
+    gezeichnet, hunderttausende Stützpunkte. Gemeldet aus dem Betrieb als
+    „Wochenansicht friert alles ein, kein Fehler im Log" — kein Absturz,
+    sondern schlicht Arbeit. Wer mehr braucht, sagt es (`limit` bleibt bis
+    5.000 erlaubt); die Karte sagt umgekehrt, wenn sie deckelt.
     """
     limit = max(1, min(limit, 5000))
     q = db.query(Track).filter(Track.user_id == user.id)
@@ -921,5 +935,13 @@ def list_tracks(
         q = q.filter(Track.date_end >= start)
     if end:
         q = q.filter(Track.date_start <= end)
-    rows = q.order_by(Track.date_start.desc()).limit(limit).all()
-    return [TrackRead.model_validate(t) for t in reversed(rows)]
+    total = q.count()
+    if total <= limit:
+        rows = q.order_by(Track.date_start).all()
+    else:
+        rows = even_spread(db, Track, q, Track.id, Track.date_start, limit, total)
+    return {
+        "total": total,
+        "shown": len(rows),
+        "tracks": [TrackRead.model_validate(t).model_dump(mode="json") for t in rows],
+    }

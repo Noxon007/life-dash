@@ -47,6 +47,44 @@ def weather_cell(lat_col, lng_col):
     return func.round(lat_col * 10) * 3601 + func.round(lng_col * 10)
 
 
+def even_spread(db, entity, query, id_col, order_col, limit: int, total: int):
+    """`limit` Zeilen, GLEICHMÄSSIG über die Reihenfolge verteilt statt vorne.
+
+    **Deckeln heißt nicht abschneiden.** `ORDER BY … LIMIT 1000` liefert die
+    ersten (oder letzten) tausend — über einen Monat mit 3.000 Wegen also die
+    ersten zehn Tage, und der Rest des Monats fehlt, während die Karte voll
+    aussieht. Genau dieser Defekt steckte in `all.slice(0, 300)` (Anmerkung
+    110), in der Fotopunkt-Deckelung (A45) und zuletzt in `/api/tracks`.
+
+    **Gleichmäßig heißt nicht „jede n-te".** Ein ganzzahliger Schritt trifft
+    das Budget nur, wenn es aufgeht: bei 8.120 Zeilen und Platz für 5.000 ist
+    `ceil(8120/5000)` gleich 2, also jede zweite — 4.060 gezeigte Zeilen und
+    940 Plätze verschenkt. Der mitlaufende Zähler unten behält die Zeile, bei
+    der `rn · limit / total` über die nächste ganze Zahl springt, und ergibt
+    damit EXAKT `limit` Zeilen für jedes Verhältnis.
+
+    Gerechnet wird in der Datenbank: tausende Kennungen in ein `IN (…)` zu
+    legen wäre die Sorte Abfrage, die je nach Übersetzung an einer
+    Parametergrenze zerbricht.
+
+    Diese Funktion stand vorher zweimal wörtlich da (`photo_points.points_for`
+    und, unangewandt, bei den Gruppen-Vorschaubildern) — der Anmerkung-106-Fall
+    in seiner leisesten Form. Sie steht deshalb hier, wo jeder sie findet, der
+    dieselbe Frage stellt.
+    """
+    numbered = (query.with_entities(
+        id_col.label("pid"),
+        func.row_number().over(order_by=order_col).label("rn")).subquery())
+    # `* 1.0` erzwingt die Division mit Nachkommastellen: SQLite teilt zwei
+    # ganze Zahlen ganzzahlig, und dann stünde links wie rechts dasselbe.
+    scaled = lambda n: func.floor(n * limit * 1.0 / total)  # noqa: E731
+    return (db.query(entity)
+            .join(numbered, numbered.c.pid == id_col)
+            .filter(scaled(numbered.c.rn - 1) < scaled(numbered.c.rn))
+            .order_by(order_col)
+            .limit(limit).all())
+
+
 # A47: Welche Nominatim-Bausteine als „Ortsteil" gelten, in dieser Reihenfolge.
 # Nominatim benennt dieselbe Ebene je nach Land und Ortsgröße anders — in
 # Deutschland meist `suburb`, in Großstädten `city_district`, anderswo

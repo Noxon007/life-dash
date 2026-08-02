@@ -82,6 +82,11 @@ function makeDom(withPhotos) {
             { id: 'm2', provider: 'local', thumb_url: '/api/media/m2/thumb',
               url: '/api/media/m2/file', captured_at: '2024-07-12T11:00:00', sort_order: 1 },
           ] };
+        // Die Wege-Ebene antwortet seit Anmerkung 141 mit `{total, shown,
+        // tracks}`. Ein Doppel, das hier die alte nackte Liste liefert, prüft
+        // eine Schnittstelle, die es nicht mehr gibt — und lässt genau die
+        // Sorte Fehler durch, die es finden soll.
+        else if (/api\/tracks/.test(p)) body = { total: 0, shown: 0, tracks: [] };
         else if (/api\/events\?/.test(p) || /api\/events$/.test(p)) body = [EVENT];
         else if (/events\/index/.test(p)) body = { total: 1, dated: 1, undated: 0, unconfirmed: 0, fuzzy: 0, years: [2024], visits: 0 };
         else if (/auth\/config/.test(p)) body = { mode: 'dev' };

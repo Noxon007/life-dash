@@ -1246,6 +1246,11 @@
               <!-- A45: derselbe Ort für denselben Satz — was die Foto-Ebene
                    nicht zeigen kann, steht auf der Karte, nicht daneben. -->
               <div id="mp-photo-note" class="map-note" style="display:none"></div>
+              <!-- Und derselbe Satz noch einmal für die Wege: `/api/tracks`
+                   deckelte still bei 1000 und nahm die NEUESTEN — in einem
+                   Monat mit 3000 Wegen fehlten die ersten drei Wochen, ohne
+                   ein Wort. -->
+              <div id="mp-track-note" class="map-note" style="display:none"></div>
             </div>
           </div>
           <div class="panel" id="mp-stops"></div>
@@ -2845,6 +2850,7 @@ const I18N_EN = {
   'map.photos.tip': "Every photo with coordinates as its own point — where it was taken. Has to be located first under “My data → Immich”.",
   'map.photos.none': "No photo located yet — the run is under “My data → Immich → Locate photos”.",
   'map.photos.cap': "{s} of {n} photos shown, spread evenly across the period — pick a smaller period for all of them.",
+  'map.tracks.cap': "{s} of {n} paths shown, spread evenly across the period — pick a smaller period for all of them.",
   'map.photos.nowhere': "no place given",
   'tl.photos': "📷 Photos",
   'tl.photos.tip': "Located photos as their own rows in the timeline, condensed per day and place — has to be located first under “My data → Immich”",
@@ -7172,30 +7178,87 @@ function keyRange(key) {
     default:       return null; // 'alle' -> keine Eingrenzung
   }
 }
+// Gemeldet aus dem Betrieb: „Vektorkarte an, dann Wochenansicht — alles
+// stürzt ab, kein Fehler im Log, der Browser sagt die Seite verlangsamt
+// alles." Kein Absturz, sondern schlicht Arbeit, und zwar an drei Stellen
+// zugleich:
+//
+//   1. **`/api/tracks` lieferte bis zu 1000 Wege mit voller Punktliste** —
+//      mehrere Megabyte je Zeitraumwechsel. Jetzt 400, gleichmäßig gegriffen,
+//      und die Zahl steht dabei (siehe `list_tracks`).
+//   2. **Jeder Weg wurde als SVG-Pfad gezeichnet.** Leaflet legt dafür je
+//      Linie einen DOM-Knoten an und projiziert ihn bei jedem Verschieben neu.
+//      Dieselbe Zeichenlast, die A45 für die Fotopunkte schon auf die Leinwand
+//      verschoben hat — die Regel stand da, angewandt war sie nur einmal.
+//      Und mit der Vektorkarte darunter wiegt sie doppelt: dort liegt eine
+//      lebende WebGL-Leinwand, über die der SVG-Layer bei jedem Bild neu
+//      zusammengesetzt wird. Deshalb fiel es genau dort auf.
+//   3. **Der Cache wuchs unbegrenzt.** Wer durch ein Jahr blättert, sammelte
+//      52 Wochen voller Punktlisten im Arbeitsspeicher an und gab keine wieder
+//      her — „die Seite verlangsamt alles" ist genau das.
+const TRACK_MAX = 400;
 async function drawTracks(key) {
   mapTracks.clearLayers();
+  mpTrackNote(null);
   if (!mp.showTracks) return;
   // Routen nur bis Monats-Zoom — bei Jahr/Jahrzehnt/Alles wären es nach einem
   // Timeline-Import zehntausende Polylinien (Browser friert ein)
   if (!['day', 'week', 'month'].includes(mp.mode)) return;
   const cacheKey = mp.mode + ':' + key;
-  let tracks = trackCache.get(cacheKey);
-  if (!tracks) {
+  let res = trackCache.get(cacheKey);
+  if (!res) {
     const range = keyRange(key);
-    const qs = range ? `?start=${range[0]}&end=${range[1]}` : '';
-    try { tracks = await api('/api/tracks' + qs); } catch { tracks = []; }
-    trackCache.set(cacheKey, tracks);
+    const qs = new URLSearchParams({ limit: String(TRACK_MAX) });
+    if (range) { qs.set('start', range[0]); qs.set('end', range[1]); }
+    try { res = await api('/api/tracks?' + qs); } catch { res = null; }
+    // Nur Gelungenes merken: ein gescheiterter Abruf als leeres Ergebnis im
+    // Cache heißt „dieser Zeitraum hat keine Wege" und bleibt für immer so.
+    if (res) cacheKeep(trackCache, cacheKey, res);
   }
   // Stale-Guard: Nutzer hat inzwischen weitergeblättert
-  if (mp.periods.length && mp.periods[mp.index] !== key) return;
-  tracks.forEach(t => {
+  if (!res || (mp.periods.length && mp.periods[mp.index] !== key)) return;
+  (res.tracks || []).forEach(t => {
     if (!t.points || t.points.length < 2) return;
     const km = t.distance_m ? `${(t.distance_m/1000).toFixed(1)} km · ` : '';
-    L.polyline(t.points, { color: TRACK_COLORS[t.activity_type] || TRACK_COLORS.unknown, weight: 3, opacity: .75 })
-      .addTo(mapTracks)
+    L.polyline(t.points, {
+      color: TRACK_COLORS[t.activity_type] || TRACK_COLORS.unknown,
+      weight: 3, opacity: .75,
+      // `smoothFactor` wirft Stützpunkte weg, die auf dieser Zoomstufe ohnehin
+      // auf denselben Bildpunkt fielen. Ein Timeline-Pfad bringt hunderte mit,
+      // und keiner davon ist bei Zoom 12 zu sehen.
+      smoothFactor: 2,
+      renderer: mpCanvas(),
+    }).addTo(mapTracks)
       .bindPopup(`<b>${trackLabel(t.activity_type)}</b><br>`
         + `${km}${t.date_start.slice(0,10)} ${t.date_start.slice(11,16)}–${t.date_end.slice(11,16)}`);
   });
+  mpTrackNote(res);
+}
+// Was die Wege-Ebene weglässt, sagt sie — auf der Karte, wo hingeschaut wird
+// (A40 / Anmerkung 110, jetzt zum dritten Mal in derselben Ansicht).
+function mpTrackNote(res) {
+  const box = document.getElementById('mp-track-note');
+  if (!box) return;
+  // Auf die ZAHLEN prüfen, nicht nur auf „da": antwortet der Server anders als
+  // erwartet (alter Stand, Zwischenversion, Fehlerseite), ist `res.total`
+  // undefiniert — und `undefined <= undefined` ist falsch, der Hinweis liefe
+  // also weiter und risse die ganze Karte mit. Ein Hinweis über einer
+  // Deckelung darf nicht das Einzige sein, was den Reiter umbringt.
+  const known = res && typeof res.total === 'number' && typeof res.shown === 'number';
+  if (!known || res.total <= res.shown) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.style.display = '';
+  box.innerHTML = `🛰️ ${esc(t('map.tracks.cap',
+      '{s} von {n} Wegen gezeigt, gleichmäßig über den Zeitraum verteilt — kleineren Zeitraum wählen für alle.')
+    .replace('{s}', res.shown.toLocaleString(LOC()))
+    .replace('{n}', res.total.toLocaleString(LOC())))}`;
+}
+// Ein Cache ohne Grenze ist ein Speicherleck mit gutem Ruf. Zwölf Zeiträume
+// decken das Blättern ab, um das es geht (hin und zurück, ein paar Schritte);
+// alles darüber wird ohnehin neu geholt, sobald jemand wirklich dorthin geht.
+const CACHE_KEEP = 12;
+function cacheKeep(map, key, value) {
+  map.set(key, value);
+  while (map.size > CACHE_KEEP) map.delete(map.keys().next().value);
 }
 
 function renderPeriod() {
@@ -7332,12 +7395,17 @@ const MP_PHOTOS = new Map();   // Zeitraum-Schlüssel -> {points, total, shown}
 // EINE Leinwand für alle Fotopunkte, erst beim ersten Bedarf angelegt. Je
 // Punkt eine eigene wäre schlimmer als gar keine, und beim Laden gibt es die
 // Karte noch nicht.
-let MP_PHOTO_CANVAS = null;
-function mpPhotoCanvas() {
-  if (!MP_PHOTO_CANVAS && typeof L.canvas === 'function') {
-    MP_PHOTO_CANVAS = L.canvas({ padding: 0.5 });
+// Umbenannt von `mpPhotoCanvas`: die Leinwand ist keine Eigenschaft der
+// Foto-Ebene, sondern die Antwort auf „viele Formen auf einer Karte". Solange
+// sie nach den Fotos hieß, hat sie niemand für die Wege gesucht — und genau
+// deshalb zeichneten die als SVG weiter (Anmerkung 106 in seiner leisesten
+// Form: der Name entscheidet, wer die Regel findet).
+let MP_CANVAS = null;
+function mpCanvas() {
+  if (!MP_CANVAS && typeof L.canvas === 'function') {
+    MP_CANVAS = L.canvas({ padding: 0.5 });
   }
-  return MP_PHOTO_CANVAS || undefined;   // ohne Leinwand: Leaflets Standard
+  return MP_CANVAS || undefined;   // ohne Leinwand: Leaflets Standard
 }
 async function mpLoadPhotos(key, from, to) {
   if (MP_PHOTOS.has(key)) return MP_PHOTOS.get(key);
@@ -7349,7 +7417,7 @@ async function mpLoadPhotos(key, from, to) {
     if (from) qs.set('from', from);
     if (to) qs.set('to', to);
     const r = await api(`/api/photos/map?${qs}`);
-    MP_PHOTOS.set(key, r);
+    cacheKeep(MP_PHOTOS, key, r);
     return r;
   } catch (_) {
     // Ohne Fotos bleibt die Karte vollständig — sie zeigt dann eben nur die
@@ -7400,7 +7468,7 @@ function mpDrawPhotos(key, all) {
         // die der Browser bei jedem Verschieben neu anfassen muss. Genau diese
         // Zeichenlast war der Grund für die frühere Deckelung bei 5.000 —
         // nicht die Datenmenge.
-        renderer: mpPhotoCanvas(),
+        renderer: mpCanvas(),
       }).addTo(mapPhotos).bindPopup(
         `<img src="/api/photos/${encodeURIComponent(p.id)}/thumb" alt="" `
         + `style="max-width:180px; border-radius:6px; display:block; margin-bottom:6px" loading="lazy">`
