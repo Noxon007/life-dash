@@ -88,4 +88,11 @@ with TestClient(app):
     timed("/api/world", "/api/world")
     timed("/api/cities", "/api/cities")
 
-os.remove(DB)
+# Unter Windows hält die noch offene SQLite-Verbindung die Datei; das ist kein
+# Fehler des Laufs und darf ihn nicht mit einem Stack-Trace beenden — die
+# Messung ist zu diesem Zeitpunkt längst ausgegeben. Beim nächsten Start wird
+# sie ohnehin ersetzt (siehe oben).
+try:
+    os.remove(DB)
+except OSError:
+    print(f"\n(Hinweis: {DB} liegt noch da und wird beim nächsten Lauf ersetzt.)")

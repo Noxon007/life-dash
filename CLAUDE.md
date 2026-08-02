@@ -10,13 +10,18 @@ Datei, Anm. 147). Erst dort gezielt nachlesen statt Code raten.
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI, Geocoding aus)
-  — 590 Tests, ~12 s, SQLite im Arbeitsspeicher
+  — 551 Tests, ~12 s, SQLite im Arbeitsspeicher
 - **Tests gegen echtes PostgreSQL** (das, worauf betrieben wird — `postgres:18-alpine`):
   `pwsh tools/pg-test.ps1` (Container `lifedash-pgtest` auf Port **55432**, danach weg;
   `-Keep` lässt ihn stehen). Setzt `TEST_DATABASE_URL`, das `conftest.py` auswertet;
   **zwei Riegel davor**, weil die Suite das Schema löscht: die URL darf nicht die
   betriebene sein, und der DB-Name muss `test` enthalten.
-- Wächter: `cd tools` → `npm run check` (27 jsdom-Prüfungen)
+- Wächter: `cd tools` → `npm run check` (28 jsdom-Dateien, ~390 Zusicherungen)
+- **Smoke gegen ein HTTP-Doppel** (Immich): `<python> tools/immich_double.py &`
+  dann `<python> tools/smoke_a45.py` — findet, was Unit-Tests prinzipiell nicht
+  können (Blättern, Zeitzonen, echte DTOs). Immer aus dem Wurzelverzeichnis.
+- **API-Kosten messen** statt raten: `<python> tools/_measure_api.py` legt
+  20.000 Ereignisse an und misst die Endpunkte (Anm. 140)
 - **CI** (`.github/workflows/tests.yml`): fährt bei jedem Push/PR beides — pytest auf
   SQLite *und* auf PostgreSQL — plus die Wächter. Bewusst ohne Pfadfilter und ohne
   `cancel-in-progress`: ein übersprungener Test sieht aus wie ein bestandener.
@@ -56,6 +61,97 @@ Datei, Anm. 147). Erst dort gezielt nachlesen statt Code raten.
   etc. aus Config); `.env.example` ist die Setup-Referenz
 
 ## Stand
+**Doku aufgeteilt (2026-08-02, Anm. 147):** `docs/KONZEPT.md` = was und warum
+(Vision, Architektur, Roadmap 14.2/14.3); **`docs/DECISIONS.md` = die
+nummerierten Anmerkungen** mit ihrer Begründung. Erst dort nachlesen, nicht
+mehr in KONZEPT Kap. 15 — das ist jetzt ein Zeiger mit der Tabelle der noch
+OFFENEN Fragen (144–147).
+
+**Feedback-Runde 2026-08-02 (Anmerkungen 139–147), auf `main`, ohne
+Versionssprung.** Fünf Punkte gebaut, vier bewusst nur entworfen.
+
+**Anm. 139 — ein Foto ist ein Ereignis.** Die teuerste Änderung dieser Runde,
+und die einzige, die ein Modell anfasst. Anm. 138 hatte ZWEI Mechanismen für
+dieselben Bilder stehen lassen: `PhotoPoint` (verwerfbare Kartenebene, ein
+Punkt je Foto) und einen Lauf, der Fototage zu Ereignissen machte. Jetzt einer:
+jedes eigene, verortete, im Immich-Zeitstrahl sichtbare Foto wird ein sofort
+bestätigtes Ereignis (`immich:photo:<asset>`), keine Mindestzahl mehr.
+**`services/immich_source.py`, `PhotoPoint`, `/api/photos/{index,days,map,
+groups}` und der Job `immich_source` sind WEG** — `photo_points.py` ist der
+eine verbliebene Lauf und legt Ereignisse an, keine Punkte.
+**Die eigentliche Frage war, wo die Koordinate liegt.** `Event.lat/lng` wären
+zwei Spalten im Kern für einen Konnektor gewesen — nicht nötig: `PhotoPoint`
+war ein Ort + ein Zeitstempel + eine Asset-Kennung, und alle drei haben im
+Ereignis-Modell längst einen Platz. Entdoppelt wird über die auf **5 Stellen
+gerundete Koordinate** (`immich:pt:<lat>,<lng>`): je Stadt wäre der gemeldete
+A45-Defekt („London, 1200 Bilder" = ein Punkt), je Foto wären 20.000
+Ortszeilen. Diese Orte tragen `type="photo"` und eine **gesetzte `address`** —
+ohne die Marke schickte der A47-Rückfüll-Lauf 20.000 gedrosselte
+Nominatim-Abrufe hinterher (Endlos-Abruf-Falle, neunte Auflage).
+**Karte und Zeitstrahl zeigen zwei verschiedene Dinge derselben Zeile:** die
+Karte das BILD (Punkt auf der Leinwand, Vorschaubild im Popup), der Zeitstrahl
+die TATSACHE — `eventPhotos()` ist für `source=immich` ausdrücklich
+unterdrückt. Das sieht beim Lesen wie ein Fehler aus und ist deshalb im
+Wächter festgenagelt.
+**Zwei getrennte Schalter** (🛰️ Google, 📷 Immich) → `_hidden_sources()`,
+zwei Zähler im Index, und die A39-Bündelung gruppiert nach **(Tag, Ort,
+QUELLE)**. Ohne die Quelle im Schlüssel ließe „📷 aus" eine Gruppe stehen,
+deren Vertreter ein Foto ist. Der Client-Rückfallfilter musste mit
+(`tlShowsSource`) — er warf die Fotos weg, sobald der Google-Schalter aus
+stand; **gefunden vom neuen Wächter, nicht von Hand.**
+`_DROPPED_TABLES` in `migrate.py` ist die erste Migration, die etwas WEGNIMMT —
+sie darf es, weil `photo_points` Schicht 4 war.
+
+**Anm. 140 — gemessen statt geraten.** „Warum lädt er beim Start alles?" — tut
+er nicht: 9 Anfragen, 86 ms, 11 kB bei 20.000 Ereignissen (A37). Teuer ist die
+**Karte**: 631 ms / 6,1 MB, und zwar bei JEDEM Öffnen des Reiters. Deshalb
+`EventsIndex.revision` (= `total` + `max(updated_at)`) und ein Übersprung in
+`mpLoadPoints`. **Kein Zeit-Cache** — der zeigt eine Weile etwas Falsches und
+danach etwas Richtiges, beides ohne Anlass. `total` allein reichte nicht: eine
+Umbenennung ließe die Zahl gleich, und der Titel steht auf der Karte.
+**Offen und bewusst liegen gelassen:** `/api/stats/overview` (224 ms) und die
+6,1 MB Nutzlast der Karte — ein Fotopunkt braucht vier Werte, nicht ein volles
+Ereignis. Die Messung steht in Anm. 140, damit sie nicht wiederholt werden muss.
+
+**Anm. 141 — die Wege-Ebene fror die Wochenansicht ein.** Zwei Defekte:
+`/api/tracks` deckelte bei 1000 **still** und nahm die NEUESTEN (in einem
+Monat fehlten die ersten 16 Tage — Anm. 110 in einer anderen Datei), und jeder
+Weg ging als SVG-Knoten in den DOM. Die Leinwand-Regel aus A45 stand längst da
+— sie hieß nur `mpPhotoCanvas`, also **nach der Foto-Ebene statt nach ihrer
+Aufgabe**, und wer die Wege baute, hat sie nicht gesucht. Jetzt `mpCanvas`.
+**Regel: ein Name entscheidet, wer die Regel findet.** `sqlutil.even_spread`
+(„deckeln heißt nicht abschneiden") steht deshalb jetzt dort, wo jeder sucht.
+
+**Anm. 142 — Rekord-Kacheln führen zu ihrem TAG,** nicht in den
+Bearbeiten-Dialog eines Eintrags, der zufällig den Messwert trägt (seit
+Anm. 119 kommt der Tageswert aus einer Verdichtung über ALLE Einträge des
+Tages). `tl.day` + `tlShowDay()`, serverseitig über `from`/`to`.
+
+**Anm. 143 — Tage führen, Einträge stehen daneben.** Welt, Top-Orte,
+Meistbesuchte Städte, Städte-Kompendium. Beide Zahlen bleiben („47 Tage · 312
+Einträge") — das beantwortet das „hmm, da villt nicht immer" des Users, ohne
+eine Frage unbeantwortbar zu machen. `sqlutil.day_number` statt `func.concat`
+(SQLite kann es erst ab 3.44, `extract` liefert auf PG Fließkomma). Die
+Abweichung ist als TEST festgehalten, sonst liest der A37-Gleichheitsvergleich
+sie beim nächsten Mal als Rückschritt.
+
+**Bewusst NICHT gebaut, mit abgewogenen Alternativen in DECISIONS.md:**
+**144** Grundort für Zeiträume ohne Daten („Elternhaus 0–6") — braucht eine
+VIERTE Sorte Aussage (stehende Tatsache mit Gültigkeitszeitraum, zur
+Abfragezeit beantwortet) und drei Entscheidungen des Users vorher; **145**
+Lückenprüfung (hängt an 144; ist eine ANSICHT, kein gespeicherter Zustand);
+**146** Partner-Ansicht (P6.1, nach 1.0 — eine falsch gebaute Freigabe ist
+kein Fehler, sondern eine Offenlegung: Freigabe je Richtung, widerruflich,
+NIE kopieren sondern durch die Freigabe lesen); **147** Weblate (die eigentliche
+Frage ist „Katalog aus index.html herauslösen?", also ein Build-Schritt gegen
+Anm. 4 — abgelehnt, mit der Reihenfolge für später).
+
+**Drei Zusicherungen waren in dieser Runde aus dem falschen Grund grün**
+(Anm. 108): `every` auf einer leeren Liste, eine Negativbedingung über eine
+leere Anfrageliste, und `hasattr` auf einem Dict. Alle drei fielen erst auf,
+als der Wächter gegen den kaputten Stand gefahren wurde — **die Regel trägt,
+aber nur, wenn man sie wirklich anwendet.**
+
 Umgesetzt bis **v0.39.0** (2026-07-23). **Gruppe A ist komplett** (A1–A48),
 Gruppe B bis **F19**; **P5.1, F1 und P2.1 (alle drei Stufen) sind fertig**. Offen
 ist damit nur noch: **0.40 (offen, sammelt auf `main`)**, **Demo-Modus (0.41)**
