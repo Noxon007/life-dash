@@ -23,6 +23,7 @@ from datetime import datetime
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from app.sqlutil import day_number
 from app.models import (ConfirmState, Entity, Event, EventEntityLink, Location,
                         Metric, Source)
 from app.services import weather_day
@@ -145,9 +146,16 @@ def compute_overview(db: Session, user_id: str, *, today: datetime | None = None
     # ---------------- Orte: gruppiert in SQL, gekürzt in Python --------------
     # Nach Location.name gruppieren heißt: nur die *verschiedenen* Namen landen
     # in Python (Tausende), nicht alle Ereignisse (Zehntausende).
-    place_rows = (db.query(Location.name, func.count(Event.id))
+    # Anmerkung 143: gezählt werden TAGE, nicht Einträge. „Zuhause: 4.812"
+    # war nach dem Timeline-Import keine Auskunft über das Leben, sondern über
+    # die Zufuhr — dreißig Besuche an einem Tag sind ein Tag. Dieselbe
+    # Korrektur, die A31/Anmerkung 64 für die Wettertafeln schon gemacht hat;
+    # sie hatte hier nur nie stattgefunden.
+    day_key = day_number(Event.date_start)
+    place_rows = (db.query(Location.name, func.count(func.distinct(day_key)))
                   .join(Event, Event.location_id == Location.id)
-                  .filter(*mine, Location.name.isnot(None))
+                  .filter(*mine, Location.name.isnot(None),
+                          Event.date_start.isnot(None))
                   .group_by(Location.name).all())
     per_place: dict[str, int] = {}
     for name, n in place_rows:
@@ -161,9 +169,10 @@ def compute_overview(db: Session, user_id: str, *, today: datetime | None = None
     # welche Bausteine der Nutzer gewählt hat (`place_name_parts`) — wer
     # „Stadt" abgewählt hat, hätte hier gar keine. Der Leerstring bedeutet
     # „nachgesehen, gibt es hier nicht" und zählt darum nicht mit.
-    city_rows = (db.query(Location.city, func.count(Event.id))
+    city_rows = (db.query(Location.city, func.count(func.distinct(day_key)))
                  .join(Event, Event.location_id == Location.id)
-                 .filter(*mine, Location.city.isnot(None), Location.city != "")
+                 .filter(*mine, Location.city.isnot(None), Location.city != "",
+                         Event.date_start.isnot(None))
                  .group_by(Location.city).all())
     per_city = {c: n for c, n in city_rows}
     top_cities = sorted(per_city.items(), key=lambda kv: -kv[1])[:TOP_N]

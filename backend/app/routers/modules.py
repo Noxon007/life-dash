@@ -13,6 +13,7 @@ from app.models import (CityInfo, Entity, Event, EventEntityLink, Location,
                         User)
 from app.modules.registry import registry
 from app.routers._serialize import EAGER, event_to_read
+from app.sqlutil import day_number
 from app.schemas import (CityDetailRead, CityInfoRead, CityPlaceRead, CityRead,
                          EntityRead, EventRead, ModuleRead)
 from app.services.geocode import lang_for
@@ -82,12 +83,18 @@ def cities(
     Der Leerstring bedeutet „nachgesehen, keine Stadt" (A39) und ist keine
     Stadt — er fällt hier genauso weg wie NULL.
     """
+    # Anmerkung 143: die TAGE sind die führende Zahl. `count(distinct <Tag>)`
+    # statt einer Python-Menge, weil sonst zehntausende Zeilen nur für eine
+    # Zahl in den Prozess kämen (A37: wer eine Zahl über den GESAMTEN Bestand
+    # braucht, holt sie vom Server — und der rechnet sie in der Datenbank).
+    day_key = day_number(Event.date_start)
     rows = (db.query(Location.city,
                      func.min(Location.country),
                      func.count(Event.id),
                      func.count(func.distinct(Location.id)),
                      func.min(Event.date_start),
-                     func.max(Event.date_start))
+                     func.max(Event.date_start),
+                     func.count(func.distinct(day_key)))
             .join(Event, Event.location_id == Location.id)
             .filter(Location.user_id == user.id,
                     Event.user_id == user.id,
@@ -96,8 +103,9 @@ def cities(
             .order_by(Location.city)
             .all())
     return [CityRead(name=name, country=country, event_count=events,
-                     place_count=places, first_visit=first, last_visit=last)
-            for name, country, events, places, first, last in rows]
+                     place_count=places, first_visit=first, last_visit=last,
+                     day_count=days)
+            for name, country, events, places, first, last, days in rows]
 
 
 # --------------------------------------------------------------------------- #

@@ -108,9 +108,9 @@ def test_name_defects_still_come_first(db, user):
 # --------------------------------------------------------------------------- #
 # Statistik
 # --------------------------------------------------------------------------- #
-def _event(db, user, loc, title="Besuch"):
+def _event(db, user, loc, title="Besuch", day=1):
     ev = Event(user_id=user.id, title=title, category="event",
-               date_start=datetime(2026, 7, 1), date_precision=DatePrecision.day,
+               date_start=datetime(2026, 7, day), date_precision=DatePrecision.day,
                confirmed=ConfirmState.confirmed, confirmed_by="import",
                source=Source.google_timeline, location=loc)
     db.add(ev)
@@ -124,17 +124,41 @@ def test_cities_counted_across_different_places(db, user):
     for i, street in enumerate(["Kaiserstraße", "Bilker Allee", "Ratinger Str."]):
         loc = _loc(db, user, name=f"{street}, Düsseldorf", city="Düsseldorf",
                    lat=51.2 + i / 100, lng=6.7)
-        _event(db, user, loc)
+        # Drei verschiedene TAGE (Anmerkung 143): lägen alle drei Besuche auf
+        # demselben Tag, wäre die richtige Antwort „1 Tag" — und der Test
+        # bewiese dann nur noch, dass die Stadt eine ist, nicht dass sie
+        # zusammengezählt wird.
+        _event(db, user, loc, day=i + 1)
     loc2 = _loc(db, user, name="Marktplatz, Detmold", city="Detmold",
                 lat=51.9, lng=8.8)
-    _event(db, user, loc2)
+    _event(db, user, loc2, day=9)
     db.commit()
 
     ov = compute_overview(db, user.id)
     assert ov["counts"]["cities"] == 2
+    # Anmerkung 143: die Balken zählen TAGE, nicht Einträge.
     assert ov["top_cities"][0] == ["Düsseldorf", 3]
     # Orte bleiben getrennt gezählt — die Städte treten daneben, nicht an ihre Stelle
     assert ov["counts"]["places"] == 4
+
+
+def test_the_city_bars_count_days_not_entries(db, user):
+    """Anmerkung 143 — die Zahl an einer Stadt ist eine Zahl über das LEBEN.
+
+    Gemeldet: „gerade durch die Massenimporte sinnvoller, immer auf die Tage zu
+    gehen". Der Grund ist keine Vorliebe: dreißig Google-Besuche an einem Tag
+    sind ein Tag. „Düsseldorf: 4.812" beschreibt nach einem Timeline-Import die
+    Zufuhr und nicht die Stadt.
+    """
+    loc = _loc(db, user, name="Kaiserstraße, Düsseldorf", city="Düsseldorf")
+    for _ in range(30):
+        _event(db, user, loc, day=1)      # EIN Tag, dreißig Besuche
+    _event(db, user, loc, day=2)
+    db.commit()
+
+    ov = compute_overview(db, user.id)
+    assert ov["top_cities"][0] == ["Düsseldorf", 2], ov["top_cities"]
+    assert ov["top_places"][0][1] == 2, ov["top_places"]
 
 
 def test_cityless_places_do_not_become_a_city(db, user):

@@ -232,7 +232,10 @@ def test_the_numbers_did_not_change(db, user):
     assert wx["warmest_trip"]["avg"] == old["warmest_trip"]
 
     assert [tuple(y) for y in new["per_year"]] == old["per_year"]
-    assert [tuple(p) for p in new["top_places"]] == old["top_places"]
+    # `top_places` steht hier NICHT mehr: es zählt seit Anmerkung 143 Tage
+    # statt Einträge — die einzige bewusste Abweichung neben der englischen
+    # Geburt. Sie hat ihren eigenen Test (siehe unten), damit sie eine
+    # Entscheidung bleibt und nicht als „Gleichheit" durchrutscht.
 
 
 def test_the_one_deliberate_difference_is_the_english_birth(db, user):
@@ -251,6 +254,40 @@ def test_the_one_deliberate_difference_is_the_english_birth(db, user):
 
     ov = compute_overview(db, user.id, today=NOW)
     assert ov["birth"] is not None and ov["age"] == 41
+
+
+def test_the_second_deliberate_difference_is_days_instead_of_entries(db, user):
+    """Anmerkung 143 — die Ortsbalken zählen TAGE.
+
+    Gemeldet aus der Nutzung: „gerade durch die Massenimporte sinnvoller, immer
+    auf die Tage zu gehen". Die alte Zählung war nie falsch, sie beantwortete
+    nur eine andere Frage: „Zuhause: 4.812" beschreibt nach einem
+    Timeline-Import die Zufuhr und nicht das Leben. Dieselbe Korrektur, die
+    A31/Anmerkung 64 für die Wettertafeln schon gemacht hatte — in dieser
+    Datei hatte sie nie stattgefunden.
+
+    Festgehalten als TEST und nicht nur im CHANGELOG, weil sie sonst beim
+    nächsten Gleichheits-Vergleich wie ein Rückschritt aussieht.
+    """
+    loc = Location(user_id=user.id, name="Zuhause", lat=51.0, lng=8.0,
+                   city="Detmold")
+    db.add(loc)
+    db.flush()
+    for i in range(30):
+        db.add(Event(user_id=user.id, title=f"Besuch {i}", category="event",
+                     date_start=datetime(2024, 5, 4, 8 + i % 12),
+                     date_precision=DatePrecision.exact, location=loc,
+                     source=Source.google_timeline,
+                     confirmed=ConfirmState.confirmed))
+    db.add(Event(user_id=user.id, title="Besuch am zweiten Tag", category="event",
+                 date_start=datetime(2024, 5, 5, 9), date_precision=DatePrecision.exact,
+                 location=loc, source=Source.google_timeline,
+                 confirmed=ConfirmState.confirmed))
+    db.commit()
+
+    ov = compute_overview(db, user.id, today=NOW)
+    hit = next(p for p in ov["top_places"] if p[0] == "Zuhause")
+    assert hit[1] == 2, f"{hit} — 31 Besuche an ZWEI Tagen sind zwei"
 
 
 def test_top_animals_match_the_old_counting(db, user):

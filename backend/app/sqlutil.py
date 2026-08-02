@@ -22,6 +22,28 @@ def day_parts(col):
             func.extract("day", col))
 
 
+def day_number(col):
+    """Der Kalendertag als EINE Zahl (20240712) — dialektneutral.
+
+    Gedacht für `count(distinct day_number(Event.date_start))`: „an wie vielen
+    Tagen?" statt „wie viele Einträge?" (Anmerkung 143). `group_by(*day_parts)`
+    kann das nicht — dort sind es drei Spalten, und `count(distinct a, b, c)`
+    gibt es in SQLite nicht.
+
+    **Warum gerechnet und nicht zusammengesetzt:** `concat()` kennt SQLite erst
+    ab 3.44, und `extract` liefert auf PostgreSQL Fließkommazahlen — aus
+    „2024-7-12" würde dort „2024.0-7.0-12.0". Beides zählt zwar in sich
+    stimmig, aber die eine Datenbank wäre dann nur zufällig richtig, und genau
+    dafür gibt es `test_a37_postgres_dialect.py`. Eine Multiplikation können
+    beide, und das Ergebnis ist in beiden dieselbe Zahl.
+
+    Die Zahl ist zum ZÄHLEN und Gruppieren da, nicht zum Vergleichen mit einem
+    Datum — dass sie sich wie ein ISO-Datum liest, ist bequem und keine Zusage.
+    """
+    y, m, d = day_parts(col)
+    return y * 10000 + m * 100 + d
+
+
 def weather_cell(lat_col, lng_col):
     """Eine Zahl je Wetter-Gitterzelle (0,1° ≈ 11 km) — dialektneutral.
 

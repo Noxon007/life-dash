@@ -94,6 +94,9 @@ class CityRead(BaseModel):
     name: str
     country: str | None = None
     event_count: int = 0
+    # Anmerkung 143: die führende Zahl — an wie vielen Kalendertagen war
+    # jemand hier. Die Ereigniszahl bleibt daneben stehen.
+    day_count: int = 0
     place_count: int = 0     # wie viele Orte in dieser Stadt
     first_visit: datetime | None = None
     last_visit: datetime | None = None
@@ -488,6 +491,11 @@ class VisitedCountry(BaseModel):
     name: str
     continent: str
     event_count: int
+    # Anmerkung 143: An wie vielen KALENDERTAGEN war jemand hier. Die führende
+    # Zahl, seit die Massenimporte da sind: dreißig Google-Besuche an einem Tag
+    # sind ein Tag, nicht dreißig. Die Ereigniszahl bleibt daneben stehen — sie
+    # ist keine Falschaussage, sie beantwortet eine andere Frage.
+    day_count: int = 0
     first_visit: datetime | None = None
     last_visit: datetime | None = None
     # F11: Durchschnittstemperatur der bestätigten Events dieses Landes —

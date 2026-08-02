@@ -54,13 +54,20 @@ def world(
         slot = agg.setdefault(
             country.iso,
             {"country": country, "event_count": 0, "first": None, "last": None,
-             "event_ids": set()},
+             "event_ids": set(), "days": set()},
         )
         if confirmed_event:
             slot["event_count"] += 1
             slot["event_ids"].add(event.id)
             when = event.date_start
             if when is not None:
+                # Anmerkung 143: TAGE sind die führende Zahl, Einträge stehen
+                # daneben. Seit die Massenimporte da sind, sagt „312 Ereignisse
+                # in Frankreich" nichts mehr über Frankreich, sondern über die
+                # Zufuhr — dreißig Google-Besuche an einem Tag sind ein Tag.
+                # Beide Zahlen bleiben: die Ereigniszahl ist keine Falschaussage,
+                # sie beantwortet nur eine andere Frage.
+                slot["days"].add(when.date())
                 if slot["first"] is None or when < slot["first"]:
                     slot["first"] = when
                 if slot["last"] is None or when > slot["last"]:
@@ -89,6 +96,7 @@ def world(
             name=country.name_de,
             continent=country.continent,
             event_count=slot["event_count"],
+            day_count=len(slot["days"]),
             first_visit=slot["first"],
             last_visit=slot["last"],
             avg_temp_c=round(sum(temps) / len(temps), 1) if temps else None,

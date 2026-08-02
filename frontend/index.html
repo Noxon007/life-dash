@@ -1381,14 +1381,17 @@
             <div id="chart-cats"></div>
           </div>
           <div class="panel">
-            <h3 data-i18n="chart.topplaces">Top-Orte</h3>
+            <!-- Anmerkung 143: die Balken zählen TAGE. Ohne die Überschrift
+                 liest man eine Zahl und rät ihre Einheit — und rät nach dem
+                 Timeline-Import garantiert falsch. -->
+            <h3 data-i18n="chart.topplaces">Top-Orte <span class="stat-label">(Tage)</span></h3>
             <div id="chart-places"></div>
           </div>
           <!-- A39: Städte neben den Orten, nicht statt ihrer. „Kaiserstraße",
                „Bilker Allee" und „Ratinger Str." sind drei Orte und eine Stadt —
                beide Zählweisen beantworten verschiedene Fragen. -->
           <div class="panel" id="panel-cities">
-            <h3 data-i18n="chart.topcities">Meistbesuchte Städte</h3>
+            <h3 data-i18n="chart.topcities">Meistbesuchte Städte <span class="stat-label">(Tage)</span></h3>
             <div id="chart-cities"></div>
           </div>
           <div class="panel" data-req-mod="animal">
@@ -2635,7 +2638,6 @@ const I18N_EN = {
   'tl.city.tip': "Timeline limited to this city — click to show everything again",
   'tl.day.tip': "Timeline limited to this day — click to show everything again",
   'comp.cities.empty': "No cities yet — they are filled in by the place-name run (“Resolve place names” in the settings).",
-  'comp.cities.entries': "entries",
   'tl.journal.tip': "Write a journal entry for a day (Markdown) — appears as a day header above that day’s events",
   'tl.print.tip': "Pick a date range and print or save as PDF — printed light, without navigation, with every event in the range",
   'map.view': "View",
@@ -2698,7 +2700,7 @@ const I18N_EN = {
   'stat.sub.weather': "run weather enrichment",
   'chart.peryear': "Events per year",
   'chart.categories': "Category distribution",
-  'chart.topplaces': "Top places",
+  'chart.topplaces': "Top places <span class=\"stat-label\">(days)</span>",
   'chart.topcities': "Most-visited cities",
   'tl.visits': "visits",
   'tl.group.tip': "Show the individual visits of this day",
@@ -2876,6 +2878,11 @@ const I18N_EN = {
   'dc.more': "… and {n} more",
   'dc.done': "✓ {n} summary entries removed.",
   'dc.needpreview': "Look at what is affected first.",
+  // Anmerkung 143 — Tage führen, Einträge stehen daneben
+  'n.day': "day",
+  'n.days': "days",
+  'n.entry': "entry",
+  'n.entries': "entries",
   'map.tracks.cap': "{s} of {n} paths shown, spread evenly across the period — pick a smaller period for all of them.",
   'map.photos.nowhere': "no place given",
   'tl.photos': "📷 Photos",
@@ -5478,7 +5485,8 @@ async function loadCities() {
     <div class="comp-card" data-city="${esc(c.name)}">
       <div class="comp-emoji">🏙️</div>
       <div class="comp-name">${esc(c.name)}</div>
-      <div class="comp-count">${c.event_count} ${t('comp.cities.entries', 'Einträge')}${
+      <div class="comp-count">${esc(dayCount(c.day_count))} <span class="stat-label">· ${
+        esc(entryCount(c.event_count))}</span>${
         c.first_visit ? ` · ${span}` : ''}${c.country ? ` · ${esc(c.country)}` : ''}</div>
     </div>`;
   }).join('');
@@ -5517,7 +5525,8 @@ async function openCityDetail(name) {
   const yr = s => s ? String(s).slice(0, 4) : null;
   const span = [yr(city.first_visit), yr(city.last_visit)].filter(Boolean);
   const sub = [
-    `${city.event_count.toLocaleString(LOC())} ${t('comp.cities.entries', 'Einträge')}`,
+    dayCount(city.day_count),
+    entryCount(city.event_count),
     `${city.place_count} ${city.place_count === 1 ? t('comp.city.place', 'Ort') : t('comp.city.places', 'Orte')}`,
     span.length ? (span[0] === span[1] ? span[0] : `${span[0]}–${span[1]}`) : null,
     city.country,
@@ -5566,7 +5575,7 @@ async function openCityDetail(name) {
     located.forEach(p => L.circleMarker([p.lat, p.lng],
       { radius: 8, fillColor: accent, color: '#fff', weight: 2, fillOpacity: .9 })
       .addTo(compMapObj)
-      .bindPopup(`<b>${esc(p.name)}</b><br>${p.event_count} ${t('comp.cities.entries', 'Einträge')}`));
+      .bindPopup(`<b>${esc(p.name)}</b><br>${esc(entryCount(p.event_count))}`));
     compMapObj.fitBounds(L.latLngBounds(latlngs).pad(0.4));
     setTimeout(() => compMapObj && compMapObj.invalidateSize(), 60);
   }
@@ -7788,8 +7797,43 @@ async function loadWorldGeo() {
   return worldGeo;
 }
 
-// Vier Intensitätsstufen nach Ereigniszahl — mehr Stufen liest man auf einer
-// Weltkarte ohnehin nicht auseinander.
+// **Anmerkung 143: Tage führen, Einträge stehen daneben.**
+//
+// Gemeldet aus der Nutzung: „Im Welt-Reiter sieht man die Anzahl an Ereignissen
+// pro Land. Ich finde besser, wenn man die Anzahl an Tage sieht. Gerade durch
+// die Massenimporte."
+//
+// Der Grund dahinter ist keine Vorliebe, sondern eine Bedeutungsfrage. Solange
+// jeder Eintrag von Hand kam, war „312 Einträge in Frankreich" eine Aussage
+// über Frankreich. Seit Google-Besuche und (mit Anmerkung 139) Foto-Ereignisse
+// dazukommen, ist dieselbe Zahl eine Aussage über die ZUFUHR: dreißig Besuche
+// an einem Tag sind ein Tag, und ein Fototag mit 200 Bildern schlägt jeden
+// selbst erfassten Urlaub. Die Zahl ist nicht falsch geworden, sie beantwortet
+// nur eine andere Frage als die, die man beim Hinsehen stellt.
+//
+// **Beide bleiben deshalb stehen**, und die Reihenfolge entscheidet: Tage groß,
+// Einträge klein daneben. Eine Zahl wegzunehmen hieße, eine Frage nicht mehr
+// beantworten zu können — und beim Kompendium („wie viele Filme?") ist die
+// Ereigniszahl weiterhin die richtige.
+function dayCount(n) {
+  // Einzahl und Mehrzahl sind ZWEI Schlüssel, nicht einer mit Wahl im
+  // Deutschen: `t()` gibt sonst für beide dasselbe englische Wort zurück, und
+  // „1 days" ist genau die Sorte Fehler, die man in der eigenen Sprache nie
+  // sieht (F10: Deutsch steht im Quelltext und fällt beim Fehlen zurück).
+  return n === 1 ? `1 ${t('n.day', 'Tag')}`
+                 : `${(n || 0).toLocaleString(LOC())} ${t('n.days', 'Tage')}`;
+}
+// Die Zweitzahl, immer in derselben Form. Sie steht NEBEN der Tageszahl, nicht
+// an ihrer Stelle.
+function entryCount(n) {
+  return n === 1 ? `1 ${t('n.entry', 'Eintrag')}`
+                 : `${(n || 0).toLocaleString(LOC())} ${t('n.entries', 'Einträge')}`;
+}
+
+// Vier Intensitätsstufen nach TAGEN — mehr Stufen liest man auf einer
+// Weltkarte ohnehin nicht auseinander. Die Schwellen sind mit der Umstellung
+// mitgewandert: 25 EINTRÄGE waren nach einem Timeline-Import ein verlängertes
+// Wochenende, 25 TAGE sind ein Land, in dem man wirklich war.
 function worldShade(count) {
   if (count >= 25) return .85;
   if (count >= 10) return .65;
@@ -7838,7 +7882,7 @@ function renderWorldChecklist(data) {
     const chips = c.countries.map(x => {
       // F11: Durchschnittstemperatur, wenn das Land Wetterdaten trägt
       const temp = x.avg_temp_c != null ? ` · ⌀ ${x.avg_temp_c} °C` : '';
-      return `<span class="world-chip hit" title="${esc(x.name)}: ${x.event_count} ${esc(nEvents(x.event_count))}${temp}">${esc(x.name)}<span class="n">${x.event_count}</span></span>`;
+      return `<span class="world-chip hit" title="${esc(x.name)}: ${esc(dayCount(x.day_count))} · ${esc(entryCount(x.event_count))}${temp}">${esc(x.name)}<span class="n">${x.day_count.toLocaleString(LOC())}</span></span>`;
     }).join('');
     const missing = c.missing.map(n => `<span class="world-chip">${esc(n)}</span>`).join('');
     return `<div class="world-cont" data-cont="${esc(c.code)}">
@@ -7899,7 +7943,7 @@ async function renderWorldMap(data) {
         weight: hit ? 1 : .4,
         opacity: hit ? .9 : .25,
         fillColor: accent,
-        fillOpacity: hit ? worldShade(hit.event_count) : 0,
+        fillOpacity: hit ? worldShade(hit.day_count) : 0,
       };
     },
     onEachFeature: (feat, layer) => {
@@ -7910,7 +7954,7 @@ async function renderWorldMap(data) {
         // F11: Durchschnittstemperatur aus den bereits gespeicherten Wetterdaten
         const temp = hit.avg_temp_c != null
           ? `<br>${t('world.avgtemp', 'Ø Temperatur')} ${hit.avg_temp_c} °C` : '';
-        layer.bindPopup(`<b>${esc(hit.name)}</b><br>${hit.event_count} ${esc(nEvents(hit.event_count))}${temp}<br>
+        layer.bindPopup(`<b>${esc(hit.name)}</b><br>${esc(dayCount(hit.day_count))} <span class="stat-label">· ${esc(entryCount(hit.event_count))}</span>${temp}<br>
           <span style="opacity:.7">${esc(t('world.firstvisit', 'erstmals'))} ${first}<br>${
             esc(t('world.lastvisit', 'zuletzt'))} ${last}</span>`);
       } else {
