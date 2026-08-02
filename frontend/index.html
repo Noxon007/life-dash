@@ -1143,6 +1143,13 @@
           <span class="filter-chip active" id="tl-city-chip" style="display:none"
                 data-i18n-title="tl.city.tip"
                 title="Zeitstrahl auf diese Stadt eingeschränkt — klicken, um wieder alles zu zeigen"></span>
+          <!-- Anmerkung 142: derselbe Chip noch einmal für EINEN TAG. Er kommt
+               von den Rekord-Kacheln der Statistik („heißester Tag"), die
+               vorher den Bearbeiten-Dialog aufmachten — eine Antwort auf die
+               Frage „was war an diesem Tag?", die den Tag gar nicht zeigt. -->
+          <span class="filter-chip active" id="tl-day-chip" style="display:none"
+                data-i18n-title="tl.day.tip"
+                title="Zeitstrahl auf diesen Tag eingeschränkt — klicken, um wieder alles zu zeigen"></span>
           <span class="filter-chip off" id="tl-visits-toggle" data-i18n-title="tl.visits.tip" title="Automatisch erfasste Einträge (Google-Besuche, Immich-Fototage) im Zeitstrahl anzeigen — auf der Karte sind sie immer sichtbar" data-i18n="tl.visits.chip">🛰️ Automatisch erfasst</span>
           <!-- Anmerkung 135: unbestätigte Google-/Immich-Vorschläge sind
                Beleg, kein Ereignis — sie stehen nicht mehr zwischen den
@@ -2619,6 +2626,7 @@ const I18N_EN = {
   'tl.visits.tip': "Show automatically detected entries (Google visits, Immich photo days) in the timeline — on the map they are always visible",
   // A41 — Stadtfilter
   'tl.city.tip': "Timeline limited to this city — click to show everything again",
+  'tl.day.tip': "Timeline limited to this day — click to show everything again",
   'comp.cities.empty': "No cities yet — they are filled in by the place-name run (“Resolve place names” in the settings).",
   'comp.cities.entries': "entries",
   'tl.journal.tip': "Write a journal entry for a day (Markdown) — appears as a day header above that day’s events",
@@ -4022,6 +4030,7 @@ const monthLong = m => t('mon.l.' + m, MONTHS_LONG[m]);
 const tl = { zoom: 'year', query: '', events: [], catFilter: new Set(FILTER_CATS),
              showVisits: false, offset: 0, done: false, loading: false, autoPages: 0,
              city: null,     // A41: Stadtfilter, serverseitig (siehe loadTimeline)
+             day: null,      // Anm. 142: EIN Kalendertag (ISO), serverseitig
              // A45: Foto-Ebene. `level` ist die Verdichtungsstufe (A47) und
              // gilt für Fotos wie für Besuche — EINE Einstellung, nicht zwei
              // nebeneinander.
@@ -4243,7 +4252,16 @@ async function loadTimeline(more = false) {
       // Besuche — sonst stünde man vor einer leeren Liste), und verdichtet wird
       // nicht (wer nach einer Stadt fragt, will die Einträge sehen, nicht eine
       // Sammelkarte je Tag).
+      // Anmerkung 142: Ein gewählter TAG ist derselbe Fall wie eine gewählte
+      // Stadt, und deshalb gelten dieselben zwei Mitzieher. Wer auf „heißester
+      // Tag" klickt, fragt nach dem 3. Juli 2015 — nicht nach „dem 3. Juli
+      // 2015, sofern an ihm etwas von Hand erfasst wurde". An genau so einem
+      // Tag stehen aber oft nur importierte Besuche, und dann wäre die Antwort
+      // auf eine Zahl, die es sichtbar GIBT, eine leere Liste. Verdichtet wird
+      // ebenfalls nicht: eine Sammelkarte „12× Detmold" ist die Antwort auf
+      // eine Übersicht, nicht auf einen einzelnen Tag.
       const cityMode = !!tl.city;
+      const narrow = cityMode || !!tl.day;
       const page = await fetchEvents({ limit: TL_PAGE, offset: tl.offset,
                                        // Anmerkung 135: unbestätigte Google-/
                                        // Immich-Vorschläge sind Beleg, kein
@@ -4252,15 +4270,23 @@ async function loadTimeline(more = false) {
                                        // welcher Schalter steht. Erst nach der
                                        // Moderation werden sie zu Ereignissen.
                                        machine_proposals: 0,
-                                       visits: (cityMode || tl.showVisits) ? 1 : 0,
+                                       visits: (narrow || tl.showVisits) ? 1 : 0,
                                        // A47: Die Stufe geht IMMER mit, auch
                                        // wenn gerade nicht verdichtet wird —
                                        // sonst hinge die Antwort davon ab, in
                                        // welcher Reihenfolge zwei Schalter
                                        // umgelegt wurden.
                                        group: tl.level,
-                                       ...(cityMode ? { city: tl.city }
-                                           : tl.showVisits ? { condense: 1 } : {}) });
+                                       // Anmerkung 142: ein gewählter Tag ist
+                                       // ein Fenster über den GESAMTEN Bestand,
+                                       // also fragt ihn der Server (A37). Im
+                                       // Browser gefiltert träfe er nur die
+                                       // geladene Seite — und die reicht bei
+                                       // 20 Jahren nie bis 2004.
+                                       ...(tl.day ? { from: `${tl.day}T00:00:00`,
+                                                      to: `${tl.day}T23:59:59` } : {}),
+                                       ...(cityMode ? { city: tl.city } : {}),
+                                       ...(!narrow && tl.showVisits ? { condense: 1 } : {}) });
       tl.events = more ? tl.events.concat(page) : page;
       tl.offset += page.length;
       tl.done = page.length < TL_PAGE;
@@ -4534,6 +4560,7 @@ function renderTimelineList() {
   // Index — in der geladenen Liste wäre sie eine beliebige Teilmenge.
   if (!tlShowsVisits()) filtered = filtered.filter(e => !MACHINE_SOURCES.includes(e.source));
   renderCityChip();
+  renderDayChip();         // Anmerkung 142
   ensurePhotoIndex();      // A45: entscheidet, ob der Foto-Schalter etwas kann
   const toggle = document.getElementById('tl-visits-toggle');
   toggle.style.display = TL_VISIT_COUNT ? '' : 'none';
@@ -5678,10 +5705,63 @@ function tlFilterOnly(cat) {
 // Abfrage.
 function tlFilterCity(city) {
   tl.city = city || null;
+  // Ein Tagesfilter und ein Stadtfilter sind zwei Antworten auf „was soll ich
+  // sehen?" — nebeneinander stehen gelassen ergäben sie stillschweigend „diese
+  // Stadt an diesem einen Tag", was niemand angeklickt hat.
+  tl.day = null; tl.dayLabel = null;
   tl.offset = 0; tl.done = false; tl.events = []; tl.autoPages = 0;
   gotoView('timeline');
   loadTimeline();
 }
+// Anmerkung 142: EINEN TAG im Zeitstrahl zeigen. Der Zielort für jede
+// Statistik-Kachel, die einen Tag NENNT — „heißester Tag", „längster Tag",
+// „stärkste Böe".
+//
+// Bis hierher öffnete ein Klick darauf `openEventEdit()`: den Bearbeiten-
+// Dialog EINES Eintrags. Das ist an drei Stellen die falsche Antwort. Erstens
+// beantwortet es die gestellte Frage nicht — wer auf „38,4 °C" klickt, will
+// wissen, was an diesem Tag war, und bekommt ein Formular. Zweitens ist der
+// gezeigte Eintrag gar nicht „der Tag", sondern der eine, der zufällig den
+// Messwert trägt (Anm. 119: die Tageswerte kommen aus einer Verdichtung über
+// ALLE Einträge des Tages — die Kachel nennt einen Tag, die Kennung zeigte
+// auf einen Eintrag; zwei Angaben über verschiedene Dinge, die aussehen wie
+// eine). Drittens ist ein Bearbeiten-Dialog aus einer Statistik heraus ein
+// Angebot, Bestätigtes zu ändern, wo niemand danach gefragt hat.
+//
+// `zoom` geht bewusst auf 'day': ein einzelner Tag unter einer Jahresüberschrift
+// sieht aus wie ein Jahr mit einem Eintrag.
+function tlShowDay(day, label) {
+  if (!day) return;
+  tl.day = day.slice(0, 10);
+  tl.dayLabel = label || null;
+  tl.zoom = 'day';
+  document.querySelectorAll('#tl-zoom .zoom-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.zoom === 'day'));
+  tl.offset = 0; tl.done = false; tl.events = []; tl.autoPages = 0;
+  gotoView('timeline');
+  loadTimeline();
+}
+// Der Chip trägt seine eigene Abschaltung — dieselbe Zusage wie beim
+// Stadtfilter (Anmerkung 92): niemand steht vor einem fast leeren Zeitstrahl,
+// ohne den Grund zu sehen.
+function renderDayChip() {
+  const chip = document.getElementById('tl-day-chip');
+  if (!chip) return;
+  chip.style.display = tl.day ? '' : 'none';
+  if (!tl.day) return;
+  const d = new Date(`${tl.day}T12:00:00`);
+  const shown = isNaN(d) ? tl.day : d.toLocaleDateString(LOC(),
+    { year: 'numeric', month: 'long', day: 'numeric' });
+  // Der Anlass steht dabei („heißester Tag"), sonst ist der Chip ein Datum
+  // ohne Herkunft und man weiß nicht mehr, worauf man geklickt hat.
+  chip.textContent = `📅 ${shown}${tl.dayLabel ? ` · ${tl.dayLabel}` : ''} ✕`;
+}
+document.getElementById('tl-day-chip').addEventListener('click', () => {
+  tl.day = null; tl.dayLabel = null;
+  tl.offset = 0; tl.done = false; tl.events = []; tl.autoPages = 0;
+  loadTimeline();
+});
+
 // Anmerkung 129: eine Entity im Zeitstrahl zeigen — über die Volltextsuche
 // (der Endpunkt durchsucht auch verknüpfte Entity-Namen). Das Suchfeld wird
 // mitgesetzt, damit sichtbar ist, wonach gefiltert wird.
@@ -5689,6 +5769,7 @@ function tlSearchFor(term) {
   const box = document.getElementById('global-search');
   if (box) box.value = term;
   tl.query = (term || '').trim();
+  tl.day = null; tl.dayLabel = null;   // siehe tlFilterCity
   gotoView('timeline');
   loadTimeline();
 }
@@ -5740,8 +5821,16 @@ document.querySelectorAll('.stat-card[data-go]').forEach(card =>
       if (target) setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
     } else gotoView(go);   // input, timeline, admin, map …
   }));
-document.querySelectorAll('#view-stats .stat-card[data-event-slot]').forEach(card =>
-  card.addEventListener('click', () => { if (card.dataset.eventId) openEventEdit(card.dataset.eventId); }));
+// Anmerkung 142: Rekord-Kacheln führen in den ZEITSTRAHL, an ihren Tag —
+// nicht in den Bearbeiten-Dialog. Ohne Datum bleibt die Kachel still (A40:
+// was gerade nichts kann, tut auch nicht so): eine Kachel mit „–" darauf hat
+// keinen Tag, zu dem sie führen könnte.
+document.querySelectorAll('#view-stats .stat-card[data-event-slot]').forEach(card => {
+  const label = () => (card.querySelector('.stat-label') || {}).textContent || '';
+  card.addEventListener('click', () => {
+    if (card.dataset.day) tlShowDay(card.dataset.day, label().trim());
+  });
+});
 
 // ---------- STATISTIK ----------
 // --------------------------------------------------------------------------- //
@@ -5857,8 +5946,13 @@ async function loadStats() {
     ? `${t('stat.born', 'geboren')} ${fmtDate(ov.birth)}`
     : t('stat.born.hint', 'Geburt als Meilenstein eintragen'));
 
-  // Wetter-Extreme. Der Server liefert je Kachel Wert, Datum, Ort und Titel;
-  // ein Klick öffnet den Eintrag und lädt ihn dafür bei Bedarf einzeln nach.
+  // Wetter-Extreme. Der Server liefert je Kachel Wert, Datum, Ort und Titel.
+  //
+  // Anmerkung 142: Gemerkt wird der TAG, nicht die Ereigniskennung. Die Kachel
+  // sagt „heißester Tag" — sie sagte es schon immer —, und der Klick führte
+  // trotzdem in den Bearbeiten-Dialog EINES Eintrags, nämlich dessen, der
+  // zufällig den Messwert trägt. Das ist Anmerkung 106 in klein: zwei Angaben
+  // über verschiedene Dinge (ein Tag, ein Eintrag), die aussehen wie eine.
   const tempCard = (id, x, unit = ' °C',
                     empty = t('wx.none', 'keine Wetterdaten — Verwaltung → Meine Daten → „Wetter ergänzen"')) => {
     num(id, x ? `${x.value}${unit}` : '–');
@@ -5866,7 +5960,7 @@ async function loadStats() {
       ? `${fmtDate(x)} · ${x.place || t('wx.noplace', 'ohne Ort')} — ${x.title}`
       : empty);
     const card = document.getElementById(id).closest('.stat-card');
-    if (card) card.dataset.eventId = x ? x.id : '';
+    if (card) card.dataset.day = (x && x.date_start) ? x.date_start.slice(0, 10) : '';
   };
   const ex = ov.extremes || {};
   tempCard('stat-hot', ex.hot);
