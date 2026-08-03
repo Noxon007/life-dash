@@ -15,13 +15,13 @@ ein Nutzer merkt.
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI, Geocoding aus)
-  — 584 Tests, ~15 s, SQLite im Arbeitsspeicher
+  — 586 Tests, ~14 s, SQLite im Arbeitsspeicher
 - **Tests gegen echtes PostgreSQL** (das, worauf betrieben wird — `postgres:18-alpine`):
   `pwsh tools/pg-test.ps1` (Container `lifedash-pgtest` auf Port **55432**, danach weg;
   `-Keep` lässt ihn stehen). Setzt `TEST_DATABASE_URL`, das `conftest.py` auswertet;
   **zwei Riegel davor**, weil die Suite das Schema löscht: die URL darf nicht die
   betriebene sein, und der DB-Name muss `test` enthalten.
-- Wächter: `cd tools` → `npm run check` (31 jsdom-Dateien, ~468 Zusicherungen)
+- Wächter: `cd tools` → `npm run check` (31 jsdom-Dateien, ~480 Zusicherungen)
 - **Smoke gegen ein HTTP-Doppel** (Immich): `<python> tools/immich_double.py &`
   dann `<python> tools/smoke_a45.py` — findet, was Unit-Tests prinzipiell nicht
   können (Blättern, Zeitzonen, echte DTOs). Immer aus dem Wurzelverzeichnis.
@@ -128,6 +128,43 @@ P6.1/P5.2 + Konnektoren danach. **Nichts wurde beim Verschieben umgeschrieben**
 — eine Anmerkung, die „14.1" zitiert, findet ihren Satz weiter. Kap. 15 behält
 die Fragen MIT ihrer Antwort statt sie zu löschen: eine Frage, die beim
 Beantworten aus dem Index verschwindet, nimmt mit, dass sie je gestellt wurde.
+
+**Fünfter Durchgang 2026-08-03 (Anmerkung 161) — Rückmeldung zur neuen Leiste.**
+Vier Punkte, einer davon eine FRAGE („was ist das für eine Grenze und warum
+genau 300?"), und die hatte die teuerste Antwort.
+
+**Die 300 waren keine Grenze über irgendetwas:** in „Jeder Punkt" entstanden je
+Eintrag ZWEI Leaflet-Objekte (Marker + nummerierter Kreis darauf), bei 14.747
+Punkten also rund dreißigtausend — die Objektlast aus Anm. 153. **Die Ebene
+daneben zeichnete zur selben Zeit 20.000 Fotos ohne ein einziges Objekt.** Eine
+Regel, die für die eine Punktmenge gilt, gilt auch für die andere; sie stand
+nur weiter unten und hieß nach den Fotos (Anm. 141: der Name entscheidet, wer
+die Regel findet). Jetzt ist die Leinwand-Ebene ein Bauplan mit Parametern
+(`dotLayerProto`), beide Punktmengen benutzen ihn, und **der Deckel ist weg,
+nicht erhöht** — samt Hinweis, denn ein Hinweis über einer vollständigen Karte
+behauptet einen Verlust, den es nicht gibt. Der EINZIGE verbliebene Deckel
+sitzt im Server (50.000, gleichmäßig verteilt).
+**Regel aus der Formulierung:** die Meldung führte mit der VERSTECKTEN Zahl
+(„14.447 von 14.747 sind ausgeblendet") — daher die Rückfrage „warum werden
+genau 300 nicht angezeigt". Ein Hinweis über eine Auswahl nennt zuerst das,
+was man ansieht.
+
+**Nummern nur mit Reihenfolge** (die Nummer ist die Beschriftung EINER Linie),
+und nur bis 120 Punkte. Gezeichnet auf die Leinwand, nicht als dauerhaftes
+Tooltip — das wäre ein DOM-Knoten je Punkt, also genau das, was die Ebene
+abschafft. **Eine Marke je Eintrag statt zwei:** der Kreis trug die
+Kategoriefarbe, der Marker nichts. **Etiketten über den Blasen weg** (sie
+stapelten sich beim Herauszoomen). **Nähe- und Orts-Blase sprechen dieselbe
+Bildsprache** — vorher Plugin-Blau mit Ziffer gegen Kategoriefarbe mit
+Kern, also zwei Aussehen für eine Aussage. **Ob dieses gemeinsame Aussehen das
+richtige ist, ist Anm. 162 und offen.**
+
+**Der englische Katalog hat in dieser Runde die dritte Zusicherung erwischt.**
+Unter jsdom startet die Seite ENGLISCH, `applyI18n` ersetzt das deutsche
+Markup — eine Prüfung auf gerenderten deutschen Text ist grün, egal was im
+Markup steht. Anm. 116 hat das einmal aufgeschrieben; nach drei Fällen ist es
+eine Gewohnheit: **wer nutzersichtbaren Text prüft, prüft Anzeige, deutschen
+Quelltext UND englischen Katalog.**
 
 **Vierter Durchgang 2026-08-03 (Anmerkung 160) — die Kartenschalter, gebaut.**
 Anm. 154 lag als Analyse mit drei Entwürfen da; entschieden wurde an einem

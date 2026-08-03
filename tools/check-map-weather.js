@@ -139,8 +139,15 @@ setTimeout(async () => {
     const stops = d.getElementById('mp-stops');
     ok('…und steht in der Stopp-Liste', /21[.,]5/.test(stops.textContent),
        stops.textContent.slice(0, 200));
-    ok('…und im Marker-Popup', state.popups.some(c => /21[.,]5/.test(c)),
-       JSON.stringify(state.popups.slice(0, 2)));
+    // **Anmerkung 161:** in „Jeder Punkt" gibt es keinen Marker mehr, an dem
+    // ein Popup hinge — die Punkte liegen auf einer Leinwand, und der Klick
+    // sucht den Treffer in der Liste, die beim Zeichnen entsteht. Der
+    // Popup-Inhalt ist deshalb eine eigene, reine Funktion (`pinPopupHtml`),
+    // genau wie bei den Fotos seit Anmerkung 139 — damit die Zusage prüfbar
+    // bleibt, obwohl es kein `bindPopup` mehr gibt.
+    const pinPopup = inPage(w, "pinPopupHtml(mp.located.find(e => e.id === 'he1'))");
+    ok('…und im Popup des Punktes', /21[.,]5/.test(String(pinPopup)),
+       String(pinPopup).slice(0, 160));
     w.close();
   }
 

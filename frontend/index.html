@@ -592,29 +592,32 @@
      nur die Ziffer sagt den Unterschied — den muss man lesen, umrechnen und
      vergleichen. Hier wächst die FLÄCHE mit der Menge (Radius = Wurzel), und
      die Ziffer kommt erst dazu, wo Platz für sie ist. */
-  .mp-bubble {
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--accent) 24%, transparent);
-    border: 1.5px solid color-mix(in srgb, var(--accent) 65%, transparent);
-    display: grid; place-items: center;
-    color: var(--text); font: 600 11px/1 inherit;
-    font-variant-numeric: tabular-nums;
+  /* Anmerkung 161: DIESELBE Bildsprache wie die Orts-Blasen auf der Leinwand —
+     Kategoriefarbe, durchscheinende Fläche, fester Ring, harter Kern. Vorher
+     war eine Nähe-Blase blau mit Zahl und eine Orts-Blase kategoriefarben und
+     durchscheinend: zwei Aussehen für dieselbe Aussage, je nach gewählter
+     Stufe. Die Farbe kommt als `--c` aus dem Symbol (divIcon nimmt nur eine
+     Klasse, keinen Stil). */
+  .mp-bubble .mp-bub-in {
+    display: grid; place-items: center; width: 100%; height: 100%;
+    border-radius: 50%; position: relative;
+    background: color-mix(in srgb, var(--c, var(--accent)) 20%, transparent);
+    border: 1.5px solid color-mix(in srgb, var(--c, var(--accent)) 55%, transparent);
+    color: var(--text); font: 600 11px/1 inherit; font-variant-numeric: tabular-nums;
   }
   /* Der harte Kern hält den Ort fest — sonst wandert bei einer großen Blase
      die Aussage von „hier“ zu „ungefähr hier“. */
-  .mp-bubble::before {
-    content: ''; position: absolute; width: 8px; height: 8px; border-radius: 50%;
-    background: var(--accent); box-shadow: 0 0 0 1.5px rgba(255,255,255,.9);
+  .mp-bubble .mp-bub-in::before {
+    content: ''; position: absolute; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--c, var(--accent)); box-shadow: 0 0 0 2px rgba(255,255,255,.92);
   }
   .mp-bubble b { position: relative; z-index: 1; text-shadow: 0 1px 3px var(--bg); }
-  /* Etikett über den größten Blasen: die Zahl UND wofür sie steht. */
-  .leaflet-tooltip.mp-bubble-label {
-    background: color-mix(in srgb, var(--bg-panel) 92%, transparent);
-    border: 1px solid var(--border); color: var(--text);
-    font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 6px;
-    box-shadow: none; white-space: nowrap;
+  /* Ein Einzelpunkt im Cluster-Layer: sieht aus wie der Leinwand-Punkt daneben,
+     weil das Plugin über `L.Marker` rechnet und keine Leinwand kennt. */
+  .mp-dot span {
+    display: block; width: 100%; height: 100%; border-radius: 50%;
+    border: 2px solid #fff; box-sizing: border-box;
   }
-  .leaflet-tooltip.mp-bubble-label::before { display: none; }
   /* A40 (dieselbe Regel, anderes Bedienelement): der Umschalter „Manuell" kann
      ohne Verbindung nichts speichern — das muss man ihm ansehen. */
   .zoom-btn.inert { opacity: .45; text-decoration: line-through; cursor: help; }
@@ -1368,7 +1371,7 @@
                    nicht mehr an diesem Schalter: er ist eine Eigenschaft der
                    Stufe „jeder Punkt“ und steht in ihrem Titel. -->
               <div class="seg-switch" id="mp-density" role="group" data-i18n-label="map.density">
-                <button type="button" data-level="point" data-i18n-title="map.dens.point.tip" title="Jeder Eintrag als eigener Punkt. Über 300 Punkten zeigt die Karte eine gleichmäßig verteilte Auswahl und sagt es." data-i18n="map.dens.point">Jeder Punkt</button>
+                <button type="button" data-level="point" data-i18n-title="map.dens.point.tip" title="Jeder Eintrag als eigener Punkt — alle, egal wie viele. Die Nummern erscheinen nur, wenn „Reihenfolge verbinden“ an ist." data-i18n="map.dens.point">Jeder Punkt</button>
                 <button type="button" data-level="near" data-i18n-title="map.dens.near.tip" title="Was dicht beieinander liegt, wird zu einer Blase — ihre Größe zeigt, wie viel darin steckt" data-i18n="map.dens.near">Nach Nähe</button>
                 <button type="button" data-level="place" data-i18n-title="map.dens.place.tip" title="Alles am selben Ort wird eine Blase („59× Zuhause“)" data-i18n="map.dens.place">Je Ort</button>
                 <button type="button" data-level="city" data-i18n-title="map.dens.city.tip" title="Alles in derselben Stadt wird eine Blase — für die Frage „in welchen Städten war ich?“" data-i18n="map.dens.city">Je Stadt</button>
@@ -2835,7 +2838,8 @@ const I18N_EN = {
   'map.visits.tip': "Visits taken from the Google Timeline import — the same layer the timeline lists under 🛰️",
   'map.visits.none': "Nothing imported yet — the Google Timeline import lives under “My data”.",
   'map.dens.point': "Every point",
-  'map.dens.point.tip': "Every entry as its own point. Above 300 the map shows a selection spread evenly across the period, and says so.",
+  'map.dens.point.tip': "Every entry as its own point — all of them, however many there are. The numbers only appear when “Connect in order” is on.",
+  'map.list.cap': "The map shows all {n} — the list beside it shows {s} of them, spread evenly across the period.",
   'map.dens.near': "By proximity",
   'map.dens.near.tip': "Whatever sits close together becomes one bubble — its size shows how much is in it",
   'map.dens.place': "Per place",
@@ -3469,8 +3473,6 @@ const I18N_EN = {
   'track.modal.hint': "Pick the areas that interest you — they decide the collection, the statistics and what the AI recognises. Changeable at any time under Settings → My data.",
 
   // --- Nachtrag: Kopfzeile & fehlende Attribute ---
-  'map.cap': "{h} of {n} points are hidden — “Every point” draws at most 300, spread evenly.",
-  'map.cap.fix': "Merge by proximity",
   'jr.ph': "How was your day? Just write freely …",
   'of.dash': "of –",
   'by': "by",
@@ -8087,14 +8089,44 @@ function mpGroupColor(items) {
 }
 // Dieselbe Regel für die Nähe-Cluster des Plugins: Größe = Menge, und die
 // Ziffer erst dort, wo die Blase Platz für sie hat.
+//
+// **Anmerkung 161: und derselbe STIL.** Bis dahin war eine Nähe-Blase blau mit
+// Zahl (das Plugin-Aussehen) und eine Orts-Blase kategoriefarben und
+// durchscheinend — zwei Bildsprachen für dieselbe Aussage „hier steckt mehr
+// als eins drin", je nachdem, welche Stufe gewählt war. Gemeldet als „hat
+// einen anderen Stil", und das war kein Geschmacksurteil, sondern ein Befund.
 function mpClusterIcon(cluster) {
+  const kids = cluster.getAllChildMarkers ? cluster.getAllChildMarkers() : [];
   const n = cluster.getChildCount();
   const r = Math.min(MP_BUBBLE_MAX, MP_BUBBLE_MIN + Math.sqrt(n) * 3.4);
   const size = Math.round(r * 2);
+  // Die Farbe der häufigsten Kategorie darin — dieselbe Regel wie bei den
+  // Orts-Blasen (`mpGroupColor`), damit eine blaue Blase blau bleibt, egal
+  // über welche Stufe man auf sie schaut.
+  const cats = {};
+  kids.forEach(m => { const c = m.options && m.options.ldCat;
+                      if (c) cats[c] = (cats[c] || 0) + 1; });
+  const top = Object.keys(cats).sort((a, b) => cats[b] - cats[a])[0];
+  const color = catColor(top || 'event');
+  // Die Farbe kann nur über den Inhalt kommen: `divIcon` nimmt eine Klasse,
+  // keinen Stil. Also trägt ein innerer Knoten die Custom Property, und das
+  // Stylesheet baut daraus dieselbe Blase wie auf der Leinwand.
   return L.divIcon({
-    html: r >= 17 ? `<b>${n.toLocaleString(LOC())}</b>` : '',
+    html: `<span class="mp-bub-in" style="--c:${color}">`
+        + (r >= 17 ? `<b>${n.toLocaleString(LOC())}</b>` : '') + '</span>',
     className: 'mp-bubble',
     iconSize: [size, size],
+  });
+}
+// Ein Einzelpunkt im Cluster-Layer. Das Plugin rechnet über `L.Marker`, kennt
+// also keine Leinwand — deshalb hier ein Symbol statt eines Kreises. Es sieht
+// aus wie der Leinwand-Punkt daneben, sonst wären es wieder zwei Bildsprachen.
+function mpDotIcon(cat) {
+  const r = mpPinRadius();
+  return L.divIcon({
+    className: 'mp-dot',
+    iconSize: [r * 2, r * 2],
+    html: `<span style="background:${catColor(cat)}"></span>`,
   });
 }
 
@@ -8160,60 +8192,61 @@ function renderPeriod() {
   // seine Aufschrift mit keinem Wort. Der Schalter „Punkte zusammenfassen"
   // war damit auch der Schalter, der entschied, OB die Karte alles zeigt.
   //
-  // Jetzt vier benannte Stufen, und der Deckel gehört zu genau einer davon:
-  // „Jeder Punkt" kann nicht beliebig viele Marker zeichnen, und das steht in
-  // ihrem Titel. In allen anderen Stufen gibt es ihn gar nicht, weil dort
-  // schon die Verdichtung die Zahl der Objekte begrenzt.
+  // Jetzt vier benannte Stufen — und seit Anmerkung 161 gibt es den Deckel
+  // gar nicht mehr: „Jeder Punkt" zeichnet auf dieselbe Leinwand wie die
+  // Fotos und erzeugt kein Objekt je Punkt.
   // ══════════════════════════════════════════════════════════════════════
   if ((mp.density === 'place' || mp.density === 'city') && all.length) {
     mpSyncChips(true);
+    mpDrawPins([]);              // die Einzelpunkt-Ebene ist hier nicht dran
     renderGroupedPeriod(all, key, stops, mp.density);
     return;
   }
-  const MP_MAX = 300;
   // „Nach Nähe" heißt geclustert — ohne Schwelle, ohne Zoom-Bedingung. Eine
   // Schwelle, die die gewählte Stufe still aushebelt, wäre derselbe Defekt
-  // eine Nummer kleiner. Ohne Cluster-Plugin (CDN offline) bleibt der Deckel.
+  // eine Nummer kleiner. Ohne Cluster-Plugin (CDN offline) fällt es auf
+  // Einzelpunkte zurück, und die kann die Leinwand vollständig zeigen.
   const clustered = mp.density === 'near' && !!mapCluster;
   mpSyncChips(clustered);
-  // **Deckeln heißt nicht abschneiden** (dieselbe Regel wie `even_spread` im
-  // Backend). `all.slice(0, 300)` lieferte die ersten dreihundert
-  // CHRONOLOGISCH — bei 2.000 Besuchen im Monat fehlte alles ab der Mitte,
-  // und die Karte sah vollständig aus. Gegriffen wird jetzt gleichmäßig über
-  // den Zeitraum; die Reihenfolge bleibt, nur dünner.
-  const items = mpEvenSpread(all, MP_MAX);
-  const markerTarget = clustered ? mapCluster : mapMarkers;
+  const MP_LIST_MAX = 300;       // nur die LISTE daneben, nicht die Karte
+  const items = mpEvenSpread(all, MP_LIST_MAX);
   // Datepicker mit dem angezeigten Zeitraum synchron halten
   const dateInput = document.getElementById('mp-date');
-  if (dateInput) dateInput.value = items.length ? items[0].date_start.slice(0, 10) : '';
-  const latlngs = [];
-  (clustered ? all : items).forEach((e, i) => {
-    const ll = [e.location.lat, e.location.lng];
-    latlngs.push(ll);
-    const w = weatherOf(e);
-    const num = clustered ? '' : `${i+1}. `;
-    L.marker(ll).addTo(markerTarget).bindPopup(
-      `<b>${num}${esc(e.title)}</b><br>${fmtDate(e)}<br>${esc(e.location.name)}`
-      + (w ? `<br>🌤️ ${esc(w)}` : ''));
-    if (!clustered)
-      L.circleMarker(ll, { radius: 13, fillColor: catColor(e.category), color: '#fff', weight: 2, fillOpacity: .9 })
-        .addTo(mapMarkers).bindTooltip(String(i+1), { permanent: true, direction: 'center', className: 'route-num' });
-  });
+  if (dateInput) dateInput.value = all.length ? all[0].date_start.slice(0, 10) : '';
+  const latlngs = all.map(e => [e.location.lat, e.location.lng]);
+  if (clustered) {
+    // Der Cluster braucht Marker — das Plugin trägt seine Rechnung über
+    // `L.Marker` und kennt keine Leinwand. Bei geclusterten Punkten ist das
+    // in Ordnung: sichtbar sind immer die Blasen, nie zehntausend Einzelne.
+    mpDrawPins([]);
+    all.forEach(e => {
+      L.marker([e.location.lat, e.location.lng],
+               { icon: mpDotIcon(e.category), ldCat: e.category })
+        .addTo(mapCluster).bindPopup(pinPopupHtml(e));
+    });
+  } else {
+    // **Anmerkung 161: alle Punkte, ohne ein Objekt je Punkt.** Vorher waren
+    // es zwei je Eintrag (Marker + nummerierter Kreis) und deshalb ein Deckel
+    // bei 300. Die Nummer zeichnet die Leinwand mit, und nur wenn die
+    // Reihenfolge auch als Linie da ist.
+    mpDrawPins(all);
+  }
   if (!clustered && mp.showRoute && latlngs.length > 1) {
     L.polyline(latlngs, { color: '#5b8cff', weight: 3, opacity: .8, dashArray: '6 6' }).addTo(mapRoute);
   }
   if (latlngs.length) {
     try { mapObj.fitBounds(L.latLngBounds(latlngs).pad(0.35)); } catch (_) {}
   }
-  // Der stille Verlust, der diesen Hinweis erzwungen hat: ohne Bündelung
-  // zeichnet die Karte `all.slice(0, 300)` — die ersten dreihundert
-  // CHRONOLOGISCH. Bei 2000 Besuchen im Monat fehlt damit alles ab der
-  // Monatsmitte, und ein einzelner Besuch in Amerika ist garantiert dabei.
-  mpCapNote(clustered ? 0 : all.length - items.length, all.length);
+  // **Anmerkung 161: Die KARTE lässt nichts mehr weg** — der Hinweis gilt seit
+  // dieser Anmerkung nur noch der Liste daneben, und deshalb steht er auch
+  // dort und nicht mehr über der Karte. Ein Hinweis über einer vollständigen
+  // Karte behauptet einen Verlust, den es nicht gibt (A40, andersherum).
+  mpCapNote(0, all.length);
   stops.innerHTML = `<h3>${all.length} Stopp${all.length===1?'':'s'} · ${periodLabel(key)}</h3>`
-    + (all.length > MP_MAX ? `<div class="hint">${clustered
-        ? `Karte zeigt alle ${all.length} Punkte (gebündelt) — Liste zeigt ${MP_MAX} davon.`
-        : `Karte und Liste zeigen ${MP_MAX} von ${all.length}, gleichmäßig über den Zeitraum verteilt — „Nach Nähe" zeigt alle.`}</div>` : '')
+    + (all.length > MP_LIST_MAX ? `<div class="hint">${t('map.list.cap',
+        'Karte zeigt alle {n} — die Liste zeigt {s} davon, gleichmäßig über den Zeitraum verteilt.')
+        .replace('{n}', all.length.toLocaleString(LOC()))
+        .replace('{s}', String(MP_LIST_MAX))}</div>` : '')
     + items.map((e, i) => {
       const w = weatherOf(e);
       return `<div style="padding:10px 0; border-bottom:1px solid var(--border)">
@@ -8233,20 +8266,19 @@ function renderPeriod() {
 //
 // Bewusst kein Wegklick-Knopf, der es dauerhaft stummschaltet: der Hinweis
 // verschwindet, sobald er nicht mehr zutrifft, und sonst nicht.
-function mpCapNote(hidden, total) {
+// **Anmerkung 161: es gibt nichts mehr zu melden — die Karte lässt clientseitig
+// keinen Punkt mehr weg.** Der Hinweis stammte aus der Zeit, als „Jeder Punkt"
+// je Eintrag zwei Leaflet-Objekte anlegte und deshalb bei 300 aufhören musste.
+// Seit die Einzelpunkte auf derselben Leinwand liegen wie die Fotos, ist der
+// Deckel weg und mit ihm sein Hinweis.
+//
+// Die Funktion bleibt als ein Zeiger stehen, weil die Frage wiederkommt: der
+// EINZIGE verbliebene Deckel sitzt im Server (`MAP_MAX_POINTS`, 50.000,
+// gleichmäßig verteilt), und den meldet `mpPhotoNote` — mit denselben zwei
+// Zahlen, an derselben Stelle auf der Karte.
+function mpCapNote(hidden, total) {          // eslint-disable-line no-unused-vars
   const box = document.getElementById('mp-cap-note');
-  if (!box) return;
-  if (hidden <= 0) { box.style.display = 'none'; box.innerHTML = ''; return; }
-  box.style.display = '';
-  // Anmerkung 160: Der Hinweis sagt jetzt auch, WARUM gedeckelt wird — es ist
-  // eine Eigenschaft der Stufe „Jeder Punkt" und keine Nebenwirkung eines
-  // anderen Schalters mehr. Und der Knopf führt in die Stufe, die alles zeigt.
-  box.innerHTML = `⚠️ ${esc(t('map.cap', '{h} von {n} Punkten sind ausgeblendet — „Jeder Punkt" zeichnet höchstens 300, gleichmäßig verteilt.')
-      .replace('{h}', hidden.toLocaleString(LOC())).replace('{n}', total.toLocaleString(LOC())))}`
-    + ` <button type="button" id="mp-cap-fix">${esc(t('map.cap.fix', 'Nach Nähe zusammenfassen'))}</button>`;
-  document.getElementById('mp-cap-fix').addEventListener('click', () => {
-    mpSetDensity('near');
-  });
+  if (box) { box.style.display = 'none'; box.innerHTML = ''; }
 }
 
 // --------------------------------------------------------------------------- //
@@ -8321,6 +8353,7 @@ function photoDotColor() {
 // nur, wie viel Reserve darüber noch bleibt.
 const MP_PHOTO_PAD = 0.2;        // Überstand je Seite, damit Ziehen nichts abschneidet
 const mpPhotoPoints = [];        // die Punkte des Zeitraums — Quelle des Layers
+const mpPinPoints = [];          // dasselbe für die Einträge (Anmerkung 161)
 // Der Popup-Inhalt als eigene, reine Funktion: **hier hängt das Bild** — und
 // nur hier. Der Zeitstrahl zeigt dasselbe Ereignis bewusst als Text (siehe
 // `eventPhotos`): die Karte ist der Ort für das Bild, der Zeitstrahl der für
@@ -8334,7 +8367,27 @@ function photoPopupHtml(e) {
     + `<b>${esc((e.location && e.location.name) || t('map.photos.nowhere', 'ohne Ortsangabe'))}</b><br>`
     + esc(new Date(e.date_start).toLocaleString(LOC()));
 }
-const PHOTO_DOT_LAYER = {
+// **Anmerkung 161 — dieselbe Ebene, jetzt auch für die Pins.**
+//
+// Gefragt wurde: „was ist das für eine Grenze und warum genau 300?" Die
+// Antwort war unbefriedigend, weil die Grenze keine fachliche war: in „Jeder
+// Punkt" entstanden je Eintrag ZWEI Leaflet-Objekte (ein Marker und ein
+// nummerierter Kreis), bei 14.747 Punkten also rund dreißigtausend — genau die
+// Objektlast aus Anmerkung 153.
+//
+// Die Ebene daneben zeichnete zur selben Zeit zwanzigtausend Fotos ohne ein
+// einziges Objekt. **Eine Regel, die für die eine Punktmenge gilt, gilt auch
+// für die andere** — sie stand nur in einer Datei weiter unten und hieß nach
+// den Fotos (dieselbe Form wie in Anmerkung 141: der Name entscheidet, wer die
+// Regel findet). Deshalb ist sie jetzt ein Bauplan mit Parametern, und der
+// Deckel ist ersatzlos weg.
+//
+// `cfg` beantwortet die vier Fragen, in denen sich zwei Punktmengen
+// unterscheiden: welche Punkte, ob sie überhaupt gezeigt werden, wie groß und
+// welche Farbe sie haben, und was im Popup steht.
+function dotLayerProto(cfg) {
+  return {
+  _cfg: cfg,
   onAdd(map) {
     this._map = map;
     const c = this._canvas = L.DomUtil.create('canvas', 'leaflet-photo-dots leaflet-layer');
@@ -8384,30 +8437,45 @@ const PHOTO_DOT_LAYER = {
     ctx.setTransform(this._dpr, 0, 0, this._dpr, 0, 0);
     ctx.clearRect(0, 0, this._w, this._h);
     const hits = this._hits = [];
-    if (!mp.showPhotos || !mpPhotoPoints.length) return;
-    const r = this._r = mpPhotoRadius();
-    // Anmerkung 160: die Farbe kommt aus dem Theme, nicht aus dieser Zeile.
-    // Bei jedem Zeichnen gelesen und nicht einmal gemerkt: der Themenwechsel
-    // zeichnet neu, und ein gemerkter Wert wäre dann der von vorhin.
-    ctx.fillStyle = photoDotColor();
+    const pts = this._cfg.points();
+    if (!pts.length) return;
+    const r = this._r = this._cfg.radius();
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 2;
-    for (const e of mpPhotoPoints) {
+    // Anmerkung 161: Nummern werden GEZEICHNET, nicht als Etikett in den DOM
+    // gehängt. Ein dauerhaftes Tooltip je Punkt ist ein DOM-Knoten je Punkt —
+    // also genau das, was diese Ebene abschafft.
+    const label = this._cfg.label;
+    if (label) {
+      ctx.font = '600 11px -apple-system, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+    }
+    let i = 0;
+    for (const e of pts) {
+      i++;
       const lp = this._map.latLngToLayerPoint([e.location.lat, e.location.lng]);
       const x = lp.x - this._origin.x, y = lp.y - this._origin.y;
       // Was außerhalb liegt, wird nicht gezeichnet UND nicht in die Trefferliste
       // gelegt: in der Weltansicht sind das fast alle, und die Suche beim Klick
       // soll die Punkte durchgehen, die man sehen kann.
       if (x < -r || y < -r || x > this._w + r || y > this._h + r) continue;
+      // Die Farbe kommt bei jedem Zeichnen frisch — der Themenwechsel zeichnet
+      // neu, und ein gemerkter Wert wäre dann der von vorhin.
+      ctx.fillStyle = this._cfg.color(e);
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
+      if (label) {
+        const txt = label(e, i);
+        if (txt) { ctx.fillStyle = '#fff'; ctx.fillText(txt, x, y + 0.5); }
+      }
       hits.push([x, y, e]);
     }
   },
   _onClick(ev) {
-    if (!mp.showPhotos || !this._hits || !this._hits.length) return;
+    if (!this._hits || !this._hits.length) return;
     const lp = this._map.latLngToLayerPoint(ev.latlng);
     const x = lp.x - this._origin.x, y = lp.y - this._origin.y;
     // Der zuletzt gezeichnete Treffer gewinnt — das ist der, der oben liegt.
@@ -8419,27 +8487,69 @@ const PHOTO_DOT_LAYER = {
     }
     if (!found) return;
     L.popup().setLatLng([found.location.lat, found.location.lng])
-      .setContent(photoPopupHtml(found)).openOn(this._map);
+      .setContent(this._cfg.popup(found)).openOn(this._map);
   },
-};
+  };
+}
+
+const PHOTO_DOT_LAYER = dotLayerProto({
+  points: () => mpPhotoPoints,
+  radius: () => mpPhotoRadius(),
+  color: () => photoDotColor(),
+  popup: e => photoPopupHtml(e),
+});
+// Anmerkung 161: dieselbe Ebene für die Einträge. Der Punkt trägt die Farbe
+// SEINER Kategorie — das war bis dahin die einzige Auskunft des zusätzlichen
+// Kreises unter dem Marker, und sie bleibt; der Marker daneben ist weg.
+const PIN_DOT_LAYER = dotLayerProto({
+  points: () => mpPinPoints,
+  radius: () => mpPinRadius(),
+  color: e => catColor(e.category),
+  popup: e => pinPopupHtml(e),
+  // **Die Nummer nur, wenn die Reihenfolge gezeichnet wird.** Sie ist die
+  // Beschriftung EINER Linie; ohne Linie ist sie die Antwort auf eine Frage,
+  // die niemand gestellt hat — und in Jahr, Jahrzehnt und „Alles" steht sie
+  // über tausenden Punkten, die in keiner sinnvollen Reihenfolge liegen.
+  label: (e, i) => (mp.showRoute && mpPinPoints.length <= MP_ROUTE_NUMBERS
+                    ? String(i) : ''),
+});
+
+// Ein Punkt wächst mit dem Zoom, wie die Fotopunkte (Anmerkung 120) — aber
+// eine Spur größer, weil er die Lebensdatenbank ist und die Fotos die
+// Ableitung: was oben liegt und was größer ist, sagt, was zählt.
+function mpPinRadius() {
+  const z = mapObj ? mapObj.getZoom() : 6;
+  const base = z >= 14 ? 10 : z >= 11 ? 9 : z >= 8 ? 8 : 7;
+  // Mit Nummern darin braucht der Kreis Platz für zwei Ziffern.
+  return (mp.showRoute && mpPinPoints.length <= MP_ROUTE_NUMBERS) ? Math.max(base, 11) : base;
+}
+// Bis zu wie vielen Punkten die Reihenfolge überhaupt beziffert wird. Über
+// hundert nummerierte Kreise sind keine Reihenfolge mehr, sondern ein Muster.
+const MP_ROUTE_NUMBERS = 120;
+function pinPopupHtml(e) {
+  const w = weatherOf(e);
+  return `<b>${esc(e.title)}</b><br>${fmtDate(e)}<br>${esc(e.location.name)}`
+    + (w ? `<br>🌤️ ${esc(w)}` : '');
+}
+
 // `null` = noch nicht versucht, `false` = geht hier nicht (kein echtes Leaflet).
 // Ohne die Unterscheidung würde bei jedem Neuzeichnen erneut eine Klasse
 // gebaut, die schon einmal nicht getragen hat.
-let MP_PHOTO_LAYER = null;
-function mpPhotoLayer() {
-  if (MP_PHOTO_LAYER !== null) return MP_PHOTO_LAYER;
-  MP_PHOTO_LAYER = false;
+const MP_DOT_LAYERS = { photo: null, pin: null };
+function mpDotLayer(kind, proto) {
+  if (MP_DOT_LAYERS[kind] !== null) return MP_DOT_LAYERS[kind];
+  MP_DOT_LAYERS[kind] = false;
   try {
-    const inst = new (L.Layer.extend(PHOTO_DOT_LAYER))();
+    const inst = new (L.Layer.extend(proto))();
     inst.addTo(mapObj);
-    MP_PHOTO_LAYER = inst;
+    MP_DOT_LAYERS[kind] = inst;
   } catch (_) {
     // Ohne Leaflet (CDN nicht geladen) bleibt die Ebene aus. Die PUNKTE gibt es
-    // trotzdem — `mpPhotoPoints` ist gefüllt, und daran hängen Deckelungs-Hinweis
-    // und Wächter. Eine Ebene, die nicht gezeichnet werden kann, darf nicht die
+    // trotzdem — die Listen sind gefüllt, und daran hängen Hinweise und
+    // Wächter. Eine Ebene, die nicht gezeichnet werden kann, darf nicht die
     // Auskunft darüber mitreißen, wie viele Punkte es gäbe (A40).
   }
-  return MP_PHOTO_LAYER;
+  return MP_DOT_LAYERS[kind];
 }
 // Übergibt die Foto-Ereignisse des Zeitraums an den Layer. Sie kommen aus
 // derselben Liste wie alle anderen Punkte (`mp.located`) — der eigene Abruf ist
@@ -8448,7 +8558,16 @@ function mpPhotoLayer() {
 function mpDrawPhotos(photos) {
   mpPhotoPoints.length = 0;
   if (mp.showPhotos) for (const e of photos) mpPhotoPoints.push(e);
-  const layer = mpPhotoLayer();
+  const layer = mpDotLayer('photo', PHOTO_DOT_LAYER);
+  if (layer) layer.redraw();
+}
+// Und dasselbe für die Einträge (Anmerkung 161). Leer übergeben heißt: diese
+// Stufe zeichnet ihre Punkte anders (gebündelt oder geclustert) — die Ebene
+// muss dann trotzdem gelöscht werden, sonst bleibt der vorige Zustand liegen.
+function mpDrawPins(pins) {
+  mpPinPoints.length = 0;
+  for (const e of pins) mpPinPoints.push(e);
+  const layer = mpDotLayer('pin', PIN_DOT_LAYER);
   if (layer) layer.redraw();
 }
 // Der Zeitraum als ISO-Grenzen; `null` heißt „alles", also keine Eingrenzung.
@@ -8558,13 +8677,12 @@ function renderGroupedPeriod(all, key, stops, level) {
       radius: 5, fillColor: color, color: '#fff', weight: 2, fillOpacity: .95,
       renderer: mpCanvas(),
     }).addTo(mapMarkers).bindPopup(popup);
-    // Beschriftet werden nur die größten — jede Blase mit einem dauerhaften
-    // Etikett wären hunderte DOM-Knoten übereinander, und lesbar wäre keins.
-    if (gi < 10 && r > 16) {
-      L.tooltip({ permanent: true, direction: 'top', className: 'mp-bubble-label',
-                  offset: [0, -r - 2] })
-        .setLatLng(ll).setContent(`${n}× ${esc(short)}`).addTo(mapMarkers);
-    }
+    // **Anmerkung 161: kein dauerhaftes Etikett mehr.** Es war als Zugabe für
+    // die größten Blasen gedacht und wurde beim Herauszoomen zu einer Reihe
+    // sich überlagernder Kästchen — genau dort, wo die Karte am dichtesten
+    // ist und man am wenigsten lesen kann. Der Name steht im Popup und in der
+    // Liste daneben; die Blase sagt die MENGE, und dafür braucht sie keine
+    // Schrift.
     return { n, range, short, loc: g.loc };
   });
   const dateInput = document.getElementById('mp-date');

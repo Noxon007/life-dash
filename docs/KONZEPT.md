@@ -758,6 +758,7 @@ answered on 2026-08-03; two of them became packages, two became rulings.
 | 145 | **Gap detection** — “eventually have at least one place for every day since birth, and let the system find the gaps”. | **Decided → [F21](#142-open-packages)**, after F20 and not before it. A view, never a stored state. |
 | 146 | **Shared view across accounts** — two independent databases, laid over each other. | **Confirmed for after 1.0 → [P6.1](#142-open-packages).** Nothing is to be prepared early: the preparation that matters is already in place and consists of things this project did not do (no cross-account copying, `user_id` filtered at the query). |
 | 147 | **Translation workflow** (Weblate or similar). | **Not now, and the trigger is named:** a third language or an outside contributor. Until then the inline catalogue plus `check-i18n-coverage.js` is the whole apparatus; nothing is extracted “so it is ready”. |
+| 162 | **What a merged bubble should look like** — “I don’t really like either of them.” | The *inconsistency* between the two bubble styles is fixed (note 161); the look itself is taste, and so is whether it should be a setting at all. Asked back with a visual comparison. |
 
 **Closed earlier:** **154** (map controls) — the choice between the three designs
 was made from an interactive mockup and built as note 160: two labelled groups,

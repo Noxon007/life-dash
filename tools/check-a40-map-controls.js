@@ -152,16 +152,21 @@ setTimeout(async () => {
   const allTexts = b => [b.title, w.eval(`(I18N_EN['${b.dataset.level
       ? 'map.dens.' + b.dataset.level + '.tip' : ''}'] || '')`),
       (html.match(new RegExp(`data-level="${b.dataset.level}"[^>]*`)) || [''])[0]];
+  // **Anmerkung 161: es gibt gar keinen Deckel mehr.** Bis dahin nannte die
+  // Stufe „Jeder Punkt" ihre eigene Grenze von 300 — richtig, solange je
+  // Eintrag zwei Leaflet-Objekte entstanden. Seit die Einzelpunkte auf
+  // derselben Leinwand liegen wie die Fotos (die dort seit Anmerkung 153
+  // zwanzigtausend ohne ein Objekt zeichnet), ist die Grenze weg. Geprüft wird
+  // deshalb die Umkehrung: **keine Stufe darf eine Punkt-Grenze behaupten**,
+  // sonst steht auf der Karte eine Einschränkung, die es nicht gibt.
   const point = dens.find(b => b.dataset.level === 'point');
-  check('Die Stufe „Jeder Punkt" nennt ihren eigenen Deckel',
-        allTexts(point).every(x => /300/.test(x)),
-        `${JSON.stringify(allTexts(point))} — der Deckel gehört zu dieser Stufe `
-        + 'und zu keiner anderen');
-  const others = dens.filter(b => b.dataset.level !== 'point');
-  check('…und keine andere Stufe behauptet einen',
-        others.every(b => allTexts(b).every(x => !/300/.test(x))),
-        others.filter(b => allTexts(b).some(x => /300/.test(x)))
-              .map(b => b.dataset.level).join('/'));
+  check('Keine Stufe behauptet eine Punkt-Grenze',
+        dens.every(b => allTexts(b).every(x => !/\b(300|1\.?000)\b/.test(x))),
+        dens.filter(b => allTexts(b).some(x => /\b(300|1\.?000)\b/.test(x)))
+            .map(b => b.dataset.level).join('/'));
+  check('„Jeder Punkt" sagt stattdessen, wovon die Nummern abhängen',
+        allTexts(point).slice(0, 2).every(x => /Reihenfolge|order/i.test(x)),
+        JSON.stringify(allTexts(point).slice(0, 2)));
 
   // --- 5. Reihenfolge: außer Kraft, sobald verdichtet wird ---------------- //
   const routeChip = d.getElementById('mp-route-toggle');

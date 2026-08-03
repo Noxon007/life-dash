@@ -25,6 +25,8 @@ const html = fs.readFileSync(process.argv[2] || 'frontend/index.html', 'utf8');
 const placed = [];
 const lines = [];          // gezeichnete Linienzüge samt Optionen
 const calls = [];          // abgesetzte Anfragen
+const tooltips = [];       // dauerhafte Etiketten — Anmerkung 161: es darf keine geben
+const icons = [];          // divIcon-Optionen (Cluster-Blase, Einzelpunkt im Cluster)
 
 const layer = name => ({ _n: name, clearLayers() {}, addTo() { return this; },
                          addLayer() { return this; }, removeLayer() { return this; } });
@@ -68,8 +70,13 @@ const dom = new JSDOM(html, {
       circleMarker: (ll, opt) => ({ addTo(l) { placed.push([l && l._n, ll[0], ll[1], opt, 'circle']); return this; },
                              bindTooltip() { return this; },
                              bindPopup() { return this; } }),
-      tooltip: () => ({ setLatLng() { return this; }, setContent() { return this; },
-                        addTo() { return this; } }),
+      // Anmerkung 161: die dauerhaften Etiketten über den Blasen sind weg —
+      // sie überlagerten sich beim Herauszoomen genau dort, wo die Karte am
+      // dichtesten ist. Gezählt wird, damit sie nicht unbemerkt zurückkommen.
+      tooltip: () => { tooltips.push(1);
+                       return { setLatLng() { return this; },
+                                setContent() { return this; },
+                                addTo() { return this; } }; },
       polyline: (pts, opt) => { lines.push(opt || {});
                                 return { addTo() { return this; }, bindPopup() { return this; } }; },
       // Muss es GEBEN: fehlt `L.canvas`, fällt `mpCanvas()` still auf Leaflets
@@ -78,7 +85,10 @@ const dom = new JSDOM(html, {
       // prüfte einen Zustand, in dem die Prüfung nicht scheitern KANN.
       canvas: () => ({ _n: 'canvas' }),
       latLngBounds: () => ({ pad: () => ({}) }),
-      divIcon: () => ({}), control: { layers: () => ({ addTo() {} }) },
+      // Die Symbol-Optionen werden behalten: an ihnen hängt die Zusage, dass
+      // Nähe-Blase und Orts-Blase DIESELBE Bildsprache sprechen (Anm. 161).
+      divIcon: (opt) => { icons.push(opt || {}); return {}; },
+      control: { layers: () => ({ addTo() {} }) },
     };
     w.fetch = (u) => {
       const p = String(u);
@@ -128,34 +138,49 @@ setTimeout(async () => {
   const far = () => new Set(placed.filter(p => p[2] < -50).map(p => p[1] + ',' + p[2])).size;
   const markers = () => placed.filter(p => p[4] === 'marker').length;
 
-  // --- 1. Der Normalfall: nichts wird weggelassen, nichts wird behauptet -- //
-  render('point', makeEvents(20, 8));
-  ok('Kleine Menge: alle Punkte auf der Karte', markers() === 23,
-     `${markers()} Marker`);
-  ok('…und kein Hinweis, der nicht zutrifft', !noteVisible());
+  // **Anmerkung 161 — die Zusage ist STÄRKER geworden: die Karte lässt
+  // clientseitig gar nichts mehr weg.**
+  //
+  // Der Bericht von damals hing an einem Deckel von 300, und der hing daran,
+  // dass jeder Eintrag zwei Leaflet-Objekte anlegte. Seit die Einzelpunkte auf
+  // derselben Leinwand liegen wie die Fotos (die dort seit Anmerkung 153
+  // zwanzigtausend ohne ein einziges Objekt zeichnet), gibt es weder Objekte
+  // je Punkt noch einen Grund für den Deckel. Geprüft wird deshalb nicht mehr
+  // „wenn sie etwas weglässt, sagt sie es", sondern **„sie lässt nichts weg" —
+  // und die Objektlast wächst trotzdem nicht mit der Punktzahl.**
+  const onCanvas = () => w.eval('mpPinPoints.length');
+  const objects = () => placed.length;
 
-  // --- 2. Der gemeldete Fall ---------------------------------------------- //
+  // --- 1. Der Normalfall -------------------------------------------------- //
+  render('point', makeEvents(20, 8));
+  ok('Kleine Menge: alle Punkte auf der Karte', onCanvas() === 23,
+     `${onCanvas()} von 23`);
+  ok('…und kein Hinweis, der nicht zutrifft', !noteVisible());
+  const smallObjects = objects();
+
+  // --- 2. Der gemeldete Fall, in seiner heutigen Form --------------------- //
   const many = makeEvents(2000, 250);
   render('point', many);
-  const droppedOff = markers() < many.length;
-  ok('„Jeder Punkt" deckelt (Vorbedingung des Berichts)', droppedOff,
-     `${markers()} von ${many.length} — der Deckel greift nicht mehr?`);
-  if (droppedOff) {
-    ok('…und sagt es AUF DER KARTE', noteVisible(),
-       'genau die Stille, die den Bericht ausgelöst hat');
-    // Der Tausendertrenner hängt seit Anmerkung 114 an der Sprache (LOC()):
-    // „1.703" auf Deutsch, „1,703" auf Englisch. Beides ist dieselbe Zahl —
-    // die Prüfung gilt der ZAHL, nicht dem Punkt.
-    ok('…mit beiden Zahlen', /1[.,]?703/.test(note().textContent)
-       && /2[.,]?003/.test(note().textContent), note().textContent);
-    ok('…und mit dem Weg hinaus', !!d.getElementById('mp-cap-fix'),
-       'ein Hinweis ohne Ausweg ist eine Entschuldigung');
-  }
+  ok('Zweitausend Punkte kommen VOLLSTÄNDIG auf die Karte',
+     onCanvas() === many.length, `${onCanvas()} von ${many.length}`);
+  ok('…und dabei entsteht kein Objekt je Punkt', objects() === smallObjects,
+     `${objects()} Objekte bei ${many.length} Punkten, ${smallObjects} bei 23 — `
+     + 'genau die Last, wegen der es den Deckel überhaupt gab');
+  ok('…es gibt also nichts zu melden', !noteVisible(),
+     'ein Hinweis über einer vollständigen Karte behauptet einen Verlust, den '
+     + 'es nicht gibt');
+  // Die drei einzelnen Punkte in Amerika WAREN der Bericht.
+  const usOnCanvas = w.eval('mpPinPoints.filter(e => e.location.lng < -50).length');
+  ok('Die seltenen Orte sind dabei', usOnCanvas === 3,
+     `${usOnCanvas} von 3 Amerika-Punkten`);
 
+  // --- 2b. Die LISTE daneben deckelt weiterhin, und zwar gleichmäßig ------ //
+  //
   // **Anmerkung 160: gedeckelt heißt gleichmäßig, nicht vorne.** `slice(0, 300)`
   // lieferte die ersten dreihundert CHRONOLOGISCH — bei einem Monat mit 2.000
-  // Besuchen fehlte alles ab der Mitte, und genau darin lagen die drei Punkte
-  // in Amerika. Dieselbe Regel wie `sqlutil.even_spread` im Backend.
+  // Besuchen fehlte alles ab der Mitte. Dieselbe Regel wie
+  // `sqlutil.even_spread` im Backend, nur dass sie seit Anmerkung 161 nur noch
+  // für die Liste gilt: die Karte zeigt alles.
   //
   // **Geprüft wird am ERGEBNIS, nicht an der Funktion.** Im ersten Anlauf stand
   // hier `mpEvenSpread([...])` — die Funktion allein. Gegen den kaputten Stand
@@ -169,14 +194,42 @@ setTimeout(async () => {
   const stopDays = () => [...d.getElementById('mp-stops').textContent
     .matchAll(/(\d{2})\.05\.2024/g)].map(m => +m[1]);
   const lastDay = Math.max(0, ...stopDays());
-  ok('Der Deckel greift gleichmäßig über den Zeitraum', lastDay >= 25,
+  ok('Die Liste greift gleichmäßig über den Zeitraum', lastDay >= 25,
      `letzter gezeigter Tag: ${lastDay}. Mai — „die ersten 300" hören Anfang `
-     + 'des Monats auf, und die Karte sieht trotzdem voll aus');
-  ok('…und die Auswahl beginnt trotzdem am Anfang', Math.min(...stopDays()) <= 2,
+     + 'des Monats auf, und die Liste sieht trotzdem voll aus');
+  ok('…und beginnt trotzdem am Anfang', Math.min(...stopDays()) <= 2,
      `erster gezeigter Tag: ${Math.min(...stopDays())}.`);
+  // In BEIDEN Sprachen: unter jsdom startet die Seite englisch, der Katalog
+  // ersetzt den deutschen Text — eine Prüfung nur auf „alle" wäre hier rot,
+  // ohne dass etwas fehlt (Anmerkung 116, und in dieser Runde zum dritten Mal).
+  ok('…und sagt, dass die KARTE alles zeigt',
+     /(alle|all) 2[.,]?003/.test(d.getElementById('mp-stops').textContent),
+     d.getElementById('mp-stops').textContent.slice(0, 160));
   ok('…und trifft das Budget genau',
      w.eval('mpEvenSpread(Array.from({length: 8120}, (_, i) => i), 5000).length') === 5000,
      'jede n-te trifft es nur, wenn es aufgeht — bei 8.120 auf 5.000 wären es 4.060');
+
+  // --- 2c. Nummern nur mit Reihenfolge ------------------------------------ //
+  //
+  // Gemeldet: „bei jedem Punkt wird immer die Zahl angezeigt — das ist bei
+  // Jahr, Jahrzehnt und Alles nicht sinnvoll". Die Nummer ist die Beschriftung
+  // EINER Linie; ohne Linie ist sie die Antwort auf eine ungestellte Frage.
+  const labels = () => w.eval(
+    '(function () { const c = PIN_DOT_LAYER._cfg; let n = 0;'
+    + ' mpPinPoints.forEach((e, i) => { if (c.label && c.label(e, i + 1)) n++; });'
+    + ' return n; })()');
+  render('point', makeEvents(12, 5));
+  w.eval('mp.showRoute = false; renderPeriod();');
+  ok('Ohne „Reihenfolge verbinden" trägt kein Punkt eine Nummer', labels() === 0,
+     `${labels()} nummerierte Punkte`);
+  w.eval('mp.showRoute = true; renderPeriod();');
+  ok('…mit Reihenfolge schon', labels() === 15, `${labels()} von 15`);
+  // …aber nicht bei tausenden: über hundert nummerierte Kreise sind keine
+  // Reihenfolge mehr, sondern ein Muster.
+  render('point', many);
+  w.eval('mp.showRoute = true; renderPeriod();');
+  ok('…und bei zweitausend Punkten wieder nicht', labels() === 0,
+     `${labels()} nummerierte Punkte bei ${many.length}`);
 
   // --- 3. Zusammengefasst ist wirklich alles da --------------------------- //
   render('place', many);
@@ -192,6 +245,35 @@ setTimeout(async () => {
   const radii = placed.map(p => p[3] && p[3].radius).filter(r => typeof r === 'number');
   ok('Die Blasen haben verschiedene Größen', new Set(radii).size > 2,
      `${new Set(radii).size} verschiedene Radien bei ${radii.length} Kreisen`);
+  // Gemeldet: „das Textfeld über den Blasen finde ich nicht so hübsch und es
+  // überlagert sich beim Herauszoomen." Es ist weg, und zwar ganz.
+  ok('…und KEIN dauerhaftes Etikett darüber', tooltips.length === 0,
+     `${tooltips.length} Etiketten — sie stapeln sich genau dort, wo die Karte `
+     + 'am dichtesten ist');
+
+  // --- 3b. Beide Blasen sprechen dieselbe Bildsprache (Anmerkung 161) ----- //
+  //
+  // Gemeldet: „Nach Nähe hat zu Je Ort einen anderen Stil." Das war kein
+  // Geschmacksurteil, sondern ein Befund: die Nähe-Blase kam vom Plugin
+  // (immer blau, immer mit Zahl), die Orts-Blase von der Leinwand
+  // (Kategoriefarbe, durchscheinend). Zwei Aussehen für dieselbe Aussage
+  // „hier steckt mehr als eins drin", je nachdem, welche Stufe gewählt war.
+  //
+  // Festgenagelt wird die FARBREGEL, weil sie die Aussage trägt: beide nehmen
+  // die Farbe der häufigsten Kategorie darin.
+  icons.length = 0;
+  w.eval("mpClusterIcon({ getChildCount: () => 12, getAllChildMarkers: () => ["
+       + "{ options: { ldCat: 'concert' } }, { options: { ldCat: 'concert' } },"
+       + "{ options: { ldCat: 'trip' } }] })");
+  const bubbleHtml = String((icons[icons.length - 1] || {}).html || '');
+  const groupColor = w.eval("mpGroupColor([{category:'concert'},"
+                          + "{category:'concert'},{category:'trip'}])");
+  ok('Die Nähe-Blase trägt die Farbe ihrer häufigsten Kategorie',
+     bubbleHtml.includes('--c:' + groupColor),
+     `${bubbleHtml.slice(0, 90)} — erwartet --c:${groupColor}`);
+  ok('…also dieselbe, die die Orts-Blase nähme',
+     groupColor === w.eval("catColor('concert')"),
+     `${groupColor} / ${w.eval("catColor('concert')")}`);
   ok('…und die größte gehört zum meistbesuchten Ort',
      Math.max(...radii) > Math.min(...radii) * 1.4,
      `${Math.min(...radii)} … ${Math.max(...radii)}`);

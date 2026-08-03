@@ -125,6 +125,29 @@ any `MINOR`.
   change.
 
 ### Changed
+- **The map draws every point now — the 300 limit is gone.** “Every point” used
+  to stop at 300 and tell you how many it was hiding. That was never a limit
+  about your data: each entry was drawn as a marker *plus* a numbered circle on
+  top of it, and fifteen thousand entries meant thirty thousand things for the
+  browser to keep alive. The photo layer next to it had been drawing twenty
+  thousand dots without that cost for a while; the entries use the same
+  approach now, so there is nothing left to leave out and nothing left to
+  announce.
+- **The sequence number only appears when “Connect in order” is on.** A number
+  on every point is the caption of a line — without the line it answered a
+  question nobody asked, and in year or decade view it did so on top of
+  thousands of points at once. It also stops above 120 points, where numbered
+  circles are a pattern rather than an order.
+- **One mark per entry instead of two.** A pin and a coloured circle in the same
+  spot were saying the same thing twice; the circle stayed, because it carries
+  the category colour.
+- **The labels above the merged bubbles are gone.** They were meant as a bonus
+  for the biggest ones and became a row of overlapping boxes exactly where the
+  map is busiest. The name is in the popup and in the list beside the map.
+- **“By proximity” and “per place” now look the same.** They were two different
+  bubbles — one blue with a number from the clustering library, one in the
+  colour of what you did there — for the same statement, depending only on
+  which level you had picked.
 - **The map's controls are rebuilt around the two questions they answer.**
   The “Display” row used to hold four different kinds of thing at once — which
   layers are drawn, a line drawn *over* them, a merge mode, and fullscreen —
