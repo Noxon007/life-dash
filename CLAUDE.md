@@ -10,13 +10,13 @@ Datei, Anm. 147). Erst dort gezielt nachlesen statt Code raten.
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI, Geocoding aus)
-  — 551 Tests, ~12 s, SQLite im Arbeitsspeicher
+  — 560 Tests, ~15 s, SQLite im Arbeitsspeicher
 - **Tests gegen echtes PostgreSQL** (das, worauf betrieben wird — `postgres:18-alpine`):
   `pwsh tools/pg-test.ps1` (Container `lifedash-pgtest` auf Port **55432**, danach weg;
   `-Keep` lässt ihn stehen). Setzt `TEST_DATABASE_URL`, das `conftest.py` auswertet;
   **zwei Riegel davor**, weil die Suite das Schema löscht: die URL darf nicht die
   betriebene sein, und der DB-Name muss `test` enthalten.
-- Wächter: `cd tools` → `npm run check` (28 jsdom-Dateien, ~390 Zusicherungen)
+- Wächter: `cd tools` → `npm run check` (29 jsdom-Dateien, ~400 Zusicherungen)
 - **Smoke gegen ein HTTP-Doppel** (Immich): `<python> tools/immich_double.py &`
   dann `<python> tools/smoke_a45.py` — findet, was Unit-Tests prinzipiell nicht
   können (Blättern, Zeitzonen, echte DTOs). Immer aus dem Wurzelverzeichnis.
@@ -65,7 +65,55 @@ Datei, Anm. 147). Erst dort gezielt nachlesen statt Code raten.
 (Vision, Architektur, Roadmap 14.2/14.3); **`docs/DECISIONS.md` = die
 nummerierten Anmerkungen** mit ihrer Begründung. Erst dort nachlesen, nicht
 mehr in KONZEPT Kap. 15 — das ist jetzt ein Zeiger mit der Tabelle der noch
-OFFENEN Fragen (144–147).
+OFFENEN Fragen (144–147). Anmerkungen stehen in der Reihenfolge, in der sie
+AUFKAMEN, nicht in der sie gebaut wurden — Neues wird angehängt, auch wenn
+davor noch Offenes steht.
+
+**Feedback-Runde 2026-08-03 (Anmerkungen 148–151), auf `main`, ohne
+Versionssprung.** Vier gemeldete Punkte, drei davon in der Sammlung.
+
+**Anm. 150 — der gemeldete 500er, und warum ihn 560 Tests nicht sahen.**
+„Sammeleinträge entfernen" (der Aufräum-Knopf aus Anm. 139) löscht im BULK
+(`query(...).delete()`), und ein Massenlöschen fragt das ORM nie — also läuft
+`cascade="all, delete-orphan"` nicht, und Metriken/Verknüpfungen/Bilder bleiben
+mit einem Fremdschlüssel ins Leere stehen. **Auf SQLite ist das eine stille
+Waise, auf PostgreSQL ein 500.** Dazu baute das Testdoppel den Tagescluster
+NACKT nach — dabei ist er bestätigt und verortet, hat also per Definition
+Wetter-Metriken. *Ein Doppel, das ein Feld auslässt, ist keine Vereinfachung,
+sondern eine andere Funktion* (Anm. 116, zweites Auftreten). Drei Regeln im
+Fix, alle drei standen anderswo schon: Metriken/Links gehen MIT, Wege werden
+ABGEHÄNGT (eigene Aufzeichnung, keine Ableitung), **hochgeladene Bilder werden
+abgehängt statt gelöscht** (Anm. 57) — und bekommen dabei `captured_at`, sonst
+wäre das Abhängen ein stilles Wegwerfen. **Regel: wo `db.delete()` durch
+`query().delete()` ersetzt wird, geht die Kaskade verloren — und zwar nur dort
+sichtbar, wo Fremdschlüssel erzwungen werden.** `pwsh tools/pg-test.ps1` ist
+für genau diese Klasse da.
+
+**Anm. 148/149 — Sammlung: Tage führen, und sie ist sortierbar.** Anm. 143
+hatte Welt/Top-Orte/Städte umgestellt und den REST des Kompendiums
+alphabetisch nach Einträgen zählen lassen: zwei Kacheln derselben Wand, zwei
+verschiedene Dinge (Anm. 106 auf einem Bildschirm). Jetzt alle Typen. Zwei
+Fallen im Backend: der Besitzfilter gehört in die **JOIN-Bedingung** (ein
+äußerer Join mit gefilterter rechter Seite ist ein innerer — sonst
+verschwinden genau die Entities ohne Ereignisse, also die zu bestätigenden),
+und `count(EventEntityLink.id)` zählte LINKS, nicht Ereignisse.
+**Sortiert wird im Browser, und das ist hier richtig:** beide Endpunkte liefern
+ihre Menge vollständig, weil ein Kompendium eine Menge mit Horizont ist
+(Anm. 95). Über ein Fenster wäre eine Sortierung eine Lüge. Wahl im
+localStorage, reiterübergreifend, Voreinstellung Tage.
+
+**Anm. 151 — „Tage mit Wetter" ist weg.** Sie zählte den Fortschritt des
+Wetter-Laufs, also eine Auskunft über den LAUF. Die Zahl bleibt in der Antwort
+(Schalter für den Block, Nenner des Regenanteils).
+
+**Wächter gegen den kaputten Stand (Anm. 108), und einer war wieder aus dem
+falschen Grund grün:** `check-comp-sort.js` prüfte nur den frisch GEKLICKTEN
+Zustand — der ist immer stimmig. Der Fall, der auffällt, ist der ERSTE Blick
+nach dem Laden (Leiste sagt „Tage", Kacheln stehen alphabetisch); der Wächter
+setzt jetzt `localStorage` VOR dem Parsen. Neu: `check-comp-sort.js`,
+`test_anm148_compendium_days.py`, drei Prüfungen in `test_photo_events.py`.
+**Auf PostgreSQL gegengefahren** (`pwsh tools/pg-test.ps1`) — bei Anm. 150 ist
+das nicht optional, dort liegt der Defekt.
 
 **Feedback-Runde 2026-08-02 (Anmerkungen 139–147), auf `main`, ohne
 Versionssprung.** Fünf Punkte gebaut, vier bewusst nur entworfen.

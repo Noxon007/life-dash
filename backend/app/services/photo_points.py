@@ -57,8 +57,9 @@ from datetime import date, datetime, timezone
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import (ConfirmState, DatePrecision, Event, Fragment,
-                        FragmentStatus, Location, MediaRef, Source)
+from app.models import (ConfirmState, DatePrecision, Event, EventEntityLink,
+                        Fragment, FragmentStatus, Location, MediaRef, Metric,
+                        Source, Track)
 from app.services import immich as api
 from app.services.immich_link import PROVIDER
 
@@ -534,6 +535,16 @@ def remove_slots(db: Session, user_id: str, prefix: str,
 
     Die Foto-Orte gehen mit, aber nur die eigenen (`immich:pt:`) und nur die,
     an denen nichts mehr hängt.
+
+    **Alles, was am Ereignis hängt, muss hier von Hand mit** (Anmerkung 150),
+    und das ist die Falle: `db.delete(event)` räumt Metriken, Verknüpfungen und
+    Bilder über die ORM-Kaskade ab (`cascade="all, delete-orphan"` in
+    `models.py`), ein Massenlöschen (`query(...).delete()`) fragt das Objekt nie
+    und geht an ihr vorbei. Auf SQLite blieben Waisen zurück, auf PostgreSQL — dem, worauf
+    betrieben wird — ist es eine Fremdschlüsselverletzung, also ein 500 statt
+    einer Aufräumung. Getroffen hat es die Tagescluster aus Anmerkung 138: sie
+    sind bestätigt und verortet, der Wetter-Lauf hat ihnen also Metriken
+    angehängt, und die Testdoppel bauten sie nackt nach.
     """
     events = _slot_events(db, user_id, prefix).all()
     if not events:
@@ -541,10 +552,36 @@ def remove_slots(db: Session, user_id: str, prefix: str,
     frag_ids = {e.origin_fragment_id for e in events if e.origin_fragment_id}
     loc_ids = {e.location_id for e in events if e.location_id}
     ids = [e.id for e in events]
-    # Medien zuerst: ein `MediaRef` mit Fremdschlüssel auf ein gelöschtes
-    # Ereignis ist auf PostgreSQL ein Fehler und auf SQLite eine Waise.
+    # Alles Anhängende zuerst — ein Fremdschlüssel auf ein gelöschtes Ereignis
+    # ist auf PostgreSQL ein Fehler und auf SQLite eine Waise.
+    #
+    # HOCHGELADENE Bilder werden dabei abgehängt, nicht gelöscht (Anmerkung 57:
+    # `provider="local"` ist Lebensdatenbank, keine Ableitung). Sie hängen
+    # danach am TAG (F18) — dafür braucht ein loses Bild `captured_at`, sonst
+    # wäre das Abhängen ein stilles Wegwerfen.
+    dates = {e.id: e.date_start for e in events}
+    for ref in (db.query(MediaRef)
+                .filter(MediaRef.event_id.in_(ids),
+                        MediaRef.provider == "local").all()):
+        ref.captured_at = ref.captured_at or dates.get(ref.event_id)
+        ref.event_id = None
+    db.flush()      # sonst löscht das Massenlöschen unten sie doch noch mit
     (db.query(MediaRef).filter(MediaRef.event_id.in_(ids))
      .delete(synchronize_session=False))
+    (db.query(Metric).filter(Metric.event_id.in_(ids))
+     .delete(synchronize_session=False))
+    (db.query(EventEntityLink).filter(EventEntityLink.event_id.in_(ids))
+     .delete(synchronize_session=False))
+    # Der Weg ist eine eigene Aufzeichnung (Stufe 3) und keine Ableitung dieses
+    # Ereignisses: er wird abgehängt, nicht gelöscht.
+    (db.query(Track).filter(Track.event_id.in_(ids))
+     .update({Track.event_id: None}, synchronize_session=False))
+    # F7: Kinder werden abgehängt statt mitgelöscht — dieselbe Entscheidung wie
+    # im Lösch-Dialog (`with_children=False`), und ohne sie zeigt der
+    # Fremdschlüssel `parent_event_id` auf eine gelöschte Zeile.
+    (db.query(Event).filter(Event.parent_event_id.in_(ids),
+                            Event.id.notin_(ids))
+     .update({Event.parent_event_id: None}, synchronize_session=False))
     (db.query(Event).filter(Event.id.in_(ids)).delete(synchronize_session=False))
     if drop_fragments and frag_ids:
         (db.query(Fragment).filter(Fragment.id.in_(frag_ids))

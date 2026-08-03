@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
@@ -45,19 +45,45 @@ def compendium(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[EntityRead]:
-    """Eigene Entities eines Typs (z. B. 'animal', 'country') fürs Kompendium."""
+    """Eigene Entities eines Typs (z. B. 'animal', 'country') fürs Kompendium.
+
+    Anmerkung 148: **die TAGE stehen vorn**, die Einträge daneben — dieselbe
+    Regel, die Anmerkung 143 schon für Welt, Top-Orte und Städte gezogen hat.
+    „Deutschland: 11.203 Einträge" ist nach einem Timeline-Import eine Aussage
+    über den Import, nicht über das Leben; „8.412 Tage" ist die Aussage, nach
+    der gefragt war. Beide Zahlen bleiben stehen, damit keine Frage
+    unbeantwortbar wird.
+
+    Gezählt wird in der Datenbank (`count(distinct <Tag>)`), nicht über eine
+    Python-Menge: A37 — wer eine Zahl über den GESAMTEN Bestand braucht, holt
+    sie vom Server, und der rechnet sie dort, wo die Zeilen liegen.
+
+    Ereignisse ohne Datum tragen keinen Tag bei und fallen aus dieser Zahl
+    heraus; sie stehen aber weiterhin in `event_count`. Genau dafür gibt es die
+    zweite Zahl.
+    """
+    day_key = day_number(Event.date_start)
     rows = (
-        db.query(Entity, func.count(EventEntityLink.id))
+        db.query(Entity,
+                 func.count(func.distinct(Event.id)),
+                 func.count(func.distinct(day_key)))
         .outerjoin(EventEntityLink, EventEntityLink.entity_id == Entity.id)
+        # Der Besitzfilter gehört in die JOIN-Bedingung, nicht ins WHERE: als
+        # Bedingung ließe er Entities ohne eigene Ereignisse ganz aus der Liste
+        # fallen — ein äußerer Join, dessen rechte Seite gefiltert wird, ist
+        # ein innerer.
+        .outerjoin(Event, and_(Event.id == EventEntityLink.event_id,
+                               Event.user_id == user.id))
         .filter(Entity.user_id == user.id, Entity.type == type)
         .group_by(Entity.id)
         .order_by(Entity.name)
         .all()
     )
     out = []
-    for entity, count in rows:
+    for entity, count, days in rows:
         item = EntityRead.model_validate(entity)
         item.event_count = count
+        item.day_count = days
         out.append(item)
     return out
 

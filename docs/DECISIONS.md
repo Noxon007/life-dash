@@ -599,3 +599,28 @@ author has to make, one because it depends on another.*
 
     *Recorded rather than dismissed*, because “we looked at it and here is what would have to be true” is a different answer from “no”.
 
+**Feedback round 2026-08-03 (notes 148–151), on `main`, no version bump.** Four
+points from use, three of them about the collection tab and one a reported
+server error. The error is the interesting one: it had been shipped for a
+week, it is invisible on SQLite, and the test double that was meant to cover
+it built the rows *without the things that hang off them*.
+
+148. ✅ **“Show days for countries in the collection too, not just events.”** Note 143 moved the world tab, the top places and the cities to days-lead-entries-beside; the rest of the compendium kept counting entries. That is note 106 within one screen: two tiles on the same wall counting two different things, and the one that still counted entries was the one where the timeline import had multiplied the number — “Germany — 11 203 entries” is a statement about Google, not about a life.
+
+    *Done for **every** collection type, not only countries.* An animal, an artist, a dish all answer “how many days” as sensibly as a country does, and the alternative would have been a rule that holds in one tab and not the next — exactly the divergence 143 was fixed to end. Both numbers stay (“40 days · 41 entries”), for the same reason as in 143: removing one removes a question. Counted in the database with `count(distinct day_number(...))` per A37, not by pulling rows into the process.
+
+    **Two traps found while writing it.** The ownership filter has to sit in the **join condition**, not in the `WHERE`: an outer join whose right side is filtered is an inner join, and the entries that would have vanished are exactly the ones with nothing linked yet — the ones someone wants to confirm. And `count(EventEntityLink.id)` counted *links*, so an event linked twice (`subject` and `location`) counted as two; it is `count(distinct Event.id)` now. Undated events contribute an entry and no day, which is precisely why there are two numbers.
+
+149. ✅ **“A sort function in the collection, by name and by number of days.”** Until now the wall was always alphabetical, which at 300 cities means no order at all: the first screen showed whichever places start with A. **The order is the only statement a wall of tiles makes on its own.**
+
+    Sorted in the **browser**, and that is right here rather than a lapse from A37: both endpoints return their set in full, because a compendium presupposes a bounded set — that is its justification (note 95). A sort over a *window* would be a lie; a sort over a complete list is a reordering. The timeline is the opposite case and asks the server.
+
+    The choice lives in `localStorage` and applies across tabs: it describes what someone is looking for, and that does not change when the tab does. Default is **days, most first**. `tools/check-comp-sort.js` locks the three ways this breaks silently — order not applied, tile not showing days, and the one that only appears on the *first* look: the bar saying “days” while the tiles stand alphabetically, because the remembered state was never rendered (A40). Run against the broken state per note 108, and against three injected defects; the third one passed at first, because the guardian only ever tested the freshly-clicked state — it now seeds `localStorage` before the page loads.
+
+150. ✅ **“The ‘remove collection entries’ button returns a 500.”** The button from note 139 that clears the old note-138 photo-day clusters. Cause: `remove_slots` deletes in **bulk** (`query(...).delete()`), and a bulk delete never asks the ORM — so `cascade="all, delete-orphan"` on `Event.metrics`, `Event.entity_links` and `Event.media` never runs. The rows that hang off the event stay, and their foreign key now points at nothing.
+
+    **Why nothing caught it.** On SQLite that is a silent orphan, so all 560 tests stayed green; on PostgreSQL — what this is actually operated on — it is a foreign-key violation, i.e. a 500. And the test double built a day cluster as a bare row: no location, no metrics, no links. But a day cluster is *confirmed and located*, so the weather run has given it metrics by definition. **A double that omits a field is not a simplification, it is a different function** (note 116, second occurrence) — the double now builds the row the way it actually stands in the corpus.
+
+    Three decisions inside the fix, each one a rule that already existed elsewhere: metrics and entity links **go with** the event; tracks are **detached**, not deleted (a track is its own layer-3 recording, not a derivation of this event); and **uploaded** media are detached rather than deleted (note 57: `provider='local'` is the life database, machines never touch it) — they hang off the **day** afterwards (F18), which is why the detach also fills `captured_at`, or it would be a silent discard. Child events are unhooked, not deleted, the same call the delete dialog makes (F7).
+
+151. ✅ **“‘Days with weather’ can go, it is not useful information.”** Agreed and removed. It counted how far the weather run has got — a statement about the **run**, not about the life, and the only tile on that wall that answered a question nobody asks. The number stays in the server's answer, where it does two jobs it is right for: it is the switch that decides whether the weather block exists at all, and it is the denominator of the rainy-day share (“40 % of your recorded days”). `tools/check-weather-summary.js` now asserts the opposite of what it asserted before — that the number does *not* appear as a tile.

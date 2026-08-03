@@ -24,7 +24,8 @@ from datetime import datetime
 
 import pytest
 
-from app.models import (ConfirmState, DatePrecision, Event, Fragment, Location,
+from app.models import (ConfirmState, DatePrecision, Entity, Event,
+                        EventEntityLink, Fragment, Location, MediaRef, Metric,
                         Source, User, UserRole)
 from app.services import immich as api
 from app.services import photo_points as pp
@@ -309,16 +310,38 @@ def test_reset_leaves_other_accounts_alone(db, user):
 # Der Aufräum-Lauf für die Tagescluster aus Anmerkung 138
 # --------------------------------------------------------------------------- #
 def _day_cluster(db, user, day: int = 12) -> Event:
+    """Ein Tagescluster, **so wie er im Bestand wirklich steht.**
+
+    Das Doppel hat diese Zeilen lange nackt nachgebaut — und genau daran ist
+    die Prüfung vorbeigelaufen: ein Tagescluster ist bestätigt und verortet,
+    also hat der Wetter-Lauf ihm Metriken angehängt, die KI eine Entity
+    verknüpft und der Foto-Lauf Bilder. Ein Doppel, das ein Feld auslässt, ist
+    keine Vereinfachung, sondern eine andere Funktion (Anmerkung 116).
+    """
     frag = Fragment(user_id=user.id, raw_text='{"slot": "immich:day:x"}',
                     source=Source.immich)
-    db.add(frag)
+    loc = Location(user_id=user.id, name="Detmold", lat=51.93, lng=8.87,
+                   city="Detmold", country="Deutschland")
+    db.add_all([frag, loc])
     db.flush()
     e = Event(user_id=user.id, title="34 Fotos in Detmold", category="event",
               date_start=datetime(YEAR, 7, day), date_precision=DatePrecision.day,
               source=Source.immich, confirmed=ConfirmState.confirmed,
-              confirmed_by="import", origin_fragment=frag,
+              confirmed_by="import", origin_fragment=frag, location=loc,
               external_id=f"immich:day:{YEAR}-07-{day:02d}:Detmold")
     db.add(e)
+    db.flush()
+    ent = Entity(user_id=user.id, type="country", name=f"Land {day}")
+    db.add(ent)
+    db.flush()
+    db.add_all([
+        Metric(event_id=e.id, key="temperature_c", value=21.5,
+               source=Source.weather),
+        EventEntityLink(event_id=e.id, entity_id=ent.id),
+        MediaRef(user_id=user.id, event_id=e.id, provider="immich",
+                 external_id=f"asset-{day}",
+                 captured_at=datetime(YEAR, 7, day, 10)),
+    ])
     db.commit()
     return e
 
@@ -354,6 +377,52 @@ def test_the_cleanup_is_idempotent(db, user):
     assert pp.remove_day_clusters(db, user.id) == 1
     db.commit()
     assert pp.remove_day_clusters(db, user.id) == 0
+
+
+def test_the_cleanup_takes_everything_that_hangs_on_the_row(db, user):
+    """**Der gemeldete 500er.** Metriken und Verknüpfungen sind auf PostgreSQL
+    ein Fremdschlüssel; ein Massenlöschen geht an der ORM-Kaskade vorbei, also
+    scheiterte der Knopf dort mit einem Serverfehler und hier — auf SQLite —
+    still mit Waisen."""
+    _day_cluster(db, user)
+    assert pp.remove_day_clusters(db, user.id) == 1
+    db.commit()
+    assert db.query(Metric).count() == 0
+    assert db.query(EventEntityLink).count() == 0
+    assert db.query(MediaRef).count() == 0
+
+
+def test_the_cleanup_detaches_uploads_instead_of_deleting_them(db, user):
+    """Anmerkung 57: ein hochgeladenes Bild ist Lebensdatenbank. Es hängt
+    danach am TAG (F18) — und braucht dafür `captured_at`, sonst wäre das
+    Abhängen ein stilles Wegwerfen."""
+    e = _day_cluster(db, user)
+    db.add(MediaRef(user_id=user.id, event_id=e.id, provider="local",
+                    external_id="eigenes.jpg"))
+    db.commit()
+
+    pp.remove_day_clusters(db, user.id)
+    db.commit()
+    ref = db.query(MediaRef).one()
+    assert ref.provider == "local" and ref.event_id is None
+    assert ref.captured_at == datetime(YEAR, 7, 12)
+
+
+def test_the_cleanup_unhooks_children_instead_of_orphaning_them(db, user):
+    """F7: Kinder werden abgehängt, nicht mitgelöscht — dieselbe Entscheidung
+    wie im Lösch-Dialog. Ohne sie zeigte `parent_event_id` ins Leere."""
+    parent = _day_cluster(db, user)
+    child = Event(user_id=user.id, title="Abends am See", category="event",
+                  date_start=datetime(YEAR, 7, 12, 20), source=Source.manual,
+                  date_precision=DatePrecision.exact,
+                  confirmed=ConfirmState.confirmed, parent_event_id=parent.id)
+    db.add(child)
+    db.commit()
+
+    assert pp.remove_day_clusters(db, user.id) == 1
+    db.commit()
+    kept = db.query(Event).one()
+    assert kept.id == child.id and kept.parent_event_id is None
 
 
 # --------------------------------------------------------------------------- #

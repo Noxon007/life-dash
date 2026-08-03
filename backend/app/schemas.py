@@ -85,6 +85,10 @@ class EntityRead(BaseModel):
     attributes: dict = {}
     confirmed: ConfirmState
     event_count: int = 0  # Anzahl verknüpfter Events (Kompendium-Kacheln)
+    # Anmerkung 148: an wie vielen KALENDERTAGEN — die führende Zahl auf der
+    # Kachel und der Sortierschlüssel aus Anmerkung 149. Die Zahl bleibt daneben,
+    # wie bei den Städten (Anmerkung 143).
+    day_count: int = 0
 
 
 class CityRead(BaseModel):

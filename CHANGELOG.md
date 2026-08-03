@@ -48,6 +48,15 @@ any `MINOR`.
   tile and its siblings used to open the edit dialog for whichever single entry
   happened to carry the reading. They now narrow the timeline to the whole day,
   with a chip that names the date and the reason and can be clicked away again.
+- **The collection can be sorted — by days or by name.** It was always
+  alphabetical, which at three hundred cities is no order at all: the first
+  screen showed whichever places happen to start with A. The choice is
+  remembered and applies to every tab.
+- **Every collection tile now leads with days.** Countries, animals, artists,
+  dishes — all of them read “40 days · 41 entries” now, the way cities and the
+  world map already did. “11 203 entries in Germany” was a statement about your
+  photo library, not about your life; both numbers stay, because “how many
+  films” still wants entries.
 
 ### Fixed
 - **The week and month view no longer freezes the browser** (reported as
@@ -67,12 +76,22 @@ any `MINOR`.
 - **The timeline no longer throws away photo entries when the Google switch is
   off.** The two switches are separate now, and the browser-side filter had to
   learn that.
+- **“Remove collection entries” no longer fails with a server error.** The
+  clean-up for the old photo-day summary entries ran into a database error
+  whenever an entry had weather attached to it — which, for those entries, is
+  always. Everything hanging off such an entry is now removed with it, except
+  the things that must survive: photos **you** uploaded are kept and attached
+  to the day instead, travelled paths are unlinked rather than deleted, and
+  sub-entries are unhooked, exactly as the delete dialog does it.
 
 ### Changed
 - **The concept document has been split.** `docs/KONZEPT.md` keeps what
   Life-Dash is and where it is going; the numbered decisions with their
   reasoning moved into **`docs/DECISIONS.md`**. Nothing was deleted and the
   numbering is unbroken — two audiences, two documents.
+- **“Days with weather” is gone from the weather record.** It counted how far
+  the weather run had got, which says something about the run and nothing about
+  your life. The other three tiles are unchanged.
 
 ### Added (earlier this cycle)
 - **Timeline and map: what evidence and what is proven now look different.**

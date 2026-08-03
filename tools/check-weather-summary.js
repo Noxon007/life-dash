@@ -34,7 +34,11 @@ setTimeout(() => {
     }
   });
   const shown = tiles();
-  ok('Tage mit Wetter = die Zahl des Servers (300)', /(^| )300 /.test(shown));
+  // Anmerkung 148: „Tage mit Wetter" ist als Kachel WEG — sie zählte den
+  // Fortschritt des Wetter-Laufs, nicht das Leben. Die Zahl bleibt trotzdem im
+  // Spiel (Schalter für den Block, Bezugsgröße der Regentage), deshalb steht
+  // hier die Gegenprobe: sie darf nicht mehr als eigene Kachel auftauchen.
+  ok('„Tage mit Wetter" ist keine Kachel mehr', !/300/.test(shown));
   ok('Sonnenstunden unverändert übernommen (600 h)', /600 h/.test(shown));
   ok('Regentage unverändert übernommen (120)', /(^| )120 /.test(shown));
   ok('Anteil kommt vom Server (40 %)', /40%/.test(shown));

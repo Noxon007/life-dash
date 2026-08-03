@@ -1421,6 +1421,17 @@
                ein zweiter Ort für denselben Reiter hieß bis 0.34, dass er
                genau so lange existierte, bis jemand hinsah (A42). -->
         </div>
+        <!-- Anmerkung 149: Sortierung. Die Reihenfolge ist die einzige
+             Aussage, die eine Kachelwand von sich aus macht — bei 300 Städten
+             heißt „alphabetisch" faktisch „keine". Die Wahl gilt für ALLE
+             Reiter und wird gemerkt: sie beschreibt, wonach jemand gerade
+             sucht, und das wechselt nicht mit dem Reiter. -->
+        <div class="filter-chips" id="comp-sort" style="margin:12px 0 4px">
+          <span class="filter-chip active" data-sort="days" data-i18n-title="comp.sort.days.tip"
+                title="Nach der Zahl der Kalendertage, die meisten zuerst" data-i18n="comp.sort.days">📆 Tage</span>
+          <span class="filter-chip" data-sort="name" data-i18n-title="comp.sort.name.tip"
+                title="Alphabetisch nach Namen" data-i18n="comp.sort.name">🔤 Name</span>
+        </div>
         <div class="grid cols-4" id="compendium-grid"></div>
         <div id="compendium-detail" style="display:none"></div>
       </div>
@@ -2968,8 +2979,6 @@ const I18N_EN = {
   'pr.opt.photos': "Print photos",
   'wx.title': "🌦️ Your weather record",
   'wx.hint': "Computed from the weather already attached to your entries — no new lookups. The more entries carry weather, the more it says.",
-  'wx.days': "📆 Days with weather",
-  'wx.days.sub': "calendar days with weather data",
   'wx.sun': "☀️ Hours of sunshine",
   'wx.sun.sub': "across all days together",
   'wx.rain': "🌧️ Rainy days",
@@ -3326,7 +3335,10 @@ const I18N_EN = {
   'pr.unconfirmed': "unconfirmed proposal",
   // Kompendium
   'comp.empty': "There are no entries in this category yet.",
-  'comp.linked': "linked", 'comp.located': "located",
+  'comp.located': "located",
+  'comp.sort.days': "📆 Days", 'comp.sort.name': "🔤 Name",
+  'comp.sort.days.tip': "By number of calendar days, most first",
+  'comp.sort.name.tip': "Alphabetically by name",
   'comp.nolinks': "No events are linked to this entry yet.",
   'ent.type.animal': "🐾 Animal", 'ent.type.country': "🌍 Country",
   'ent.type.artist': "🎤 Artist", 'ent.type.food': "🍽️ Dish",
@@ -5459,6 +5471,54 @@ function compEmoji(type, name) {
   const map = COMP_EMOJI[type] || {};
   return map[(name || '').toLowerCase()] || map._default || "📦";
 }
+
+// --------------------------------------------------------------------------- //
+// Anmerkung 149 — Sortierung der Sammlung
+//
+// Sortiert wird im BROWSER, und das ist hier ausnahmsweise richtig: anders als
+// der Zeitstrahl (A37) laden diese beiden Endpunkte ihre Menge vollständig —
+// ein Kompendium hat einen Horizont, das ist seine Daseinsberechtigung
+// (Anmerkung 95). Eine Sortierung über ein Fenster wäre eine Lüge; über eine
+// vollständige Liste ist sie eine Umordnung.
+//
+// Der Schlüssel liegt im localStorage, nicht in einer Variablen: eine
+// Sortierung, die man bei jedem Öffnen neu wählt, ist keine Einstellung,
+// sondern eine Wiederholung.
+// --------------------------------------------------------------------------- //
+let compSort = 'days';
+try { compSort = localStorage.getItem('ld_comp_sort') || 'days'; } catch (_) {}
+function compSorted(items) {
+  const arr = items.slice();
+  if (compSort === 'name') {
+    // `localeCompare` statt `<`: sonst stünde „Österreich" hinter „Zypern",
+    // und zwar in genau der Sprache, in der es auffällt.
+    return arr.sort((a, b) => (a.name || '').localeCompare(b.name || '', LOC()));
+  }
+  // Nach Tagen absteigend; bei Gleichstand entscheidet der Name, damit die
+  // Reihenfolge zwischen zwei Aufrufen dieselbe bleibt (die Antwort des
+  // Servers ist nach Namen sortiert, aber `sort` ist nicht überall stabil,
+  // und „gleich viele Tage" ist bei 0 der Normalfall).
+  return arr.sort((a, b) => (b.day_count || 0) - (a.day_count || 0)
+    || (a.name || '').localeCompare(b.name || '', LOC()));
+}
+function compSortBar(show) {
+  const bar = document.getElementById('comp-sort');
+  if (bar) bar.style.display = show ? '' : 'none';
+}
+document.querySelectorAll('#comp-sort .filter-chip').forEach(chip =>
+  chip.addEventListener('click', () => {
+    compSort = chip.dataset.sort;
+    try { localStorage.setItem('ld_comp_sort', compSort); } catch (_) {}
+    document.querySelectorAll('#comp-sort .filter-chip').forEach(c =>
+      c.classList.toggle('active', c.dataset.sort === compSort));
+    const tab = document.querySelector('#comp-tabs .zoom-btn.active');
+    if (tab) loadCompendium(tab.dataset.type);
+  }));
+// Der gemerkte Zustand muss auch angezeigt werden — sonst sagt die Leiste
+// „Tage" und die Kacheln stehen alphabetisch da (A40: was die Ansicht tut,
+// muss sie zeigen).
+document.querySelectorAll('#comp-sort .filter-chip').forEach(c =>
+  c.classList.toggle('active', c.dataset.sort === compSort));
 // A41: Städte sind keine Entity, sondern `Location.city` (A39) — sie kommen
 // aus einer Aggregation, nicht aus der Entity-Tabelle, und eine Stadt hat
 // keine Detailseite: der Klick führt in den gefilterten Zeitstrahl, wo die
@@ -5473,12 +5533,14 @@ async function loadCities() {
   let items = [];
   try { items = await api('/api/cities'); } catch { items = []; }
   if (!items.length) {
+    compSortBar(false);
     grid.innerHTML = `<div class="hint">${t('comp.cities.empty',
       'Noch keine Städte — sie entstehen im Ortsnamen-Lauf („Ortsnamen auflösen" in den Einstellungen).')}</div>`;
     return;
   }
+  compSortBar(true);
   const yr = s => s ? String(s).slice(0, 4) : '?';
-  grid.innerHTML = items.map(c => {
+  grid.innerHTML = compSorted(items).map(c => {
     const span = yr(c.first_visit) === yr(c.last_visit)
       ? yr(c.first_visit) : `${yr(c.first_visit)}–${yr(c.last_visit)}`;
     return `
@@ -5504,6 +5566,7 @@ async function openCityDetail(name) {
   const grid = document.getElementById('compendium-grid');
   const detail = document.getElementById('compendium-detail');
   grid.style.display = 'none';
+  compSortBar(false);      // eine Seite hat nichts zu sortieren
   detail.style.display = '';
   detail.innerHTML = `<div class="hint">${t('loading', 'lade…')}</div>`;
 
@@ -5589,14 +5652,23 @@ async function loadCompendium(type) {
   let items = [];
   try { items = await api(`/api/compendium/${type}`); }
   catch { items = []; }
-  if (!items.length) { grid.innerHTML = `<div class="hint">${t('comp.empty',
-    'Für diese Kategorie gibt es noch keine Einträge.')}</div>`; return; }
+  if (!items.length) {
+    compSortBar(false);
+    grid.innerHTML = `<div class="hint">${t('comp.empty',
+      'Für diese Kategorie gibt es noch keine Einträge.')}</div>`;
+    return;
+  }
+  compSortBar(true);
   items.forEach(a => { ENTITY_CACHE[a.id] = a; });
-  grid.innerHTML = items.map(a => `
+  // Anmerkung 148: Tage führen, Einträge stehen daneben — dieselbe Zeile wie
+  // bei den Städten (Anmerkung 143), damit zwei Kacheln derselben Wand nicht
+  // zwei verschiedene Dinge zählen.
+  grid.innerHTML = compSorted(items).map(a => `
     <div class="comp-card" data-id="${esc(a.id)}" data-name="${esc(a.name)}">
       <div class="comp-emoji">${compEmoji(type, a.name)}</div>
       <div class="comp-name">${esc(a.name)}</div>
-      <div class="comp-count">${a.event_count} ${nEvents(a.event_count)} · ${
+      <div class="comp-count">${esc(dayCount(a.day_count))} <span class="stat-label">· ${
+        esc(entryCount(a.event_count))}</span> · ${
         a.confirmed === 'confirmed' ? t('state.confirmed', 'bestätigt')
                                     : t('state.unconfirmed', 'unbestätigt')}</div>
     </div>`).join('');
@@ -5611,6 +5683,7 @@ async function openEntityDetail(type, entityId, name) {
   const grid = document.getElementById('compendium-grid');
   const detail = document.getElementById('compendium-detail');
   grid.style.display = 'none';
+  compSortBar(false);
   detail.style.display = '';
   detail.innerHTML = `<div class="hint">${t('loading', 'lade…')}</div>`;
   let events = [];
@@ -5635,13 +5708,18 @@ async function openEntityDetail(type, entityId, name) {
 
   const n = events.length;
   const located = events.filter(e => e.location && e.location.lat != null);
+  // Anmerkung 148: dieselbe Reihenfolge wie auf der Kachel — Tage zuerst.
+  // Hier darf der Browser zählen, weil dieser Endpunkt ALLE Ereignisse der
+  // Entity liefert (kein Fenster wie im Zeitstrahl, A37).
+  const days = new Set(events.map(e => (e.date_start || '').slice(0, 10))
+    .filter(Boolean)).size;
   detail.innerHTML = `
     <div style="display:flex; align-items:center; gap:14px; margin-bottom:18px; flex-wrap:wrap">
       <button class="btn small secondary" id="comp-back">‹ ${t('back', 'zurück')}</button>
       <span style="font-size:28px">${compEmoji(type, name)}</span>
       <div style="flex:1; min-width:0">
         <div style="font-size:18px; font-weight:700">${esc(name)}</div>
-        <div class="stat-label">${n} ${t('comp.linked', 'verknüpft')} · ${nEvents(n)}${
+        <div class="stat-label">${esc(dayCount(days))} · ${esc(entryCount(n))}${
           located.length ? ` · ${located.length} ${t('comp.located', 'verortet')}` : ''}</div>
       </div>
       ${n ? `<button class="btn small" id="entity-timeline">${t('comp.city.timeline', 'Im Zeitstrahl')}</button>` : ''}
@@ -5845,8 +5923,13 @@ function renderWeatherSummary(ov) {
     </div>`;
   const warm = wx.warmest_trip;
   document.getElementById('weather-tiles').innerHTML = [
-    tile(wx.days, t('wx.days', '📆 Tage mit Wetter'),
-         t('wx.days.sub', 'Kalendertage mit Wetterdaten')),
+    // „Tage mit Wetter" stand hier bis Anmerkung 151 als erste Kachel. Sie
+    // zählte, wie weit der Wetter-Lauf gekommen ist — eine Auskunft über den
+    // LAUF, nicht über das Leben, und damit die einzige Kachel dieser Wand,
+    // die keine Frage beantwortet, die jemand stellt. Die Zahl bleibt in der
+    // Antwort des Servers: sie ist weiterhin der Schalter, ob es diesen Block
+    // überhaupt gibt, und die Bezugsgröße der Regentage („x % deiner
+    // erfassten Tage").
     tile(wx.sun_hours ? `${wx.sun_hours} h` : '–', t('wx.sun', '☀️ Sonnenstunden'),
          t('wx.sun.sub', 'über alle Tage zusammen')),
     tile(wx.rain_days, t('wx.rain', '🌧️ Regentage'),
