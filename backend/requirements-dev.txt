@@ -12,3 +12,11 @@ psycopg2-binary==2.9.10
 
 # Zeigt, wohin die Testdateien NICHT schauen.
 pytest-cov==6.0.0
+
+# `fastapi.testclient.TestClient` steht darauf — ohne httpx scheitert schon der
+# IMPORT, also die Sammelphase, und pytest bricht mit Code 2 ab, bevor ein
+# einziger Test lief. Lokal war es zufällig mitinstalliert und fiel deshalb
+# erst in der CI auf (F20/F21 sind die ersten Tests hier, die einen Client
+# bauen). Nur hier und nicht in requirements.txt: das Image braucht keinen
+# Testclient.
+httpx==0.28.1
