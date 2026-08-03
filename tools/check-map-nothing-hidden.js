@@ -61,7 +61,10 @@ const dom = new JSDOM(html, {
       tileLayer: () => ({ addTo() { return this; }, remove() {} }),
       layerGroup: () => layer('mapMarkers'),
       markerClusterGroup: () => layer('mapCluster'),
-      marker: ll => ({ addTo(l) { placed.push([l && l._n, ll[0], ll[1], null, 'marker']); return this; },
+      // Anmerkung 163: die Optionen gehen MIT — an ihnen hängt das Symbol, und
+      // am Symbol hängt die Zusage „Größe = Menge". Ein Doppel, das sie
+      // wegwirft, prüft eine Karte ohne Marken.
+      marker: (ll, opt) => ({ addTo(l) { placed.push([l && l._n, ll[0], ll[1], opt || null, 'marker']); return this; },
                        bindPopup() { return this; }, bindTooltip() { return this; },
                        on() { return this; } }),
       // Anmerkung 160: Gruppen sind jetzt FLÄCHEN (circleMarker), keine
@@ -87,7 +90,7 @@ const dom = new JSDOM(html, {
       latLngBounds: () => ({ pad: () => ({}) }),
       // Die Symbol-Optionen werden behalten: an ihnen hängt die Zusage, dass
       // Nähe-Blase und Orts-Blase DIESELBE Bildsprache sprechen (Anm. 161).
-      divIcon: (opt) => { icons.push(opt || {}); return {}; },
+      divIcon: (opt) => { icons.push(opt || {}); return opt || {}; },
       control: { layers: () => ({ addTo() {} }) },
     };
     w.fetch = (u) => {
@@ -242,9 +245,15 @@ setTimeout(async () => {
   // GRÖSSER sein als einer mit 2. Bis 0.39 sahen beide gleich aus und die Zahl
   // stand nur im Popup — also hinter einem Klick, den man erst macht, wenn man
   // schon weiß, dass sich einer lohnt.
-  const radii = placed.map(p => p[3] && p[3].radius).filter(r => typeof r === 'number');
-  ok('Die Blasen haben verschiedene Größen', new Set(radii).size > 2,
-     `${new Set(radii).size} verschiedene Radien bei ${radii.length} Kreisen`);
+  const sizes = placed
+    .map(p => p[3] && p[3].icon && p[3].icon.iconSize && p[3].icon.iconSize[0])
+    .filter(x => typeof x === 'number');
+  // Der Prüfstand kennt genau zwei Gruppengrößen (250 Orte mit je acht
+  // Besuchen, dazu drei einzelne in Amerika), also kann er auch nur zwei
+  // Markengrößen zeigen. `> 2` zu verlangen hieße, etwas zu prüfen, das die
+  // Daten nicht hergeben — die Abstufung selbst steht darunter.
+  ok('Die Marken haben verschiedene Größen', new Set(sizes).size >= 2,
+     `${new Set(sizes).size} verschiedene Größen bei ${sizes.length} Marken`);
   // Gemeldet: „das Textfeld über den Blasen finde ich nicht so hübsch und es
   // überlagert sich beim Herauszoomen." Es ist weg, und zwar ganz.
   ok('…und KEIN dauerhaftes Etikett darüber', tooltips.length === 0,
@@ -268,15 +277,41 @@ setTimeout(async () => {
   const bubbleHtml = String((icons[icons.length - 1] || {}).html || '');
   const groupColor = w.eval("mpGroupColor([{category:'concert'},"
                           + "{category:'concert'},{category:'trip'}])");
-  ok('Die Nähe-Blase trägt die Farbe ihrer häufigsten Kategorie',
-     bubbleHtml.includes('--c:' + groupColor),
-     `${bubbleHtml.slice(0, 90)} — erwartet --c:${groupColor}`);
-  ok('…also dieselbe, die die Orts-Blase nähme',
+  ok('Der Nähe-Tropfen trägt die Farbe seiner häufigsten Kategorie',
+     bubbleHtml.includes(`fill="${groupColor}"`),
+     `${bubbleHtml.slice(0, 90)} — erwartet fill="${groupColor}"`);
+  ok('…also dieselbe, die die Orts-Gruppe nähme',
      groupColor === w.eval("catColor('concert')"),
      `${groupColor} / ${w.eval("catColor('concert')")}`);
+  // **Und dieselbe FORM.** Beide Stufen zeichnen denselben Pfad; zwei
+  // Zeichnungen desselben Zeichens sind zwei Zeichen, sobald jemand eine
+  // davon anfasst (Anmerkung 161, letzte Hälfte).
+  ok('…und denselben Tropfen-Pfad',
+     bubbleHtml.includes(w.eval('MP_DROP_PATH')),
+     bubbleHtml.slice(0, 120));
+  ok('Die Spitze sitzt auf dem Ort, nicht die Mitte',
+     (() => { const ic = w.eval("mpDropIcon('trip', 12)");
+              return ic.iconAnchor[1] === ic.iconSize[1]; })(),
+     'ein Tropfen, der mit seiner Mitte auf der Koordinate klebt, zeigt daneben');
   ok('…und die größte gehört zum meistbesuchten Ort',
-     Math.max(...radii) > Math.min(...radii) * 1.4,
-     `${Math.min(...radii)} … ${Math.max(...radii)}`);
+     Math.max(...sizes) > Math.min(...sizes) * 1.4,
+     `${Math.min(...sizes)} … ${Math.max(...sizes)}`);
+  // **Anmerkung 163: die Größe ist ABSOLUT, nicht auf die größte Gruppe im
+  // Bild normiert.** Sonst wäre dieselbe Zwölf beim Blättern mal groß und mal
+  // klein, und die beiden Stufen rechneten zwei Größen für dasselbe Zeichen.
+  const dropAt = n => w.eval(`mpDropIcon('trip', ${n}).iconSize[0]`);
+  // Die Abstufung, die der Prüfstand oben nicht hergibt: mehr ist größer, und
+  // zwar mit der Wurzel — sonst sähe der zehnfache Wert hundertfach aus.
+  ok('Mehr Einträge, größere Marke',
+     dropAt(1) < dropAt(8) && dropAt(8) < dropAt(30) && dropAt(30) < dropAt(59),
+     [1, 8, 30, 59].map(n => `${n}:${dropAt(n)}`).join(' '));
+  ok('…und zwar mit der Wurzel, nicht linear',
+     (dropAt(59) - dropAt(1)) < (dropAt(8) - dropAt(1)) * 8,
+     'linear wäre die 59 achtmal so weit von der 1 entfernt wie die 8');
+  ok('…und unabhängig von der größten Gruppe im Bild',
+     (() => { render('place', makeEvents(30, 3)); const a = dropAt(12);
+              render('place', makeEvents(2000, 250)); return a === dropAt(12); })(),
+     'normiert wäre dieselbe Zahl je nach Zeitraum eine andere Marke');
 
   // --- 4. Der Knopf im Hinweis tut, was er verspricht --------------------- //
   render('point', many);

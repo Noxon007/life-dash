@@ -592,31 +592,29 @@
      nur die Ziffer sagt den Unterschied — den muss man lesen, umrechnen und
      vergleichen. Hier wächst die FLÄCHE mit der Menge (Radius = Wurzel), und
      die Ziffer kommt erst dazu, wo Platz für sie ist. */
-  /* Anmerkung 161: DIESELBE Bildsprache wie die Orts-Blasen auf der Leinwand —
-     Kategoriefarbe, durchscheinende Fläche, fester Ring, harter Kern. Vorher
-     war eine Nähe-Blase blau mit Zahl und eine Orts-Blase kategoriefarben und
-     durchscheinend: zwei Aussehen für dieselbe Aussage, je nach gewählter
-     Stufe. Die Farbe kommt als `--c` aus dem Symbol (divIcon nimmt nur eine
-     Klasse, keinen Stil). */
-  .mp-bubble .mp-bub-in {
-    display: grid; place-items: center; width: 100%; height: 100%;
-    border-radius: 50%; position: relative;
-    background: color-mix(in srgb, var(--c, var(--accent)) 20%, transparent);
-    border: 1.5px solid color-mix(in srgb, var(--c, var(--accent)) 55%, transparent);
-    color: var(--text); font: 600 11px/1 inherit; font-variant-numeric: tabular-nums;
+  /* Anmerkung 163 — der Tropfen. Die Marke für „hier steckt mehr als eins
+     drin“, in BEIDEN Stufen dieselbe (Nähe-Cluster wie Orts-Gruppe): Größe
+     nach Menge, Farbe nach häufigster Kategorie, und die Spitze auf dem Ort.
+     Genau deshalb braucht er keinen zweiten, harten Kern in der Mitte, den die
+     Blase davor hatte — zwei Kreise für eine Aussage. */
+  .mp-drop { position: relative; }
+  .mp-drop svg { display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
+  /* Die Zahl sitzt über dem KOPF, nicht in der Mitte des Symbols: die Mitte
+     eines Tropfens ist der Hals. Höhe kommt inline, weil sie mit dem Kopf
+     wächst. */
+  .mp-drop b {
+    position: absolute; left: 0; right: 0; top: 0;
+    display: grid; place-items: center; pointer-events: none;
+    color: #fff; font: 600 11px/1 inherit; font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 2px rgba(0,0,0,.45);
   }
-  /* Der harte Kern hält den Ort fest — sonst wandert bei einer großen Blase
-     die Aussage von „hier“ zu „ungefähr hier“. */
-  .mp-bubble .mp-bub-in::before {
-    content: ''; position: absolute; width: 10px; height: 10px; border-radius: 50%;
-    background: var(--c, var(--accent)); box-shadow: 0 0 0 2px rgba(255,255,255,.92);
-  }
-  .mp-bubble b { position: relative; z-index: 1; text-shadow: 0 1px 3px var(--bg); }
-  /* Ein Einzelpunkt im Cluster-Layer: sieht aus wie der Leinwand-Punkt daneben,
-     weil das Plugin über `L.Marker` rechnet und keine Leinwand kennt. */
+  /* Ein EINZELNER Eintrag bleibt ein runder Punkt — die Form sagt schon, ob da
+     eins oder viele liegen. Er sieht aus wie der Leinwand-Punkt daneben, weil
+     das Cluster-Plugin über `L.Marker` rechnet und keine Leinwand kennt. */
   .mp-dot span {
     display: block; width: 100%; height: 100%; border-radius: 50%;
     border: 2px solid #fff; box-sizing: border-box;
+    box-shadow: 0 1px 2px rgba(0,0,0,.35);
   }
   /* A40 (dieselbe Regel, anderes Bedienelement): der Umschalter „Manuell" kann
      ohne Verbindung nichts speichern — das muss man ihm ansehen. */
@@ -8068,25 +8066,32 @@ function mpEvenSpread(rows, limit) {
 // vergleichen heißt lesen, rechnen, vergleichen. Bei „12" neben „1.240" sieht
 // man den Unterschied erst im dritten Schritt.
 //
-// Die Fläche wächst deshalb mit der Zahl (Radius = Wurzel, damit die FLÄCHE
-// proportional ist und nicht der Durchmesser — sonst sähe der zehnfache Wert
-// hundertfach aus). Normiert auf die größte Gruppe im Bild: verglichen wird
-// innerhalb einer Ansicht, nicht gegen einen absoluten Maßstab, den niemand
-// kennt.
-const MP_BUBBLE_MIN = 9, MP_BUBBLE_MAX = 34;
-function mpBubbleRadius(n, maxN) {
-  if (maxN <= 1) return MP_BUBBLE_MIN;
-  const f = Math.sqrt(Math.max(1, n) / maxN);
-  return MP_BUBBLE_MIN + (MP_BUBBLE_MAX - MP_BUBBLE_MIN) * f;
+// Die Fläche wächst deshalb mit der Zahl: **Radius aus der Wurzel**, damit die
+// FLÄCHE proportional ist und nicht der Durchmesser — sonst sähe der zehnfache
+// Wert hundertfach aus.
+//
+// **Anmerkung 163: die Größe ist ABSOLUT, nicht auf die größte Gruppe im Bild
+// normiert.** Normiert war innerhalb einer Ansicht schöner (das Maximum füllt
+// immer aus), aber es machte dieselbe Zwölf beim Blättern mal groß und mal
+// klein, und in den beiden Stufen (Nähe / je Ort) waren es zwei verschiedene
+// Rechnungen für dasselbe Zeichen — genau die Doppelregel, wegen der die
+// Bildsprachen vorher auseinanderliefen. Eine Zwölf ist jetzt überall eine
+// Zwölf.
+const MP_DROP_MIN = 7, MP_DROP_MAX = 22;
+function mpDropRadius(n) {
+  return Math.min(MP_DROP_MAX, MP_DROP_MIN + Math.sqrt(Math.max(1, n)) * 2.4);
 }
 // Die Farbe einer Gruppe ist die ihrer häufigsten Kategorie — nicht ein
-// neutrales Blau: eine Blase über zwölf Konzerten soll aussehen wie Konzerte.
-function mpGroupColor(items) {
+// neutrales Blau: ein Tropfen über zwölf Konzerten soll aussehen wie Konzerte.
+// Zurück kommt die KATEGORIE, nicht die Farbe: die Marke braucht beides
+// (Füllung und Herkunft), und wer die Farbe schon aufgelöst hat, kann die
+// Kategorie nicht mehr zurückrechnen.
+function mpGroupColorCat(items) {
   const n = {};
   items.forEach(e => { n[e.category] = (n[e.category] || 0) + 1; });
-  const top = Object.keys(n).sort((a, b) => n[b] - n[a])[0];
-  return catColor(top || 'event');
+  return Object.keys(n).sort((a, b) => n[b] - n[a])[0] || 'event';
 }
+function mpGroupColor(items) { return catColor(mpGroupColorCat(items)); }
 // Dieselbe Regel für die Nähe-Cluster des Plugins: Größe = Menge, und die
 // Ziffer erst dort, wo die Blase Platz für sie hat.
 //
@@ -8095,37 +8100,62 @@ function mpGroupColor(items) {
 // durchscheinend — zwei Bildsprachen für dieselbe Aussage „hier steckt mehr
 // als eins drin", je nachdem, welche Stufe gewählt war. Gemeldet als „hat
 // einen anderen Stil", und das war kein Geschmacksurteil, sondern ein Befund.
+// **Anmerkung 163 — der Tropfen, EINE Definition für beide Stufen.**
+//
+// Aus acht vorgelegten Varianten gewählt. Der Grund, warum er hier trägt und
+// eine Scheibe nicht: **die Spitze zeigt exakt auf den Ort.** Bei einer Blase
+// wandert die Aussage mit wachsender Fläche von „hier" zu „ungefähr hier" —
+// deshalb hatte die vorige Fassung einen zweiten, harten Kern in der Mitte,
+// also zwei Kreise für eine Aussage. Der Tropfen braucht den nicht.
+//
+// Der Pfad steht EINMAL da und wird von beiden Stufen benutzt (Nähe-Cluster
+// wie Orts-Gruppe). Zwei Zeichnungen desselben Zeichens sind zwei Zeichen,
+// sobald jemand eine davon anfasst — das war Anmerkung 161 in ihrer letzten
+// Hälfte, und der Weg dahin war ein Plugin-Blau neben einer Kategoriefarbe.
+const MP_DROP_PATH = 'M12 32 C12 32 24 20 24 12 A12 12 0 1 0 0 12 C0 20 12 32 12 32 Z';
+function mpDropIcon(cat, n) {
+  const r = mpDropRadius(n);
+  const w = Math.round(r * 2), h = Math.round(r * 2 * (32 / 24));
+  const color = catColor(cat);
+  // Die Zahl steht als HTML über dem Kopf und nicht im SVG: im `viewBox`
+  // skalierte sie mit der Tropfengröße mit, und über einer großen Gruppe
+  // stünde eine riesige Ziffer. Erst ab einem Kopf, in den sie hineinpasst —
+  // die Größe sagt es ohnehin schon.
+  const num = r >= 13 ? `<b style="height:${w}px">${n.toLocaleString(LOC())}</b>` : '';
+  return L.divIcon({
+    className: 'mp-drop',
+    iconSize: [w, h],
+    // Die SPITZE sitzt auf der Koordinate, nicht die Mitte des Kopfes.
+    iconAnchor: [w / 2, h],
+    popupAnchor: [0, -h + 4],
+    html: `<svg viewBox="0 0 24 32" width="${w}" height="${h}" aria-hidden="true">`
+        + `<path d="${MP_DROP_PATH}" fill="${color}" stroke="#fff" stroke-width="2"`
+        + ' stroke-linejoin="round"/></svg>' + num,
+  });
+}
+// Dieselbe Marke für die Nähe-Cluster des Plugins.
 function mpClusterIcon(cluster) {
   const kids = cluster.getAllChildMarkers ? cluster.getAllChildMarkers() : [];
   const n = cluster.getChildCount();
-  const r = Math.min(MP_BUBBLE_MAX, MP_BUBBLE_MIN + Math.sqrt(n) * 3.4);
-  const size = Math.round(r * 2);
   // Die Farbe der häufigsten Kategorie darin — dieselbe Regel wie bei den
-  // Orts-Blasen (`mpGroupColor`), damit eine blaue Blase blau bleibt, egal
-  // über welche Stufe man auf sie schaut.
+  // Orts-Gruppen (`mpGroupColor`), damit ein blauer Tropfen blau bleibt, egal
+  // über welche Stufe man auf ihn schaut.
   const cats = {};
   kids.forEach(m => { const c = m.options && m.options.ldCat;
                       if (c) cats[c] = (cats[c] || 0) + 1; });
   const top = Object.keys(cats).sort((a, b) => cats[b] - cats[a])[0];
-  const color = catColor(top || 'event');
-  // Die Farbe kann nur über den Inhalt kommen: `divIcon` nimmt eine Klasse,
-  // keinen Stil. Also trägt ein innerer Knoten die Custom Property, und das
-  // Stylesheet baut daraus dieselbe Blase wie auf der Leinwand.
-  return L.divIcon({
-    html: `<span class="mp-bub-in" style="--c:${color}">`
-        + (r >= 17 ? `<b>${n.toLocaleString(LOC())}</b>` : '') + '</span>',
-    className: 'mp-bubble',
-    iconSize: [size, size],
-  });
+  return mpDropIcon(top || 'event', n);
 }
-// Ein Einzelpunkt im Cluster-Layer. Das Plugin rechnet über `L.Marker`, kennt
-// also keine Leinwand — deshalb hier ein Symbol statt eines Kreises. Es sieht
-// aus wie der Leinwand-Punkt daneben, sonst wären es wieder zwei Bildsprachen.
-function mpDotIcon(cat) {
-  const r = mpPinRadius();
+// Ein EINZELNER Eintrag bleibt ein runder Punkt — die Form sagt damit schon,
+// ob da eins oder viele liegen, bevor man eine Zahl liest. Und ein kleiner
+// Punkt zeigt ohnehin genau genug auf seinen Ort; die Spitze des Tropfens
+// braucht es erst, wenn der Kopf groß wird.
+function mpDotIcon(cat, radius) {
+  const d = Math.round((radius || mpPinRadius()) * 2);
   return L.divIcon({
     className: 'mp-dot',
-    iconSize: [r * 2, r * 2],
+    iconSize: [d, d],
+    iconAnchor: [d / 2, d / 2],   // der Punkt sitzt MIT SEINER MITTE auf dem Ort
     html: `<span style="background:${catColor(cat)}"></span>`,
   });
 }
@@ -8647,7 +8677,6 @@ function renderGroupedPeriod(all, key, stops, level) {
     g.lat += e.location.lat; g.lng += e.location.lng;
   });
   const groups = [...byLoc.values()].sort((a, b) => b.items.length - a.items.length);
-  const maxN = groups.length ? groups[0].items.length : 1;
   const latlngs = [];
   const rows = groups.map((g, gi) => {
     const n = g.items.length;
@@ -8659,29 +8688,27 @@ function renderGroupedPeriod(all, key, stops, level) {
       : (first.title.replace(/^Besuch: /, '') || g.loc.name.split(',')[0]);
     const ll = level === 'city' ? [g.lat / n, g.lng / n] : [g.loc.lat, g.loc.lng];
     latlngs.push(ll);
-    const color = mpGroupColor(g.items);
-    const r = mpBubbleRadius(n, maxN);
+    const cat = mpGroupColorCat(g.items);
     const popup = `<b>${n > 1 ? `${n}× ` : ''}${esc(short)}</b><br>${range}`
       + (level === 'city' ? '' : `<br>${esc(g.loc.name)}`);
-    // Die Fläche. Auf der gemeinsamen Leinwand gezeichnet (Anmerkung 141/153):
-    // hunderte Orte sind keine zwanzigtausend Fotos, aber ein SVG-Knoten je
-    // Blase ist auch hier der Posten, den man nicht braucht.
-    L.circleMarker(ll, {
-      radius: r, fillColor: color, color, weight: 1.5,
-      fillOpacity: .20, opacity: .55, renderer: mpCanvas(),
-    }).addTo(mapMarkers).bindPopup(popup);
-    // Der harte Kern hält den ORT fest. Ohne ihn wandert bei einer großen
-    // Blase die Aussage von „hier" zu „ungefähr hier", und das ist bei einer
-    // Karte der ganze Unterschied.
-    L.circleMarker(ll, {
-      radius: 5, fillColor: color, color: '#fff', weight: 2, fillOpacity: .95,
-      renderer: mpCanvas(),
+    // **Anmerkung 163: dieselbe Marke wie im Nähe-Cluster** — ein Tropfen für
+    // mehrere, ein runder Punkt für einen einzelnen. Die Form sagt damit
+    // schon, ob da eins oder viele liegen, bevor man eine Zahl liest.
+    //
+    // Als Symbol und nicht auf der Leinwand: hunderte Orte sind keine
+    // zwanzigtausend Fotos (dort gilt Anmerkung 153), und die Marke muss in
+    // beiden Stufen dieselbe sein — das Cluster-Plugin rechnet über `L.Marker`
+    // und kennt keine Leinwand. Ein Zeichen, zwei Zeichner wären wieder zwei
+    // Zeichen, sobald jemand eines davon anfasst.
+    L.marker(ll, {
+      icon: n > 1 ? mpDropIcon(cat, n) : mpDotIcon(cat, mpDropRadius(1)),
+      ldCat: cat,
     }).addTo(mapMarkers).bindPopup(popup);
     // **Anmerkung 161: kein dauerhaftes Etikett mehr.** Es war als Zugabe für
     // die größten Blasen gedacht und wurde beim Herauszoomen zu einer Reihe
     // sich überlagernder Kästchen — genau dort, wo die Karte am dichtesten
     // ist und man am wenigsten lesen kann. Der Name steht im Popup und in der
-    // Liste daneben; die Blase sagt die MENGE, und dafür braucht sie keine
+    // Liste daneben; die Marke sagt die MENGE, und dafür braucht sie keine
     // Schrift.
     return { n, range, short, loc: g.loc };
   });

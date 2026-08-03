@@ -1,3 +1,10 @@
+- **Merged points are a teardrop now, sized by how much is in them.** A place
+  you went to fifty times draws a bigger mark than one you went to twice, in the
+  colour of whatever you mostly did there — and the tip sits exactly on the
+  place, so a big mark still says *here* rather than *roughly here*. A single
+  entry stays a round dot, so the shape tells you whether there is one thing or
+  several before you read a number. The same mark is used whether you merge by
+  proximity or per place.
 # Changelog
 
 All notable changes to Life-Dash. The format follows
@@ -144,6 +151,14 @@ any `MINOR`.
 - **The labels above the merged bubbles are gone.** They were meant as a bonus
   for the biggest ones and became a row of overlapping boxes exactly where the
   map is busiest. The name is in the popup and in the list beside the map.
+- **Merged points are a teardrop now, sized by how much is in them.** A place you
+  went to fifty times draws a bigger mark than one you went to twice, in the
+  colour of whatever you mostly did there — and its tip sits exactly on the
+  place, so a big mark still says *here* rather than *roughly here*. A single
+  entry stays a round dot, so the shape tells you whether there is one thing or
+  several before you read a number. The same mark is used whether you merged by
+  proximity or per place, and the same size means the same count in every
+  period.
 - **“By proximity” and “per place” now look the same.** They were two different
   bubbles — one blue with a number from the clustering library, one in the
   colour of what you did there — for the same statement, depending only on

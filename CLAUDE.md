@@ -21,7 +21,7 @@ ein Nutzer merkt.
   `-Keep` lässt ihn stehen). Setzt `TEST_DATABASE_URL`, das `conftest.py` auswertet;
   **zwei Riegel davor**, weil die Suite das Schema löscht: die URL darf nicht die
   betriebene sein, und der DB-Name muss `test` enthalten.
-- Wächter: `cd tools` → `npm run check` (31 jsdom-Dateien, ~480 Zusicherungen)
+- Wächter: `cd tools` → `npm run check` (31 jsdom-Dateien, ~479 Zusicherungen)
 - **Smoke gegen ein HTTP-Doppel** (Immich): `<python> tools/immich_double.py &`
   dann `<python> tools/smoke_a45.py` — findet, was Unit-Tests prinzipiell nicht
   können (Blättern, Zeitzonen, echte DTOs). Immer aus dem Wurzelverzeichnis.
@@ -128,6 +128,23 @@ P6.1/P5.2 + Konnektoren danach. **Nichts wurde beim Verschieben umgeschrieben**
 — eine Anmerkung, die „14.1" zitiert, findet ihren Satz weiter. Kap. 15 behält
 die Fragen MIT ihrer Antwort statt sie zu löschen: eine Frage, die beim
 Beantworten aus dem Index verschwindet, nimmt mit, dass sie je gestellt wurde.
+
+**Sechster Durchgang 2026-08-03 (Anmerkung 163) — die Marke ist ein Tropfen.**
+Aus acht nebeneinandergelegten Varianten gewählt (dieselbe Methode wie Anm. 160:
+eine Frage, die man ansieht statt liest). **Warum der Tropfen trägt: die Spitze
+zeigt auf den Ort.** Bei einer Fläche wandert die Aussage mit wachsender Größe
+von „hier" zu „ungefähr hier" — genau deshalb brauchte die Blase davor einen
+zweiten, harten Kern, also zwei Kreise für eine Aussage. **EIN Pfad für beide
+Stufen** (Nähe-Cluster wie Orts-Gruppe), eine Größenfunktion, eine Farbregel.
+**Die Größe ist ABSOLUT statt auf die größte Gruppe im Bild normiert** —
+normiert war dieselbe Zwölf beim Blättern mal groß und mal klein, und die
+beiden Stufen rechneten zwei Größen für ein Zeichen. Radius weiter aus der
+Wurzel (die FLÄCHE ist proportional). **Ein einzelner Eintrag bleibt ein runder
+Punkt** — die Form sagt schon, ob eins oder viele.
+**Gefragt beim Entscheiden: „clustern die auch?"** Festgehalten, weil daran die
+ganze Stufenwahl hängt: in „Nach Nähe" clustert weiter das Plugin (Zusammen-
+rücken, Aufteilen, Aufklappen — nur das Symbol ist neu); in „Je Ort"/„Je Stadt"
+clustert NICHTS, dort wird nach Ort bzw. Stadt gruppiert, unabhängig vom Zoom.
 
 **Fünfter Durchgang 2026-08-03 (Anmerkung 161) — Rückmeldung zur neuen Leiste.**
 Vier Punkte, einer davon eine FRAGE („was ist das für eine Grenze und warum
