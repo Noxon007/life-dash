@@ -10,13 +10,13 @@ Datei, Anm. 147). Erst dort gezielt nachlesen statt Code raten.
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI, Geocoding aus)
-  — 582 Tests, ~12 s, SQLite im Arbeitsspeicher
+  — 584 Tests, ~15 s, SQLite im Arbeitsspeicher
 - **Tests gegen echtes PostgreSQL** (das, worauf betrieben wird — `postgres:18-alpine`):
   `pwsh tools/pg-test.ps1` (Container `lifedash-pgtest` auf Port **55432**, danach weg;
   `-Keep` lässt ihn stehen). Setzt `TEST_DATABASE_URL`, das `conftest.py` auswertet;
   **zwei Riegel davor**, weil die Suite das Schema löscht: die URL darf nicht die
   betriebene sein, und der DB-Name muss `test` enthalten.
-- Wächter: `cd tools` → `npm run check` (31 jsdom-Dateien, ~438 Zusicherungen)
+- Wächter: `cd tools` → `npm run check` (31 jsdom-Dateien, ~468 Zusicherungen)
 - **Smoke gegen ein HTTP-Doppel** (Immich): `<python> tools/immich_double.py &`
   dann `<python> tools/smoke_a45.py` — findet, was Unit-Tests prinzipiell nicht
   können (Blättern, Zeitzonen, echte DTOs). Immer aus dem Wurzelverzeichnis.
@@ -68,6 +68,57 @@ mehr in KONZEPT Kap. 15 — das ist jetzt ein Zeiger mit der Tabelle der noch
 OFFENEN Fragen (144–147). Anmerkungen stehen in der Reihenfolge, in der sie
 AUFKAMEN, nicht in der sie gebaut wurden — Neues wird angehängt, auch wenn
 davor noch Offenes steht.
+
+**Vierter Durchgang 2026-08-03 (Anmerkung 160) — die Kartenschalter, gebaut.**
+Anm. 154 lag als Analyse mit drei Entwürfen da; entschieden wurde an einem
+**klickbaren Mockup** (sechs Leisten über EINER Karte, Ist-Zustand als Reiter
+null) statt an Prosa. Gewählt: **Entwurf D „Zwei Fragen"**, Blasen statt
+Ziffern, eigene Farbe für Fotos.
+
+**Was daraus wurde.** **(a)** Die Leiste ist nach der FRAGE geteilt: „Ebenen"
+(woher kommt, was hier liegt) und „Wie dicht"; Vollbild sitzt in der
+Kartenecke, wo Fensterfunktionen hingehören. **(c)** 🛰️ gehört dem
+Zeitstrahl — der Besuchs-Schalter der Karte trägt dasselbe Zeichen, denselben
+Wortlaut und dieselbe Zahl aus demselben Index, die Wege-Ebene bekommt eine
+farbige Linie als Marke. Dazu ein dritter Schalter **„Von Hand"**, den der
+Zeitstrahl bewusst NICHT bekommt: eigene Einträge in einer Liste des eigenen
+Lebens auszublenden ist sinnlos, auf einer Karte unter 6.000 importierten
+Besuchen ist es die nützlichste Ansicht. Ein Unterschied im MEDIUM, keine
+Inkonsistenz. **(d)** Vier **benannte** Stufen (jeder Punkt · nach Nähe · je
+Ort · je Stadt), und die Zoomstufe entscheidet daran **nichts** mehr. Der
+300er-Deckel gehört zu genau einer Stufe und steht in ihrem Titel. **A18s
+Cluster-Schwelle ist ersatzlos weg** — sobald die Stufe die Frage beantwortet,
+ist eine zweite, numerische Antwort in den Einstellungen die Doppelregel, um
+die es in dieser ganzen Runde geht.
+
+**Und der Deckel schneidet nicht mehr ab:** `all.slice(0, 300)` nahm die ersten
+dreihundert CHRONOLOGISCH — in einem Monat mit 2.000 Besuchen fehlte alles ab
+der Mitte. Jetzt gleichmäßig verteilt (`mpEvenSpread`, dieselbe Regel wie
+`sqlutil.even_spread`).
+
+**„Fläche statt Ziffer".** Eine Cluster-Blase ist fast immer gleich groß, also
+sagt nur die ZIFFER etwas — und zwei Ziffern zu vergleichen heißt lesen,
+umrechnen, vergleichen. Radius aus der Wurzel (damit die FLÄCHE proportional
+ist, nicht der Durchmesser), normiert auf die größte Gruppe im Bild, harter
+Kern für den Ort, Name nur wo Platz ist, Farbe der häufigsten Kategorie.
+
+**Fotos sind nicht mehr orange.** `#f5921b` (Foto) gegen `#f5a623` (Kategorie
+`event`, also jeder importierte Google-Besuch): zwei Orangetöne einen Farbwert
+auseinander für die zwei Dinge, die man auf dieser Karte am ehesten
+auseinanderhalten will. Jetzt Cyan, **als Variable `--photo-dot` in beiden
+Themes** — die Karte wechselt ihren Untergrund mit dem Theme (F13), und der
+Schalter liest dieselbe Variable (zwei gepflegte Farbwerte für eine Ebene
+laufen auseinander). `Location.city` reist für „je Stadt" mit: 99 kB von
+2,7 MB, nur an den Pins.
+
+**Drei Wächter waren dabei aus dem falschen Grund grün** (Anm. 108). Einer
+prüfte, dass `mpEvenSpread` EXISTIERT, statt dass `renderPeriod` sie BENUTZT —
+den Deckel zurückgebaut, und er blieb grün; jetzt liest er den letzten Tag in
+der Stopp-Liste. Zwei prüften gerenderten DEUTSCHEN Text: **unter jsdom startet
+die Seite englisch**, der Katalog überschreibt das Markup, und ein ins Markup
+gebauter Defekt erreicht die Zusicherung nie (Anm. 116 hat genau das schon
+einmal aufgeschrieben). Beide prüfen jetzt Anzeige, deutschen Quelltext UND
+englischen Katalog.
 
 **Dritter Durchgang 2026-08-03 (Anmerkungen 157–159), auf `main`, ohne
 Versionssprung — und diesmal ohne neue Meldung.** Ausgangspunkt war die Liste

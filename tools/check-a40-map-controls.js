@@ -1,10 +1,37 @@
-// A40 (Anmerkung 92): die Kartenschalter.
+// Die Kartenschalter — A40 (Anmerkung 92), fortgeschrieben mit Anmerkung 160.
 //
-// Der Auslöser war, dass der Autor selbst nicht mehr sagen konnte, was die
-// vier Schalter tun — und die Untersuchung fand den Grund: zwei von ihnen
+// Der Auslöser war 2026-07, dass der Autor selbst nicht mehr sagen konnte, was
+// die vier Schalter tun — und die Untersuchung fand den Grund: zwei von ihnen
 // taten unter üblichen Umständen gar nichts und sahen dabei eingeschaltet aus.
-// Genau das prüft dieses Skript: nicht ob die Schalter da sind, sondern ob
-// einer von ihnen wieder still wirkungslos werden kann.
+// Anmerkung 154 hat die Reihe dann ganz auseinandergenommen und vier Befunde
+// benannt; Anmerkung 160 baut den Entwurf „Zwei Fragen" daraus.
+//
+// **Die Regel, die dieser Wächter durchsetzt, ist über alle drei Runden
+// dieselbe: kein Bedienelement darf still wirkungslos sein.** Was dazugekommen
+// ist, ist die Form, in der die Leiste das einlöst:
+//
+//   1. **Zwei beschriftete Gruppen.** „Ebenen" = woher kommt, was hier liegt.
+//      „Wie dicht" = wie es zusammengefasst wird. Vorher stand beides plus
+//      eine Fensterfunktion in einer Reihe gleich aussehender Chips.
+//   2. **Vollbild ist keine Darstellung** und steht deshalb nicht mehr in der
+//      Leiste, sondern in der Kartenecke.
+//   3. **Vier benannte Stufen statt eines Ein/Aus**, dessen BEDEUTUNG die
+//      Zoomstufe entschied — und dessen Aus-Zustand zusätzlich den 300er-
+//      Deckel scharf schaltete, was auf ihm nirgends stand (Befund d).
+//   4. **Der Deckel hängt an der Stufe „Jeder Punkt"**, nicht an einem
+//      anderen Schalter, und jede Stufe sagt, was sie tut.
+//   5. **🛰️ gehört dem Zeitstrahl.** Auf der Karte hieß es „zurückgelegte
+//      Wege", im Zeitstrahl „automatisch erfasst" — dasselbe Zeichen für zwei
+//      Dinge in zwei Reitern derselben App (Befund c).
+//   6. **Fotos und Google-Besuche haben verschiedene Farben.** Sie waren
+//      `#f5921b` und `#f5a623`: zwei Orangetöne für die zwei Ebenen, die man
+//      am ehesten auseinanderhalten will.
+//
+// Geprüft wird über `renderPeriod()` mit PUNKTEN auf der Karte — nicht durch
+// Direktaufruf der Sync-Funktionen und nicht auf der leeren Karte, die einen
+// eigenen Zweig hat. Beides war im ersten Anlauf grün, ohne etwas zu prüfen
+// (Anmerkung 108, und `check-a41-cities.js` hat denselben Fehler ein Jahr lang
+// gemacht).
 //
 // Aufruf aus dem Repo-Wurzelverzeichnis: node tools/check-a40-map-controls.js
 const fs = require('fs');
@@ -23,129 +50,227 @@ const dom = new JSDOM(html, {
   beforeParse(w) {
     w.fetch = () => Promise.reject(new Error('offline'));
     w.matchMedia = w.matchMedia || (() => ({ matches: false, addEventListener() {}, addListener() {} }));
-    w.L = new Proxy(function () { return w.L; }, { get: (_t, k) => (k === 'getZoom' ? () => 6 : w.L), apply: () => w.L });
+    w.L = new Proxy(function () { return w.L; }, {
+      get: (_t, k) => (k === 'getZoom' ? () => 6 : w.L), apply: () => w.L,
+    });
     w.addEventListener('error', e => errors.push('ERROR: ' + (e.error && e.error.stack || e.message)));
   },
 });
 
+const EV = (id, cat, city) => ({
+  id, title: 'Eintrag ' + id, category: cat, date_start: '2024-07-12T20:00:00',
+  date_precision: 'exact', source: 'manual',
+  location: { id: 'l' + id, name: 'Ort ' + id, lat: 50.9, lng: 6.9, city },
+});
+
 setTimeout(async () => {
   const w = dom.window, d = w.document;
-  // Die Karte muss aufgebaut sein, sonst gibt es die Ebenen nicht, die
-  // `renderPeriod()` leert — und die Prüfungen unten liefen an einer Ausnahme
-  // vorbei statt an der Sache.
   try { await w.openMapView(); } catch (_) { /* offline: die Punkte fehlen, die Karte steht */ }
   check('lädt ohne Fehler',
-        errors.filter(e => !/offline|Not implemented|fetch/i.test(e)).length === 0);
+        errors.filter(e => !/offline|Not implemented|fetch/i.test(e)).length === 0,
+        errors[0]);
 
-  // Ein Schalter für die Verdichtung, nicht zwei plus eine Zahl. Geprüft am
-  // Quelltext: `mp` ist ein const im Modulscope und steht deshalb nicht auf
-  // window — was für den Rest der Datei gut ist und hier nur heißt, dass die
-  // Prüfung eine Zeile weiter unten ansetzt.
-  check('mp.condense löst groupPlaces ab',
-        /condense:\s*true/.test(html) && !/groupPlaces/.test(html),
-        'groupPlaces steckt noch im Quelltext');
+  // Punkte herstellen — der Zustand, aus dem die Beschwerde kam.
+  w.eval(`mp.located = ${JSON.stringify([EV('a', 'trip', 'Köln'), EV('b', 'concert', 'Köln'),
+                                         EV('c', 'event', null)])};`);
+  const render = (extra = '') =>
+    w.eval(`${extra} rebuildPeriods(); renderPeriod();`);
+  render("mp.mode = 'month';");
+  check('Die Karte hat für diese Prüfungen wirklich Punkte',
+        w.eval('mp.periods.length') > 0, 'sonst läuft alles durch den Leer-Zweig');
 
-  // Die Schwelle ist ein Schutzwert und gehört in die Einstellungen — nicht
-  // neben die Schalter, die man beim Kartengucken bedient.
-  const cluster = d.getElementById('mp-cluster-min');
-  check('Cluster-Schwelle existiert weiterhin', !!cluster);
-  check('Cluster-Schwelle nicht mehr in der Kartenansicht',
-        cluster && !d.getElementById('view-map').contains(cluster),
-        'steckt noch unter #view-map');
+  // --- 1. Zwei beschriftete Gruppen statt einer Reihe --------------------- //
+  const groupOf = id => {
+    const el = d.getElementById(id);
+    const g = el && el.closest('.filter-group');
+    return g ? (g.querySelector('label') || {}).textContent : null;
+  };
+  const layers = ['mp-manual-toggle', 'mp-visits-toggle', 'mp-photos-toggle', 'mp-tracks-toggle']
+    .map(groupOf);
+  check('Die vier Ebenen stehen in EINER Gruppe',
+        layers.every(g => g && g === layers[0]), JSON.stringify(layers));
+  check('…und die Verdichtung in einer ANDEREN',
+        groupOf('mp-density') && groupOf('mp-density') !== layers[0],
+        `${groupOf('mp-density')} / ${layers[0]}`);
+  check('Die Gruppen sind beschriftet', !!layers[0] && !!groupOf('mp-density'));
 
-  // Der Kern: „Reihenfolge verbinden“ muss sichtbar außer Kraft treten,
-  // wenn verdichtet wird — vorher blieb er aktiv und zeichnete nichts.
+  // --- 2. Vollbild ist keine Darstellung ---------------------------------- //
+  const fs_ = d.getElementById('mp-fullscreen');
+  check('Vollbild existiert weiterhin', !!fs_);
+  check('…steht aber NICHT mehr in der Filterleiste',
+        fs_ && !fs_.closest('.filter-group'),
+        'eine Fensterfunktion zwischen Datenebenen liest sich als eine davon');
+  check('…sondern an der Karte', fs_ && !!fs_.closest('.map-wrap'));
+
+  // --- 3. Vier benannte Stufen, genau eine gewählt ------------------------ //
+  const dens = [...d.querySelectorAll('#mp-density button')];
+  check('Vier benannte Verdichtungsstufen', dens.length === 4,
+        dens.map(b => b.textContent.trim()).join(' / '));
+  const LEVELS = ['point', 'near', 'place', 'city'];
+  const haveAll = LEVELS.every(l => dens.some(b => b.dataset.level === l));
+  check('…und zwar genau diese vier', haveAll,
+        dens.map(b => b.dataset.level).join(', '));
+  // Fehlt eine Stufe, sind alle folgenden Prüfungen sinnlos — und ein Wächter,
+  // der beim kaputten Stand ABSTÜRZT, sagt zwar „nicht grün", aber nicht warum
+  // (Anmerkung 108). Also hier sauber aussteigen.
+  if (dens.length !== 4 || !haveAll) {
+    ok.forEach(n => console.log('  ok  ' + n));
+    fails.forEach(n => console.log('  XX  ' + n));
+    console.log(`\n${fails.length} Prüfung(en) fehlgeschlagen`);
+    process.exit(1);
+  }
+  check('…jede mit einem Namen, nicht mit einer Zahl',
+        dens.every(b => /[a-zäöü]/i.test(b.textContent)),
+        'eine unbeschriftete Stufe muss man ausprobieren statt lesen');
+  check('…jede erklärt sich', dens.every(b => b.title && b.title.length > 30),
+        dens.map(b => (b.title || '').length).join('/'));
+  const pressed = () => dens.filter(b => b.getAttribute('aria-pressed') === 'true');
+  check('Genau eine Stufe ist gewählt', pressed().length === 1,
+        `${pressed().length} — eine Reihe Chips las sich als „mehrere dürfen an sein"`);
+
+  // Und die Wahl wirkt: umschalten ändert, was gezeichnet wird.
+  const level = () => w.eval('mp.density');
+  dens.find(b => b.dataset.level === 'near')
+      .dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  check('Ein Klick auf eine Stufe wählt sie', level() === 'near', level());
+  check('…und die Leiste zeigt das', pressed().length === 1
+        && pressed()[0].dataset.level === 'near');
+
+  // --- 4. Der Deckel hängt an der Stufe, nicht an einem anderen Schalter -- //
+  //
+  // **Befund (d), der teuerste.** Bis 0.39 aktivierte AUSschalten von „Punkte
+  // zusammenfassen" zusätzlich den 300er-Deckel — der Schalter mit der
+  // Aufschrift „zusammenfassen" war also auch der, der entschied, ob die Karte
+  // alles zeigt. Die Zusicherung dagegen ist nicht „es gibt keinen Deckel",
+  // sondern: **die Stufe „Jeder Punkt" sagt in ihrem eigenen Titel, dass sie
+  // deckelt.**
+  //
+  // Geprüft in BEIDEN Sprachen: unter jsdom startet die Seite englisch, also
+  // steht im `title` der Katalogeintrag und nicht der deutsche Quelltext. Ein
+  // Defekt, der nur ins Markup geschrieben wird, erreicht die Zusicherung
+  // sonst nie — beim Gegenfahren war das hier zum zweiten Mal der Fall.
+  const allTexts = b => [b.title, w.eval(`(I18N_EN['${b.dataset.level
+      ? 'map.dens.' + b.dataset.level + '.tip' : ''}'] || '')`),
+      (html.match(new RegExp(`data-level="${b.dataset.level}"[^>]*`)) || [''])[0]];
+  const point = dens.find(b => b.dataset.level === 'point');
+  check('Die Stufe „Jeder Punkt" nennt ihren eigenen Deckel',
+        allTexts(point).every(x => /300/.test(x)),
+        `${JSON.stringify(allTexts(point))} — der Deckel gehört zu dieser Stufe `
+        + 'und zu keiner anderen');
+  const others = dens.filter(b => b.dataset.level !== 'point');
+  check('…und keine andere Stufe behauptet einen',
+        others.every(b => allTexts(b).every(x => !/300/.test(x))),
+        others.filter(b => allTexts(b).some(x => /300/.test(x)))
+              .map(b => b.dataset.level).join('/'));
+
+  // --- 5. Reihenfolge: außer Kraft, sobald verdichtet wird ---------------- //
   const routeChip = d.getElementById('mp-route-toggle');
-  if (typeof w.mpSyncChips === 'function' && routeChip) {
-    w.mpSyncChips(true);
-    check('Reihenfolge-Schalter zeigt sich außer Kraft',
-          routeChip.classList.contains('inert'));
-    const blockedTitle = routeChip.title;
-    w.mpSyncChips(false);
-    check('Reihenfolge-Schalter wieder normal',
-          !routeChip.classList.contains('inert'));
-    check('Begründung unterscheidet sich je Lage',
-          blockedTitle && blockedTitle !== routeChip.title,
-          'derselbe Titel in beiden Zuständen');
-  } else {
-    check('mpSyncChips vorhanden', false, 'Funktion oder Chip fehlt');
-  }
+  render("mp.density = 'place';");
+  check('Reihenfolge-Schalter zeigt sich außer Kraft',
+        routeChip.classList.contains('inert'),
+        'zusammengefasste Punkte haben keine Reihenfolge');
+  const blockedTitle = routeChip.title;
+  render("mp.density = 'point';");
+  check('…und bei „Jeder Punkt" ist er normal',
+        !routeChip.classList.contains('inert'));
+  check('Begründung unterscheidet sich je Lage',
+        blockedTitle && blockedTitle !== routeChip.title,
+        'derselbe Titel in beiden Zuständen');
 
-  // **Anmerkung 154 (b): derselbe Satz, der dritte Schalter.**
-  // `drawTracks` kehrt oberhalb der Monats-Ansicht sofort zurück — richtig
-  // (zehntausende Polylinien, Anmerkung 141), aber der Schalter leuchtete
-  // weiter. Der Wächter aus 0.33.0 kannte nur seinen eigenen Auslöser und war
-  // deshalb grün: **ein Wächter, der nur seinen Auslöser kennt, ist einer für
-  // die Vergangenheit** (Anmerkung 114). Geprüft wird die REGEL — kein
-  // Schalter darf still wirkungslos sein —, nicht der eine Fall.
-  //
-  // **Und zwar über `renderPeriod()`, nicht über `mpSyncTrackChip()`.** Im
-  // ersten Anlauf rief diese Prüfung die Sync-Funktion selbst auf — dann ist
-  // sie grün, sobald es die Funktion GIBT, auch wenn niemand sie ruft. Genau
-  // so bestand `check-a41-cities.js` ein Jahr lang (Anmerkung 102): wer eine
-  // Eigenschaft der Oberfläche absichert, muss den Zustand HERSTELLEN, in dem
-  // ein Nutzer sie sieht. Nachgewiesen am kaputten Stand: mit dem
-  // herausgenommenen Aufruf fällt diese Prüfung um, mit dem Direktaufruf nicht.
-  //
-  // **Mit PUNKTEN auf der Karte**, denn die leere Karte hat einen eigenen
-  // Zweig. Im zweiten Anlauf war die Prüfung noch grün, obwohl der Aufruf aus
-  // dem normalen Weg entfernt war — sie lief durch den Leer-Zweig, der ihn
-  // ebenfalls macht. Ein Wächter muss den Weg gehen, den die Beschwerde ging:
-  // eine Karte mit Inhalt, an der jemand die Zoomstufe wechselt.
+  // --- 6. Wege: außer Kraft, wo nicht gezeichnet wird (Anm. 154 b) -------- //
   const trackChip = d.getElementById('mp-tracks-toggle');
-  if (typeof w.renderPeriod === 'function' && trackChip) {
-    w.eval(`mp.located = [{ id: 'e1', title: 'Konzert', category: 'concert',
-      date_start: '2024-07-12T20:00:00', date_precision: 'exact',
-      source: 'manual', location: { id: 'l1', name: 'Köln', lat: 50.9, lng: 6.9 } }];`);
-    const state = zoom =>
-      w.eval(`mp.mode = '${zoom}'; rebuildPeriods(); renderPeriod();`);
-    state('year');
-    check('…und die Karte hat für diese Prüfung wirklich Punkte',
-          w.eval('mp.periods.length') > 0,
-          'sonst läuft alles unten durch den Leer-Zweig');
-    check('Wege-Schalter zeigt sich außer Kraft, wo nicht gezeichnet wird',
-          trackChip.classList.contains('inert'),
-          'in Jahr/Jahrzehnt/Alles zeichnet drawTracks nichts');
-    const blocked = trackChip.title;
-    check('…und nennt den Grund', /Monat|month/i.test(blocked), blocked);
-    state('all');
-    check('…auch in „Alles"', trackChip.classList.contains('inert'));
-    state('month');
-    check('Bis Monat ist er normal', !trackChip.classList.contains('inert'));
-    check('…mit anderer Begründung', blocked && blocked !== trackChip.title,
-          'derselbe Titel in beiden Zuständen');
-    // Die Wahl überlebt die Zoomstufe: außer Kraft ist die ANSICHT, nicht der
-    // Wunsch. Ohne diese Prüfung wäre `.inert` auch dann grün, wenn es den
-    // Schalter einfach abschaltete — und das ist ausdrücklich `.off`.
-    w.eval('mp.showTracks = false'); state('month');
-    check('Ausgeschaltet bleibt ausgeschaltet, nicht außer Kraft',
-          trackChip.classList.contains('off')
-          && !trackChip.classList.contains('inert'));
-    state('year');
-    check('…und in der Jahresansicht gilt wieder außer Kraft',
-          trackChip.classList.contains('inert')
-          && !trackChip.classList.contains('off'),
-          'zwei verschiedene Aussagen dürfen nicht gleich aussehen (A40)');
-    // Und der Leer-Zweig ebenfalls: ob Wege gezeichnet werden können, hängt an
-    // der Zoomstufe, nicht am Inhalt — sonst bliebe der Schalter dort auf dem
-    // Stand von vorhin stehen.
-    w.eval("mp.located = []; mp.mode = 'year'; rebuildPeriods(); renderPeriod();");
-    check('Auch auf der leeren Karte gilt die Zoomstufe',
-          trackChip.classList.contains('inert'));
-    w.eval("mp.showTracks = true; mp.mode = 'day'; renderPeriod();");
-  } else {
-    check('renderPeriod vorhanden', false, 'Funktion oder Chip fehlt');
-  }
+  render("mp.mode = 'year';");
+  check('Wege-Schalter zeigt sich außer Kraft, wo nicht gezeichnet wird',
+        trackChip.classList.contains('inert'),
+        'in Jahr/Jahrzehnt/Alles zeichnet drawTracks nichts');
+  const tBlocked = trackChip.title;
+  check('…und nennt den Grund', /Monat|month/i.test(tBlocked), tBlocked);
+  render("mp.mode = 'month';");
+  check('Bis Monat ist er normal', !trackChip.classList.contains('inert'));
+  check('…mit anderer Begründung', tBlocked && tBlocked !== trackChip.title);
+  // Ausgeschaltet ist etwas anderes als außer Kraft — sonst sähen zwei
+  // verschiedene Aussagen gleich aus (A40).
+  render("mp.showTracks = false;");
+  check('Ausgeschaltet bleibt ausgeschaltet, nicht außer Kraft',
+        trackChip.classList.contains('off') && !trackChip.classList.contains('inert'));
+  render("mp.mode = 'year';");
+  check('…und in der Jahresansicht gilt wieder außer Kraft',
+        trackChip.classList.contains('inert') && !trackChip.classList.contains('off'));
+  render("mp.showTracks = true; mp.mode = 'month';");
+
+  // --- 7. „Je Stadt" ohne eine einzige Stadt ------------------------------ //
+  w.eval(`mp.located = ${JSON.stringify([EV('x', 'trip', null), EV('y', 'event', null)])};`);
+  render();
+  const cityBtn = dens.find(b => b.dataset.level === 'city');
+  check('„Je Stadt" tritt außer Kraft, wenn keine Stadt bekannt ist',
+        cityBtn.classList.contains('inert'),
+        'sonst fällt alles in einen Klumpen „ohne Stadt" und sieht aus wie ein Fehler');
+  check('…mit Begründung und Weg hinaus', /Ortsnamen|place names/i.test(cityBtn.title),
+        cityBtn.title);
+  w.eval(`mp.located = ${JSON.stringify([EV('a', 'trip', 'Köln')])};`);
+  render();
+  check('…und ist wieder da, sobald eine Stadt bekannt ist',
+        !cityBtn.classList.contains('inert'));
+
+  // --- 8. 🛰️ gehört dem Zeitstrahl (Befund c) ----------------------------- //
+  const txt = id => ((d.getElementById(id) || {}).textContent || '').trim();
+  // **In BEIDEN Sprachen prüfen.** Unter jsdom startet die Seite englisch, also
+  // ersetzt `applyI18n` den deutschen Quelltext durch den Katalogeintrag —
+  // eine Prüfung nur auf das Gerenderte war grün, obwohl das Zeichen im
+  // deutschen Markup stand. Genau der Fall, den Anmerkung 116 schon einmal
+  // festgehalten hat („der Defekt erreichte die Zusicherung nie"), und beim
+  // Gegenfahren dieses Wächters ist er zum zweiten Mal passiert.
+  const sourceOf = id => {
+    const m = html.match(new RegExp(`id="${id}"[\\s\\S]{0,400}?</span>\\s*</span>`));
+    return m ? m[0] : '';
+  };
+  const cat = key => w.eval(`(I18N_EN['${key}'] || '')`);
+  const SAT = /🛰/;
+  check('Der Wege-Schalter trägt NICHT mehr 🛰️ — angezeigt',
+        !SAT.test(txt('mp-tracks-toggle')),
+        `${txt('mp-tracks-toggle')} — im Zeitstrahl heißt 🛰️ „automatisch erfasst"`);
+  check('…auch nicht im deutschen Quelltext', !SAT.test(sourceOf('mp-tracks-toggle')),
+        sourceOf('mp-tracks-toggle').slice(-90));
+  check('…auch nicht im englischen Katalog', !SAT.test(cat('map.tracks')),
+        cat('map.tracks'));
+  check('…dafür der Besuchs-Schalter, wie im Zeitstrahl',
+        SAT.test(txt('mp-visits-toggle')) && SAT.test(txt('tl-visits-toggle')),
+        `Karte: ${txt('mp-visits-toggle')} · Zeitstrahl: ${txt('tl-visits-toggle')}`);
+  check('…und zwar in beiden Sprachen dasselbe Zeichen',
+        SAT.test(cat('tl.visits.chip')) && SAT.test(sourceOf('mp-visits-toggle')),
+        `${cat('tl.visits.chip')} / ${sourceOf('mp-visits-toggle').slice(-90)}`);
+  check('Die Karte hat überhaupt einen Besuchs-Schalter',
+        !!d.getElementById('mp-visits-toggle'),
+        'von zwei maschinellen Quellen ließ sich nur eine abschalten');
 
   // Die beiden Linien dürfen nicht wieder gleich heißen: die eine ist
   // gemessen, die andere gezeichnet.
-  const label = id => (d.getElementById(id) || {}).textContent || '';
   check('gemessene und gedachte Linie heißen verschieden',
-        !/route/i.test(label('mp-tracks-toggle')) || !/route/i.test(label('mp-route-toggle')),
-        `${label('mp-tracks-toggle').trim()} / ${label('mp-route-toggle').trim()}`);
+        !/route/i.test(txt('mp-tracks-toggle')) || !/route/i.test(txt('mp-route-toggle')),
+        `${txt('mp-tracks-toggle')} / ${txt('mp-route-toggle')}`);
 
-  // Jeder Schalter erklärt sich selbst — das war die eigentliche Beschwerde.
-  ['mp-tracks-toggle', 'mp-route-toggle', 'mp-group-toggle'].forEach(id => {
+  // --- 9. Fotos sehen anders aus als Google-Besuche ----------------------- //
+  //
+  // Gemeldet beim Durchsehen der Entwürfe: „im Mockup sind beide orange".
+  // Sie waren es auch in der App — `#f5921b` gegen `#f5a623`.
+  const photoC = w.eval("photoDotColor()").toLowerCase();
+  const visitC = w.eval("catColor('event')").toLowerCase();
+  check('Die Foto-Ebene hat eine eigene Farbe', photoC && photoC !== visitC,
+        `Foto ${photoC} / Besuch ${visitC}`);
+  const hex = c => c.replace('#', '').match(/../g).map(x => parseInt(x, 16));
+  const dist = (a, b) => Math.hypot(...hex(a).map((v, i) => v - hex(b)[i]));
+  check('…und zwar eine deutlich andere, nicht einen Farbwert daneben',
+        dist(photoC, visitC) > 120,
+        `Abstand ${Math.round(dist(photoC, visitC))} — zwei Orangetöne sind bei `
+        + 'einem Punkt von 5 px dasselbe Orange');
+  const fdot = d.querySelector('#mp-photos-toggle .fdot');
+  check('Der Schalter trägt die Farbe seiner Ebene',
+        fdot && /--photo-dot/.test(fdot.getAttribute('style') || ''),
+        'zwei gepflegte Farbwerte für dieselbe Ebene laufen auseinander');
+
+  // --- 10. Jeder Schalter erklärt sich selbst ----------------------------- //
+  ['mp-tracks-toggle', 'mp-route-toggle', 'mp-manual-toggle', 'mp-visits-toggle',
+   'mp-photos-toggle'].forEach(id => {
     const el = d.getElementById(id);
     check(`${id} hat eine Erklärung`, el && el.title && el.title.length > 40,
           'kein oder zu knapper Titel');
@@ -153,6 +278,6 @@ setTimeout(async () => {
 
   ok.forEach(n => console.log('  ok  ' + n));
   fails.forEach(n => console.log('  XX  ' + n));
-  console.log(fails.length ? `\n${fails.length} Prüfung(en) fehlgeschlagen` : '\nA40: alles grün');
+  console.log(fails.length ? `\n${fails.length} Prüfung(en) fehlgeschlagen` : '\nKartenschalter: alles grün');
   process.exit(fails.length ? 1 : 0);
 }, 2500);

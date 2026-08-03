@@ -221,12 +221,24 @@ class EventGroup(BaseModel):
 # A37 — schlanke Ansichten fürs serverseitige Zeitfenster
 # --------------------------------------------------------------------------- #
 class LocationGeo(BaseModel):
-    """Nur, was ein Kartenpunkt braucht."""
+    """Nur, was ein Kartenpunkt braucht.
+
+    `city` seit Anmerkung 160: die Karte verdichtet wahlweise je Ort ODER je
+    Stadt, und die Stufe wählt der Nutzer. Ohne das Feld müsste der Browser die
+    Stadt aus dem Ortsnamen raten — genau die Zeichenketten-Raterei, die A39
+    abgeschafft hat (`Location.city` ist seitdem ein echtes Feld).
+
+    Leerstring heißt „nachgesehen, keine Stadt", `null` heißt „nie
+    nachgesehen" — dieselbe Unterscheidung wie in A39. Die Karte behandelt
+    beide gleich (eigene Gruppe „ohne Stadt"), aber sie wegzuwerfen hieße,
+    eine Auskunft zu verlieren, die die Datenbank hat.
+    """
     model_config = ConfigDict(from_attributes=True)
     id: str
     name: str
     lat: float
     lng: float | None = None
+    city: str | None = None
 
 
 class EventGeo(BaseModel):

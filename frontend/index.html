@@ -42,6 +42,18 @@
     --cat-sport: #ff8f5c;
     --cat-media: #f5a623;
     --cat-journal: #d9a441;
+    /* Anmerkung 160 — die Foto-Ebene bekommt eine EIGENE Farbe.
+       Sie war `#f5921b`, ein importierter Google-Besuch trägt Kategorie
+       `event` und damit `#f5a623`: zwei Orangetöne, die sich um einen
+       Farbwert unterscheiden, für die zwei Dinge, die man auf dieser Karte am
+       ehesten auseinanderhalten will. Cyan liegt weit von allen
+       Kategoriefarben UND von den Wege-Farben (`#60a5fa` Auto, `#35c4a7`
+       Sichtung) — bei einem Punkt von 5 px entscheidet der Abstand im
+       Farbkreis, nicht der Name des Tons.
+       Als Variable und nicht als Konstante im Zeichencode, weil die Karte
+       ihren Untergrund mit dem Theme wechselt (F13) und ein Ton, der auf
+       Nachtkarten leuchtet, auf der hellen verschwindet. */
+    --photo-dot: #22d3ee;
   }
   /* F9 — helles Theme: dieselben Variablen mit hellen Werten. Das data-theme-
      Attribut setzt JS (Auto nach Systemeinstellung, manuell übersteuerbar). */
@@ -53,6 +65,8 @@
     --text: #1d2536;
     --text-dim: #5b6880;
     --accent: #3a6ce0;
+    /* Dunkler, weil ein leuchtendes Cyan auf der hellen Karte verschwindet */
+    --photo-dot: #0e8ba8;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
@@ -519,13 +533,88 @@
     background: var(--bg-elev); border: 1px solid var(--border); color: var(--text-dim); cursor: pointer; user-select: none;
     transition: all .15s;
   }
-  .filter-chip .fdot { width: 9px; height: 9px; border-radius: 50%; }
+  .filter-chip .fdot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+  /* Anmerkung 160: die Wege sind keine Punkte, also ist ihre Marke ein Strich —
+     und zwar in den Farben, nach denen sie auf der Karte eingefärbt sind
+     (zu Fuß, Rad, Auto). Die Marke im Schalter IST das, was auf der Karte
+     liegt; dann muss niemand ein Sinnbild deuten. */
+  .filter-chip .fline {
+    width: 14px; height: 3px; border-radius: 2px; flex: 0 0 auto;
+    background: linear-gradient(90deg, #34d399, #fbbf24, #60a5fa);
+  }
   .filter-chip.active { color: var(--text); border-color: transparent; }
   .filter-chip.off { opacity: .4; }
   /* A40: Der Schalter ist an, kann aber gerade nichts bewirken — sichtbar
      außer Kraft statt stumm wirkungslos. Bewusst anders als `.off` (aus): der
      Nutzer hat ihn nicht ausgeschaltet, die Lage lässt ihn nur nicht zu. */
   .filter-chip.inert { opacity: .45; text-decoration: line-through; cursor: help; }
+  /* Anmerkung 160 — der Ein-Zustand muss man SEHEN. `.active` unterschied sich
+     bis dahin nur durch hellere Schrift und einen durchsichtigen Rahmen: bei
+     den Kategorie-Chips trägt die Kategoriefarbe den Unterschied, bei den
+     Ebenen-Chips trug ihn niemand. Ein Schalter, dessen Zustand man suchen
+     muss, ist ein halber Schalter. Die Kategorie-Chips bleiben unberührt —
+     sie setzen ihre Farbe per Inline-Stil und schlagen diese Regel. */
+  .filter-chip.active:not([data-cat]) { background: var(--bg-elev); border-color: var(--accent); }
+  /* Anmerkung 160 — vier benannte Stufen statt eines Ein/Aus, dessen Bedeutung
+     die Zoomstufe entschied. Als eigene Bauform und nicht als vier Chips: eine
+     Reihe Chips liest sich als „mehrere davon dürfen an sein“, und genau das
+     stimmt hier nicht. */
+  .seg-switch {
+    display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px;
+    background: var(--bg-elev); border: 1px solid var(--border); border-radius: 20px;
+  }
+  .seg-switch button {
+    font-family: inherit; font-size: 12px; padding: 5px 12px; border: 0;
+    border-radius: 18px; background: none; color: var(--text-dim);
+    cursor: pointer; white-space: nowrap; transition: background .15s, color .15s;
+  }
+  .seg-switch button:hover { color: var(--text); }
+  .seg-switch button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+  .seg-switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  /* Eine Stufe, die es hier nicht geben kann (z. B. „Je Stadt“ ohne eine
+     einzige aufgelöste Stadt), wird durchgestrichen — nicht versteckt: ein
+     verschwindendes Bedienelement ist schlechter als ein begründetes (A40). */
+  .seg-switch button.inert { opacity: .4; text-decoration: line-through; cursor: help; }
+  /* Vollbild & Co. in der Kartenecke */
+  .map-corner-btn {
+    position: absolute; top: 10px; right: 10px; z-index: 500;
+    width: 34px; height: 34px; display: grid; place-items: center; cursor: pointer;
+    font-family: inherit; font-size: 15px; line-height: 1;
+    background: color-mix(in srgb, var(--bg-panel) 88%, transparent);
+    border: 1px solid var(--border); border-radius: 9px; color: var(--text-dim);
+    backdrop-filter: blur(8px);
+  }
+  .map-corner-btn:hover { color: var(--text); }
+  .map-corner-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* Anmerkung 160 — „Fläche statt Ziffer“ für die Nähe-Cluster.
+     Das Plugin liefert von Haus aus drei feste Größen mit einer Zahl darin:
+     eine Blase über 12 Punkten sieht dann fast aus wie eine über 1.240, und
+     nur die Ziffer sagt den Unterschied — den muss man lesen, umrechnen und
+     vergleichen. Hier wächst die FLÄCHE mit der Menge (Radius = Wurzel), und
+     die Ziffer kommt erst dazu, wo Platz für sie ist. */
+  .mp-bubble {
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--accent) 24%, transparent);
+    border: 1.5px solid color-mix(in srgb, var(--accent) 65%, transparent);
+    display: grid; place-items: center;
+    color: var(--text); font: 600 11px/1 inherit;
+    font-variant-numeric: tabular-nums;
+  }
+  /* Der harte Kern hält den Ort fest — sonst wandert bei einer großen Blase
+     die Aussage von „hier“ zu „ungefähr hier“. */
+  .mp-bubble::before {
+    content: ''; position: absolute; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 0 1.5px rgba(255,255,255,.9);
+  }
+  .mp-bubble b { position: relative; z-index: 1; text-shadow: 0 1px 3px var(--bg); }
+  /* Etikett über den größten Blasen: die Zahl UND wofür sie steht. */
+  .leaflet-tooltip.mp-bubble-label {
+    background: color-mix(in srgb, var(--bg-panel) 92%, transparent);
+    border: 1px solid var(--border); color: var(--text);
+    font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 6px;
+    box-shadow: none; white-space: nowrap;
+  }
+  .leaflet-tooltip.mp-bubble-label::before { display: none; }
   /* A40 (dieselbe Regel, anderes Bedienelement): der Umschalter „Manuell" kann
      ohne Verbindung nichts speichern — das muss man ihm ansehen. */
   .zoom-btn.inert { opacity: .45; text-decoration: line-through; cursor: help; }
@@ -1231,21 +1320,60 @@
               <input type="date" id="mp-date" class="mf-select" data-i18n-title="map.pickday" title="Tag im Kalender wählen">
             </div>
           </div>
+          <!-- ══════════════════════════════════════════════════════════════
+               Anmerkung 160 — die Leiste ist nach der FRAGE geteilt, die sie
+               beantwortet (Entwurf „Zwei Fragen“ aus Anmerkung 154).
+
+               Bis 0.39 stand hier EINE Reihe „Darstellung“ mit vier Chips, die
+               vier verschiedene Sorten Ding waren: Datenebenen (was liegt
+               überhaupt auf der Karte), eine Zeichnung über den Daten (eine
+               Deutung, keine Aufzeichnung), ein Modus (zusammenfassen) und
+               Vollbild — eine Fensterfunktion, die mit Darstellung nichts zu
+               tun hat. Sie sahen gleich aus, weil alle vier Chips waren, also
+               las sich die Reihe als eine Liste gleichartiger Dinge und war
+               vier.
+
+               Jetzt: „Ebenen“ = woher kommt, was hier liegt. „Wie dicht“ =
+               wie es zusammengefasst wird. Vollbild sitzt in der Kartenecke,
+               wo Fensterfunktionen hingehören.
+               ══════════════════════════════════════════════════════════════ -->
           <div class="filter-group">
-            <label data-i18n="map.display">Darstellung</label>
+            <label data-i18n="map.layers">Ebenen</label>
             <div class="filter-chips">
-              <!-- A40 (Anm. 92): Zwei Ebenen und eine Verdichtung. Die beiden
-                   Linien hießen bis 0.33 beide „Route“, meinten aber Verschiedenes:
-                   gemessene Wege gegen eine gedachte Verbindung. -->
-              <span class="filter-chip active" id="mp-tracks-toggle" data-i18n-title="map.tracks.tip" title="Die tatsächlich zurückgelegten Wege aus dem Timeline-Import — echte Aufzeichnungen, eingefärbt nach Fortbewegungsart" data-i18n="map.tracks">🛰️ Zurückgelegte Wege</span>
-              <span class="filter-chip active" id="mp-route-toggle" data-i18n-title="map.route.tip" title="Verbindet die Orte dieses Zeitraums in ihrer zeitlichen Reihenfolge — eine gedachte Linie, kein gefahrener Weg. Bei zusammengefassten Punkten gibt es keine Reihenfolge zu zeigen." data-i18n="map.route">🧭 Reihenfolge verbinden</span>
-              <span class="filter-chip active" id="mp-group-toggle" data-i18n-title="map.group.tip" title="Fasst dicht beieinander liegende Punkte zusammen: im Monat und darüber je Ort („59× Zuhause“), in Tag und Woche nach Nähe. Aus heißt: jeder Besuch einzeln." data-i18n="map.group">🔁 Punkte zusammenfassen</span>
+              <!-- Der farbige Punkt ist die MARKE, die auf der Karte liegt —
+                   dieselbe Farbe, dieselbe Ebene. Damit muss niemand ein
+                   Sinnbild deuten: man schaltet das ab, was man sieht. -->
+              <span class="filter-chip active" id="mp-manual-toggle" data-i18n-title="map.manual.tip" title="Selbst erfasste Einträge — Reisen, Konzerte, Meilensteine. Auf der Karte die nummerierten Punkte in ihrer Kategoriefarbe."><span class="fdot" style="background:conic-gradient(var(--cat-trip) 0 25%, var(--cat-sighting) 0 50%, #ff5c9e 0 75%, #e85dff 0)"></span><span data-i18n="map.manual">Von Hand</span></span>
+              <!-- Anmerkung 160: dasselbe Sinnbild und derselbe Wortlaut wie
+                   im Zeitstrahl. 🛰️ hieß hier bis 0.39 „zurückgelegte Wege“
+                   und dort „automatisch erfasst“ — dasselbe Zeichen für zwei
+                   Dinge in zwei Reitern derselben App. -->
+              <span class="filter-chip active" id="mp-visits-toggle" data-i18n-title="map.visits.tip" title="Aus dem Google-Timeline-Import übernommene Besuche — dieselbe Ebene, die der Zeitstrahl unter 🛰️ führt"><span class="fdot" style="background:var(--cat-media)"></span><span data-i18n="tl.visits.chip">🛰️ Automatisch erfasst</span></span>
               <!-- A45: eine EIGENE Ebene, kein Ereignis. Ein Foto ist kein
                    Eintrag in der Lebensdatenbank, sondern ein Beleg dafür,
                    dass jemand dort war — und es sind zu viele, um sie
                    ungefragt einzublenden. -->
-              <span class="filter-chip off" id="mp-photos-toggle" data-i18n-title="map.photos.tip" title="Jedes Foto mit Koordinaten als eigener Punkt — dort, wo es aufgenommen wurde. Muss zuerst unter „Meine Daten → Immich“ verortet werden." data-i18n="map.photos">📷 Fotos</span>
-              <span class="filter-chip" id="mp-fullscreen" data-i18n-title="map.fs.tip" title="Karte im Vollbild (Esc beendet)" data-i18n="map.fs">⛶ Vollbild</span>
+              <span class="filter-chip off" id="mp-photos-toggle" data-i18n-title="map.photos.tip" title="Jedes Foto mit Koordinaten als eigener Punkt — dort, wo es aufgenommen wurde. Muss zuerst unter „Meine Daten → Immich“ verortet werden."><span class="fdot" style="background:var(--photo-dot)"></span><span data-i18n="map.photos">📷 Fotos</span></span>
+              <!-- A40 (Anm. 92): gemessene Wege gegen gedachte Verbindung —
+                   die beiden hießen bis 0.33 beide „Route“. Das Sinnbild ist
+                   seit Anmerkung 160 🛣️, weil 🛰️ dem Zeitstrahl gehört. -->
+              <span class="filter-chip active" id="mp-tracks-toggle" data-i18n-title="map.tracks.tip" title="Die tatsächlich zurückgelegten Wege aus dem Timeline-Import — echte Aufzeichnungen, eingefärbt nach Fortbewegungsart"><span class="fline"></span><span data-i18n="map.tracks">Zurückgelegte Wege</span></span>
+            </div>
+          </div>
+          <div class="filter-group">
+            <label data-i18n="map.density">Wie dicht</label>
+            <div class="filter-chips">
+              <!-- Vier BENANNTE Stufen statt eines Ein/Aus, dessen Bedeutung
+                   die Zoomstufe entschied. Der Deckel hängt seit Anmerkung 160
+                   nicht mehr an diesem Schalter: er ist eine Eigenschaft der
+                   Stufe „jeder Punkt“ und steht in ihrem Titel. -->
+              <div class="seg-switch" id="mp-density" role="group" data-i18n-label="map.density">
+                <button type="button" data-level="point" data-i18n-title="map.dens.point.tip" title="Jeder Eintrag als eigener Punkt. Über 300 Punkten zeigt die Karte eine gleichmäßig verteilte Auswahl und sagt es." data-i18n="map.dens.point">Jeder Punkt</button>
+                <button type="button" data-level="near" data-i18n-title="map.dens.near.tip" title="Was dicht beieinander liegt, wird zu einer Blase — ihre Größe zeigt, wie viel darin steckt" data-i18n="map.dens.near">Nach Nähe</button>
+                <button type="button" data-level="place" data-i18n-title="map.dens.place.tip" title="Alles am selben Ort wird eine Blase („59× Zuhause“)" data-i18n="map.dens.place">Je Ort</button>
+                <button type="button" data-level="city" data-i18n-title="map.dens.city.tip" title="Alles in derselben Stadt wird eine Blase — für die Frage „in welchen Städten war ich?“" data-i18n="map.dens.city">Je Stadt</button>
+              </div>
+              <span class="filter-chip active" id="mp-route-toggle" data-i18n-title="map.route.tip" title="Verbindet die Orte dieses Zeitraums in ihrer zeitlichen Reihenfolge — eine gedachte Linie, kein gefahrener Weg. Bei zusammengefassten Punkten gibt es keine Reihenfolge zu zeigen." data-i18n="map.route">🧭 Reihenfolge verbinden</span>
             </div>
           </div>
           <div class="filter-group" style="flex-basis:100%">
@@ -1256,6 +1384,13 @@
         <div class="map-layout">
           <div class="map-wrap">
             <div id="map"></div>
+            <!-- Anmerkung 160: Vollbild ist keine Darstellung, sondern eine
+                 Fensterfunktion — es stand als fünfter Chip in einer Reihe mit
+                 Datenebenen und einem Modus. Jetzt in der Kartenecke, wo jedes
+                 Karten-Werkzeug es hat. -->
+            <button type="button" class="map-corner-btn" id="mp-fullscreen"
+                    data-i18n-title="map.fs.tip" title="Karte im Vollbild (Esc beendet)"
+                    aria-label="Vollbild">⛶</button>
             <!-- Wenn die Karte Punkte weglässt, sagt sie es HIER. Der Hinweis
                  stand bisher nur in der Stopp-Liste daneben — und wer auf die
                  Karte sieht, sieht die Liste nicht. -->
@@ -2169,18 +2304,15 @@
                ist ein Schutzwert, keine Vorliebe. Anmerkung 115: und zwar zu
                den KARTEN-Einstellungen; unter „Ortsnamen" stand er nur, weil
                das damals der einzige Einstellungsblock war. -->
-          <div class="action-row">
-            <div class="action-key"><b style="font-size:13px" data-i18n="adm.cluster">🔵 Kartenpunkte bündeln</b></div>
-            <div class="action-desc"><span data-i18n="adm.cluster.desc"><b>Ab wie vielen Punkten die Karte zusammenfasst.</b><br>
-              „Punkte zusammenfassen“ ist auf der Karte ein Schalter; diese Zahl bestimmt, ab wann er
-              greift. Niedriger heißt: früher Zahlenblasen statt Einzelpunkte — schont schwächere Geräte.
-              Höher heißt: länger jeder Besuch für sich.</span><br>
-              <label class="stat-label" style="display:inline-flex; align-items:center; gap:6px; margin-top:8px">
-                <span data-i18n="adm.cluster.from">Ab</span>
-                <input id="mp-cluster-min" type="number" min="10" max="300" step="10" value="50" class="mf-select" style="width:80px">
-                <span data-i18n="adm.cluster.points">Punkten</span>
-              </label></div>
-          </div>
+          <!-- Anmerkung 160: „Ab wie vielen Punkten die Karte zusammenfasst“
+               (A18) ist ERSATZLOS weg. Seit die Karte vier benannte Stufen hat,
+               beantwortet die Stufe selbst die Frage „wird hier zusammengefasst?“
+               — eine zweite, numerische Antwort auf dieselbe Frage ist genau
+               die Doppelregel, die still auseinanderläuft (Anmerkung 106), und
+               sie war zusätzlich unsichtbar: die Zahl stand in den
+               Einstellungen, ihre Wirkung auf der Karte.
+               `map_cluster_min` bleibt in `User.settings` liegen und stört dort
+               niemanden; ein Wegräumen wäre eine Migration für nichts. -->
         </div>
 
         <!-- A35: Passwort ändern (nur lokale Konten) -->
@@ -2690,19 +2822,34 @@ const I18N_EN = {
   'tl.print.tip': "Pick a date range and print or save as PDF — printed light, without navigation, with every event in the range",
   'map.view': "View",
   'map.range': "Range",
-  'map.display': "Display",
   'map.prev': "‹ back",
   'map.next': "next ›",
   'map.pickday': "Pick a day from the calendar",
   'map.route': "🧭 Connect in order",
   'map.route.tip': "Joins this period's places in the order they happened — a drawn line, not a route you travelled. With points merged there is no order left to show.",
   'map.route.blocked': "Not possible while points are merged — there is no order left to show.",
-  'map.tracks': "🛰️ Paths travelled",
+  'map.layers': "Layers",
+  'map.density': "How dense",
+  'map.manual': "By hand",
+  'map.manual.tip': "Entries you recorded yourself — trips, concerts, milestones. On the map the numbered points in their category colour.",
+  'map.visits.tip': "Visits taken from the Google Timeline import — the same layer the timeline lists under 🛰️",
+  'map.visits.none': "Nothing imported yet — the Google Timeline import lives under “My data”.",
+  'map.dens.point': "Every point",
+  'map.dens.point.tip': "Every entry as its own point. Above 300 the map shows a selection spread evenly across the period, and says so.",
+  'map.dens.near': "By proximity",
+  'map.dens.near.tip': "Whatever sits close together becomes one bubble — its size shows how much is in it",
+  'map.dens.place': "Per place",
+  'map.dens.place.tip': "Everything at the same place becomes one bubble (“59× Home”)",
+  'map.dens.city': "Per city",
+  'map.dens.city.tip': "Everything in the same city becomes one bubble — for the question “which cities have I been to?”",
+  'map.dens.city.none': "No city is known for any of these points — the “resolve place names” run under “My data” fills them in.",
+  'map.dens.nocity': "no city",
+  'map.tracks': "Paths travelled",
   'map.tracks.tip': "The paths you actually travelled, from the timeline import — real recordings, coloured by how you moved.",
   'map.tracks.blocked': "Only up to month view — a year of paths is tens of thousands of lines, and drawing them freezes the browser. Zoom in to see them.",
-  'map.group.tip': "Merges points that sit close together: per place from month view up (“59× Home”), by proximity in day and week view. Off means every visit on its own.",
   'map.fs.tip': "Map in fullscreen (Esc exits)",
   'tl.visits.chip': "🛰️ Auto-detected",
+  'tl.visits.chip.short': "Auto-detected",
   'tl.visits.n': "auto-detected",
   'tl.pending.tip': "Unconfirmed proposals from Google/Immich — they only become events once reviewed in moderation",
   'tl.pending.chip': "{n} proposals waiting",
@@ -2711,12 +2858,6 @@ const I18N_EN = {
   'tl.agg.days': "days",
   'tl.journal': "📖 Write journal",
   'tl.print': "🖨️ Print",
-  'map.group': "🔁 Merge points",
-  'adm.cluster': "🔵 Merging map points",
-  'adm.cluster.desc': "<b>How many points before the map merges them.</b><br>“Merge points” is a switch on the map; this number decides when it takes effect. Lower means bubbles instead of single points sooner — easier on weaker devices. Higher means every visit stays on its own for longer.",
-  'adm.cluster.from': "From",
-  'adm.cluster.points': "points",
-  'map.fs': "⛶ Fullscreen",
 
   // --- Statistik, Welt & Erfolge ---
   'stat.events': "Events total",
@@ -3328,8 +3469,8 @@ const I18N_EN = {
   'track.modal.hint': "Pick the areas that interest you — they decide the collection, the statistics and what the AI recognises. Changeable at any time under Settings → My data.",
 
   // --- Nachtrag: Kopfzeile & fehlende Attribute ---
-  'map.cap': "{h} of {n} points are hidden.",
-  'map.cap.fix': "🔁 Merge points",
+  'map.cap': "{h} of {n} points are hidden — “Every point” draws at most 300, spread evenly.",
+  'map.cap.fix': "Merge by proximity",
   'jr.ph': "How was your day? Just write freely …",
   'of.dash': "of –",
   'by': "by",
@@ -7368,7 +7509,32 @@ function startVoice() {
 let mapObj = null, mapMarkers = null, mapCluster = null, mapRoute = null, mapTracks = null;
 // A45/Anmerkung 153: Die Fotopunkte liegen in einem eigenen Layer mit EINER
 // Leinwand (`PHOTO_DOT_LAYER`) — kein LayerGroup mit einem Objekt je Foto.
-const mp = { mode: 'day', periods: [], index: 0, showRoute: true, showTracks: true, condense: true, located: [], catFilter: new Set(FILTER_CATS),
+// **Anmerkung 160 — `condense` ist weg, `density` ist da.**
+//
+// `condense` war ein Boolescher Wert, dessen BEDEUTUNG die Zoomstufe entschied:
+// ab Monat bündelte er je Ort, in Tag und Woche clusterte er nach Nähe, und
+// ausgeschaltet aktivierte er zusätzlich den 300er-Deckel — drei Wirkungen an
+// einem Schalter, von denen eine nicht auf ihm stand. `density` ist eine von
+// vier BENANNTEN Stufen, und die Zoomstufe entscheidet daran gar nichts mehr.
+//
+// Gemerkt wird sie wie die Sortierung der Sammlung (Anmerkung 149): wer einmal
+// „je Stadt" gewählt hat, meint das auch beim nächsten Öffnen.
+const MP_DENSITY_LEVELS = ['point', 'near', 'place', 'city'];
+function mpStoredDensity() {
+  try {
+    const v = localStorage.getItem('ld_map_density');
+    if (MP_DENSITY_LEVELS.includes(v)) return v;
+  } catch (_) { /* privater Modus: dann eben die Voreinstellung */ }
+  return 'place';
+}
+const mp = { mode: 'day', periods: [], index: 0, showRoute: true, showTracks: true,
+  density: mpStoredDensity(), located: [], catFilter: new Set(FILTER_CATS),
+  // Anmerkung 160: die beiden maschinellen Quellen sind auf der Karte getrennt
+  // schaltbar — wie im Zeitstrahl, mit demselben Sinnbild und derselben Zahl.
+  // `showManual` gibt es nur hier: im Zeitstrahl wäre „meine eigenen Einträge
+  // ausblenden" sinnlos (das IST die Liste), auf einer Karte mit 6.000
+  // importierten Besuchen ist es die nützlichste Ansicht überhaupt.
+  showManual: true, showVisits: true, visitTotal: 0,
   // A45 — Fotopunkte als eigene Ebene. `showPhotos` ist bewusst AUS: bei
   // zwanzig Jahren Bibliothek sind das zehntausende Marker, und wer die Karte
   // öffnet, will zuerst seine Ereignisse sehen. `total` ist die Zahl aus dem
@@ -7381,8 +7547,7 @@ const mp = { mode: 'day', periods: [], index: 0, showRoute: true, showTracks: tr
   // Anmerkung 140: für welchen Bestand die Punkte in `located` gelten.
   mapTotal: 0, mapShown: 0, loadedFor: null };
 // A18: Cluster-Schwelle — vom Nutzer einstellbar (10–300, in User.settings)
-const SETTINGS = { map_cluster_min: 50 };
-function mpClusterMin() { return SETTINGS.map_cluster_min || 50; }
+const SETTINGS = {};
 
 // **Bis zu welcher Zoomstufe Wege gezeichnet werden — die EINE Antwort.**
 // Sie steht hier und nicht in `drawTracks`, weil zwei Stellen sie brauchen:
@@ -7400,11 +7565,62 @@ function mpSyncChips(condensed) {
   const chip = document.getElementById('mp-route-toggle');
   if (!chip) return;
   chip.classList.toggle('inert', !!condensed);
+  chip.classList.toggle('active', !condensed && mp.showRoute);
+  chip.classList.toggle('off', !condensed && !mp.showRoute);
   chip.title = condensed
     ? t('map.route.blocked', 'Nicht möglich, solange Punkte zusammengefasst sind — dann gibt es keine Reihenfolge zu zeigen.')
     : t('map.route.tip', 'Verbindet die Orte dieses Zeitraums in ihrer zeitlichen Reihenfolge — eine gedachte Linie, kein gefahrener Weg. Bei zusammengefassten Punkten gibt es keine Reihenfolge zu zeigen.');
   mpSyncTrackChip();
   mpSyncPhotoChip();
+  mpSyncSourceChips();
+  mpSyncDensity();
+}
+// Anmerkung 160: die beiden übrigen Quellen-Schalter. „Von Hand" kann nicht
+// außer Kraft treten — es ist die Lebensdatenbank, und die gibt es immer;
+// „Automatisch erfasst" schon, nämlich solange nichts importiert wurde.
+function mpSyncSourceChips() {
+  const man = document.getElementById('mp-manual-toggle');
+  if (man) {
+    man.classList.toggle('active', mp.showManual);
+    man.classList.toggle('off', !mp.showManual);
+  }
+  const vis = document.getElementById('mp-visits-toggle');
+  if (!vis) return;
+  const empty = !mp.visitTotal;
+  vis.classList.toggle('inert', empty);
+  vis.classList.toggle('active', !empty && mp.showVisits);
+  vis.classList.toggle('off', !empty && !mp.showVisits);
+  const label = vis.querySelector('[data-i18n]');
+  if (label) {
+    // Der Schalter nennt SEINE Zahl — dieselbe, die im Zeitstrahl steht
+    // (Anmerkung 139). Nur das Beschriftungs-Element wird angefasst, sonst
+    // löschte der Text die Farbmarke daneben.
+    label.textContent = empty
+      ? `🛰️ ${t('tl.visits.chip.short', 'Automatisch erfasst')}`
+      : `🛰️ ${mp.visitTotal.toLocaleString(LOC())} ${t('tl.visits.n', 'automatisch erfasst')}`;
+  }
+  vis.title = empty
+    ? t('map.visits.none', 'Noch nichts importiert — der Google-Timeline-Import steht unter „Meine Daten".')
+    : t('map.visits.tip', 'Aus dem Google-Timeline-Import übernommene Besuche — dieselbe Ebene, die der Zeitstrahl unter 🛰️ führt');
+}
+// **Der Kern von Anmerkung 154 (d).** Vier benannte Stufen, und die Zoomstufe
+// entscheidet daran nichts mehr. „Je Stadt" tritt außer Kraft, wenn zu keinem
+// Punkt eine Stadt aufgelöst ist — eine Stufe, die alles in einen Klumpen
+// „ohne Stadt" wirft, ist keine Verdichtung, sondern ein Fehler mit Anspruch.
+function mpSyncDensity() {
+  const box = document.getElementById('mp-density');
+  if (!box) return;
+  const noCity = !mp.located.some(e => e.location && e.location.city);
+  box.querySelectorAll('button').forEach(b => {
+    const lvl = b.dataset.level;
+    const blocked = lvl === 'city' && noCity;
+    b.classList.toggle('inert', blocked);
+    b.setAttribute('aria-pressed', String(!blocked && mp.density === lvl));
+    if (blocked) {
+      b.title = t('map.dens.city.none',
+        'Zu keinem dieser Punkte ist eine Stadt bekannt — der Lauf „Ortsnamen auflösen" unter „Meine Daten" trägt sie nach.');
+    }
+  });
 }
 // **Anmerkung 154 (b) — A40 zum dritten Mal an derselben Leiste.**
 // `drawTracks` kehrt oberhalb der Monats-Ansicht sofort zurück, und das ist
@@ -7448,7 +7664,13 @@ function mpSyncPhotoChip() {
       // „🛰️ N automatisch erfasst" Google-Besuche und Immich zusammen — mit
       // zwei getrennten Schaltern wäre das eine Zahl, die zu keinem von beiden
       // passt (hunderte Besuche gegen zehntausende Fotos).
-      chip.textContent = empty
+      //
+      // Anmerkung 160: geschrieben wird ins BESCHRIFTUNGS-Element, wo es eins
+      // gibt. Der Kartenschalter trägt seit dieser Anmerkung eine Farbmarke
+      // daneben — die Farbe der Ebene auf der Karte —, und `chip.textContent`
+      // hätte sie bei jedem Neuzeichnen weggeräumt.
+      const label = chip.querySelector('[data-i18n]') || chip;
+      label.textContent = empty
         ? `📷 ${t('tl.photos', 'Fotos')}`
         : `📷 ${mp.photoTotal.toLocaleString(LOC())} ${t('tl.photos.n2', 'Fotos')}`;
       chip.title = empty
@@ -7469,11 +7691,17 @@ async function ensurePhotoIndex(force) {
     // dafür wäre eine zweite Auskunft über denselben Bestand (Anm. 106).
     const idx = await fetchIndex(force);
     mp.photoTotal = idx.photo_events || 0;
-  } catch (_) { mp.photoTotal = 0; }
+    // Anmerkung 160: dieselbe Zahl, die der Zeitstrahl unter 🛰️ nennt — aus
+    // demselben Index. Zwei Zähler für dieselbe Ebene wären zwei Auskünfte
+    // über denselben Bestand (Anm. 106), und sie liefen genau dann
+    // auseinander, wenn jemand importiert und nur einen Reiter neu lädt.
+    mp.visitTotal = idx.visits || 0;
+  } catch (_) { mp.photoTotal = 0; mp.visitTotal = 0; }
   // Die durchsuchten Jahre sind eine Notiz über einen LAUF und stehen deshalb
   // in den Einstellungen, nicht im Ereignis-Index. Sie werden nur in „Meine
   // Daten" gebraucht und dort geholt.
   mpSyncPhotoChip();
+  mpSyncSourceChips();
 }
 // Nur Events, die den aktiven Kategorie-Filter passieren
 function mpFiltered() { return mp.located.filter(e => passesFilter(e, mp.catFilter)); }
@@ -7633,10 +7861,17 @@ function expandPhotoPoints(block) {
 async function mpLoadPoints(force) {
   const qs = new URLSearchParams({ machine_proposals: '0' });
   if (!mp.showPhotos) qs.set('photos', '0');
+  // Anmerkung 160: derselbe Grund wie beim Foto-Schalter — ein ausgeschalteter
+  // Google-Schalter soll die sechstausend Besuche gar nicht erst über die
+  // Leitung schicken. Im Browser zu filtern wäre bequemer und würde die
+  // gesamte Nutzlast trotzdem holen.
+  if (!mp.showVisits) qs.set('visits', '0');
+  if (!mp.showManual) qs.set('manual', '0');
   let stamp = null;
   try {
     const idx = await fetchIndex(true);
-    stamp = `${idx.revision || ''}|${mp.showPhotos ? 1 : 0}`;
+    stamp = `${idx.revision || ''}|${mp.showPhotos ? 1 : 0}`
+      + `|${mp.showVisits ? 1 : 0}|${mp.showManual ? 1 : 0}`;
   } catch (_) { /* ohne Kennung wird geholt — lieber zu viel als veraltet */ }
   if (!force && stamp && stamp === mp.loadedFor && mp.located.length) return;
   try {
@@ -7671,8 +7906,12 @@ async function openMapView() {
     // Fallback auf layerGroup, falls das Plugin (CDN) nicht geladen wurde.
     // 0.10.1: weniger aggressiv bündeln — kleinerer Radius erzeugt mehr,
     // dafür aussagekräftigere Bubbles (keine 3er-Bubbles über halbe Kontinente)
+    // Anmerkung 160: eigenes Blasen-Symbol — Größe = Menge (siehe
+    // `mpClusterIcon`). Die drei festen Größen des Plugins beantworten die
+    // Frage „wo war ich viel?" mit einer Ziffer, die man erst lesen muss.
     mapCluster = (typeof L.markerClusterGroup === 'function')
-      ? L.markerClusterGroup({ showCoverageOnHover: false, chunkedLoading: true, maxClusterRadius: 30 })
+      ? L.markerClusterGroup({ showCoverageOnHover: false, chunkedLoading: true,
+                               maxClusterRadius: 30, iconCreateFunction: mpClusterIcon })
       : null;
     if (mapCluster) mapCluster.addTo(mapObj);
     mapRoute = L.layerGroup().addTo(mapObj);
@@ -7804,6 +8043,61 @@ function cacheKeep(map, key, value) {
   while (map.size > CACHE_KEEP) map.delete(map.keys().next().value);
 }
 
+// **Deckeln heißt nicht abschneiden** — dieselbe Regel wie `sqlutil.even_spread`
+// im Backend, hier für eine Liste, die schon im Speicher liegt (Anmerkung 160).
+//
+// Der Zähler behält die Zeile, bei der `i · limit / n` über die nächste ganze
+// Zahl springt; das ergibt EXAKT `limit` Zeilen für jedes Verhältnis, während
+// „jede n-te" bei 8.120 Zeilen und Platz für 5.000 nur 4.060 liefert und 940
+// Plätze verschenkt.
+function mpEvenSpread(rows, limit) {
+  if (rows.length <= limit) return rows;
+  const out = [];
+  for (let i = 0; i < rows.length; i++) {
+    if (Math.floor(i * limit / rows.length) < Math.floor((i + 1) * limit / rows.length)) {
+      out.push(rows[i]);
+    }
+  }
+  return out;
+}
+
+// **„Fläche statt Ziffer" (Anmerkung 160).** Eine Zahlenblase ist fast immer
+// gleich groß — es sagt also nur die ZIFFER etwas, und zwei Ziffern zu
+// vergleichen heißt lesen, rechnen, vergleichen. Bei „12" neben „1.240" sieht
+// man den Unterschied erst im dritten Schritt.
+//
+// Die Fläche wächst deshalb mit der Zahl (Radius = Wurzel, damit die FLÄCHE
+// proportional ist und nicht der Durchmesser — sonst sähe der zehnfache Wert
+// hundertfach aus). Normiert auf die größte Gruppe im Bild: verglichen wird
+// innerhalb einer Ansicht, nicht gegen einen absoluten Maßstab, den niemand
+// kennt.
+const MP_BUBBLE_MIN = 9, MP_BUBBLE_MAX = 34;
+function mpBubbleRadius(n, maxN) {
+  if (maxN <= 1) return MP_BUBBLE_MIN;
+  const f = Math.sqrt(Math.max(1, n) / maxN);
+  return MP_BUBBLE_MIN + (MP_BUBBLE_MAX - MP_BUBBLE_MIN) * f;
+}
+// Die Farbe einer Gruppe ist die ihrer häufigsten Kategorie — nicht ein
+// neutrales Blau: eine Blase über zwölf Konzerten soll aussehen wie Konzerte.
+function mpGroupColor(items) {
+  const n = {};
+  items.forEach(e => { n[e.category] = (n[e.category] || 0) + 1; });
+  const top = Object.keys(n).sort((a, b) => n[b] - n[a])[0];
+  return catColor(top || 'event');
+}
+// Dieselbe Regel für die Nähe-Cluster des Plugins: Größe = Menge, und die
+// Ziffer erst dort, wo die Blase Platz für sie hat.
+function mpClusterIcon(cluster) {
+  const n = cluster.getChildCount();
+  const r = Math.min(MP_BUBBLE_MAX, MP_BUBBLE_MIN + Math.sqrt(n) * 3.4);
+  const size = Math.round(r * 2);
+  return L.divIcon({
+    html: r >= 17 ? `<b>${n.toLocaleString(LOC())}</b>` : '',
+    className: 'mp-bubble',
+    iconSize: [size, size],
+  });
+}
+
 function renderPeriod() {
   mapMarkers.clearLayers();
   if (mapCluster) mapCluster.clearLayers();
@@ -7857,25 +8151,37 @@ function renderPeriod() {
   mpDrawPhotos(photos);
   mpPhotoNote(mp.mapTotal > mp.mapShown
     ? { total: mp.mapTotal, shown: mp.mapShown } : null);
-  // A5/A40 (Besuchs-Verdichtung): EIN Schalter, zwei Verfahren — welches
-  // greift, entscheidet die Zoomstufe, nicht der Nutzer. Ab Monats-Ansicht
-  // wird je Ort gebündelt („59× Zuhause"), in Tag/Woche nach Nähe geclustert.
-  if (mp.condense && !['day', 'week'].includes(mp.mode) && all.length) {
+  // ══════════════════════════════════════════════════════════════════════
+  // **Anmerkung 160 — die Stufe entscheidet, nicht die Zoomstufe.**
+  //
+  // Bis 0.39 stand hier EIN Schalter für drei Wirkungen: ab Monats-Ansicht
+  // bündelte er je Ort, in Tag und Woche clusterte er nach Nähe, und
+  // ausgeschaltet aktivierte er zusätzlich den 300er-Deckel — den erwähnte
+  // seine Aufschrift mit keinem Wort. Der Schalter „Punkte zusammenfassen"
+  // war damit auch der Schalter, der entschied, OB die Karte alles zeigt.
+  //
+  // Jetzt vier benannte Stufen, und der Deckel gehört zu genau einer davon:
+  // „Jeder Punkt" kann nicht beliebig viele Marker zeichnen, und das steht in
+  // ihrem Titel. In allen anderen Stufen gibt es ihn gar nicht, weil dort
+  // schon die Verdichtung die Zahl der Objekte begrenzt.
+  // ══════════════════════════════════════════════════════════════════════
+  if ((mp.density === 'place' || mp.density === 'city') && all.length) {
     mpSyncChips(true);
-    renderGroupedPeriod(all, key, stops);
+    renderGroupedPeriod(all, key, stops, mp.density);
     return;
   }
-  // A5/A18: Bis zur Cluster-Schwelle (einstellbar, max. 300) gibt es die
-  // nummerierte Route; darüber werden ALLE Punkte geclustert statt
-  // abgeschnitten (Nummern & Route wären bei tausenden Stopps ohnehin
-  // bedeutungslos). Die Stopp-Liste bleibt als DOM-Schutz gedeckelt.
-  // Ohne Cluster-Plugin (CDN offline): alter 300er-Deckel.
   const MP_MAX = 300;
-  // A40: Geclustert wird nur noch, wenn „Punkte zusammenfassen" an ist. Aus
-  // heißt aus — dann greift der Deckel unten, und die Liste sagt das auch.
-  const clustered = mp.condense && all.length > mpClusterMin() && !!mapCluster;
+  // „Nach Nähe" heißt geclustert — ohne Schwelle, ohne Zoom-Bedingung. Eine
+  // Schwelle, die die gewählte Stufe still aushebelt, wäre derselbe Defekt
+  // eine Nummer kleiner. Ohne Cluster-Plugin (CDN offline) bleibt der Deckel.
+  const clustered = mp.density === 'near' && !!mapCluster;
   mpSyncChips(clustered);
-  const items = all.slice(0, MP_MAX);
+  // **Deckeln heißt nicht abschneiden** (dieselbe Regel wie `even_spread` im
+  // Backend). `all.slice(0, 300)` lieferte die ersten dreihundert
+  // CHRONOLOGISCH — bei 2.000 Besuchen im Monat fehlte alles ab der Mitte,
+  // und die Karte sah vollständig aus. Gegriffen wird jetzt gleichmäßig über
+  // den Zeitraum; die Reihenfolge bleibt, nur dünner.
+  const items = mpEvenSpread(all, MP_MAX);
   const markerTarget = clustered ? mapCluster : mapMarkers;
   // Datepicker mit dem angezeigten Zeitraum synchron halten
   const dateInput = document.getElementById('mp-date');
@@ -7906,12 +8212,8 @@ function renderPeriod() {
   mpCapNote(clustered ? 0 : all.length - items.length, all.length);
   stops.innerHTML = `<h3>${all.length} Stopp${all.length===1?'':'s'} · ${periodLabel(key)}</h3>`
     + (all.length > MP_MAX ? `<div class="hint">${clustered
-        ? `Karte zeigt alle ${all.length} Punkte (gebündelt) — Liste zeigt die ersten ${MP_MAX}.`
-        : mp.condense
-          ? `Zeige die ersten ${MP_MAX} — feinere Zoomstufe wählen für alle.`
-          // A40: Wer die Verdichtung abschaltet, soll den Preis sehen statt
-          // sich zu wundern, warum Punkte fehlen.
-          : `Zeige die ersten ${MP_MAX} von ${all.length} — „Punkte zusammenfassen" einschalten, um alle zu sehen.`}</div>` : '')
+        ? `Karte zeigt alle ${all.length} Punkte (gebündelt) — Liste zeigt ${MP_MAX} davon.`
+        : `Karte und Liste zeigen ${MP_MAX} von ${all.length}, gleichmäßig über den Zeitraum verteilt — „Nach Nähe" zeigt alle.`}</div>` : '')
     + items.map((e, i) => {
       const w = weatherOf(e);
       return `<div style="padding:10px 0; border-bottom:1px solid var(--border)">
@@ -7936,11 +8238,14 @@ function mpCapNote(hidden, total) {
   if (!box) return;
   if (hidden <= 0) { box.style.display = 'none'; box.innerHTML = ''; return; }
   box.style.display = '';
-  box.innerHTML = `⚠️ ${esc(t('map.cap', '{h} von {n} Punkten sind ausgeblendet.')
+  // Anmerkung 160: Der Hinweis sagt jetzt auch, WARUM gedeckelt wird — es ist
+  // eine Eigenschaft der Stufe „Jeder Punkt" und keine Nebenwirkung eines
+  // anderen Schalters mehr. Und der Knopf führt in die Stufe, die alles zeigt.
+  box.innerHTML = `⚠️ ${esc(t('map.cap', '{h} von {n} Punkten sind ausgeblendet — „Jeder Punkt" zeichnet höchstens 300, gleichmäßig verteilt.')
       .replace('{h}', hidden.toLocaleString(LOC())).replace('{n}', total.toLocaleString(LOC())))}`
-    + ` <button type="button" id="mp-cap-fix">${esc(t('map.cap.fix', '🔁 Punkte zusammenfassen'))}</button>`;
+    + ` <button type="button" id="mp-cap-fix">${esc(t('map.cap.fix', 'Nach Nähe zusammenfassen'))}</button>`;
   document.getElementById('mp-cap-fix').addEventListener('click', () => {
-    if (!mp.condense) document.getElementById('mp-group-toggle').click();
+    mpSetDensity('near');
   });
 }
 
@@ -7982,6 +8287,15 @@ function mpCanvas() {
 function mpPhotoRadius() {
   const z = mapObj ? mapObj.getZoom() : 6;
   return z >= 14 ? 8 : z >= 11 ? 7 : z >= 8 ? 6 : 5;
+}
+// Anmerkung 160: die Farbe der Foto-Ebene — EINE Stelle, und sie liest das
+// Theme. Sie steht auch im Schalter (`.fdot`), damit dort dieselbe Farbe
+// leuchtet wie auf der Karte; zwei gepflegte Farbwerte für dieselbe Ebene
+// wären genau die Sorte Doppelregel, die still auseinanderläuft.
+function photoDotColor() {
+  const v = getComputedStyle(document.documentElement)
+    .getPropertyValue('--photo-dot').trim();
+  return v || '#22d3ee';
 }
 // --------------------------------------------------------------------------- //
 // Anmerkung 153 — EIN Layer für alle Fotopunkte statt eines Objekts je Foto
@@ -8072,7 +8386,10 @@ const PHOTO_DOT_LAYER = {
     const hits = this._hits = [];
     if (!mp.showPhotos || !mpPhotoPoints.length) return;
     const r = this._r = mpPhotoRadius();
-    ctx.fillStyle = '#f5921b';
+    // Anmerkung 160: die Farbe kommt aus dem Theme, nicht aus dieser Zeile.
+    // Bei jedem Zeichnen gelesen und nicht einmal gemerkt: der Themenwechsel
+    // zeichnet neu, und ein gemerkter Wert wäre dann der von vorhin.
+    ctx.fillStyle = photoDotColor();
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 2;
     for (const e of mpPhotoPoints) {
@@ -8183,29 +8500,71 @@ function mpPhotoNote(r) {
 
 // A5: Gebündelte Darstellung eines Zeitraums — Events nach Ort gruppiert.
 // Alltagsorte (Zuhause/Arbeit) fallen damit automatisch zu je einer Zeile
-// zusammen. Marker wandern in den Cluster-Layer (Dichte-Darstellung).
-function renderGroupedPeriod(all, key, stops) {
+// zusammen.
+//
+// **Anmerkung 160, zwei Änderungen.** (1) `level` sagt, WONACH gruppiert wird:
+// je Ort oder je Stadt. Die Stadt kommt aus `Location.city` (A39, seit dieser
+// Anmerkung auch am Kartenpunkt) — aus dem Ortsnamen zu raten wäre die
+// Zeichenketten-Raterei, die A39 abgeschafft hat. (2) Die Gruppe ist eine
+// FLÄCHE und kein Standard-Marker: bis 0.39 sah ein Ort mit 2 Besuchen genauso
+// aus wie einer mit 59, und die Zahl stand nur im Popup — also hinter einem
+// Klick, den man erst macht, wenn man schon weiß, dass sich etwas lohnt.
+function renderGroupedPeriod(all, key, stops, level) {
   const day = iso => iso ? iso.slice(0, 10).split('-').reverse().join('.') : '';
   const byLoc = new Map();
+  const noCity = t('map.dens.nocity', 'ohne Stadt');
   all.forEach(e => {
-    const k = e.location.id || `${e.location.lat},${e.location.lng}`;
-    if (!byLoc.has(k)) byLoc.set(k, { loc: e.location, items: [] });
-    byLoc.get(k).items.push(e); // `all` ist chronologisch sortiert
+    const k = level === 'city'
+      // Leerstring und `null` landen zusammen — die Karte kann „nachgesehen,
+      // keine Stadt" und „nie nachgesehen" nicht verschieden zeichnen. Der
+      // Unterschied bleibt in der Datenbank, wo er hingehört (A39).
+      ? `city:${e.location.city || ''}`
+      : (e.location.id || `${e.location.lat},${e.location.lng}`);
+    if (!byLoc.has(k)) byLoc.set(k, { loc: e.location, items: [], lat: 0, lng: 0 });
+    const g = byLoc.get(k);
+    g.items.push(e);                      // `all` ist chronologisch sortiert
+    // Bei „je Stadt" liegt die Blase im Schwerpunkt ihrer Punkte; der Ort des
+    // ERSTEN Besuchs wäre eine zufällige Straßenecke mit einer Zahl darüber.
+    g.lat += e.location.lat; g.lng += e.location.lng;
   });
   const groups = [...byLoc.values()].sort((a, b) => b.items.length - a.items.length);
-  // A18: unterhalb der Schwelle Einzelmarker statt Zahlenblasen
-  const markerTarget = (mapCluster && groups.length > mpClusterMin()) ? mapCluster : mapMarkers;
+  const maxN = groups.length ? groups[0].items.length : 1;
   const latlngs = [];
-  const rows = groups.map(g => {
+  const rows = groups.map((g, gi) => {
     const n = g.items.length;
     const first = g.items[0], last = g.items[n - 1];
     const range = first === last ? day(first.date_start)
       : `${day(first.date_start)} – ${day(last.date_start)}`;
-    const short = first.title.replace(/^Besuch: /, '') || g.loc.name.split(',')[0];
-    const ll = [g.loc.lat, g.loc.lng];
+    const short = level === 'city'
+      ? (g.loc.city || noCity)
+      : (first.title.replace(/^Besuch: /, '') || g.loc.name.split(',')[0]);
+    const ll = level === 'city' ? [g.lat / n, g.lng / n] : [g.loc.lat, g.loc.lng];
     latlngs.push(ll);
-    L.marker(ll).addTo(markerTarget).bindPopup(
-      `<b>${n > 1 ? `${n}× ` : ''}${esc(short)}</b><br>${range}<br>${esc(g.loc.name)}`);
+    const color = mpGroupColor(g.items);
+    const r = mpBubbleRadius(n, maxN);
+    const popup = `<b>${n > 1 ? `${n}× ` : ''}${esc(short)}</b><br>${range}`
+      + (level === 'city' ? '' : `<br>${esc(g.loc.name)}`);
+    // Die Fläche. Auf der gemeinsamen Leinwand gezeichnet (Anmerkung 141/153):
+    // hunderte Orte sind keine zwanzigtausend Fotos, aber ein SVG-Knoten je
+    // Blase ist auch hier der Posten, den man nicht braucht.
+    L.circleMarker(ll, {
+      radius: r, fillColor: color, color, weight: 1.5,
+      fillOpacity: .20, opacity: .55, renderer: mpCanvas(),
+    }).addTo(mapMarkers).bindPopup(popup);
+    // Der harte Kern hält den ORT fest. Ohne ihn wandert bei einer großen
+    // Blase die Aussage von „hier" zu „ungefähr hier", und das ist bei einer
+    // Karte der ganze Unterschied.
+    L.circleMarker(ll, {
+      radius: 5, fillColor: color, color: '#fff', weight: 2, fillOpacity: .95,
+      renderer: mpCanvas(),
+    }).addTo(mapMarkers).bindPopup(popup);
+    // Beschriftet werden nur die größten — jede Blase mit einem dauerhaften
+    // Etikett wären hunderte DOM-Knoten übereinander, und lesbar wäre keins.
+    if (gi < 10 && r > 16) {
+      L.tooltip({ permanent: true, direction: 'top', className: 'mp-bubble-label',
+                  offset: [0, -r - 2] })
+        .setLatLng(ll).setContent(`${n}× ${esc(short)}`).addTo(mapMarkers);
+    }
     return { n, range, short, loc: g.loc };
   });
   const dateInput = document.getElementById('mp-date');
@@ -8248,10 +8607,45 @@ buildCatFilter('mp-filters', mp.catFilter, () => {
   renderPeriod();
 });
 document.getElementById('mp-route-toggle').addEventListener('click', function () {
+  // Klassen setzt `mpSyncChips` — hier nur die Wahl umlegen (Anmerkung 106:
+  // zwei Antworten auf „wie sieht der Schalter aus?" laufen auseinander).
   mp.showRoute = !mp.showRoute;
-  this.classList.toggle('active', mp.showRoute);
-  this.classList.toggle('off', !mp.showRoute);
   renderPeriod();
+});
+// Anmerkung 160 — die beiden Quellen-Schalter der Karte.
+document.getElementById('mp-manual-toggle').addEventListener('click', function () {
+  mp.showManual = !mp.showManual;
+  mpSyncSourceChips();
+  const keep = mp.periods[mp.index];
+  mpLoadPoints().then(() => { rebuildPeriods(keep); renderPeriod(); });
+});
+document.getElementById('mp-visits-toggle').addEventListener('click', function () {
+  if (this.classList.contains('inert')) {
+    toast(t('map.visits.none', 'Noch nichts importiert — der Google-Timeline-Import steht unter „Meine Daten".'), 'warn', 7000);
+    return;
+  }
+  mp.showVisits = !mp.showVisits;
+  mpSyncSourceChips();
+  // Wie beim Foto-Schalter: der Server filtert, also muss neu geholt werden.
+  const keep = mp.periods[mp.index];
+  mpLoadPoints().then(() => { rebuildPeriods(keep); renderPeriod(); });
+});
+// **Anmerkung 160 — die vier Verdichtungsstufen.** Gemerkt wie die Sortierung
+// der Sammlung (Anm. 149): wer „je Stadt" wählt, meint das auch morgen.
+function mpSetDensity(level) {
+  if (!MP_DENSITY_LEVELS.includes(level)) return;
+  mp.density = level;
+  try { localStorage.setItem('ld_map_density', level); } catch (_) { /* privater Modus */ }
+  if (mapObj) renderPeriod(); else mpSyncDensity();
+}
+document.getElementById('mp-density').addEventListener('click', ev => {
+  const btn = ev.target.closest('button[data-level]');
+  if (!btn) return;
+  if (btn.classList.contains('inert')) {
+    toast(t('map.dens.city.none', 'Zu keinem dieser Punkte ist eine Stadt bekannt — der Lauf „Ortsnamen auflösen" unter „Meine Daten" trägt sie nach.'), 'warn', 7000);
+    return;
+  }
+  mpSetDensity(btn.dataset.level);
 });
 document.getElementById('mp-tracks-toggle').addEventListener('click', function () {
   // Der Klick bleibt auch im `inert`-Zustand erlaubt und schaltet die WAHL um:
@@ -8260,13 +8654,6 @@ document.getElementById('mp-tracks-toggle').addEventListener('click', function (
   // `mpSyncTrackChip`, sonst stünden hier und dort zwei Antworten auf „wie
   // sieht der Schalter gerade aus?" (Anmerkung 106).
   mp.showTracks = !mp.showTracks;
-  renderPeriod();
-});
-// A5/A40: Verdichtung ein/aus — ein Schalter für Bündeln UND Clustern
-document.getElementById('mp-group-toggle').addEventListener('click', function () {
-  mp.condense = !mp.condense;
-  this.classList.toggle('active', mp.condense);
-  this.classList.toggle('off', !mp.condense);
   renderPeriod();
 });
 // A45: Foto-Ebene ein/aus. Der `inert`-Zustand ist KEIN Klick — ein Schalter,
@@ -8296,21 +8683,10 @@ document.getElementById('mp-fullscreen').addEventListener('click', () => {
 document.addEventListener('fullscreenchange', () => {
   if (mapObj) setTimeout(() => mapObj.invalidateSize(), 80);
 });
-// A18: Cluster-Schwelle ändern — sofort anwenden + pro Nutzer speichern
-document.getElementById('mp-cluster-min').addEventListener('change', async ev => {
-  const v = Math.max(10, Math.min(300, +ev.target.value || 50));
-  ev.target.value = v;
-  SETTINGS.map_cluster_min = v;
-  if (mapObj) renderPeriod();
-  try {
-    await api('/api/auth/me/settings', {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ map_cluster_min: v }),
-    });
-  } catch (err) {
-    toast(t('toast.savefail', 'Speichern fehlgeschlagen: ') + err.message, 'error');
-  }
-});
+// A18s Cluster-Schwelle ist mit Anmerkung 160 entfallen — die Stufe „Wie
+// dicht" auf der Karte beantwortet dieselbe Frage, und zwar dort, wo man
+// hinsieht. Der gespeicherte Wert wird deshalb nicht mehr gelesen und nicht
+// mehr geschrieben.
 document.querySelectorAll('[data-mode]').forEach(chip => {
   chip.addEventListener('click', () => {
     // Anker-Datum merken (erstes Event des aktuellen Zeitraums), um nach
@@ -10531,8 +10907,6 @@ function enterOfflineCapture() {
   // Nutzer-Einstellungen + Module (A7/A15/A18) — best effort
   try {
     const s = await api('/api/auth/me/settings');
-    SETTINGS.map_cluster_min = s.map_cluster_min || 50;
-    document.getElementById('mp-cluster-min').value = SETTINGS.map_cluster_min;
     SETTINGS.job_schedule = s.job_schedule || {};
     MODULES = await api('/api/modules');
     TRACKED = Array.isArray(s.tracked_modules) ? new Set(s.tracked_modules) : null;

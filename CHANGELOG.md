@@ -118,6 +118,38 @@ any `MINOR`.
   change.
 
 ### Changed
+- **The map's controls are rebuilt around the two questions they answer.**
+  The “Display” row used to hold four different kinds of thing at once — which
+  layers are drawn, a line drawn *over* them, a merge mode, and fullscreen —
+  all looking alike because they were all chips. It is now **“Layers”** (where
+  what you see comes from: by hand, Google, photos, paths) and **“How dense”**;
+  fullscreen moved into the corner of the map. Each layer switch carries the
+  colour it has on the map, so there is nothing left to decode.
+- **“Merge points” became four named steps: every point · by proximity · per
+  place · per city.** The old switch quietly did three different things
+  depending on how far you were zoomed out — and switching it *off* was also
+  what made the map hide everything past the first 300 points, which it never
+  said. Now the step you pick is the step you get, the zoom level no longer
+  changes what it means, and the 300 limit belongs to “every point” alone and
+  is written on it. **“Per city” is new**, for the question “which cities was I
+  in that year?”.
+- **When the map does show a selection, it now spreads it across the whole
+  period** instead of taking the first 300 by date. In a busy month that used
+  to mean everything after the first few days was missing while the map looked
+  complete.
+- **Places you visited a lot now look like it.** A place with 59 visits used to
+  draw the same marker as one with two, and the number only appeared once you
+  clicked. It is now a circle whose *area* is the count, in the colour of
+  whatever you mostly did there, with the name on the biggest ones. The same
+  applies to the proximity clusters, which used to be near-identical bubbles
+  with a number in them.
+- **Photos are no longer orange.** They shared a colour with imported Google
+  visits — two shades of orange for the two things on that map you most want to
+  tell apart. Photo dots are cyan now, in both light and dark themes, and the
+  photo switch shows the same colour.
+- **Removed: the “merge map points above N” setting.** With four named steps on
+  the map itself, a number in the settings page answering the same question was
+  a second, invisible answer to it.
 - **The map loads about half as much, twice as fast.** At twenty thousand
   entries opening the map tab moved 6.1 MB in 0.64 s; it is now 2.7 MB in
   0.19 s. Nothing was dropped: photo dots are simply sent as dots — a position,

@@ -114,7 +114,7 @@ setTimeout(async () => {
     await w.openMapView();
     await wait(80);
     state.calls.length = 0; state.popups.length = 0;
-    w.eval("mp.mode = 'all'; mp.condense = false; rebuildPeriods(); renderPeriod();");
+    w.eval("mp.mode = 'all'; mp.density = 'point'; rebuildPeriods(); renderPeriod();");
     await wait(200);
 
     const wxCalls = state.calls.filter(([, p]) => /events\/map/.test(p) && /weather=1/.test(p))
@@ -151,7 +151,7 @@ setTimeout(async () => {
     await wait(160);
     await w.openMapView();
     await wait(80);
-    w.eval("mp.mode = 'all'; mp.condense = false; rebuildPeriods(); renderPeriod();");
+    w.eval("mp.mode = 'all'; mp.density = 'point'; rebuildPeriods(); renderPeriod();");
     await wait(200);
     ok('Nach einem Fehlschlag steht die Karte trotzdem',
        inPage(w, 'mp.located.length') === 2,

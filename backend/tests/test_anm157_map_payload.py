@@ -154,6 +154,62 @@ def test_weather_still_reaches_the_pins(db, user):
     assert "weather" not in str(r["photos"]["points"])
 
 
+def test_the_pins_carry_their_city(db, user):
+    """Anmerkung 160: die Stufe „Je Stadt" braucht die Stadt AM Punkt.
+
+    Ohne das Feld müsste der Browser sie aus dem Ortsnamen schneiden — genau
+    die Zeichenketten-Raterei, die A39 mit einem echten `Location.city`
+    abgeschafft hat. Leerstring und `null` bleiben unterscheidbar (A39:
+    „nachgesehen, keine Stadt" gegen „nie nachgesehen"); die Karte behandelt
+    beide gleich, aber die Antwort wirft die Unterscheidung nicht weg.
+    """
+    known = _loc(db, user, "Kaiserstraße")
+    known.city = "Köln"
+    nowhere = _loc(db, user, "Waldrand", 51.0, 9.0)
+    nowhere.city = ""
+    never = _loc(db, user, "Irgendwo", 52.0, 9.5)
+    db.commit()
+    _pin(db, user, "a", datetime(2024, 6, 1), known)
+    _pin(db, user, "b", datetime(2024, 6, 2), nowhere)
+    _pin(db, user, "c", datetime(2024, 6, 3), never)
+
+    cities = {e["title"]: e["location"]["city"]
+              for e in list_map_events(db=db, user=user)["events"]}
+    assert cities == {"a": "Köln", "b": "", "c": None}
+
+
+def test_manual_can_be_switched_off_like_the_machine_sources(db, user):
+    """Anmerkung 160: der dritte Schalter der Kartenleiste.
+
+    „Von Hand" ist keine einzelne Quelle, sondern alles, was KEINE maschinelle
+    ist — getippt, diktiert, über die Schnittstelle angelegt. Deshalb über
+    `MACHINE_SOURCES` und nicht über eine dritte Liste, die beim nächsten
+    Konnektor vergessen wird (Anm. 106).
+    """
+    loc = _loc(db, user)
+    _pin(db, user, "Handeintrag", datetime(2024, 6, 1), loc)
+    _pin(db, user, "Diktiert", datetime(2024, 6, 2), loc, source=Source.ai)
+    _pin(db, user, "Besuch", datetime(2024, 6, 3), loc,
+         source=Source.google_timeline)
+    _photo(db, user, "a1", datetime(2024, 6, 4, 12), loc)
+
+    off = list_map_events(db=db, user=user, manual=False)
+    assert [e["title"] for e in off["events"]] == ["Besuch"]
+    assert len(off["photos"]["points"]) == 1
+    # `total` zählt, was gezeigt WIRD — sonst meldete die Karte einen Deckel
+    # über etwas, das gar nicht gefragt war.
+    assert off["total"] == 2
+
+    on = list_map_events(db=db, user=user)
+    assert sorted(e["title"] for e in on["events"]) == [
+        "Besuch", "Diktiert", "Handeintrag"]
+
+    # Und die drei Schalter greifen unabhängig voneinander.
+    only_photos = list_map_events(db=db, user=user, manual=False, visits=False)
+    assert only_photos["events"] == []
+    assert len(only_photos["photos"]["points"]) == 1
+
+
 def test_old_day_clusters_still_draw_as_points(db, user):
     """Die alten Fototag-Sammeleinträge (`immich:day:…`) sind ebenfalls
     `source=immich` und gehören weiter auf die Foto-Ebene — sie haben nur kein

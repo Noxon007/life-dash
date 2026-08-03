@@ -59,11 +59,17 @@ const dom = new JSDOM(html, {
       tileLayer: () => ({ addTo() { return this; }, remove() {} }),
       layerGroup: () => layer('mapMarkers'),
       markerClusterGroup: () => layer('mapCluster'),
-      marker: ll => ({ addTo(l) { placed.push([l && l._n, ll[0], ll[1]]); return this; },
+      marker: ll => ({ addTo(l) { placed.push([l && l._n, ll[0], ll[1], null, 'marker']); return this; },
                        bindPopup() { return this; }, bindTooltip() { return this; },
                        on() { return this; } }),
-      circleMarker: () => ({ addTo() { return this; }, bindTooltip() { return this; },
+      // Anmerkung 160: Gruppen sind jetzt FLÄCHEN (circleMarker), keine
+      // Standard-Marker. Ein Doppel, das sie nicht mitzählt, prüfte eine
+      // Karte, auf der nichts liegt — und wäre still grün.
+      circleMarker: (ll, opt) => ({ addTo(l) { placed.push([l && l._n, ll[0], ll[1], opt, 'circle']); return this; },
+                             bindTooltip() { return this; },
                              bindPopup() { return this; } }),
+      tooltip: () => ({ setLatLng() { return this; }, setContent() { return this; },
+                        addTo() { return this; } }),
       polyline: (pts, opt) => { lines.push(opt || {});
                                 return { addTo() { return this; }, bindPopup() { return this; } }; },
       // Muss es GEBEN: fehlt `L.canvas`, fällt `mpCanvas()` still auf Leaflets
@@ -102,7 +108,9 @@ setTimeout(async () => {
   const w = dom.window, d = w.document;
   const note = () => d.getElementById('mp-cap-note');
   const noteVisible = () => note() && note().style.display !== 'none';
-  const render = (condense, events) => {
+  // Anmerkung 160: statt `condense` (ein Ein/Aus, dessen Bedeutung die
+  // Zoomstufe entschied) die gewählte STUFE.
+  const render = (density, events) => {
     placed.length = 0;
     w.eval(`
       mapObj = L.map('map'); mapMarkers = L.layerGroup();
@@ -110,23 +118,28 @@ setTimeout(async () => {
       mapTracks = L.layerGroup();
       mp.located = ${JSON.stringify(events)};
       mp.mode = 'month'; mp.catFilter = new Set(FILTER_CATS_BASE.concat(['event']));
-      mp.periods = ['2024-05']; mp.index = 0; mp.condense = ${condense};
+      mp.periods = ['2024-05']; mp.index = 0; mp.density = '${density}';
       renderPeriod();`);
   };
-  const far = () => placed.filter(p => p[2] < -50).length;
+  // Gezählt werden ORTE, nicht Zeichenaufrufe: eine Gruppe ist seit
+  // Anmerkung 160 eine Fläche PLUS ein Kern, also zwei Kreise an derselben
+  // Stelle. Ein Wächter, der Aufrufe zählt, meldete dann sechs Amerika-Punkte
+  // und hätte recht — nur nicht in der Sache, um die es geht.
+  const far = () => new Set(placed.filter(p => p[2] < -50).map(p => p[1] + ',' + p[2])).size;
+  const markers = () => placed.filter(p => p[4] === 'marker').length;
 
   // --- 1. Der Normalfall: nichts wird weggelassen, nichts wird behauptet -- //
-  render(false, makeEvents(20, 8));
-  ok('Kleine Menge: alle Punkte auf der Karte', placed.length === 23,
-     `${placed.length} Marker`);
+  render('point', makeEvents(20, 8));
+  ok('Kleine Menge: alle Punkte auf der Karte', markers() === 23,
+     `${markers()} Marker`);
   ok('…und kein Hinweis, der nicht zutrifft', !noteVisible());
 
   // --- 2. Der gemeldete Fall ---------------------------------------------- //
   const many = makeEvents(2000, 250);
-  render(false, many);
-  const droppedOff = placed.length < many.length;
-  ok('Ohne Bündelung deckelt die Karte (Vorbedingung des Berichts)', droppedOff,
-     `${placed.length} von ${many.length} — der Deckel greift nicht mehr?`);
+  render('point', many);
+  const droppedOff = markers() < many.length;
+  ok('„Jeder Punkt" deckelt (Vorbedingung des Berichts)', droppedOff,
+     `${markers()} von ${many.length} — der Deckel greift nicht mehr?`);
   if (droppedOff) {
     ok('…und sagt es AUF DER KARTE', noteVisible(),
        'genau die Stille, die den Bericht ausgelöst hat');
@@ -139,18 +152,56 @@ setTimeout(async () => {
        'ein Hinweis ohne Ausweg ist eine Entschuldigung');
   }
 
-  // --- 3. Mit Bündelung ist wirklich alles da ----------------------------- //
-  render(true, many);
-  ok('Mit Bündelung sind die seltenen Orte da', far() === 3,
+  // **Anmerkung 160: gedeckelt heißt gleichmäßig, nicht vorne.** `slice(0, 300)`
+  // lieferte die ersten dreihundert CHRONOLOGISCH — bei einem Monat mit 2.000
+  // Besuchen fehlte alles ab der Mitte, und genau darin lagen die drei Punkte
+  // in Amerika. Dieselbe Regel wie `sqlutil.even_spread` im Backend.
+  //
+  // **Geprüft wird am ERGEBNIS, nicht an der Funktion.** Im ersten Anlauf stand
+  // hier `mpEvenSpread([...])` — die Funktion allein. Gegen den kaputten Stand
+  // gefahren (Deckel zurück auf `slice(0, 300)`) blieb das grün: die Funktion
+  // gab es ja weiterhin, sie wurde nur nicht mehr benutzt. Anmerkung 108, und
+  // schon wieder in der Form „prüft, dass es das GIBT, statt dass es WIRKT".
+  //
+  // Die Tage stehen in der Stopp-Liste. Nimmt die Karte die ersten dreihundert
+  // chronologisch, endet sie bei rund 2.000 Besuchen im Monat am 4. oder 5.;
+  // greift sie gleichmäßig, reicht sie bis zum Monatsende.
+  const stopDays = () => [...d.getElementById('mp-stops').textContent
+    .matchAll(/(\d{2})\.05\.2024/g)].map(m => +m[1]);
+  const lastDay = Math.max(0, ...stopDays());
+  ok('Der Deckel greift gleichmäßig über den Zeitraum', lastDay >= 25,
+     `letzter gezeigter Tag: ${lastDay}. Mai — „die ersten 300" hören Anfang `
+     + 'des Monats auf, und die Karte sieht trotzdem voll aus');
+  ok('…und die Auswahl beginnt trotzdem am Anfang', Math.min(...stopDays()) <= 2,
+     `erster gezeigter Tag: ${Math.min(...stopDays())}.`);
+  ok('…und trifft das Budget genau',
+     w.eval('mpEvenSpread(Array.from({length: 8120}, (_, i) => i), 5000).length') === 5000,
+     'jede n-te trifft es nur, wenn es aufgeht — bei 8.120 auf 5.000 wären es 4.060');
+
+  // --- 3. Zusammengefasst ist wirklich alles da --------------------------- //
+  render('place', many);
+  ok('Je Ort sind die seltenen Orte da', far() === 3,
      `${far()} von 3 Amerika-Punkten — das war der Bericht`);
   ok('…und der Hinweis verschwindet wieder', !noteVisible(),
      'ein Hinweis, der über einer vollständigen Karte stehen bleibt, lügt');
 
+  // **„Fläche statt Ziffer" (Anmerkung 160):** ein Ort mit 59 Besuchen muss
+  // GRÖSSER sein als einer mit 2. Bis 0.39 sahen beide gleich aus und die Zahl
+  // stand nur im Popup — also hinter einem Klick, den man erst macht, wenn man
+  // schon weiß, dass sich einer lohnt.
+  const radii = placed.map(p => p[3] && p[3].radius).filter(r => typeof r === 'number');
+  ok('Die Blasen haben verschiedene Größen', new Set(radii).size > 2,
+     `${new Set(radii).size} verschiedene Radien bei ${radii.length} Kreisen`);
+  ok('…und die größte gehört zum meistbesuchten Ort',
+     Math.max(...radii) > Math.min(...radii) * 1.4,
+     `${Math.min(...radii)} … ${Math.max(...radii)}`);
+
   // --- 4. Der Knopf im Hinweis tut, was er verspricht --------------------- //
-  render(false, many);
+  render('point', many);
   if (d.getElementById('mp-cap-fix')) {
     d.getElementById('mp-cap-fix').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
-    ok('Der Knopf schaltet die Bündelung ein', w.eval('mp.condense') === true);
+    ok('Der Knopf führt in eine Stufe, die alles zeigt',
+       w.eval('mp.density') === 'near', w.eval('mp.density'));
   }
 
   // --- 5. Und dieselbe Zusage für die WEGE (Anmerkung 141) ---------------- //

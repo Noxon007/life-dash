@@ -1056,10 +1056,15 @@ MAP_MAX_POINTS = 50000
 # Aufruf, der nichts davon behält. Das ist die Lehre aus Anmerkung 80 in ihrer
 # zweiten Auflage: der Preis ist das ERZEUGEN jeder Zeile, nicht das Finden —
 # ein Index hilft dagegen nichts, eine Tupel-Abfrage alles.
+#
+# `city` ist seit Anmerkung 160 dabei — für die Verdichtungsstufe „je Stadt".
+# Sie kostet nur die PINS: der Fotoblock trägt sie nicht, weil eine Ebene aus
+# zwanzigtausend Punkten nicht je Punkt eine Stadt braucht, um als Punktwolke
+# zu erscheinen.
 _MAP_COLS = (Event.id, Event.title, Event.category, Event.date_start,
              Event.date_precision, Event.source, Event.external_id,
              Location.id.label("loc_id"), Location.name.label("loc_name"),
-             Location.lat, Location.lng)
+             Location.lat, Location.lng, Location.city.label("loc_city"))
 
 
 def _photo_block(rows) -> dict:
@@ -1121,6 +1126,11 @@ def list_map_events(
     photos: Annotated[bool | None, Query(
         description="Anmerkung 139: Immich-Foto-Ereignisse einschließen "
                     "(Default: ja)")] = None,
+    manual: Annotated[bool | None, Query(
+        description="Anmerkung 160: selbst erfasste Einträge einschließen "
+                    "(Default: ja). Der dritte Schalter der Kartenleiste — "
+                    "auf einer Karte mit tausenden importierten Besuchen ist "
+                    "„nur meine eigenen“ die nützlichste Ansicht.")] = None,
     limit: Annotated[int | None, Query(ge=1, le=200000)] = None,
 ) -> dict:
     """Nur verortete eigene Events (mit Koordinaten) — für die Karte.
@@ -1163,6 +1173,12 @@ def list_map_events(
     hidden = _hidden_sources(visits, photos)
     if hidden:
         query = query.filter(Event.source.notin_(hidden))
+    # Anmerkung 160: „von Hand" ist keine einzelne Quelle, sondern alles, was
+    # KEINE maschinelle ist — selbst getippt, diktiert, per Schnittstelle
+    # angelegt. Deshalb über `MACHINE_SOURCES` und nicht über eine dritte
+    # Liste: die eine Liste, die es schon gibt, kennt die Antwort.
+    if manual is False:
+        query = query.filter(Event.source.in_(MACHINE_SOURCES))
 
     cap = limit or MAP_MAX_POINTS
     total = query.count()
@@ -1195,7 +1211,7 @@ def list_map_events(
                 date_start=r.date_start, date_precision=r.date_precision,
                 source=r.source,
                 location=LocationGeo(id=r.loc_id, name=r.loc_name,
-                                     lat=r.lat, lng=r.lng),
+                                     lat=r.lat, lng=r.lng, city=r.loc_city),
                 weather=w,
             ).model_dump(mode="json")
             for r, w in zip(pins, wx)

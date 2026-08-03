@@ -54,6 +54,12 @@ const PHOTO_EVENT = {
   media: [{ id: 'mp', provider: 'immich', thumb_url: '/api/media/mp/thumb',
             url: '/api/media/mp/file', sort_order: 0 }],
 };
+// Wie ein Fotopunkt im Speicher aussieht, nachdem `expandPhotoPoints` die
+// kompakte Form entpackt hat (Anmerkung 157) — keine Ereigniskennung.
+const PHOTO_EVENT_POINT = {
+  source: 'immich', category: 'event', date_start: '2024-07-12T10:00:00',
+  photo: ASSET, location: { name: 'Detmold', lat: 51.93, lng: 8.87 },
+};
 const HAND_EVENT = {
   id: 'he1', title: 'Konzert', category: 'concert',
   date_start: '2024-07-12T20:00:00', date_precision: 'exact',
@@ -213,8 +219,38 @@ setTimeout(async () => {
   // ist deshalb nicht mehr „es wird ein Kreis gezeichnet", sondern **„es
   // entsteht KEIN Objekt je Foto"** — und das ist die Zusicherung, die beim
   // nächsten bequemen `L.circleMarker(...)` sofort umfällt.
-  ok('…und dabei entsteht kein Leaflet-Objekt je Foto', drawn.circle === 0,
-     `${drawn.circle} Einzelobjekte — genau die Last, die den Tab umbrachte`);
+  //
+  // **Anmerkung 160 schärft die Zusicherung.** Bis dahin lautete sie „es
+  // entsteht KEIN `circleMarker`" — das war richtig, solange nur Fotos Kreise
+  // waren. Seit die Ortsgruppen Flächen sind (Fläche statt Ziffer), gibt es
+  // Kreise, die mit Fotos nichts zu tun haben, und die alte Fassung wäre rot
+  // geworden, ohne dass etwas kaputt ist.
+  //
+  // Was wirklich gemeint war und jetzt dasteht: **die Zahl der Leaflet-Objekte
+  // wächst nicht mit der Zahl der Fotos.** Gemessen wird mit einem Foto und
+  // mit fünfhundert; bleibt die Zahl gleich, ist die Ebene eine Leinwand.
+  // Genau diese Zusicherung fällt beim nächsten bequemen `L.circleMarker(...)`
+  // je Punkt sofort um.
+  const objectsWith = n => {
+    const many = Array.from({ length: n }, (_, i) => ({
+      source: 'immich', category: 'event', date_start: '2024-07-12T10:00:00',
+      photo: 'a' + i,
+      location: { name: 'Detmold', lat: 51.93 + i * 0.0001, lng: 8.87 },
+    }));
+    drawn.marker = 0; drawn.circle = 0;
+    inPage(w, `mp.located = mp.located.filter(e => e.source !== 'immich')
+                 .concat(${JSON.stringify(many)});
+               rebuildPeriods(); renderPeriod();`);
+    return drawn.marker + drawn.circle;
+  };
+  const few = objectsWith(1), lots = objectsWith(500);
+  ok('…und die Objektlast wächst NICHT mit der Zahl der Fotos', few === lots,
+     `${few} Objekte bei 1 Foto, ${lots} bei 500 — genau die Last, die den Tab umbrachte`);
+  ok('…die Punkte sind trotzdem alle da', inPage(w, 'mpPhotoPoints.length') === 500,
+     `${inPage(w, 'mpPhotoPoints.length')} — eine Leinwand, die nichts zeichnet, ist auch sparsam`);
+  // Zurück auf den Stand, den die folgenden Prüfungen erwarten.
+  inPage(w, "mp.located = mp.located.filter(e => e.source !== 'immich')"
+          + `.concat([${JSON.stringify(PHOTO_EVENT_POINT)}]); rebuildPeriods(); renderPeriod();`);
   // **Anmerkung 157.** Der Punkt kommt kompakt an und wird hier wieder zu
   // einem Punkt mit Ort, Zeit und Bild — aber ohne Ereigniskennung. Beides
   // wird geprüft: dass die Entpackung stimmt (sonst zeichnete die Ebene
