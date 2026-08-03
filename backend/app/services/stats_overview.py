@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 from app.sqlutil import day_number
 from app.models import (ConfirmState, Entity, Event, EventEntityLink, Location,
                         Metric, Source)
-from app.services import weather_day
+from app.services import baseline, weather_day
 
 # Dieselben Muster wie im Frontend (dort als RegExp über „Titel + Beschreibung")
 _MOVE_RE = re.compile(r"umzug|umgezogen|eingezogen", re.I)
@@ -157,8 +157,22 @@ def compute_overview(db: Session, user_id: str, *, today: datetime | None = None
                   .filter(*mine, Location.name.isnot(None),
                           Event.date_start.isnot(None))
                   .group_by(Location.name).all())
+    # F20: Die abgeleiteten Tage zählen VOLL mit (Entscheidung des Users zu
+    # Anmerkung 144). Ein Kindheitstag im Elternhaus war ein Tag in Bad
+    # Segeberg — eine Statistik, die ihn wegließe, beschriebe die Aufzeichnung
+    # und nicht das Leben. Addieren ist hier gefahrlos und zwar nicht aus
+    # Nachlässigkeit: der Grundort füllt nur LÜCKEN, die beiden Tagesmengen
+    # sind also disjunkt (`services/baseline.py`). Einmal geholt, viermal
+    # benutzt — sonst liefe der Kalender für Orte, Städte und Zähler dreimal.
+    b_days = baseline.day_counts(db, user_id)
     per_place: dict[str, int] = {}
     for name, n in place_rows:
+        short = _short_place(name)
+        if short:
+            per_place[short] = per_place.get(short, 0) + n
+    for name, n in b_days["places"].items():
+        # Gekürzt wie die Ereignis-Orte daneben — sonst stünde derselbe Ort
+        # zweimal in derselben Liste, einmal lang und einmal kurz.
         short = _short_place(name)
         if short:
             per_place[short] = per_place.get(short, 0) + n
@@ -175,6 +189,8 @@ def compute_overview(db: Session, user_id: str, *, today: datetime | None = None
                          Event.date_start.isnot(None))
                  .group_by(Location.city).all())
     per_city = {c: n for c, n in city_rows}
+    for city, n in b_days["cities"].items():
+        per_city[city] = per_city.get(city, 0) + n
     top_cities = sorted(per_city.items(), key=lambda kv: -kv[1])[:TOP_N]
 
     # ---------------- Textregeln: SQL grenzt ein, Python entscheidet ---------
@@ -212,6 +228,11 @@ def compute_overview(db: Session, user_id: str, *, today: datetime | None = None
         "top_places": [[name, n] for name, n in top_places],
         "top_cities": [[name, n] for name, n in top_cities],   # A39
         "top_animals": top_animals,
+        # F20: die abgeleiteten Tage als EIGENE Zahl neben allem anderen. Sie
+        # stecken in `top_places`/`top_cities` bereits drin (sie zählen voll
+        # mit) — hier steht, WIE VIELE es sind, damit die Oberfläche es sagen
+        # kann. A40: was eine Ansicht mitrechnet, muss sie auch nennen können.
+        "baseline_days": b_days["total"],
         **weather,
     }
 

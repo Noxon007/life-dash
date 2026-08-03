@@ -7,6 +7,8 @@ Schlüssel, den `frontend/world-countries.geojson` je Fläche trägt.
 """
 from __future__ import annotations
 
+from datetime import datetime, time
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -15,6 +17,7 @@ from app.data import countries as ref
 from app.database import get_db
 from app.models import ConfirmState, Entity, Event, EventEntityLink, Metric, Source, User
 from app.schemas import ContinentProgress, VisitedCountry, WorldRead
+from app.services import baseline
 
 router = APIRouter(prefix="/api", tags=["Welt"])
 
@@ -72,6 +75,49 @@ def world(
                     slot["first"] = when
                 if slot["last"] is None or when > slot["last"]:
                     slot["last"] = when
+
+    # F20: Der Grundort färbt die Karte mit. Ein Land, in dem jemand sechs
+    # Jahre Kindheit verbracht hat, ist besucht — und zwar auch dann, wenn aus
+    # dieser Zeit kein einziger Eintrag existiert; das ist der Fall, für den es
+    # das Paket gibt (Anmerkung 144, Entscheidung 2: abgeleitete Tage zählen
+    # voll). Das Land kommt aus `Location.country` und nicht aus einer
+    # `country`-Entity: eine Entity anzulegen hieße, aus einer Ableitung eine
+    # Zeile in der Lebensdatenbank zu machen — genau das, was F20 vermeidet.
+    #
+    # `event_count` bleibt unberührt. Ein abgeleiteter Tag ist kein Eintrag,
+    # und beide Zahlen stehen nebeneinander (Anmerkung 143).
+    #
+    # EIN Kalenderdurchlauf für alle Länder: je Grundort einen zu fahren wäre
+    # je Zeitraum eine eigene Abfrage nach den erfassten Tagen, für dieselbe
+    # Antwort.
+    iso_cache: dict[str, str | None] = {}
+    for day, row in baseline.inferred_days(db, user.id).items():
+        name = (row.location.country if row.location else None) or ""
+        if not name:
+            continue
+        if name not in iso_cache:
+            found = ref.resolve(name)
+            iso_cache[name] = found.iso if found else None
+            if found is None:
+                unmatched.add(name)
+        iso = iso_cache[name]
+        if iso is None:
+            continue
+        slot = agg.setdefault(
+            iso, {"country": ref.BY_ISO[iso], "event_count": 0, "first": None,
+                  "last": None, "event_ids": set(), "days": set()})
+        # Die Tage landen in DERSELBEN Menge wie die Ereignistage. Ein `set`
+        # und keine Summe: läge zufällig doch ein Ereignistag darin, zählte er
+        # sonst zweimal. Dass das nicht vorkommen kann (der Grundort füllt nur
+        # Lücken), ist eine Eigenschaft der Ableitung — sich darauf zu
+        # VERLASSEN, wo eine Menge es ohnehin erledigt, wäre die vermeidbare
+        # Hälfte der Annahme.
+        slot["days"].add(day)
+        when = datetime.combine(day, time.min)
+        if slot["first"] is None or when < slot["first"]:
+            slot["first"] = when
+        if slot["last"] is None or when > slot["last"]:
+            slot["last"] = when
 
     # F11: Durchschnittstemperatur je Land — aus bereits gespeicherten
     # Wetterdaten, ohne einen einzigen API-Aufruf. Bewusst in EINER Abfrage

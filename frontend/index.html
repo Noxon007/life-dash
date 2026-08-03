@@ -235,6 +235,16 @@
   }
   .badge-confirmed { background: rgba(53,196,167,.15); color: var(--confirmed); }
   .badge-unconfirmed { background: rgba(245,166,35,.15); color: var(--unconfirmed); }
+  /* F20: ein abgeleiteter Grundort-Tag. Er sieht bewusst ANDERS aus als eine
+     Ereigniskarte — was hier steht, hat niemand erfasst, es ist gefolgert.
+     Gestrichelt und blasser statt bunt: die Zeile soll lesbar sein und nicht
+     um Aufmerksamkeit mit den echten Einträgen konkurrieren, zwischen denen
+     sie steht. Kein Farbstreifen links (der gehört einer Kategorie, und ein
+     abgeleiteter Tag hat keine) und kein Zeigefinger — sie ist nicht
+     anklickbar, weil es nichts zu bearbeiten gibt. */
+  .event-card.baseline-day { border-style: dashed; opacity: .78; cursor: default; }
+  .event-card.baseline-day::before { display: none; }
+  .badge-baseline { background: var(--bg-elev); color: var(--text-dim); }
   /* ---------- Cards / grid ---------- */
   .grid { display: grid; gap: 16px; }
   .grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
@@ -1941,7 +1951,7 @@
           <b>1.</b> Module wählen · <b>2.</b> Google-Timeline importieren ·
           <b>3.</b> Ortsnamen auflösen · <b>4.</b> Immich verbinden, Vorschläge ansehen
           und Fotos verknüpfen · <b>5.</b> mehrtägiges aufteilen ·
-          <b>6.</b> Wetter ergänzen · <b>7.</b> Backup ziehen.
+          <b>6.</b> Grundorte eintragen · <b>7.</b> Wetter ergänzen · <b>8.</b> Backup ziehen.
           Nichts davon ist Pflicht, und jeder Lauf lässt sich beliebig oft wiederholen —
           nachgetragen wird immer nur, was fehlt.
           <br><b>Ausführliche Erklärung zu jedem Schritt</b> steht in der README-Anleitung
@@ -2205,7 +2215,54 @@
              normale Nutzer gar nicht vorhanden. Bewusst nach dem Aufteilen:
              jeder Tages-Eintrag will sein eigenes Wetter, und geholt wird je
              Ereignis genau einmal. -->
-        <div class="section-title" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap"><span data-i18n="adm.weather">6 · Wetter</span><span class="eff add" data-i18n="eff.enrich">ergänzt</span></div>
+        <!-- F20 (Anmerkung 144): der Grundort. Steht VOR dem Wetter, weil der
+             Wetterlauf die Tage anreichert, die hier entstehen — dieselbe
+             Reihenfolgen-Regel wie überall auf dieser Seite (jeder Schritt
+             liefert dem nächsten sein Material, Anmerkung 115).
+
+             Der Block ist bewusst ein FORMULAR und kein Lauf: hier wird eine
+             Tatsache eingetragen, nicht etwas berechnet. Deshalb trägt er auch
+             kein „ergänzt"-Abzeichen, sondern „Lebensdatenbank". -->
+        <div class="section-title" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap"><span data-i18n="adm.baseline">6 · Grundort</span><span class="eff layer" data-i18n="eff.lifedb">Lebensdatenbank</span></div>
+        <div class="panel" style="padding:0">
+          <div class="action-row">
+            <div class="action-key"><b style="font-size:13px" data-i18n="bl.title">🏠 Wo warst du normalerweise?</b></div>
+            <div class="action-desc">
+              <span data-i18n="bl.desc"><b>Ein Zeitraum, ein Ort — für alles, was du nie erfasst hast.</b><br>
+                „Von meiner Geburt bis 2006 war ich im Elternhaus in Bad Segeberg." Jeder Tag in
+                diesem Zeitraum, an dem <b>kein</b> Eintrag steht, gilt dann als Tag an diesem Ort:
+                er taucht im Zeitstrahl auf, zählt in Statistik, Weltkarte und Abzeichen mit und
+                bekommt beim nächsten Wetterlauf sein Wetter.<br>
+                <b>Es entstehen dabei keine Einträge.</b> Der Zeitraum bleibt eine einzige Zeile —
+                korrigierst du ihn später, rechnet sich alles neu, statt tausend falsche Einträge
+                zurückzulassen. Ein Tag mit einem echten Eintrag gewinnt immer.
+                Zeiträume dürfen sich nicht überschneiden.</span>
+              <div id="bl-list" style="margin-top:10px"></div>
+              <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end">
+                <label style="display:flex; flex-direction:column; gap:3px">
+                  <span class="stat-label" data-i18n="bl.f.label">Bezeichnung</span>
+                  <input id="bl-label" type="text" data-i18n-ph="bl.f.label.ph" placeholder="Elternhaus">
+                </label>
+                <label style="display:flex; flex-direction:column; gap:3px">
+                  <span class="stat-label" data-i18n="bl.f.place">Ort</span>
+                  <input id="bl-place" type="text" data-i18n-ph="bl.f.place.ph" placeholder="Bad Segeberg">
+                </label>
+                <label style="display:flex; flex-direction:column; gap:3px">
+                  <span class="stat-label" data-i18n="bl.f.from">Von</span>
+                  <input id="bl-from" type="date">
+                </label>
+                <label style="display:flex; flex-direction:column; gap:3px">
+                  <span class="stat-label" data-i18n="bl.f.to">Bis (leer = bis heute)</span>
+                  <input id="bl-to" type="date">
+                </label>
+                <button class="btn" id="bl-add" data-i18n="bl.add">Zeitraum eintragen</button>
+              </div>
+              <div id="bl-result" class="hint action-result" style="display:none"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap"><span data-i18n="adm.weather">7 · Wetter</span><span class="eff add" data-i18n="eff.enrich">ergänzt</span></div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key">
@@ -2219,7 +2276,7 @@
           </div>
         </div>
 
-        <div class="section-title" data-i18n="adm.backup">7 · Sichern &amp; Zurückspielen</div>
+        <div class="section-title" data-i18n="adm.backup">8 · Sichern &amp; Zurückspielen</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key" style="display:flex; flex-direction:column; gap:8px; align-items:flex-start">
@@ -2999,11 +3056,35 @@ const I18N_EN = {
   // Spalte — sie stehen für die Reihenfolge, in der die Abschnitte einander
   // füttern, und ein Katalog, der sie weglässt, macht aus der Anleitung auf
   // Englisch wieder eine Liste.
-  'adm.backup': "7 · Backup &amp; restore",
+  'adm.backup': "8 · Backup &amp; restore",
   'adm.imports': "2 · Imports",
   'adm.placenames': "3 · Place names",
   'adm.tracking': "1 · What do you track?",
-  'adm.weather': "6 · Weather",
+  'adm.weather': "7 · Weather",
+  // F20 (Anmerkung 144) — der Grundort
+  'adm.baseline': "6 · Baseline location",
+  'eff.lifedb': "life database",
+  'bl.title': "🏠 Where were you, normally?",
+  'bl.desc': "<b>One period, one place — for everything you never recorded.</b><br>“From my birth until 2006 I was at my parents' house in Bad Segeberg.” Every day in that period with <b>no</b> entry then counts as a day at that place: it shows up in the timeline, counts in the statistics, the world map and the badges, and gets its weather on the next weather run.<br><b>No entries are created.</b> The period stays a single row — correct it later and everything recomputes, instead of leaving a thousand wrong entries behind. A day with a real entry always wins. Periods may not overlap.",
+  'bl.f.label': "Name", 'bl.f.label.ph': "Parents' house",
+  'bl.f.place': "Place", 'bl.f.place.ph': "Bad Segeberg",
+  'bl.f.from': "From", 'bl.f.to': "To (empty = until today)",
+  'bl.add': "Add period",
+  'bl.none': "No baseline period yet.",
+  'bl.until': "today",
+  'bl.del': "Remove",
+  'bl.del.ask': "Remove this period? The place and every real entry stay.",
+  'bl.added': "Period added — {n} days filled.",
+  'bl.removed': "Period removed.",
+  'bl.need': "Place and start date are required.",
+  'bl.nocoords': "no coordinates — the days count, but stay without weather.",
+  'bl.wx.clear': "Discard day weather",
+  'bl.wx.ask': "Discard the weather of all baseline days? It can be fetched again at any time.",
+  'bl.wx.done': "{n} values discarded.",
+  'bl.card.tag': "baseline", 'bl.card.here': "here",
+  'bl.card.tip': "Derived from your baseline location — there is no entry on this day.",
+  'tl.bl.capped': "Showing {n} of {m} derived baseline days, spread evenly across the period.",
+  'tl.agg.derived': "derived",
   'adm.firstrun': "<b>First time here?</b> The sections are in the order that makes sense — each one feeds the next its material: <b>1.</b> pick your modules · <b>2.</b> import the Google timeline · <b>3.</b> resolve place names · <b>4.</b> connect Immich, review its proposals and link photos · <b>5.</b> split multi-day entries · <b>6.</b> add weather · <b>7.</b> take a backup. None of it is mandatory, and every run can be repeated as often as you like — it only ever fills in what is missing.<br><b>A detailed explanation of every step</b> is in the README guide (“Getting started — a sensible order”).",
   'adm.users.title': "Users",
   'adm.modqueue': "Moderation queue",
@@ -4406,6 +4487,115 @@ async function loadDayWeather(page) {
   } catch { /* Wetter ist Beiwerk — ohne es bleibt der Zeitstrahl gültig */ }
 }
 
+// F20 (Anmerkung 144): die abgeleiteten Tage der geladenen Spanne — dieselbe
+// Bauform wie `loadDayMedia`/`loadDayWeather` daneben, eine Abfrage je Seite.
+//
+// **Die Spanne reicht weiter als die Seite, sobald alles geladen ist.** Ein
+// Grundort füllt gerade die Zeit, in der es KEINE Einträge gibt; wäre das
+// Fenster immer nur die Spanne der geladenen Ereignisse, blieben genau die
+// Jahre unsichtbar, für die es dieses Paket gibt. Der Index kennt das erste
+// abgeleitete Jahr (`baseline_years`), und ab da unten hängen die Tage an.
+async function loadBaselineDays(page) {
+  const days = page.map(e => (e.date_start || '').slice(0, 10)).filter(Boolean).sort();
+  let from = days[0], to = days[days.length - 1];
+  try {
+    const idx = await fetchIndex();
+    TL_BASELINE_TOTAL = idx.baseline_days || 0;
+    const yrs = idx.baseline_years || [];
+    if (!yrs.length) return;
+    // Solange noch Seiten kommen, bleibt es bei der geladenen Spanne — sonst
+    // lüde der erste Seitenaufruf gleich vierzig Jahre Tage nach.
+    if (tl.done || !from) {
+      const last = `${yrs[yrs.length - 1].year}-12-31`;
+      from = `${yrs[0].year}-01-01`;
+      if (!to || last > to) to = last;
+    }
+  } catch (_) { return; }
+  if (!from || !to) return;
+  try {
+    const r = await api(`/api/days/baseline?from=${from}&to=${to}`);
+    const periods = r.periods || [];
+    Object.entries(r.days || {}).forEach(([d, i]) => TL_BASELINE.set(d, periods[i]));
+    // Und ihr Wetter. `loadDayWeather` fragt die Spanne der geladenen SEITE ab
+    // — die abgeleiteten Tage liegen aber gerade dort, wo keine Ereignisse
+    // sind, also außerhalb davon. Ohne diesen zweiten Abruf hätten sie Wetter
+    // in der Datenbank und zeigten keins: die Sorte Stille, die dieses Projekt
+    // regelmäßig teuer bezahlt (Anmerkung 158, gleiche Form).
+    if (periods.length) {
+      const wx = await api(`/api/days/weather?from=${from}&to=${to}`);
+      Object.entries(wx).forEach(([d, v]) => TL_DAY_WX.set(d, v));
+    }
+  } catch { /* Beiwerk — ohne die Tage bleibt der Zeitstrahl gültig */ }
+}
+
+// Wie viele abgeleitete Tage höchstens als eigene Zeile gezeichnet werden.
+//
+// Ein Grundort über zwanzig Jahre sind 7 300 Zeilen, und eine Ansicht, die
+// siebentausend Zeilen baut, ist keine Ansicht mehr (dieselbe Rechnung wie bei
+// den Kartenpunkten, Anmerkung 153). Gegriffen wird GLEICHMÄSSIG über den
+// Zeitraum statt vorne abzuschneiden — `all.slice(0, 300)` war der Defekt aus
+// Anmerkung 110 und noch einmal aus Anmerkung 160 — und die Zahl steht in der
+// Fußzeile, statt verschwiegen zu werden (A40).
+const TL_BASELINE_CAP = 300;
+const TL_BASELINE = new Map();
+let TL_BASELINE_TOTAL = 0;
+let TL_BASELINE_SHOWN = 0;
+
+// Die abgeleiteten Tage als Zeilen — in genau der Form, die `tlGroup` von
+// einem Ereignis erwartet, damit sie in JEDER Zoomstufe von selbst richtig
+// einsortiert und (im Jahr/Jahrzehnt) mitgezählt werden. Ein eigener
+// Gruppierungsweg wäre eine zweite Fassung derselben Regel.
+function tlBaselineRows() {
+  if (!TL_BASELINE.size) { TL_BASELINE_SHOWN = 0; return []; }
+  const all = [...TL_BASELINE.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1));
+  const pick = all.length > TL_BASELINE_CAP ? spreadPick(all, TL_BASELINE_CAP) : all;
+  TL_BASELINE_SHOWN = pick.length;
+  return pick.map(([day, pd]) => ({
+    baselineDay: true, day,
+    date_start: `${day}T00:00:00`,
+    label: (pd && pd.label) || null,
+    // `location` in der Form, die `tlAggTopPlace` liest — sonst wüsste die
+    // Jahres-Sammelzeile nicht, wo dieser Tag war.
+    location: pd ? { name: pd.place, city: pd.city } : null,
+  }));
+}
+
+// Eine Zeile für einen abgeleiteten Tag. Bewusst KEINE Ereigniskarte: sie ist
+// nicht anklickbar, hat keine Kennung und trägt eine eigene Marke — was hier
+// steht, hat niemand erfasst, es ist gefolgert. Sähe sie aus wie ein Eintrag,
+// wäre die Unterscheidung genau dort verloren, wo sie zählt.
+function baselineDayCard(x) {
+  const wx = dayWeatherLine(x.day);
+  const place = (x.location && (x.location.name || x.location.city)) || '';
+  const chips = (place ? [`📍 ${esc(place)}`] : [])
+    .concat(wx ? [`🌤️ ${esc(wx.line)}`] : []);
+  return `
+    <div class="event-card baseline-day" title="${esc(t('bl.card.tip',
+      'Abgeleitet aus deinem Grundort — an diesem Tag steht kein Eintrag.'))}">
+      <div class="ev-head">
+        <span class="ev-title">${esc(x.label || place || t('bl.card.here', 'hier'))}</span>
+        <span class="chip badge-baseline">${esc(t('bl.card.tag', 'Grundort'))}</span>
+        <span class="ev-date">${esc(fmtDay(x.day))}</span>
+      </div>
+      ${chips.length ? `<div class="ev-meta">${
+        chips.map(c => `<span class="chip">${c}</span>`).join('')}</div>` : ''}
+    </div>`;
+}
+
+// Welche Karte eine Zeile des Zeitstrahls bekommt — an EINER Stelle.
+//
+// Stand bis F20 zweimal wörtlich da (einmal in `renderTimelineList`, einmal in
+// der Aufklapp-Ansicht der Jahres-Sammelzeilen). Die neue Sorte Zeile hätte
+// beide Stellen gebraucht, und wer nur die erste findet, baut eine Ansicht, in
+// der ein aufgeklapptes Jahr etwas anderes zeigt als das Jahr darüber —
+// Anmerkung 106 in ihrer leisesten Form.
+function renderItem(x) {
+  if (x.dayMedia) return dayMediaCard(x);
+  if (x.baselineDay) return baselineDayCard(x);
+  if (x.visitGroup) return visitGroupCard(x);
+  return x.category === 'journal' ? journalCard(x) : eventCard(x);
+}
+
 // Die Wetterzeile eines Tages, fertig zum Anzeigen — oder null.
 //
 // `regions > 1` heißt: an diesem Tag lagen die Einträge in verschiedenen
@@ -4514,6 +4704,7 @@ async function loadTimeline(more = false) {
       tl.done = page.length < TL_PAGE;
       await loadDayMedia(page);   // F18: Tages-Bilder derselben Spanne
       await loadDayWeather(page);          // Anm. 119: Wetter derselben Spanne
+      await loadBaselineDays(page);        // F20: abgeleitete Tage
     }
   } finally {
     tl.loading = false;
@@ -4793,6 +4984,14 @@ function renderTimelineList() {
   // Server-Filter ab (Suchtreffer). Die Zahl auf dem Schalter kommt aus dem
   // Index — in der geladenen Liste wäre sie eine beliebige Teilmenge.
   filtered = filtered.filter(e => tlShowsSource(e.source));
+  // F20: die abgeleiteten Tage treten VOR dem Gruppieren ein, damit `tlGroup`
+  // sie einsortiert wie alles andere — und damit ein Zeitraum, in dem gar kein
+  // Eintrag liegt, überhaupt eine Gruppe bekommt. Ohne das bliebe die Kindheit
+  // im Zeitstrahl leer, obwohl jede Statistik sie zählt.
+  // Bei gewähltem Tag, gewählter Stadt oder Suche bleiben sie draußen: das
+  // sind Auswahlen über EINTRÄGE, und ein abgeleiteter Tag ist keiner.
+  const blRows = (tl.query || tl.day || tl.city) ? [] : tlBaselineRows();
+  filtered = filtered.concat(blRows);
   renderCityChip();
   renderDayChip();         // Anmerkung 142
   ensurePhotoIndex();      // A45: entscheidet, ob der Foto-Schalter etwas kann
@@ -4894,9 +5093,6 @@ function renderTimelineList() {
     // wenn ein Tagebuch-Eintrag denselben Tag beansprucht.
     g.items.sort((a, b) => dayOf(a) === dayOf(b) ? jr(b) - jr(a) : 0);
   });
-  const renderItem = x => x.dayMedia ? dayMediaCard(x)
-    : x.visitGroup ? visitGroupCard(x)
-    : (x.category === 'journal' ? journalCard(x) : eventCard(x));
   const ordered = Object.values(groups).sort((a,b) => b.sort - a.sort);
   el.innerHTML = ordered.map((g, gi) => `
     <div class="tl-year">
@@ -4956,14 +5152,23 @@ function aggRowCard(bucket) {
   const idx = TL_AGG_GROUPS.push(bucket) - 1;
   const days = new Set(bucket.items.map(e => (e.date_start || '').slice(0, 10))).size;
   const place = tlAggTopPlace(bucket.items);
+  // F20: Ein abgeleiteter Grundort-Tag zählt als TAG, aber nicht als Ereignis.
+  // `bucket.items.length` als „N Ereignisse" auszugeben wäre in einem
+  // gefüllten Kindheitsjahr die Aussage „365 Ereignisse" über ein Jahr, in dem
+  // niemand etwas erfasst hat — genau die Vermischung, gegen die Anmerkung 143
+  // die zweite Zahl überhaupt eingeführt hat. Beide Zahlen bleiben, jede sagt,
+  // was sie meint.
+  const derived = bucket.items.filter(x => x.baselineDay).length;
   return `
     <div class="event-card" data-agg-group="${idx}" title="${esc(t('tl.agg.tip', 'Klicken zum Aufklappen'))}">
       <div class="ev-head">
         <span class="ev-title">▸ ${esc(bucket.label)}</span>
       </div>
       <div class="ev-meta">
-        <span class="chip">${bucket.items.length.toLocaleString(LOC())} ${esc(t('tl.agg.events', 'Ereignisse'))}</span>
+        <span class="chip">${(bucket.items.length - derived).toLocaleString(LOC())} ${esc(t('tl.agg.events', 'Ereignisse'))}</span>
         <span class="chip">${days.toLocaleString(LOC())} ${esc(t('tl.agg.days', 'Tage'))}</span>
+        ${derived ? `<span class="chip badge-baseline">${derived.toLocaleString(LOC())} ${
+          esc(t('tl.agg.derived', 'abgeleitet'))}</span>` : ''}
         ${place ? `<span class="chip">📍 ${esc(place)}</span>` : ''}
       </div>
     </div>`;
@@ -4984,9 +5189,6 @@ function tlAggDetailHtml(items) {
                    total: strip.length, span: 'month', date_start: `${days[0]}T00:00:00` });
   }
   rows.sort((a, b) => dayOf(a) === dayOf(b) ? jr(b) - jr(a) : 0);
-  const renderItem = x => x.dayMedia ? dayMediaCard(x)
-    : x.visitGroup ? visitGroupCard(x)
-    : (x.category === 'journal' ? journalCard(x) : eventCard(x));
   return rows.map(renderItem).join('');
 }
 document.getElementById('timeline-list').addEventListener('click', ev => {
@@ -5025,11 +5227,19 @@ function tlBindFooter(el) {
 // Impulsscrollen). Ohne diesen Hinweis sähe ein Fenster wie ein Ende aus.
 function tlFooter() {
   if (tl.query) return '';
+  // F20/A40: Was die Ansicht nicht alles zeigen kann, sagt sie — und zwar
+  // hier, wo hingeschaut wird, nicht in einer Einstellung (Anmerkung 110).
+  const bl = (TL_BASELINE_TOTAL > TL_BASELINE_SHOWN && TL_BASELINE_SHOWN)
+    ? `<div class="hint" style="text-align:center">${esc(
+        t('tl.bl.capped', '{n} von {m} abgeleiteten Grundort-Tagen gezeigt, gleichmäßig über den Zeitraum verteilt.')
+          .replace('{n}', TL_BASELINE_SHOWN.toLocaleString(LOC()))
+          .replace('{m}', TL_BASELINE_TOTAL.toLocaleString(LOC())))}</div>`
+    : '';
   if (tl.done) {
-    return `<div class="hint" style="text-align:center">${
+    return bl + `<div class="hint" style="text-align:center">${
       t('tl.end', 'Das ist der Anfang deiner Geschichte.')}</div>`;
   }
-  return `<div class="hint" id="tl-load-more" style="text-align:center; cursor:pointer">${
+  return bl + `<div class="hint" id="tl-load-more" style="text-align:center; cursor:pointer">${
     tl.loading ? t('tl.loading', 'Lade …') : t('tl.more', '▼ Ältere Einträge laden')}</div>`;
 }
 // Besuchs-Verdichtung (A5): gleiche Besuchs-Titel automatisch bestätigter
@@ -9130,7 +9340,7 @@ function gotoView(v) {
 let adminTab = 'moderation';
 function loadAdminTab(t) {
   if (t === 'moderation') { loadModQueue(); loadFuzzyDates(); }
-  if (t === 'daten') { loadPlaceFormat(); pollDataJobs(); }
+  if (t === 'daten') { loadPlaceFormat(); pollDataJobs(); loadBaselines(); }
   if (t === 'jobs') { loadJobs(); renderSchedule(); }
   if (t === 'nutzer') loadUsers();
   if (t === 'db') loadDbTables();
@@ -10132,6 +10342,116 @@ document.getElementById('btn-days-run')?.addEventListener('click', async ev => {
   // Gefunden vom Wächter, nicht beim Lesen. `daysLock()` kennt die Regel und
   // lässt den Knopf nach einem FEHLER offen (dann gilt die Vorschau ja noch).
   finally { daysLock(); }
+});
+
+// --------------------------------------------------------------------------- //
+// F20 (Anmerkung 144) — Grundorte pflegen
+// --------------------------------------------------------------------------- //
+// Kein Lauf, sondern ein Formular: hier wird eine TATSACHE eingetragen, keine
+// Ableitung angestoßen. Deshalb gibt es auch keine Vorschau-Pflicht wie bei den
+// Läufen darüber — es entsteht genau eine Zeile, und sie ist mit einem Klick
+// wieder weg. Die Tage daraus rechnet der Server bei jedem Blick neu.
+let BASELINES = [];
+async function loadBaselines() {
+  const box = document.getElementById('bl-list');
+  if (!box) return;
+  try { BASELINES = await api('/api/baselines'); }
+  catch (_) { return; }          // nicht angemeldet o. ä. — der Block bleibt leer
+  renderBaselines();
+}
+function renderBaselines() {
+  const box = document.getElementById('bl-list');
+  if (!box) return;
+  if (!BASELINES.length) {
+    box.innerHTML = `<div class="stat-label">${esc(t('bl.none', 'Noch kein Grundort eingetragen.'))}</div>`;
+    return;
+  }
+  const total = BASELINES.reduce((n, b) => n + (b.day_count || 0), 0);
+  box.innerHTML = BASELINES.map(b => {
+    // „bis heute" statt eines leeren Feldes: ein offener Zeitraum ist eine
+    // Aussage („ich wohne dort noch"), kein fehlender Wert.
+    const to = b.date_end ? fmtDay(b.date_end) : t('bl.until', 'heute');
+    const name = b.label || b.place;
+    // A40: Was die Zeile NICHT kann, sagt sie. Ohne Koordinate zählen die Tage
+    // mit, bekommen aber nie Wetter — das schweigend zu lassen wäre genau die
+    // Stille, die in diesem Projekt der häufigste Defekt ist.
+    const nocoords = (b.lat == null || b.lng == null)
+      ? ` <span class="stat-label">· ${esc(t('bl.nocoords',
+          'ohne Koordinaten — die Tage zählen, bleiben aber ohne Wetter.'))}</span>` : '';
+    return `<div class="bar-row">
+      <div class="bar-label"><b>${esc(name)}</b>
+        <span class="stat-label"> · ${esc(b.place)} · ${esc(fmtDay(b.date_start))} – ${esc(to)}</span>${nocoords}</div>
+      <div class="bar-val">${esc(dayCount(b.day_count || 0))}</div>
+      <button class="btn" data-bl-del="${esc(b.id)}">${esc(t('bl.del', 'Entfernen'))}</button>
+    </div>`;
+  }).join('')
+    // Der Aufräum-Knopf steht bei den Grundorten und nicht beim Wetter: er
+    // wirft NUR das Tageswetter weg (Schicht 4). Beim Wetterlauf daneben sähe
+    // er aus, als lösche er auch das Wetter der Ereignisse — und das ist
+    // Anreicherung an bestätigten Daten, die kein Knopf hier anfassen darf.
+    + (total ? `<div style="margin-top:8px"><button class="btn" id="bl-wx-clear">${
+        esc(t('bl.wx.clear', 'Tageswetter verwerfen'))}</button></div>` : '');
+  box.querySelectorAll('[data-bl-del]').forEach(btn =>
+    btn.addEventListener('click', () => removeBaseline(btn.dataset.blDel)));
+  document.getElementById('bl-wx-clear')?.addEventListener('click', clearDayWeather);
+}
+async function removeBaseline(id) {
+  if (!await uiConfirm(t('bl.del.ask',
+      'Diesen Zeitraum entfernen? Der Ort und alle echten Einträge bleiben.'))) return;
+  try {
+    await api(`/api/baselines/${id}`, { method: 'DELETE' });
+    toast(t('bl.removed', 'Zeitraum entfernt.'), 'ok');
+    await loadBaselines();
+    refreshAfterBaseline();
+  } catch (err) { toast(err.message, 'error', 8000); }
+}
+async function clearDayWeather() {
+  if (!await uiConfirm(t('bl.wx.ask',
+      'Das Wetter aller Grundort-Tage verwerfen? Es lässt sich jederzeit neu holen.'))) return;
+  try {
+    const r = await api('/api/baselines/weather/clear', { method: 'POST' });
+    toast(t('bl.wx.done', '{n} Werte verworfen.').replace('{n}', r.removed), 'ok');
+    refreshAfterBaseline();
+  } catch (err) { toast(err.message, 'error', 8000); }
+}
+// Ein geänderter Grundort ändert Zeitstrahl, Karte und Statistik. Die teuren
+// Ansichten entscheiden anhand der Kennung aus dem Index, ob sie überhaupt neu
+// zeichnen (Anmerkung 140) — und `fetchIndex()` merkt sich seine Zusage. Ohne
+// das erzwungene Nachladen bekämen ausgerechnet sie die alte Kennung zurück
+// und täten nichts, während die Seite vollständig aussieht.
+function refreshAfterBaseline() {
+  TL_BASELINE.clear();
+  statsTopsFor = null;
+  fetchIndex(true).catch(() => {});
+  if (typeof loadTimeline === 'function') loadTimeline();
+}
+document.getElementById('bl-add')?.addEventListener('click', async ev => {
+  const place = document.getElementById('bl-place').value.trim();
+  const from = document.getElementById('bl-from').value;
+  if (!place || !from) {
+    toast(t('bl.need', 'Ort und Anfangsdatum sind nötig.'), 'warn');
+    return;
+  }
+  const btn = ev.target;
+  btn.disabled = true;
+  try {
+    const row = await api('/api/baselines', {
+      method: 'POST',
+      body: JSON.stringify({
+        place,
+        date_start: from,
+        date_end: document.getElementById('bl-to').value || null,
+        label: document.getElementById('bl-label').value.trim() || null,
+      }),
+    });
+    toast(t('bl.added', 'Zeitraum eingetragen — {n} Tage gefüllt.')
+      .replace('{n}', (row.day_count || 0).toLocaleString(LOC())), 'ok', 6000);
+    ['bl-label', 'bl-place', 'bl-from', 'bl-to'].forEach(id =>
+      document.getElementById(id).value = '');
+    await loadBaselines();
+    refreshAfterBaseline();
+  } catch (err) { toast(err.message, 'error', 9000); }
+  finally { btn.disabled = false; }
 });
 
 // --------------------------------------------------------------------------- //

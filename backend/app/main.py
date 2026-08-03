@@ -18,6 +18,7 @@ from app.routers import (
     achievements,
     admin,
     auth,
+    baselines,
     data,
     events,
     immich,
@@ -133,6 +134,7 @@ app.include_router(journal.router)    # F1: Tages-Zusammenfassung (Vorschlag)
 app.include_router(immich.router)     # P2.1 Stufe 2: Immich als Ereignis-Quelle
 app.include_router(photos.router)     # A45: Fotopunkte (Karte + Zeitstrahl-Ebene)
 app.include_router(weather.router)    # Anm. 119: Wetter je Kalendertag
+app.include_router(baselines.router)  # F20: Grundort (Anm. 144)
 app.include_router(admin.router)
 
 

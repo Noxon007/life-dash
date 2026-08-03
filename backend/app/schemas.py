@@ -302,6 +302,58 @@ class EventsIndex(BaseModel):
     # F17: der Meilenstein „Geburt" — Grundlage der Alters-Chips, und praktisch
     # immer außerhalb des geladenen Fensters
     birth: dict | None = None
+    # F20: Wie viele Tage der Grundort füllt, und über welche Jahre. Der
+    # Zeitstrahl braucht beides, BEVOR er eine Seite geladen hat: die Jahre,
+    # damit ein Jahr mit ausschließlich abgeleiteten Tagen überhaupt in der
+    # Übersicht steht (sonst wäre die Kindheit unsichtbar, obwohl sie gefüllt
+    # ist), und die Gesamtzahl für den Hinweis, dass hier abgeleitet wird.
+    # Getrennt von `years` und nicht hineingerechnet — eine Zahl, die Erfasstes
+    # und Abgeleitetes vermischt, kann keine Ansicht mehr auseinanderhalten
+    # (Anmerkung 143 in seiner allgemeinen Form).
+    baseline_days: int = 0
+    baseline_years: list[YearCount] = []
+
+
+# --------------------------------------------------------------------------- #
+# F20 — Grundort (Anmerkung 144)
+# --------------------------------------------------------------------------- #
+class BaselineRead(BaseModel):
+    """Ein eingetragener Zeitraum samt seinem Ort — und was er wirklich füllt."""
+    id: str
+    label: str | None = None
+    date_start: date_type
+    date_end: date_type | None = None
+    place: str
+    city: str | None = None
+    country: str | None = None
+    lat: float | None = None
+    lng: float | None = None
+    # Tage, die dieser Zeitraum TATSÄCHLICH füllt — ohne die, an denen ohnehin
+    # ein Eintrag steht. Die Spanne wäre die einfachere und die unehrlichere
+    # Zahl (siehe `routers/baselines.list_baselines`).
+    day_count: int = 0
+
+
+class BaselineCreate(BaseModel):
+    place: str
+    date_start: date_type
+    date_end: date_type | None = None
+    label: str | None = None
+
+
+class BaselineUpdate(BaseModel):
+    """Alles optional — was nicht kommt, bleibt.
+
+    `clear_end` ist nötig, weil `null` in JSON hier zwei Dinge heißen könnte:
+    „nicht mitgeschickt" und „das Ende soll weg". Ohne das eigene Feld wäre
+    „bis heute" nachträglich nicht mehr einstellbar — der Fall, der bei einem
+    Umzug in die aktuelle Wohnung eintritt.
+    """
+    place: str | None = None
+    date_start: date_type | None = None
+    date_end: date_type | None = None
+    clear_end: bool = False
+    label: str | None = None
 
 
 class FragmentRead(BaseModel):

@@ -13,7 +13,8 @@ from datetime import time as time_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
-from app.models import Event, Location, Metric, Source
+from app.models import BaselineLocation, DayMetric, Event, Location, Metric, Source
+from app.services import baseline
 from app.services.weather import fetch_weather
 
 log = logging.getLogger("lifedash.enrichment")
@@ -191,6 +192,100 @@ def auto_enrich_events(db: Session, events: list[Event]) -> int:
     return enriched
 
 
+# --------------------------------------------------------------------------- #
+# F20 — Wetter für Tage, an denen KEIN Ereignis steht (Grundort)
+# --------------------------------------------------------------------------- #
+def _baseline_users(db: Session, user_id: str | None) -> list[str]:
+    """Wessen Grundorte dieser Lauf anfasst.
+
+    Mit `user_id` genau dieses Konto (der Weg über „Meine Daten", Anmerkung
+    115). Ohne — der alte Rundum-Lauf — alle Konten, die überhaupt einen
+    Grundort haben; über alle Nutzer zu iterieren, um dann fast überall nichts
+    zu finden, wäre eine Abfrage je Konto für nichts.
+    """
+    if user_id is not None:
+        return [user_id]
+    return [uid for (uid,) in
+            db.query(BaselineLocation.user_id).distinct().all() if uid]
+
+
+def _day_weather_candidates(db: Session, user_id: str | None = None
+                            ) -> list[tuple[str, object, Location]]:
+    """(Konto, Tag, Ort) für Grundort-Tage, die noch keine Wettermarke tragen.
+
+    **Dieselbe Marker-Regel wie bei den Ereignissen** (`weather_rev`), und aus
+    demselben Grund: Open-Meteo liefert nicht für jeden Ort und jedes Datum
+    jedes Feld, also darf „ein Feld fehlt" nicht heißen „noch mal fragen" —
+    sonst fragt derselbe Tag bei jedem Lauf erneut (die Endlos-Abruf-Falle,
+    deren Auflagen dieses Projekt inzwischen durchnummeriert).
+
+    **Und dieselbe Behandlung des Fehlschlags:** kam gar keine Antwort, wird
+    NICHT markiert und der Tag beim nächsten Lauf erneut versucht. Das ist
+    bewusst identisch mit `_add_weather` — ein zweites Verhalten an derselben
+    Frage wäre die Doppelregel, gegen die diese Datei ohnehin schon einmal
+    verloren hat.
+    """
+    out: list[tuple[str, object, Location]] = []
+    for uid in _baseline_users(db, user_id):
+        days = baseline.inferred_days(db, uid)
+        if not days:
+            continue
+        done = {d for (d,) in
+                db.query(DayMetric.day)
+                .filter(DayMetric.user_id == uid,
+                        DayMetric.key == _REVISION_KEY,
+                        DayMetric.value >= WEATHER_REVISION).all()}
+        for day in sorted(days):
+            if day in done:
+                continue
+            loc = days[day].location
+            if loc is not None and loc.lat is not None and loc.lng is not None:
+                out.append((uid, day, loc))
+    return out
+
+
+def _add_day_weather(db: Session, user_id: str, day, loc: Location) -> bool:
+    """Wetter für EINEN Grundort-Tag holen und als `DayMetric` ablegen.
+
+    Spiegelt `_add_weather` Zeile für Zeile — dieselben Schlüssel, dieselben
+    Einheiten, dasselbe „nur Fehlendes anlegen", derselbe Revisionsmarker. Das
+    ist Absicht und keine Kopierfaulheit: die Tabelle daneben hat dieselbe Form,
+    damit `weather_day` beide vereinigen kann, und ein zweites Schlüsselschema
+    hier hieße, dass die Vereinigung zwei verschiedene Dinge addiert.
+    """
+    w = fetch_weather(loc.lat, loc.lng, day)
+    if not w:
+        return False
+    have = {k for (k,) in db.query(DayMetric.key)
+            .filter(DayMetric.user_id == user_id, DayMetric.day == day).all()}
+    added = 0
+
+    def put(key: str, *, value=None, text=None, unit=None) -> None:
+        nonlocal added
+        db.add(DayMetric(user_id=user_id, day=day, key=key, value=value,
+                         value_text=text, unit=unit, source=Source.weather))
+        added += 1
+
+    for src, (key, unit) in _WEATHER_METRICS.items():
+        if key not in have and w.get(src) is not None:
+            put(key, value=w[src], unit=unit)
+    if "weather" not in have and w.get("condition"):
+        put("weather", text=w["condition"])
+    for src, key in _WEATHER_TEXT_METRICS.items():
+        if key not in have and w.get(src):
+            put(key, text=w[src])
+    if _REVISION_KEY not in have:
+        put(_REVISION_KEY, value=WEATHER_REVISION)
+    else:
+        marker = (db.query(DayMetric)
+                  .filter(DayMetric.user_id == user_id, DayMetric.day == day,
+                          DayMetric.key == _REVISION_KEY).first())
+        if marker is not None and (marker.value or 0) < WEATHER_REVISION:
+            marker.value = WEATHER_REVISION
+            added += 1
+    return added > 0
+
+
 def enrich_weather(db: Session, limit: int | None = None,
                    user_id: str | None = None) -> tuple[int, int]:
     """Hängt Temperatur + Bedingung an Events ohne Wetter (Batch fürs Admin-UI).
@@ -225,4 +320,30 @@ def enrich_weather(db: Session, limit: int | None = None,
     if blank:
         log.info("Wetter: %d von %d ohne Daten (z. B. %s)",
                  len(blank), len(batch), "; ".join(blank[:3]))
-    return enriched, len(candidates) - enriched
+
+    # --- F20: die Grundort-Tage, NACH den Ereignissen -----------------------
+    # Die Reihenfolge ist eine Aussage: ein Ereignis ist eine erfasste Tatsache,
+    # ein Grundort-Tag ist die Ableitung darüber. Wer den Lauf abbricht, soll
+    # das Erfasste vollständig haben und nicht die Hälfte von beidem. Dass die
+    # Ableitung überhaupt in DIESEN Lauf gehört und nicht in einen eigenen, ist
+    # dieselbe Entscheidung: „Wetter ergänzen" ist eine Aussage über den
+    # eigenen Bestand, und zwei Knöpfe für eine Absicht sind der Weg, auf dem
+    # der zweite nie gedrückt wird.
+    day_total, day_done = 0, 0
+    room = None if limit is None else max(0, limit - len(batch))
+    if room != 0:
+        days = _day_weather_candidates(db, user_id)
+        day_total = len(days)
+        for uid, day, loc in (days if room is None else days[:room]):
+            try:
+                if _add_day_weather(db, uid, day, loc):
+                    db.commit()
+                    day_done += 1
+            except IntegrityError:
+                db.rollback()  # paralleler Lauf war schneller — kein Schaden
+
+    # Zwei Reste, getrennt gerechnet und dann addiert. Zusammengezählt VOR dem
+    # Abziehen käme Unsinn heraus, sobald beide Quellen im selben Durchgang
+    # etwas beitragen — der angereicherte Grundort-Tag zöge dann die Zahl der
+    # offenen EREIGNISSE herunter.
+    return enriched + day_done, (len(candidates) - enriched) + (day_total - day_done)

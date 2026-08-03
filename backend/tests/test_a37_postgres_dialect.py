@@ -188,7 +188,14 @@ def test_day_weather_translates_to_postgres(db, user):
     sql = _sql(day_value_query(db, user.id, "sunshine_h", min_value=10)).lower()
     assert "extract(year from" in sql and "group by" in sql
     assert "having" in sql, "die Schwelle gehört hinter die Verdichtung"
-    assert "min(metrics.value)" in sql and "max(metrics.value)" in sql
+    # F20: verdichtet wird über die VEREINIGUNG aus Ereignis- und Tages-Metriken
+    # (`weather_day._rows`), nicht mehr über `metrics` allein. Die Zusicherung
+    # prüft deshalb die Form (min/max über die verdichtete Menge, beide Quellen
+    # darin) statt einen Tabellennamen — sonst wäre sie beim nächsten Umbau
+    # wieder rot, ohne dass etwas kaputt wäre.
+    assert "union all" in sql, "Ereignis- und Tageswetter müssen EINE Menge sein"
+    assert "metrics.value" in sql and "day_metrics.value" in sql
+    assert sql.count("min(") >= 1 and "max(" in sql
 
     # `day_regions` gibt ein Dict zurück — die Abfrage selbst wird darum über
     # denselben Baustein geprüft, aus dem sie gebaut ist.

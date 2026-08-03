@@ -18,7 +18,7 @@ from app.models import (ConfirmState, DatePrecision, Event, EventEntityLink,
 from app.routers._serialize import EAGER, EAGER_SLIM, event_to_read
 from app.schemas import (EventGeo, EventManualCreate, EventRead, EventsIndex,
                          LocationGeo, OnThisDayGroup, YearCount)
-from app.services import visitsplit
+from app.services import baseline, visitsplit
 from app.services.immich_link import MACHINE_SOURCES
 from app.services.photo_points import asset_of as photo_asset_of
 from app.services.ingestion import create_manual_event
@@ -1018,7 +1018,22 @@ def events_index(
     # nicht.
     touched = (db.query(func.max(Event.updated_at))
                .filter(Event.user_id == user.id).scalar())
-    revision = f"{total}:{touched.isoformat() if touched else '-'}"
+    # F20: Der Grundort gehört in die Kennung. Ohne ihn zeigte die Karte nach
+    # einem neu eingetragenen Zeitraum weiter den alten Stand — und schlimmer:
+    # ein Zeitraum, der nur GEÄNDERT wurde, ließe Zahl und Zeitstempel der
+    # Ereignisse völlig unberührt. Dieselbe Überlegung wie bei `total` allein
+    # (Anmerkung 140), eine Tabelle weiter.
+    b_rows = baseline.load(db, user.id)
+    b_touched = max((r.updated_at for r in b_rows if r.updated_at), default=None)
+    revision = (f"{total}:{touched.isoformat() if touched else '-'}"
+                f":{len(b_rows)}:{b_touched.isoformat() if b_touched else '-'}")
+    # Die abgeleiteten Tage, aufgeschlüsselt nach Jahr — der Zeitstrahl braucht
+    # sie, BEVOR er eine Seite geladen hat: ein Jahr, in dem ausschließlich
+    # abgeleitete Tage liegen, stünde sonst in keiner Übersicht, obwohl es
+    # gefüllt ist. Nur gerechnet, wenn es überhaupt einen Grundort gibt — der
+    # Kalenderdurchlauf soll nicht jeden Index kosten, den jemand abruft.
+    b_counts = (baseline.day_counts(db, user.id, taken=None) if b_rows
+                else {"total": 0, "years": {}})
     return EventsIndex(
         revision=revision,
         total=total, dated=dated, undated=total - dated, unconfirmed=unconfirmed,
@@ -1028,6 +1043,9 @@ def events_index(
         year_min=years[0].year if years else None,
         year_max=years[-1].year if years else None,
         years=years,
+        baseline_days=b_counts["total"],
+        baseline_years=[YearCount(year=int(y), count=n)
+                        for y, n in sorted(b_counts["years"].items())],
         # F17 fährt hier mit: das Geburtsdatum kommt aus einem Meilenstein, der
         # in aller Regel außerhalb der geladenen Seiten liegt. Der Zeitstrahl
         # holt den Index ohnehin — so bleibt es bei einer Anfrage.

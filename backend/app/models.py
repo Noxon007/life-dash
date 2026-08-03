@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import enum
 import uuid
+from datetime import date as date_type
 from datetime import datetime, timezone
 
 from sqlalchemy import (
     JSON,
+    Date,
     DateTime,
     Enum,
     Float,
@@ -175,6 +177,62 @@ class Location(Base):
     external_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     events: Mapped[list["Event"]] = relationship(back_populates="location")
+
+
+class BaselineLocation(Base):
+    """F20 — der Grundort: eine STEHENDE TATSACHE mit Gültigkeitszeitraum.
+
+    „Zwischen dem 2. April 1986 und dem 31. August 1992 war mein Grundort das
+    Elternhaus in Bad Segeberg." **Das ist eine vierte Sorte Aussage** neben
+    Fragment, Vorschlag und Ereignis (Anmerkung 144): ein Ereignis sagt „hier
+    ist etwas passiert", ein Grundort sagt „dies war der Normalfall, solange
+    nichts anderes bekannt ist".
+
+    **Warum das keine erzeugten Ereignisse sind.** Der naheliegende Bau — je Tag
+    eine Zeile — wurde entschieden verworfen. Nicht wegen der Menge: Anmerkung
+    140 hat 20 000 Ereignisse bei 86 ms gemessen, 14 600 weitere sind kein
+    Einwand. Sondern weil eine erzeugte Zeile `confirmed` wäre und damit unter
+    die Kernregel fiele — **Maschinen ändern Bestätigtes nie**. Eine spätere
+    Korrektur an DIESER einen Zeile („ich bin doch erst 1998 umgezogen") ließe
+    tausend falsche Ereignisse stehen, die niemand mehr anfassen dürfte. Eine
+    Aussage, die sich als tausend Aussagen ausgibt, ist nicht genauer, sondern
+    nur schlechter korrigierbar.
+
+    **Die Tage entstehen deshalb bei der ABFRAGE** (`services/baseline.py`,
+    Schicht 4) und werden nirgends gespeichert — dieselbe Entscheidung, die
+    Anmerkung 145 für die Lückenprüfung vorwegnimmt: was gespeichert wird, muss
+    mit jedem Import, jeder Löschung und jeder Zeitraum-Änderung nachgeführt
+    werden, und eine veraltete Ableitung ist schlimmer als keine.
+
+    **Der Ort ist ein `Location`** und kein Textfeld. Damit trägt der Grundort
+    ohne eine Zeile Zusatzarbeit Koordinaten (fürs Wetter), `city` (A39),
+    `country` (F4) und den Namen in genau der Form, die der Nutzer für Orte
+    gewählt hat — jede Statistik, die nach Ort, Stadt oder Land gruppiert,
+    fragt dieselbe Tabelle wie bisher.
+
+    **Zeiträume überlappen sich nicht** (Entscheidung des Users, Anmerkung 144):
+    ein Grundort zur Zeit. Erzwungen wird das im Endpunkt und nicht im Schema —
+    „diese Spanne schneidet jene" ist keine Bedingung, die SQLite und
+    PostgreSQL gleich ausdrücken.
+    """
+
+    __tablename__ = "baseline_locations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    location_id: Mapped[str] = mapped_column(ForeignKey("locations.id"), index=True)
+    # Wie der Nutzer den Abschnitt NENNT („Elternhaus", „Studium Kiel") — nicht
+    # wie der Ort heißt. Beides zu vermischen hieße, den Ortsnamen umzuschreiben,
+    # sobald jemand seinen Lebensabschnitt anders benennt.
+    label: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    date_start: Mapped[date_type] = mapped_column(Date, index=True)
+    # NULL heißt „bis heute". Ein eingetragenes Enddatum wäre hier keine
+    # Vereinfachung, sondern eine Behauptung, die morgen falsch ist.
+    date_end: Mapped[date_type | None] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+    location: Mapped[Location] = relationship()
 
 
 class Event(Base):
@@ -466,3 +524,47 @@ class Metric(Base):
     enriched_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     event: Mapped[Event] = relationship(back_populates="metrics")
+
+
+class DayMetric(Base):
+    """F20 — eine Kennzahl, die an einem TAG hängt statt an einem Ereignis.
+
+    **Warum es sie geben muss.** Wetter hängt in diesem Projekt an
+    `Metric.event_id`. Ein Grundort-Tag hat definitionsgemäß kein Ereignis —
+    er ist ja gerade der Tag, an dem nichts erfasst wurde —, also hat er ohne
+    diese Tabelle keinen Platz für das, wofür der Grundort überhaupt gebaut
+    wurde. Das ist der eigentliche Aufwand von F20, nicht die Grundort-Zeile.
+
+    **Warum dieselbe FORM wie `Metric` und nicht ein JSON-Feld je Tag.** Ein
+    Blob wäre kleiner und wäre die falsche Antwort: `weather_day` fasst
+    Tageswerte in SQL zusammen (`group by` über Tag und Schlüssel, `min`/`max`
+    für die Einigkeitsfrage), und die Erfolgs-Schwellen zählen und summieren
+    über genau diese Abfrage. Aus JSON heraus geht beides nur in Python — oder
+    mit Ausdrücken, die SQLite und PostgreSQL verschieden schreiben. Gleiche
+    Form heißt: **eine Vereinigung, und alle Regeln darüber gelten unverändert
+    für beide Quellen.** Die Zeilenzahl liegt in derselben Größenordnung wie die
+    bestehende Metrik-Tabelle (16 Zeilen je Tag statt 16 je Ereignis).
+
+    **Schicht 4, restlos verwerfbar.** Es steht nichts darin, was nicht wieder
+    zu holen wäre — deshalb darf ein Lauf sie neu aufbauen, während er
+    `metrics` nie anfassen dürfte (Anmerkung 57 in der allgemeinen Form).
+
+    Der Schlüssel ist (Konto, Tag, Kennzahl): ein Tag hat genau einen Grundort,
+    also genau einen Wert je Kennzahl. Als Unique-Index, damit zwei parallele
+    Läufe nicht zwei Wahrheiten anlegen — dieselbe Absicherung wie
+    `ux_metrics_weather` (A11).
+    """
+
+    __tablename__ = "day_metrics"
+    __table_args__ = (UniqueConstraint("user_id", "day", "key",
+                                       name="ux_day_metrics_key"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    day: Mapped[date_type] = mapped_column(Date, index=True)
+    key: Mapped[str] = mapped_column(String(64))
+    value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    value_text: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    source: Mapped[Source] = mapped_column(Enum(Source), default=Source.weather)
+    enriched_at: Mapped[datetime] = mapped_column(DateTime, default=_now)

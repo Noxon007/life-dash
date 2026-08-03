@@ -46,7 +46,7 @@ from datetime import datetime, time
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
-from app.models import ConfirmState, Event, Location, Metric, Source
+from app.models import ConfirmState, DayMetric, Event, Location, Metric, Source
 from app.sqlutil import day_parts, weather_cell
 
 # Wetterwerte, die als Text gespeichert sind (`Metric.value_text`). Für sie
@@ -79,14 +79,20 @@ def _window(query, start, end):
     return query
 
 
-def _base(db: Session, user_id: str, *, confirmed_only: bool):
-    """Ereignisse mit Wetter-Metriken, auf ein Konto eingegrenzt.
+def _event_rows(db: Session, user_id: str, *, confirmed_only: bool,
+                keys: tuple[str, ...] | None, start, end):
+    """Wetterwerte, die an EREIGNISSEN hängen — je Zeile (y, m, d, key, wert).
 
     Die Nutzer-Einschränkung steht an der Abfrage und nicht am Aufrufer: A12
     verlangt sie ohne Ausnahme, sonst muss bei jeder Änderung neu begründet
     werden, warum diese eine Stelle sicher ist.
     """
-    q = (db.query(Metric)
+    y, m, d = day_parts(Event.date_start)
+    q = (db.query(y.label("y"), m.label("m"), d.label("d"),
+                  Metric.key.label("key"),
+                  Metric.value.label("value"),
+                  Metric.value_text.label("text"))
+         .select_from(Metric)
          .join(Event, Event.id == Metric.event_id)
          .filter(Event.user_id == user_id,
                  Event.date_start.isnot(None),
@@ -94,7 +100,63 @@ def _base(db: Session, user_id: str, *, confirmed_only: bool):
                  Metric.key != REVISION_KEY))
     if confirmed_only:
         q = q.filter(Event.confirmed == ConfirmState.confirmed)
+    if keys:
+        q = q.filter(Metric.key.in_(tuple(keys)))
+    return _window(q, start, end)
+
+
+def _day_rows(db: Session, user_id: str, *, keys: tuple[str, ...] | None,
+              start, end):
+    """Wetterwerte, die an einem TAG hängen — F20, dieselben Spalten.
+
+    **Hier gibt es kein `confirmed_only`, und das ist kein Versäumnis.** Ein
+    Tages-Wert entsteht aus einem Grundort, und ein Grundort ist eine von Hand
+    eingetragene Tatsache — es gibt keinen Zustand „vorgeschlagen" für ihn. Die
+    Frage, die `confirmed_only` beantwortet („zählen Vorschläge mit?"), stellt
+    sich an dieser Quelle nicht; sie stumm auf `False` abzubilden hieße, sie mit
+    „nein" zu beantworten.
+    """
+    y, m, d = day_parts(DayMetric.day)
+    q = (db.query(y.label("y"), m.label("m"), d.label("d"),
+                  DayMetric.key.label("key"),
+                  DayMetric.value.label("value"),
+                  DayMetric.value_text.label("text"))
+         .select_from(DayMetric)
+         .filter(DayMetric.user_id == user_id,
+                 DayMetric.source == Source.weather,
+                 DayMetric.key != REVISION_KEY))
+    if keys:
+        q = q.filter(DayMetric.key.in_(tuple(keys)))
+    if start is not None:
+        q = q.filter(DayMetric.day >= (start.date() if isinstance(start, datetime)
+                                       else start))
+    if end is not None:
+        q = q.filter(DayMetric.day <= (end.date() if isinstance(end, datetime)
+                                       else end))
     return q
+
+
+def _rows(db: Session, user_id: str, *, confirmed_only: bool,
+          keys: tuple[str, ...] | None = None, start=None, end=None):
+    """Beide Quellen als EINE Menge (y, m, d, key, value, text) — F20.
+
+    **Warum vereinigt und nicht nachträglich zusammengeführt.** Über dieser
+    Menge liegen drei Regeln: das Minimum bei Zahlen, die Einigkeit bei Texten
+    und die Schwellenprüfung der Erfolge. Zwei Quellen getrennt zu rechnen und
+    die Ergebnisse hinterher zu mischen hieße, jede dieser Regeln ein zweites
+    Mal aufzuschreiben — und zwei Fassungen einer Regel laufen still
+    auseinander (Anmerkung 106). So gilt jede genau einmal, für beides.
+
+    Dass dabei nichts doppelt gezählt werden kann, ist keine Vorsicht, sondern
+    eine Eigenschaft der Ableitung: ein Grundort füllt nur LÜCKEN, also gibt es
+    zu keinem Tag beides (`services/baseline.py`). `test_f20_baseline.py` nagelt
+    genau das fest, weil hier sonst der Tag mit Ereignis UND Tageswert
+    unbemerkt zwei Werte bekäme.
+    """
+    return (_event_rows(db, user_id, confirmed_only=confirmed_only,
+                        keys=keys, start=start, end=end)
+            .union_all(_day_rows(db, user_id, keys=keys, start=start, end=end))
+            .subquery())
 
 
 def day_values(db: Session, user_id: str, *, keys: tuple[str, ...] | None = None,
@@ -106,18 +168,15 @@ def day_values(db: Session, user_id: str, *, keys: tuple[str, ...] | None = None
     und `min(value_text) == max(value_text)` beantwortet die Einigkeitsfrage,
     ohne die Zeilen einzeln zu holen.
     """
-    y, m, d = day_parts(Event.date_start)
-    q = (_base(db, user_id, confirmed_only=confirmed_only)
-         .with_entities(y.label("y"), m.label("m"), d.label("d"),
-                        Metric.key.label("key"),
-                        func.min(Metric.value).label("value"),
-                        func.min(Metric.value_text).label("text_lo"),
-                        func.max(Metric.value_text).label("text_hi"))
-         .group_by(y, m, d, Metric.key))
-    if keys:
-        q = q.filter(Metric.key.in_(tuple(keys)))
+    sub = _rows(db, user_id, confirmed_only=confirmed_only, keys=keys,
+                start=start, end=end)
+    q = (db.query(sub.c.y, sub.c.m, sub.c.d, sub.c.key,
+                  func.min(sub.c.value).label("value"),
+                  func.min(sub.c.text).label("text_lo"),
+                  func.max(sub.c.text).label("text_hi"))
+         .group_by(sub.c.y, sub.c.m, sub.c.d, sub.c.key))
     out: dict[str, dict[str, float | str]] = {}
-    for row in _window(q, start, end).all():
+    for row in q.all():
         day = _iso(row.y, row.m, row.d)
         if row.value is not None:
             out.setdefault(day, {})[row.key] = row.value
@@ -200,16 +259,15 @@ def day_value_query(db: Session, user_id: str, key: str, *,
     Fallen aus, die dieses Projekt sich stellt: zwei Bedeutungen in einem
     Ausdruck, folgenlos bis zur nächsten Modul-Datei.
     """
-    y, m, d = day_parts(Event.date_start)
-    q = (_base(db, user_id, confirmed_only=confirmed_only)
-         .with_entities(y.label("y"), m.label("m"), d.label("d"),
-                        func.min(Metric.value).label("value"))
-         .filter(Metric.key == key, Metric.value.isnot(None))
-         .group_by(y, m, d))
+    sub = _rows(db, user_id, confirmed_only=confirmed_only, keys=(key,))
+    q = (db.query(sub.c.y.label("y"), sub.c.m.label("m"), sub.c.d.label("d"),
+                  func.min(sub.c.value).label("value"))
+         .filter(sub.c.value.isnot(None))
+         .group_by(sub.c.y, sub.c.m, sub.c.d))
     # „irgendein Eintrag des Tages erreicht die Schwelle" — für „mindestens"
     # ist das der größte Wert des Tages, für „höchstens" der kleinste.
     if min_value is not None:
-        q = q.having(func.max(Metric.value) >= float(min_value))
+        q = q.having(func.max(sub.c.value) >= float(min_value))
     if max_value is not None:
-        q = q.having(func.min(Metric.value) <= float(max_value))
+        q = q.having(func.min(sub.c.value) <= float(max_value))
     return q

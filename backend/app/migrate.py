@@ -206,6 +206,12 @@ def ensure_schema(engine: Engine) -> list[str]:
 # Datenbanken an; hier kommen sie in bestehende nachträglich hinein.
 _INDEXES: dict[str, list[tuple[str, str]]] = {
     "metrics": [("ix_metrics_event_id", "event_id")],
+    # F20: der Tages-Wetterspeicher wird IMMER über (Konto, Tag) gelesen —
+    # `weather_day` vereinigt ihn mit den Ereignis-Metriken und gruppiert nach
+    # Tag. Ohne Index ist das bei 14 600 Tagen ein voller Scan je Statistik.
+    "day_metrics": [("ix_day_metrics_user_id", "user_id"),
+                    ("ix_day_metrics_day", "day")],
+    "baseline_locations": [("ix_baseline_user_id", "user_id")],
     "event_entity_links": [("ix_eel_event_id", "event_id"),
                            ("ix_eel_entity_id", "entity_id")],
     "media_refs": [("ix_media_event_id", "event_id"),

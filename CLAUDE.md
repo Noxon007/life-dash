@@ -15,13 +15,22 @@ ein Nutzer merkt.
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI, Geocoding aus)
-  — 586 Tests, ~14 s, SQLite im Arbeitsspeicher
-- **Tests gegen echtes PostgreSQL** (das, worauf betrieben wird — `postgres:18-alpine`):
-  `pwsh tools/pg-test.ps1` (Container `lifedash-pgtest` auf Port **55432**, danach weg;
-  `-Keep` lässt ihn stehen). Setzt `TEST_DATABASE_URL`, das `conftest.py` auswertet;
-  **zwei Riegel davor**, weil die Suite das Schema löscht: die URL darf nicht die
-  betriebene sein, und der DB-Name muss `test` enthalten.
-- Wächter: `cd tools` → `npm run check` (31 jsdom-Dateien, ~479 Zusicherungen)
+  — 609 Tests, ~14 s, SQLite im Arbeitsspeicher
+- **Tests gegen echtes PostgreSQL** (das, worauf betrieben wird): `pwsh
+  tools/pg-test.ps1` — **kein Docker**, das Skript legt mit den installierten
+  Binärdateien einen eigenen Cluster in `backend/_pgtest/` auf Port **55432** an
+  und stoppt ihn danach (`-Keep` lässt ihn stehen, `-Stop` räumt auf). ~45 s.
+  Setzt `TEST_DATABASE_URL`, das `conftest.py` auswertet; **zwei Riegel davor**,
+  weil die Suite das Schema löscht: die URL darf nicht die betriebene sein, und
+  der DB-Name muss `test` enthalten.
+  **Zwei Fallen, beide 2026-08-03 bezahlt:** (a) ein Test mit
+  `with TestClient(app)` fährt den **Lifespan** — der öffnet die KONFIGURIERTE
+  Datenbank und startet den Minuten-Ticker; auf SQLite unsichtbar, auf
+  PostgreSQL hängt die Suite. Client ohne `with` bauen. (b) Der Cluster startet
+  mit `lc_messages=C`, weil ein deutsch installiertes PostgreSQL in cp1252
+  meldet und `psycopg2` das als UTF-8 dekodiert — **jeder echte Befund käme
+  sonst als `UnicodeDecodeError` an**.
+- Wächter: `cd tools` → `npm run check` (32 jsdom-Dateien, ~494 Zusicherungen)
 - **Smoke gegen ein HTTP-Doppel** (Immich): `<python> tools/immich_double.py &`
   dann `<python> tools/smoke_a45.py` — findet, was Unit-Tests prinzipiell nicht
   können (Blättern, Zeitzonen, echte DTOs). Immer aus dem Wurzelverzeichnis.
@@ -63,6 +72,11 @@ ein Nutzer merkt.
   ENTFERNT und wandert in den Anhang
 - Commit-Stil: deutsch, `feat(bereich): X.Y.Z — Beschreibung` (Historie ansehen)
 - Doku derzeit deutsch; Paket F10 stellt sie später einmalig auf Englisch um
+- **Vier Schichten, und F20 hat eine VIERTE Sorte Aussage dazugestellt**
+  (Anm. 144): `BaselineLocation` = stehende Tatsache mit Gültigkeitszeitraum
+  (Lebensdatenbank, eine Zeile), die Tage daraus = Schicht 4, nirgends
+  gespeichert (`services/baseline.py`). Wer eine Zahl über Tage bildet, muss
+  sie mitzählen; wer eine Zahl über EINTRÄGE bildet, darf es nicht.
 - Neue Event-Kategorie? Drei Stellen: KI-Prompt/Module-YAML, Frontend (catLabels/Farben/
   KNOWN_CATS/FILTER_CATS_BASE + CSS), ggf. Selects im HTML
 - Allgemeingültigkeit (A27): nichts Homelab-Spezifisches hart verdrahten (Provider-Namen
@@ -76,6 +90,60 @@ mehr in KONZEPT Kap. 15 — das ist jetzt ein Zeiger mit der Tabelle der noch
 OFFENEN Fragen (144–147). Anmerkungen stehen in der Reihenfolge, in der sie
 AUFKAMEN, nicht in der sie gebaut wurden — Neues wird angehängt, auch wenn
 davor noch Offenes steht.
+
+**F20 gebaut (2026-08-03, Anmerkung 144) — der Grundort. Auf `main`, ohne
+Versionssprung.** „Ich möchte irgendwann für jeden Tag einen Eintrag haben, auch
+wenn da nur ‚Bad Segeberg' steht — dann kann Wetter angereichert werden."
+
+**Gebaut als ABLEITUNG, nicht als Zeilen.** `BaselineLocation` = eine Zeile je
+Zeitraum, zeigt auf ein `Location` (damit reisen Koordinate fürs Wetter,
+`city` (A39) und `country` (F4) gratis mit, und jede Statistik fragt dieselbe
+Tabelle wie bisher). Die TAGE stehen **nirgends** — `services/baseline.py`
+läuft bei jeder Abfrage den Kalender ab (14.600 Iterationen für vierzig Jahre,
+die billigere Hälfte jeder Statistik, die sie braucht). Anm. 145 vorweggenommen:
+eine gespeicherte Ableitung müsste bei jedem Import, jeder Löschung und jeder
+Zeitraum-Änderung nachgeführt werden.
+
+**Die Eigenschaft, auf der alles andere steht: die beiden Tagesmengen sind
+disjunkt.** Der Grundort füllt nur Lücken, also hat kein Tag beides. Deshalb
+darf jede Statistik einfach ADDIEREN, und deshalb kann die Wetter-Vereinigung
+nichts doppelt sehen. `test_f20_baseline.py` nagelt genau das zuerst fest —
+alles Nachgelagerte wird still falsch, sobald es nicht mehr gilt.
+
+**Der eigentliche Aufwand war das Wetter, nicht der Grundort.** Wetter hängt an
+`Metric.event_id`; ein Grundort-Tag hat kein Ereignis. Neu: `DayMetric` —
+**dieselbe FORM wie `Metric`**, bewusst kein JSON je Tag: `weather_day` fasst in
+SQL zusammen und die Erfolgs-Schwellen zählen/summieren über genau diese
+Abfrage. Gleiche Form heißt EINE Vereinigung (`weather_day._rows`), und jede
+Regel darüber gilt unverändert für beide Quellen.
+
+**Drei Stellen, an denen das Paket hätte lügen können.** (a) Die Ranglisten
+holen mehr Zeilen, als sie zeigen (`_PRE_N`), BEVOR der Grundort eingerechnet
+wird — sonst käme ein Ort mit ein paar Einträgen und 2.000 Grundort-Tagen als
+frische Zeile mit „0 Einträgen" zurück. (b) Die Jahres-Sammelzeile zählt einen
+abgeleiteten Tag als TAG, nie als Ereignis („365 Ereignisse" über ein Jahr ohne
+Erfassung = Anm. 143 an neuer Stelle). (c) Der Zeitstrahl deckelt bei 300,
+gleichmäßig verteilt, und die Fußzeile sagt es (`slice(0, N)` war der Defekt aus
+Anm. 110 UND 160 — hier wäre es das dritte Mal).
+
+**Zwei Befunde, die der Bau erzwang:** `/api/days/baseline` trägt die
+Beschreibung EINMAL mit Index je Tag (Anm. 157: sechs Jahre × „Elternhaus,
+Musterweg 1, …" wären 1,4 MB für 30 Byte Auskunft) — diesmal gleich beim ersten
+Bau statt nach einer Messung. Und `EventsIndex.revision` musste den Grundort
+kennen: ein bloß GEÄNDERTER Zeitraum lässt Zahl und Zeitstempel aller Ereignisse
+unberührt, Karte und Ranglisten hätten ihren alten Stand behalten und dabei
+vollständig ausgesehen.
+
+**Der PostgreSQL-Lauf fand den letzten Fehler, und der saß im TEST:** die neue
+`client`-Fixture benutzte `with TestClient(app)` — im Kontextmanager fährt der
+**Lifespan**, der `ensure_schema`/`create_all` auf der KONFIGURIERTEN Datenbank
+öffnet und den Minuten-Ticker startet. `test_a35_local_auth.py` hatte genau das
+schon aufgeschrieben. Auf SQLite unsichtbar, auf PostgreSQL hing die Suite.
+**Zweiter Befund im Werkzeug selbst:** `tools/pg-test.ps1` startete den Cluster
+mit deutscher Locale → Servermeldungen in `German_Germany.1252`, und `psycopg2`
+dekodiert sie als UTF-8 → **jeder echte Befund kam als `UnicodeDecodeError` an**.
+Jetzt `lc_messages=C`, und die `psql`-Probe prüft ihren Rückgabewert, statt ihn
+mit `2>$null` zu verschlucken. Danach: 609 Tests, 43 s.
 
 **Fünfter Durchgang 2026-08-03 (Anmerkung 161) — ein Defekt, vier
 Entscheidungen, ein Doku-Umbau.**
@@ -468,12 +536,10 @@ aber nur, wenn man sie wirklich anwendet.**
 
 Umgesetzt bis **v0.39.0** (2026-07-23). **Gruppe A ist komplett** (A1–A48),
 Gruppe B bis **F19**; **P5.1, F1 und P2.1 (alle drei Stufen) sind fertig**. Offen
-ist damit: **F20** (Grundort, Anm. 144 — entschieden, ungebaut) und **F21**
-(Lückenprüfung, danach), dazu **0.40 (sammelt auf `main`)**, **Demo-Modus
-(0.41)** und **R1/R2** (1.0, drei Etappen auf `main`). **F20 ist nach Anm. 101
-ein 1.0-Kandidat** (verbessert das Erfassen, nicht die Zufuhr) und das größte
-verbliebene Paket vor dem Demo-Modus — ob eigene Version oder in 0.40, ist eine
-Größenfrage und die Entscheidung des Users.
+ist damit: **F21** (Lückenprüfung, Anm. 145 — durch F20 entsperrt), dazu
+**0.40 (sammelt auf `main`)**, **Demo-Modus (0.41)** und **R1/R2** (1.0, drei
+Etappen auf `main`). **F20 (Grundort) ist seit 2026-08-03 gebaut** und liegt
+auf `main`.
 
 **Arbeitsweise ab 0.40 (vom User festgelegt, 2026-07-23): alles auf `main`,
 kein Versionssprung, bis der User den Demo-Modus ansagt.** Was sich bis dahin

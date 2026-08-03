@@ -23,6 +23,19 @@ any `MINOR`.
 ## [Unreleased]
 
 ### Added
+- **A baseline location for the years you never recorded.** Under *My data →
+  Baseline location* you enter a period and a place — “from my birth until 2006
+  I was at my parents' house in Bad Segeberg”. Every day in that period that has
+  **no** entry then counts as a day at that place: it appears in the timeline,
+  counts in the statistics, on the world map and towards the badges, and gets
+  its weather on the next weather run. Twenty years of “nothing recorded” become
+  twenty years of “here, and this is how it was”.
+  **No entries are created for this.** The period stays a single row, so
+  correcting it later recomputes everything instead of leaving thousands of
+  wrong entries behind that nothing is allowed to touch. A day with a real entry
+  always wins, periods may not overlap, and every derived day is visibly marked
+  as derived — in the timeline, in the year summaries and in the numbers beside
+  them, a derived day is a *day* and never an *entry*.
 - **Every geotagged photo now becomes an entry of its own — on the map with
   its picture, in the timeline as plain text.** Until now a whole day with
   photos in one place became a single summary entry (“34 photos in Detmold”),

@@ -23,16 +23,56 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import Event, Location, Metric, Source
+from app.services import baseline
 from app.services import stats_overview as ov
 from app.sqlutil import day_number
 
 TOP_N = 10
 
 
+def _merge_baseline(rows: list[dict], extra: dict[str, int]) -> list[dict]:
+    """Abgeleitete Tage in eine fertige Rangliste einrechnen (F20).
+
+    **Die Rangfolge entsteht danach neu, und das ist der Punkt.** Wer den
+    Grundort erst nach dem `LIMIT 10` addierte, bekäme eine Liste, in der ein
+    Ort mit 2 190 abgeleiteten Tagen fehlt, weil er ohne sie nicht unter die
+    ersten zehn kam — der Deckel hätte dann die Antwort entschieden, nicht die
+    Zahl. Deshalb liefern die Abfragen unten mehr Zeilen, als die Liste zeigt.
+
+    Addieren ist erlaubt, weil die beiden Tagesmengen disjunkt sind: der
+    Grundort füllt nur Lücken (`services/baseline.py`). Die EINTRÄGE bleiben
+    unberührt — ein abgeleiteter Tag ist kein Eintrag, und ihn als einen zu
+    zählen wäre genau die Vermischung, gegen die Anmerkung 143 die zweite Zahl
+    überhaupt eingeführt hat.
+    """
+    if not extra:
+        return rows[:TOP_N]
+    by_name = {r["name"]: r for r in rows}
+    for name, n in extra.items():
+        cur = by_name.get(name)
+        if cur is None:
+            by_name[name] = {"name": name, "days": n, "events": 0}
+        else:
+            cur["days"] += n
+    out = sorted(by_name.values(),
+                 key=lambda r: (-r["days"], -r["events"], r["name"]))
+    return out[:TOP_N]
+
+
+# Wie viele Zeilen die Abfragen holen, bevor der Grundort eingerechnet wird.
+# Großzügig statt exakt: exakt wäre „alle", und für eine Liste von zehn Zeilen
+# den ganzen Ortsbestand zu holen ist der teurere Fehler. Ein Grundort hebt
+# einen Ort um höchstens seine Tageszahl — dass der dann nicht unter den ersten
+# fünfzig ohne ihn wäre, hieße, dass es fünfzig Orte mit noch mehr Tagen gibt,
+# und dann ist er auch mit ihm keine Antwort auf „Top 10".
+_PRE_N = 50
+
+
 # --------------------------------------------------------------------------- #
 # Ranglisten über Orte, Städte, Länder, Jahre, Kategorien
 # --------------------------------------------------------------------------- #
-def _ranked(db: Session, user_id: str, column, *extra_filters) -> list[dict]:
+def _ranked(db: Session, user_id: str, column, *extra_filters,
+            baseline_days: dict[str, int] | None = None) -> list[dict]:
     """Tage UND Einträge je Wert einer Spalte, absteigend nach Tagen.
 
     Beide Zahlen in einer Abfrage: zwei Abfragen wären zwei Zeitpunkte und
@@ -54,12 +94,14 @@ def _ranked(db: Session, user_id: str, column, *extra_filters) -> list[dict]:
             # gemeinte Antwort, nicht die alphabetisch erste.
             .order_by(func.count(func.distinct(day_key)).desc(),
                       func.count(Event.id).desc(), column.asc())
-            .limit(TOP_N).all())
-    return [{"name": str(k), "days": days, "events": events}
-            for k, days, events in rows]
+            .limit(_PRE_N if baseline_days else TOP_N).all())
+    out = [{"name": str(k), "days": days, "events": events}
+           for k, days, events in rows]
+    return _merge_baseline(out, baseline_days or {})
 
 
-def _place_ranking(db: Session, user_id: str) -> list[dict]:
+def _place_ranking(db: Session, user_id: str,
+                   baseline_days: dict[str, int] | None = None) -> list[dict]:
     """Orte — mit derselben Kürzung wie die Balken daneben (`_short_place`).
 
     Die Kürzung ist der Grund, warum das hier nicht `_ranked` sein kann: eine
@@ -91,32 +133,39 @@ def _place_ranking(db: Session, user_id: str) -> list[dict]:
         cur = merged.setdefault(short, [0, 0])
         cur[0] += days
         cur[1] += events
-    top = sorted(merged.items(),
-                 key=lambda kv: (-kv[1][0], -kv[1][1], kv[0]))[:TOP_N]
-    return [{"name": n, "days": d, "events": e} for n, (d, e) in top]
+    top = sorted(merged.items(), key=lambda kv: (-kv[1][0], -kv[1][1], kv[0]))
+    rows = [{"name": n, "days": d, "events": e} for n, (d, e) in top]
+    # F20: dieselbe Kürzung auch für den Grundort — er läuft hier über
+    # `_short_place`, nicht über den rohen Namen, sonst stünde „Musterweg 1,
+    # Bad Segeberg, Deutschland" neben „Musterweg 1" als zweiter Ort.
+    extra: dict[str, int] = {}
+    for name, n in (baseline_days or {}).items():
+        short = ov._short_place(name)
+        if short:
+            extra[short] = extra.get(short, 0) + n
+    return _merge_baseline(rows, extra)
 
 
 # --------------------------------------------------------------------------- #
 # Serien: die Tage als Kalender lesen
 # --------------------------------------------------------------------------- #
 def _days(db: Session, user_id: str) -> list[date]:
-    """Alle Kalendertage mit mindestens einem datierten Eintrag, aufsteigend.
+    """Alle Kalendertage, an denen etwas bekannt ist — aufsteigend.
 
     Die einzige Stelle hier, die wirklich Zeilen in den Prozess holt — und sie
     darf es: es sind die TAGE, nicht die Einträge. Zwanzig Jahre lückenlos sind
     7 300 Werte; zwanzigtausend Ereignisse wären es nicht.
+
+    **F20: die Grundort-Tage zählen mit.** Sie sind kein Eintrag, aber sie sind
+    Wissen über den Tag — und die Serie fragt „wie lange am Stück weiß ich, wo
+    ich war", nicht „wie lange am Stück habe ich getippt". Die Abfrage selbst
+    steht seitdem in `services/baseline.py`, weil dort auch die Ableitung
+    darauf zugreift; zwei Fassungen von „welche Tage sind belegt" wären genau
+    die stille Doppelregel, an der die Ableitung hängt.
     """
-    rows = (db.query(func.distinct(func.date(Event.date_start)))
-            .filter(Event.user_id == user_id, Event.date_start.isnot(None))
-            .all())
-    out: list[date] = []
-    for (d,) in rows:
-        if d is None:
-            continue
-        # SQLite gibt `date()` als Text zurück, PostgreSQL als `date`. Beides
-        # kommt hier an, je nachdem, worauf betrieben wird.
-        out.append(d if isinstance(d, date) else date.fromisoformat(str(d)[:10]))
-    return sorted(out)
+    days = baseline.recorded_days(db, user_id)
+    days |= set(baseline.inferred_days(db, user_id, taken=days))
+    return sorted(days)
 
 
 def _streaks(db: Session, user_id: str) -> dict:
@@ -126,7 +175,9 @@ def _streaks(db: Session, user_id: str) -> dict:
     Zeit vor dem ersten Eintrag ist keine Lücke, sondern die Zeit vor dem
     ersten Eintrag — sie als „längste Lücke: 8 000 Tage" auszugeben wäre eine
     Aussage über den Beginn der Aufzeichnung, verkleidet als Befund über das
-    Leben. (Was mit ihr wäre, hängt an Anmerkung 144, und die ist offen.)
+    Leben. Seit F20 kann ein Grundort diese Zeit ausfüllen, und dann ist sie
+    keine Lücke mehr, sondern ein bekannter Abschnitt — genau der Zweck des
+    Pakets (Anmerkung 144/145).
     """
     days = _days(db, user_id)
     out: dict = {"longest_run": None, "longest_gap": None, "longest_trip": None}
@@ -178,6 +229,10 @@ def _streaks(db: Session, user_id: str) -> dict:
 # --------------------------------------------------------------------------- #
 def compute_toplists(db: Session, user_id: str, n: int = TOP_N) -> dict:
     """Alle Ranglisten der dritten Statistik-Ansicht in einer Antwort."""
+    # F20: EINMAL rechnen, viermal verwenden. Der Kalenderdurchlauf ist billig,
+    # aber vier Durchläufe wären vier Stellen, an denen „was ist ein
+    # abgeleiteter Tag" beantwortet wird (Anmerkung 106).
+    b = baseline.day_counts(db, user_id)
     day_key = day_number(Event.date_start)
     year_rows = (db.query(func.extract("year", Event.date_start).label("y"),
                           func.count(func.distinct(day_key)),
@@ -186,22 +241,29 @@ def compute_toplists(db: Session, user_id: str, n: int = TOP_N) -> dict:
                  .group_by("y")
                  .order_by(func.count(func.distinct(day_key)).desc(),
                            func.count(Event.id).desc(), "y")
-                 .limit(n).all())
+                 .limit(_PRE_N if b["years"] else n).all())
 
     return {
         "weather": _weather_tops(db, user_id, n),
-        "places": _place_ranking(db, user_id),
+        "places": _place_ranking(db, user_id, b["places"]),
         # Der Leerstring heißt „nachgesehen, gibt es hier nicht" (A39) und ist
         # keine Stadt — er fällt hier genauso weg wie NULL.
         "cities": _ranked(db, user_id, Location.city,
-                          Event.location_id == Location.id, Location.city != ""),
+                          Event.location_id == Location.id, Location.city != "",
+                          baseline_days=b["cities"]),
         "countries": _ranked(db, user_id, Location.country,
                              Event.location_id == Location.id,
-                             Location.country != ""),
-        "years": [{"name": str(int(y)), "days": d, "events": e}
-                  for y, d, e in year_rows],
+                             Location.country != "",
+                             baseline_days=b["countries"]),
+        "years": _merge_baseline(
+            [{"name": str(int(y)), "days": d, "events": e} for y, d, e in year_rows],
+            {str(y): n for y, n in b["years"].items()}),
+        # **Kategorien bekommen den Grundort NICHT**, und das ist keine Lücke:
+        # ein abgeleiteter Tag hat keine Kategorie. Ihm eine zu geben — und sei
+        # es „event" — hieße, eine Aussage zu erfinden, die niemand gemacht hat.
         "categories": _ranked(db, user_id, Event.category),
         "streaks": _streaks(db, user_id),
+        "baseline_days": b["total"],
     }
 
 

@@ -72,7 +72,16 @@ $running = Test-Path (Join-Path $Data "postmaster.pid")
 if (-not $running) {
     Write-Host -NoNewline "Starte PostgreSQL auf $Port "
     # -h 127.0.0.1: nur lokal erreichbar. -F: kein fsync (Testdaten, Tempo).
-    & $pg_ctl -D $Data -l $Log -o "-p $Port -h 127.0.0.1 -F" -w start 2>&1 | Out-Null
+    #
+    # **`lc_messages=C` ist kein Schönheitsfehler, sondern der Unterschied
+    # zwischen einer Fehlermeldung und keiner.** Ein deutsch installiertes
+    # PostgreSQL meldet in `German_Germany.1252` — „Datenbank »x« existiert
+    # nicht" enthält also Byte 0xbb. `psycopg2` dekodiert Servermeldungen als
+    # UTF-8 und wirft darüber `UnicodeDecodeError`, BEVOR die eigentliche
+    # Meldung jemanden erreicht. Jeder echte Befund dieses Laufs — genau die
+    # Klasse, für die es ihn gibt — käme so als Kodierungsfehler an. Kostet
+    # nichts und macht den Lauf erst lesbar.
+    & $pg_ctl -D $Data -l $Log -o "-p $Port -h 127.0.0.1 -F -c lc_messages=C" -w start 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) {
         Get-Content $Log -Tail 20 -ErrorAction SilentlyContinue
         throw "Server-Start fehlgeschlagen (siehe $Log)."
@@ -84,9 +93,17 @@ if (-not $running) {
 # Riegel in conftest.py).
 # Fehlt die DB, gibt psql GAR nichts zurück ($null) — `"$exists"` macht daraus
 # einen leeren String, damit .Trim() nicht auf null läuft.
+#
+# **`2>$null` verschluckte hier jeden Grund.** Scheiterte `psql` selbst (Server
+# noch nicht bereit, falscher Port), war `$exists` leer — also „gibt es nicht" —
+# und `createdb` scheiterte gleich hinterher, nur eben mit einer Meldung, die
+# niemand las. Der Rückgabewert wird deshalb geprüft, statt aus dem leeren
+# Ergebnis eine Diagnose zu raten.
 $exists = & $psql -U postgres -h 127.0.0.1 -p $Port -d postgres -tAc `
-    "SELECT 1 FROM pg_database WHERE datname='$Db'" 2>$null
+    "SELECT 1 FROM pg_database WHERE datname='$Db'"
+if ($LASTEXITCODE -ne 0) { throw "psql erreicht den Cluster auf $Port nicht." }
 if ("$exists".Trim() -ne "1") {
+    Write-Host "Lege Testdatenbank '$Db' an ..."
     & $createdb -U postgres -h 127.0.0.1 -p $Port $Db
     if ($LASTEXITCODE -ne 0) { throw "createdb '$Db' fehlgeschlagen." }
 }

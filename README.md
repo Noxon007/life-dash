@@ -81,14 +81,21 @@ confirmed record — and it makes the imports below much easier to judge.
 5. **Split multi-day entries into days**, if trips and albums have produced
    them. Each day becomes its own entry, so each day can carry its own weather
    and its own photos.
-6. **Add weather.** Last on purpose: it asks an archive (Open-Meteo) about each
-   located, dated entry exactly once and keeps the answer forever, so it pays
-   off most when the entries above already exist. It only ever adds — nothing
-   you confirmed is overwritten.
-7. **Take a backup** (*Backup & restore*, with photos = a ZIP). Do this once the
+6. **Enter your baseline locations**, for the years you never recorded
+   anything: a period and a place — “from my birth until 2006, my parents'
+   house in Bad Segeberg”. Every day in that period with no entry then counts
+   as a day at that place, in the timeline and in every statistic. No entries
+   are created for it: the period stays one row, so a correction recomputes
+   everything instead of leaving thousands of wrong entries behind. Before the
+   weather on purpose — the run below fills those days too.
+7. **Add weather.** Last on purpose: it asks an archive (Open-Meteo) about each
+   located, dated entry — and each baseline day — exactly once and keeps the
+   answer forever, so it pays off most when everything above already exists. It
+   only ever adds — nothing you confirmed is overwritten.
+8. **Take a backup** (*Backup & restore*, with photos = a ZIP). Do this once the
    instance holds something you would miss.
 
-Steps 3, 4 and 6 also run unattended: the **Jobs** tab has a nightly schedule
+Steps 3, 4 and 7 also run unattended: the **Jobs** tab has a nightly schedule
 per run type, which is the sensible setting once the first pass is done.
 
 Once there is something to look at, two switches are worth knowing. On the map

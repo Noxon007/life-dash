@@ -275,25 +275,36 @@ def tracked_modules(db: Session, user_id: str | None) -> list[str] | None:
     return tracked if isinstance(tracked, list) else None
 
 
-def _resolve_location(db: Session, ex: ExtractedEvent, user_id: str | None) -> Location | None:
-    if not ex.location_name:
+def resolve_place(db: Session, user_id: str | None, place: str,
+                  lat: float | None = None, lng: float | None = None
+                  ) -> Location | None:
+    """Ortsname → `Location`: vorhandenen nehmen, sonst geocodieren und anlegen.
+
+    **Öffentlich seit F20**, weil der Grundort denselben Ort braucht wie ein
+    Ereignis. Ihn dort ein zweites Mal aufzulösen hieße, drei Regeln ein zweites
+    Mal aufzuschreiben — welche Namensbausteine gelten (A25/A28), welche Sprache
+    Nominatim antwortet (F10) und dass `city`/`country`/`address` mitkommen
+    (A39/F4/Anmerkung 110). Genau daraus entstünden zwei Ortsbestände, die sich
+    beim ersten Umzug widersprechen.
+    """
+    if not place:
         return None
     existing = (
         db.query(Location)
-        .filter(Location.user_id == user_id, Location.name.ilike(ex.location_name))
+        .filter(Location.user_id == user_id, Location.name.ilike(place))
         .first()
     )
     if existing:
         return existing
 
-    lat, lng, ltype, name = ex.location_lat, ex.location_lng, None, ex.location_name
+    ltype, name = None, place
     geo = None
     # Präzise Adresse per Geocoding auflösen (bis Straße/Hausnummer).
     # Der Nutzer wird VOR dem Aufruf geladen: seine UI-Sprache bestimmt, in
     # welcher Sprache Nominatim antwortet (F10), seine Bausteine den Namen.
     user = db.get(User, user_id) if user_id else None
     if settings.geocoding_enabled:
-        geo = geocode(ex.location_name, lang_for(user))
+        geo = geocode(place, lang_for(user))
         if geo:
             lat, lng, ltype = geo["lat"], geo["lng"], geo.get("type")
             # Kompakter Anzeige-Name aus den gewählten Bausteinen statt der
@@ -311,6 +322,11 @@ def _resolve_location(db: Session, ex: ExtractedEvent, user_id: str | None) -> L
     db.add(location)
     db.flush()
     return location
+
+
+def _resolve_location(db: Session, ex: ExtractedEvent, user_id: str | None) -> Location | None:
+    return resolve_place(db, user_id, ex.location_name or "",
+                         ex.location_lat, ex.location_lng)
 
 
 def _resolve_entity(
