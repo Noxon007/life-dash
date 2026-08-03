@@ -102,8 +102,28 @@ any `MINOR`.
   and expanding it now shows exactly those twelve — before, it also pulled in
   that day's Google visits, so the expanded list could be longer than the
   number above it.
+- **The weather is back on the map.** Marker popups and the stop list beside
+  the map had shown no weather at all for a while — not because it was missing,
+  but because the second request that fetches it was reading the answer in a
+  shape the server had stopped sending. Nothing looked broken: a map without
+  weather looks exactly like a map whose entries do not have any yet. A failed
+  fetch is also no longer remembered as “this period has no weather”, so a
+  brief network hiccup no longer costs you the weather for that period until
+  you reload.
+- **“Paths travelled” now shows when it cannot draw anything.** Above month
+  view the paths are deliberately left out — a year of them is tens of
+  thousands of lines and would lock the browser up — but the switch stayed lit
+  as though it were working. It is now struck through with the reason, the same
+  way the other map switches already were, and your choice survives the zoom
+  change.
 
 ### Changed
+- **The map loads about half as much, twice as fast.** At twenty thousand
+  entries opening the map tab moved 6.1 MB in 0.64 s; it is now 2.7 MB in
+  0.19 s. Nothing was dropped: photo dots are simply sent as dots — a position,
+  a time and the picture they belong to — instead of as complete entries with
+  a title, a category and a place record the map never displays. What you see
+  and what you can click is unchanged.
 - **The concept document has been split.** `docs/KONZEPT.md` keeps what
   Life-Dash is and where it is going; the numbered decisions with their
   reasoning moved into **`docs/DECISIONS.md`**. Nothing was deleted and the

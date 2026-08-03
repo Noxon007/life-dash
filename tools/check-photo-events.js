@@ -101,8 +101,22 @@ function makeDom(photoCount) {
         let body = [];
         const wantsPhotos = !/[?&]photos=0/.test(p);
         if (/events\/map/.test(p)) {
-          const evs = wantsPhotos && photoCount ? [PHOTO_EVENT, HAND_EVENT] : [HAND_EVENT];
-          body = { total: photoCount ? photoCount + 1 : 1, shown: evs.length, events: evs };
+          // **Anmerkung 157: die echte Antwortform.** Fotos kommen kompakt
+          // (`[lat, lng, Zeit, Asset, Ort-Index, Kategorie-Index]`), Pins als
+          // Ereignisse. Vorher legte dieses Doppel das Foto-EREIGNIS in
+          // `events` — die Form, die der Server bis Anmerkung 157 schickte.
+          // Damit hätte der Wächter die Umstellung nicht bemerkt und
+          // stattdessen weiter einen Weg geprüft, den es nicht mehr gibt: ein
+          // Doppel, das eine Form nachbaut, die der Server nicht mehr spricht,
+          // ist keine Vereinfachung, sondern eine andere Funktion (Anm. 116).
+          const evs = [HAND_EVENT];
+          const photos = wantsPhotos && photoCount
+            ? { places: ['Detmold'], cats: ['event'],
+                points: [[51.93, 8.87, '2024-07-12T10:00:00', ASSET, 0, 0]] }
+            : { places: [], cats: [], points: [] };
+          body = { total: photoCount ? photoCount + 1 : 1,
+                   shown: evs.length + photos.points.length,
+                   events: evs, photos };
         } else if (/events\/index/.test(p)) {
           body = { total: 2, dated: 2, undated: 0, unconfirmed: 0, fuzzy: 0,
                    years: [{ year: 2024, count: 2 }], visits: 3,
@@ -201,6 +215,19 @@ setTimeout(async () => {
   // nächsten bequemen `L.circleMarker(...)` sofort umfällt.
   ok('…und dabei entsteht kein Leaflet-Objekt je Foto', drawn.circle === 0,
      `${drawn.circle} Einzelobjekte — genau die Last, die den Tab umbrachte`);
+  // **Anmerkung 157.** Der Punkt kommt kompakt an und wird hier wieder zu
+  // einem Punkt mit Ort, Zeit und Bild — aber ohne Ereigniskennung. Beides
+  // wird geprüft: dass die Entpackung stimmt (sonst zeichnete die Ebene
+  // `undefined`-Koordinaten und wäre trotzdem „ein Punkt lang"), und dass
+  // niemand die Kennung der Vollständigkeit halber zurücklegt.
+  ok('…der kompakte Punkt trägt Ort, Zeit und Asset',
+     inPage(w, "mpPhotoPoints[0] && mpPhotoPoints[0].location.name") === 'Detmold'
+     && inPage(w, "mpPhotoPoints[0] && mpPhotoPoints[0].location.lat") === 51.93
+     && inPage(w, "mpPhotoPoints[0] && mpPhotoPoints[0].photo") === ASSET,
+     JSON.stringify(inPage(w, 'JSON.stringify(mpPhotoPoints[0])')));
+  ok('…und KEINE Ereigniskennung',
+     inPage(w, "mpPhotoPoints[0] && mpPhotoPoints[0].id") === undefined,
+     '36 Zeichen je Punkt für etwas, das die Karte nie öffnet (Anm. 139)');
   const popup = typeof w.photoPopupHtml === 'function'
     ? String(w.photoPopupHtml(PHOTO_EVENT)) : '(photoPopupHtml fehlt)';
   ok('…und das Bild hängt im Popup', popup.includes(`/api/photos/${ASSET}/thumb`),

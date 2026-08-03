@@ -416,7 +416,13 @@ def test_empty_database_answers_everywhere(db, user):
     idx = events_index(db=db, user=user)
     assert idx.total == 0 and idx.years == [] and idx.birth is None
     assert idx.year_min is None and idx.visits == 0
-    assert list_map_events(db=db, user=user) == {"total": 0, "shown": 0, "events": []}
+    assert list_map_events(db=db, user=user) == {
+        "total": 0, "shown": 0, "events": [],
+        # Anmerkung 157: der Foto-Block ist LEER, nicht abwesend. Ein Feld, das
+        # bei leerer Datenbank fehlt, zwingt jeden Leser zu `r.photos || {}` —
+        # und der eine, der es vergisst, stolpert genau bei der frischen
+        # Installation, die dieser Test absichert.
+        "photos": {"places": [], "cats": [], "points": []}}
     ov = compute_overview(db, user.id)
     assert ov["counts"]["events"] == 0 and ov["per_year"] == []
 

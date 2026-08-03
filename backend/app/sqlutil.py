@@ -69,7 +69,8 @@ def weather_cell(lat_col, lng_col):
     return func.round(lat_col * 10) * 3601 + func.round(lng_col * 10)
 
 
-def even_spread(db, entity, query, id_col, order_col, limit: int, total: int):
+def even_spread(db, entity, query, id_col, order_col, limit: int, total: int,
+                selection=None):
     """`limit` Zeilen, GLEICHMÄSSIG über die Reihenfolge verteilt statt vorne.
 
     **Deckeln heißt nicht abschneiden.** `ORDER BY … LIMIT 1000` liefert die
@@ -93,6 +94,14 @@ def even_spread(db, entity, query, id_col, order_col, limit: int, total: int):
     und, unangewandt, bei den Gruppen-Vorschaubildern) — der Anmerkung-106-Fall
     in seiner leisesten Form. Sie steht deshalb hier, wo jeder sie findet, der
     dieselbe Frage stellt.
+
+    **`selection` gibt SPALTEN statt Objekten zurück** (Anmerkung 157). Wer
+    zehntausende Zeilen deckelt, will sie meistens gerade NICHT als ORM-Objekte
+    laden — das war die Lehre aus Anmerkung 80 (der Preis ist das Erzeugen
+    jeder Zeile, nicht das Finden). Gebaut wird dann über `query.with_entities`,
+    damit die Verknüpfungen und Filter der übergebenen Abfrage erhalten
+    bleiben: ein frisches `db.query(Location.name, …)` hätte den Join auf
+    `Location` verloren und stillschweigend ein Kreuzprodukt geliefert.
     """
     numbered = (query.with_entities(
         id_col.label("pid"),
@@ -100,7 +109,9 @@ def even_spread(db, entity, query, id_col, order_col, limit: int, total: int):
     # `* 1.0` erzwingt die Division mit Nachkommastellen: SQLite teilt zwei
     # ganze Zahlen ganzzahlig, und dann stünde links wie rechts dasselbe.
     scaled = lambda n: func.floor(n * limit * 1.0 / total)  # noqa: E731
-    return (db.query(entity)
+    outer = (query.with_entities(*selection) if selection is not None
+             else db.query(entity))
+    return (outer
             .join(numbered, numbered.c.pid == id_col)
             .filter(scaled(numbered.c.rn - 1) < scaled(numbered.c.rn))
             .order_by(order_col)

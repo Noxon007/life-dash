@@ -2699,6 +2699,7 @@ const I18N_EN = {
   'map.route.blocked': "Not possible while points are merged — there is no order left to show.",
   'map.tracks': "🛰️ Paths travelled",
   'map.tracks.tip': "The paths you actually travelled, from the timeline import — real recordings, coloured by how you moved.",
+  'map.tracks.blocked': "Only up to month view — a year of paths is tens of thousands of lines, and drawing them freezes the browser. Zoom in to see them.",
   'map.group.tip': "Merges points that sit close together: per place from month view up (“59× Home”), by proximity in day and week view. Off means every visit on its own.",
   'map.fs.tip': "Map in fullscreen (Esc exits)",
   'tl.visits.chip': "🛰️ Auto-detected",
@@ -7383,6 +7384,13 @@ const mp = { mode: 'day', periods: [], index: 0, showRoute: true, showTracks: tr
 const SETTINGS = { map_cluster_min: 50 };
 function mpClusterMin() { return SETTINGS.map_cluster_min || 50; }
 
+// **Bis zu welcher Zoomstufe Wege gezeichnet werden — die EINE Antwort.**
+// Sie steht hier und nicht in `drawTracks`, weil zwei Stellen sie brauchen:
+// der Zeichner und der Schalter, der sagen muss, ob er gerade etwas bewirkt.
+// Zwei Kopien wären zwei Regeln, und die laufen still auseinander (Anm. 106) —
+// hier besonders leise, weil die eine Hälfte nur eine Beschriftung ist.
+const TRACK_ZOOMS = ['day', 'week', 'month'];
+
 // A40 (Anmerkung 92): „Reihenfolge verbinden" kann nicht gezeichnet werden,
 // solange Punkte zusammengefasst sind — es gibt dann keine Reihenfolge, die
 // eine Linie zeigen könnte. Bis 0.33 blieb der Schalter dabei aktiv aussehen
@@ -7395,7 +7403,30 @@ function mpSyncChips(condensed) {
   chip.title = condensed
     ? t('map.route.blocked', 'Nicht möglich, solange Punkte zusammengefasst sind — dann gibt es keine Reihenfolge zu zeigen.')
     : t('map.route.tip', 'Verbindet die Orte dieses Zeitraums in ihrer zeitlichen Reihenfolge — eine gedachte Linie, kein gefahrener Weg. Bei zusammengefassten Punkten gibt es keine Reihenfolge zu zeigen.');
+  mpSyncTrackChip();
   mpSyncPhotoChip();
+}
+// **Anmerkung 154 (b) — A40 zum dritten Mal an derselben Leiste.**
+// `drawTracks` kehrt oberhalb der Monats-Ansicht sofort zurück, und das ist
+// richtig: nach einem Timeline-Import wären es zehntausende Polylinien
+// (Anmerkung 141 hat genau daran die Wochenansicht eingefroren). Falsch war
+// nur, dass der Schalter weiter leuchtete, als zeichnete er — wer ihn in der
+// Jahresansicht drückt, sieht keinen Unterschied und schließt daraus auf die
+// Karte statt auf die Zoomstufe.
+//
+// `.inert` und nicht `.off`: ausgeschaltet hat der NUTZER, außer Kraft ist es
+// die Ansicht. Der Unterschied ist der ganze Punkt von A40 — der Zustand bleibt
+// erhalten und gilt wieder, sobald man weit genug hineinzoomt.
+function mpSyncTrackChip() {
+  const chip = document.getElementById('mp-tracks-toggle');
+  if (!chip) return;
+  const blocked = !TRACK_ZOOMS.includes(mp.mode);
+  chip.classList.toggle('inert', blocked);
+  chip.classList.toggle('active', !blocked && mp.showTracks);
+  chip.classList.toggle('off', !blocked && !mp.showTracks);
+  chip.title = blocked
+    ? t('map.tracks.blocked', 'Nur bis zur Monats-Ansicht — ein Jahr Wege sind zehntausende Linien, und die zu zeichnen friert den Browser ein. Näher heranzoomen, dann sind sie da.')
+    : t('map.tracks.tip', 'Die tatsächlich zurückgelegten Wege aus dem Timeline-Import — echte Aufzeichnungen, eingefärbt nach Fortbewegungsart');
 }
 // A40, derselbe Satz für die Foto-Ebene: Ein Bedienelement, das gerade nichts
 // bewirken kann, muss das ZEIGEN. Solange kein Foto verortet ist, wäre der
@@ -7515,6 +7546,19 @@ function mpJumpToDate(dateStr) {
 // Kartenpunkt 799 — über eine ganze Lebensdatenbank wäre es der größte Posten
 // der Antwort, dabei zeigt es nur, was gerade auf dem Schirm ist (Popup und
 // Stopp-Liste). Also: Punkte einmal, Wetter je angezeigtem Zeitraum.
+//
+// **Anmerkung 157 — und genau hier war es seit Anmerkung 139 still kaputt.**
+// Der Endpunkt antwortete bis dahin mit einer LISTE; seit dem Deckel-Hinweis
+// (Anmerkung 110, endgültig mit 139) antwortet er mit einem Objekt
+// `{total, shown, events}`. Diese Stelle las weiter `wx.map(…)` — was auf einem
+// Objekt keine Funktion ist, also warf, also im `catch` landete, das für „ohne
+// Netz kein Wetter" gedacht war. Ergebnis: das Wetter im Marker-Popup und in
+// der Stopp-Liste fehlte vollständig, und `MP_WX` hatte den Zeitraum bereits
+// als geladen vermerkt, also kam es auch beim nächsten Blick nicht wieder.
+// **Ein `catch`, das zwei verschiedene Fehler auf dieselbe Stille abbildet, ist
+// die Sorte Auffangnetz, die den Defekt trägt statt ihn zu melden** (Anmerkung
+// 112 in derselben Form). Der Aufruf lässt die Fotos deshalb jetzt auch weg:
+// er fragt nach Wetter für die PINS, und ein Foto-Popup zeigt keins.
 const MP_WX = new Map();   // Zeitraum-Schlüssel -> geladen
 async function mpEnsureWeather(key, items) {
   if (!items.length || MP_WX.has(key)) return false;
@@ -7523,14 +7567,21 @@ async function mpEnsureWeather(key, items) {
   try {
     const wx = await api(`/api/events/map?${new URLSearchParams({
       from: dates[0].slice(0, 19), to: dates[dates.length - 1].slice(0, 19),
-      weather: '1' })}`);
-    const byId = new Map(wx.map(e => [e.id, e.weather]));
+      photos: '0', weather: '1' })}`);
+    const byId = new Map((wx.events || []).map(e => [e.id, e.weather]));
     let hit = false;
     mp.located.forEach(e => {
       if (byId.has(e.id) && byId.get(e.id)) { e.weather = byId.get(e.id); hit = true; }
     });
+    // Ein Zeitraum ohne Wetter ist nicht dasselbe wie ein Abruf, der nicht
+    // ankam: nur der geglückte Abruf bleibt vermerkt, sonst gilt ein
+    // Fehlschlag für immer als beantwortet (die Endlos-Falle in ihrer
+    // Umkehrung, wie in `mpLoadPoints`).
     return hit;
-  } catch (_) { return false; }   // ohne Wetter bleibt die Karte vollständig
+  } catch (_) {
+    MP_WX.delete(key);
+    return false;                 // ohne Wetter bleibt die Karte vollständig
+  }
 }
 
 // Holt die Kartenpunkte. Anmerkung 139: der Foto-Schalter geht MIT — ein
@@ -7549,6 +7600,36 @@ async function mpEnsureWeather(key, items) {
 // Weile etwas Falsches und danach etwas Richtiges, beides ohne Anlass; diese
 // Kennung ist entweder gleich oder nicht. In den Schlüssel gehört auch der
 // Foto-Schalter — er ändert die ANFRAGE, nicht nur die Anzeige.
+// **Anmerkung 157: die Fotos kommen kompakt und werden hier wieder zu Punkten.**
+//
+// Auf der Leitung ist ein Foto kein Ereignis, sondern `[lat, lng, Zeit, Asset,
+// Ort-Index, Kategorie-Index]` — gemessen 4,0 statt 0,7 MB bei 13.000 Fotos,
+// weil ein volles Ereignis Titel, Präzision, Quelle, eine Ereignis- und eine
+// Ortskennung mitbringt, von denen die Karte nichts zeigt (Anmerkung 140 hatte
+// genau das gemessen und liegen gelassen).
+//
+// Im Speicher bekommen sie trotzdem dieselbe Gestalt wie jeder andere Punkt.
+// Das ist Absicht: `mpFiltered`, `periodKey`, `rebuildPeriods` und die
+// Foto-Ebene fragen alle nach `e.location.lat`, `e.date_start`, `e.category` —
+// eine zweite Gestalt hieße, jede dieser Stellen müsste beide kennen, und die
+// eine, die es vergisst, lässt die Fotos still aus (Anmerkung 106).
+//
+// **Eine Ereignis-Kennung haben sie nicht**, und das ist kein Versehen: das
+// Popup eines Fotos zeigt das Bild, nie den Bearbeiten-Dialog (Anmerkung 139).
+// Wer `e.id` von einem Punkt liest, bekommt `undefined` und muss sich fragen,
+// warum er es tut.
+function expandPhotoPoints(block) {
+  if (!block || !Array.isArray(block.points)) return [];
+  const places = block.places || [], cats = block.cats || [];
+  return block.points.map(([lat, lng, at, asset, pi, ci]) => ({
+    source: 'immich',
+    category: cats[ci] || 'event',
+    date_start: at,
+    photo: asset,
+    location: { name: places[pi] || '', lat, lng },
+  }));
+}
+
 async function mpLoadPoints(force) {
   const qs = new URLSearchParams({ machine_proposals: '0' });
   if (!mp.showPhotos) qs.set('photos', '0');
@@ -7560,7 +7641,7 @@ async function mpLoadPoints(force) {
   if (!force && stamp && stamp === mp.loadedFor && mp.located.length) return;
   try {
     const r = await api(`/api/events/map?${qs}`);
-    mp.located = r.events || [];
+    mp.located = (r.events || []).concat(expandPhotoPoints(r.photos));
     mp.mapTotal = r.total || 0;
     mp.mapShown = r.shown || 0;
     mp.loadedFor = stamp;
@@ -7662,8 +7743,10 @@ async function drawTracks(key) {
   mpTrackNote(null);
   if (!mp.showTracks) return;
   // Routen nur bis Monats-Zoom — bei Jahr/Jahrzehnt/Alles wären es nach einem
-  // Timeline-Import zehntausende Polylinien (Browser friert ein)
-  if (!['day', 'week', 'month'].includes(mp.mode)) return;
+  // Timeline-Import zehntausende Polylinien (Browser friert ein). Die Grenze
+  // steht in `TRACK_ZOOMS`, weil der Schalter sie ebenfalls braucht: er muss
+  // sagen, dass er hier nichts bewirkt (Anmerkung 154 b).
+  if (!TRACK_ZOOMS.includes(mp.mode)) return;
   const cacheKey = mp.mode + ':' + key;
   let res = trackCache.get(cacheKey);
   if (!res) {
@@ -7736,6 +7819,10 @@ function renderPeriod() {
   };
   if (!mp.periods.length) {
     mapTracks.clearLayers();
+    // Auch hier: ob Wege gezeichnet werden KÖNNEN, hängt an der Zoomstufe und
+    // nicht am Inhalt. Ohne diese Zeile bliebe der Schalter in der leeren
+    // Ansicht auf dem Stand von vorhin stehen.
+    mpSyncTrackChip();
     mpDrawPhotos([]);
     mpCapNote(0, 0);
     mpPhotoNote(null);
@@ -8167,9 +8254,12 @@ document.getElementById('mp-route-toggle').addEventListener('click', function ()
   renderPeriod();
 });
 document.getElementById('mp-tracks-toggle').addEventListener('click', function () {
+  // Der Klick bleibt auch im `inert`-Zustand erlaubt und schaltet die WAHL um:
+  // außer Kraft ist die Ansicht, nicht der Wunsch — wer in der Jahresansicht
+  // ausschaltet und hineinzoomt, findet es aus vor. Die Klassen setzt
+  // `mpSyncTrackChip`, sonst stünden hier und dort zwei Antworten auf „wie
+  // sieht der Schalter gerade aus?" (Anmerkung 106).
   mp.showTracks = !mp.showTracks;
-  this.classList.toggle('active', mp.showTracks);
-  this.classList.toggle('off', !mp.showTracks);
   renderPeriod();
 });
 // A5/A40: Verdichtung ein/aus — ein Schalter für Bündeln UND Clustern

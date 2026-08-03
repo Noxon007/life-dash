@@ -585,7 +585,8 @@ def list_events(
               if condense and group != "point" else {})
     return [event_to_read(e, slim=True, weather=w, child_count=kids.get(e.id),
                           group=groups.get(e.id))
-            for e, w in zip(events, _weather_for(db, user.id, events))]
+            for e, w in zip(events, _weather_for(db, user.id,
+                                                 [e.id for e in events]))]
 
 
 # --------------------------------------------------------------------------- #
@@ -803,19 +804,23 @@ def _child_counts(db: Session, user_id: str, events: list[Event]) -> dict[str, i
     return out
 
 
-def _weather_for(db: Session, user_id: str, events: list[Event]) -> list[dict | None]:
+def _weather_for(db: Session, user_id: str, ids: list[str]) -> list[dict | None]:
     """Kompaktes Wetter je Ereignis in EINER Tupel-Abfrage (kein ORM je Metrik).
 
     A36 holte das Wetter für alle Ereignisse des Nutzers auf einmal — bei einer
     Seite von 300 Einträgen wären das weiterhin 190.000 Zeilen. A37 fragt nur
     die Ereignisse der Seite ab. `weather_rev` ist ein interner Marker.
 
+    Nimmt **Kennungen**, nicht Ereignisse (Anmerkung 157): seit die Karte ihre
+    Punkte als Tupel liest, gibt es dort kein `Event`-Objekt mehr, und ein
+    Parameter, der eines verlangt, hätte genau das erzwungen, was der Umbau
+    abschafft.
+
     Der Join auf `Event` bleibt trotz der ID-Einschränkung stehen: A12 verlangt
     die Nutzer-Einschränkung in JEDER Abfrage, ohne Ausnahme (siehe
     `_child_counts`)."""
-    if not events:
+    if not ids:
         return []
-    ids = [e.id for e in events]
     wx: dict[str, dict] = {}
     # In Blöcken, damit die IN-Liste keine Parameter-Grenze reißt (SQLite: 999)
     for i in range(0, len(ids), 500):
@@ -828,7 +833,7 @@ def _weather_for(db: Session, user_id: str, events: list[Event]) -> list[dict | 
                 .all())
         for eid, key, value, value_text in rows:
             wx.setdefault(eid, {})[key] = value_text if value_text is not None else value
-    return [wx.get(e.id) for e in events]
+    return [wx.get(eid) for eid in ids]
 
 
 # --------------------------------------------------------------------------- #
@@ -1044,6 +1049,61 @@ def events_index(
 # abzuschneiden (`sqlutil.even_spread`).
 MAP_MAX_POINTS = 50000
 
+# Anmerkung 157: die Spalten, die ein Kartenpunkt braucht — und nur die.
+#
+# Vorher lud der Endpunkt `Event`-OBJEKTE samt `selectinload(location)`. Bei
+# 20.000 Punkten sind das 20.000 ORM-Objekte plus 20.000 Ortszeilen, für einen
+# Aufruf, der nichts davon behält. Das ist die Lehre aus Anmerkung 80 in ihrer
+# zweiten Auflage: der Preis ist das ERZEUGEN jeder Zeile, nicht das Finden —
+# ein Index hilft dagegen nichts, eine Tupel-Abfrage alles.
+_MAP_COLS = (Event.id, Event.title, Event.category, Event.date_start,
+             Event.date_precision, Event.source, Event.external_id,
+             Location.id.label("loc_id"), Location.name.label("loc_name"),
+             Location.lat, Location.lng)
+
+
+def _photo_block(rows) -> dict:
+    """Foto-Punkte in ihrer kompakten Form (Anmerkung 157).
+
+    **Ein Fotopunkt ist kein Ereignis auf der Leitung, sondern ein Punkt.**
+    Gemessen bei 20.000 Ereignissen waren es 6,1 MB, weil jedes Foto sein
+    volles Ereignis mitbrachte: Titel („Foto in Detmold" — auf der Karte steht
+    er nirgends), Kategorie, Präzision, Quelle und einen verschachtelten Ort
+    mit eigener Kennung. Anmerkung 140 hatte das gemessen und ausdrücklich
+    liegen lassen; hier ist es abgeräumt.
+
+    Gezeigt wird von einem Foto genau dreierlei: **der Punkt** (Koordinate),
+    **das Bild** (Asset-Kennung fürs Vorschaubild) und **die Beschriftung im
+    Popup** (Ortsname + Zeit). Dazu kommt die Kategorie, weil die Kartenleiste
+    danach filtert.
+
+    Zwei Entscheidungen, die man beim Lesen sonst für Sparsamkeit hielte:
+
+    * **Ortsname und Kategorie werden entdoppelt.** Zwanzigtausend Fotos
+      verteilen sich auf einige hundert Orte; der Name ist der längste Wert je
+      Punkt und derselbe für hunderte Punkte. Er steht deshalb einmal in
+      `places` und je Punkt nur sein Index.
+    * **Die Ereignis-Kennung geht NICHT mit.** Sie wäre der größte Einzelposten
+      (36 Zeichen je Punkt) für etwas, das die Karte nicht benutzt: das Popup
+      eines Fotos zeigt das BILD, nie den Bearbeiten-Dialog (Anmerkung 139 —
+      die Karte zeigt das Bild, der Zeitstrahl die Tatsache). Die Identität
+      eines Fotos ist ohnehin sein Asset (`external_id` = `immich:photo:<id>`);
+      wer das Ereignis dazu braucht, findet es darüber — eine Abfrage für einen
+      Klick statt 20.000 Kennungen bei jedem Laden.
+
+    Ebenso fehlt das **Wetter**: ein Foto-Popup zeigt keins, und ein Feld,
+    das immer `null` ist, ist ein Versprechen ohne Deckung.
+    """
+    places: dict[str, int] = {}
+    cats: dict[str, int] = {}
+    points: list[list] = []
+    for r in rows:
+        pi = places.setdefault(r.loc_name or "", len(places))
+        ci = cats.setdefault(r.category or "", len(cats))
+        points.append([r.lat, r.lng, r.date_start.isoformat(),
+                       photo_asset_of(r.external_id), pi, ci])
+    return {"places": list(places), "cats": list(cats), "points": points}
+
 
 @router.get("/map")
 def list_map_events(
@@ -1080,11 +1140,19 @@ def list_map_events(
     (🛰️ Google, 📷 Immich). Sie hier zu beantworten und nicht im Browser ist
     nicht Bequemlichkeit: ein ausgeschalteter Foto-Schalter soll die 20.000
     Punkte gar nicht erst über die Leitung schicken.
+
+    **Anmerkung 157 — zwei Formen in einer Antwort.** `events` sind Pins (Titel,
+    Kategorie, Datum, Ort, Wetter — alles davon steht im Popup oder in der
+    Stopp-Liste), `photos` sind Punkte in kompakter Form (siehe `_photo_block`).
+    Das ist kein Sonderfall, sondern die Trennung aus Anmerkung 139 eine Schicht
+    tiefer: Foto und Ereignis sind auf der Karte schon zwei Darstellungen, und
+    eine Darstellung, die vier Werte zeigt, muss nicht zwölf holen.
     """
-    query = (db.query(Event).options(selectinload(Event.location))
-             .filter(Event.user_id == user.id, Event.location_id.isnot(None))
-             .join(Event.location).filter(Location.lat.isnot(None),
-                                          Event.date_start.isnot(None)))
+    query = (db.query(*_MAP_COLS)
+             .select_from(Event)
+             .join(Location, Event.location_id == Location.id)
+             .filter(Event.user_id == user.id, Event.location_id.isnot(None),
+                     Location.lat.isnot(None), Event.date_start.isnot(None)))
     if date_from is not None:
         query = query.filter(Event.date_start >= date_from)
     if date_to is not None:
@@ -1099,34 +1167,42 @@ def list_map_events(
     cap = limit or MAP_MAX_POINTS
     total = query.count()
     if total <= cap:
-        events = query.order_by(Event.date_start.asc(), Event.id.asc()).all()
+        rows = query.order_by(Event.date_start.asc(), Event.id.asc()).all()
     else:
         # **Deckeln heißt nicht abschneiden.** `LIMIT 50000` über eine
         # Bibliothek von 2009 bis heute lieferte die Jahre bis etwa 2019 und
         # ließe alles danach von der Karte verschwinden, während sie voll
         # aussieht (dieselbe Regel wie bei den Wegen und bei A45).
-        events = even_spread(db, Event, query, Event.id, Event.date_start,
-                             cap, total)
-    wx = _weather_for(db, user.id, events) if weather else [None] * len(events)
+        #
+        # Der Deckel gilt über BEIDE Formen zusammen — er ist eine Aussage über
+        # die Karte, nicht über eine Ebene. Zwei getrennte Deckel wären zwei
+        # Hinweise, und der Nutzer sieht eine Karte.
+        rows = even_spread(db, Event, query, Event.id, Event.date_start,
+                           cap, total, selection=_MAP_COLS)
+    # Über den NAMEN und nicht über die Position: `Location.id` trägt deshalb
+    # ein Label, damit `r.id` eindeutig das Ereignis meint. Ein `r[5]` wäre
+    # genau die Zeile, die beim nächsten Spaltenwunsch still das Falsche liest.
+    pins = [r for r in rows if r.source != Source.immich]
+    photo_rows = [r for r in rows if r.source == Source.immich]
+    wx = (_weather_for(db, user.id, [r.id for r in pins]) if weather
+          else [None] * len(pins))
     return {
         "total": total,
-        "shown": len(events),
+        "shown": len(rows),
         "events": [
-            {**EventGeo(
-                id=e.id, title=e.title, category=e.category,
-                date_start=e.date_start, date_precision=e.date_precision,
-                source=e.source,
-                location=LocationGeo.model_validate(e.location), weather=w,
-            ).model_dump(mode="json"),
-             # Anmerkung 139: die Asset-Kennung für das Vorschaubild im Popup.
-             # Sie steht ohnehin schon im Platz (`external_id`); ein zweites
-             # Feld in der Datenbank wären zwei Angaben über dieselbe Sache
-             # (Anmerkung 106). Bei allem, was kein Foto ist, fehlt sie —
-             # `null` ist hier die richtige Antwort und nicht ein leerer String,
-             # der wie eine Kennung aussieht.
-             "photo": photo_asset_of(e.external_id)}
-            for e, w in zip(events, wx)
+            EventGeo(
+                id=r.id, title=r.title, category=r.category,
+                date_start=r.date_start, date_precision=r.date_precision,
+                source=r.source,
+                location=LocationGeo(id=r.loc_id, name=r.loc_name,
+                                     lat=r.lat, lng=r.lng),
+                weather=w,
+            ).model_dump(mode="json")
+            for r, w in zip(pins, wx)
         ],
+        # Anmerkung 157: die Fotos in kompakter Form. Getrennt und nicht als
+        # zwölftes Feld an jedem Punkt — der Unterschied ist 4,0 MB.
+        "photos": _photo_block(photo_rows),
     }
 
 

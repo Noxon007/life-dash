@@ -675,3 +675,48 @@ build**, because the honest answer to it is a decision and not a patch.
     **Own endpoint, fetched only when the view is opened** (A37: a view pays for what it shows). Ties are broken by days, then entries, then name — the second stage is the statement (of two categories tied at one day, the one with more entries is the intended answer), the third is what makes the ranking the same on the next load.
 
     **Two places where a number would have been dishonest.** The longest **gap** is measured only between the first and the last recorded day: the time before the first entry is not a gap, it is the time before the first entry, and reporting it as “longest gap: 8 000 days” would be a statement about when recording started, dressed as a finding about a life (what to do with it depends on note 144, which is open). And the longest **trip** is the longest *recorded* trip — the longest multi-day `trip` event — not “the longest stretch away from home”, which would be an inference from imported visits and answers a different question.
+
+**Round of 2026-08-03, third pass (notes 157–159), on `main`, no version bump.**
+No new report this time — the starting point was the list of things earlier
+rounds had **measured and deliberately left lying**, filtered down to what
+needs no decision from the author. Three items came out of it: the map payload
+that note 140 named as “the honest next step”, a defect that fell out of the
+work while reading the same code path, and the one finding of note 154 that is
+a rule violation rather than a design choice.
+
+157. ✅ **The map payload — note 140's leftover, now cleared.** Measured then, measured again before touching anything (`tools/_measure_api.py`, 20 000 entries): `/api/events/map` answered in **643 ms with 6.1 MB**, and it does so every time the tab is opened with a changed corpus. Note 140 had written down exactly what was wrong — “a photo dot needs four values, not a full event” — and left it, because that round had already reshaped the endpoint twice.
+
+    **A photo is not an event on the wire, it is a point.** Each of the 13 000 photo entries carried a title (“Foto in Detmold”, which appears nowhere on the map), a category, a precision, a source, an event id, and a nested location with its own id — about 300 bytes for something that draws a circle and, on click, shows a thumbnail, a place name and a time. Photos now travel as `photos: {places, cats, points}` with one row per point (`[lat, lng, time, asset, place index, category index]`), pins keep the shape they need for popup and stop list. **The place name is the longest value per point and the same for hundreds of them**, so it is interned; the category is, because the map's filter bar asks for it.
+
+    **The event id deliberately does not travel.** It would be the single largest item left (36 characters per point) for something the map never uses: a photo's popup shows the picture, never the edit dialog — that is note 139's split, and this is it one layer down. A photo's identity is its asset anyway (`external_id` = `immich:photo:<id>`), so one lookup for one click beats 20 000 ids on every load. `test_anm157_map_payload.py` pins that as an assertion, because it is the one that falls over the moment somebody puts the id back “for completeness” and takes half the saving with it.
+
+    **The second half was the query, and it was the older lesson.** The endpoint built 20 000 ORM objects plus their eagerly loaded locations for a response that keeps none of them — note 80's finding in its second edition (*the price is creating each row, not finding it; an index does nothing against that*). It is a tuple query now; `even_spread` grew an optional `selection` for it, built through `query.with_entities` so the joins and filters of the passed query survive — a fresh `db.query(Location.name, …)` would have lost the join to `Location` and quietly returned a cross product.
+
+    **Measured after: 188 ms and 2.7 MB** — the photo half fell from 4.05 MB to 0.74 MB, and the half that remains is the pins, which is the honest cost of what they show. The cap stays over both kinds together: it is a statement about the map, not about a layer, and two caps would be two notices for one screen.
+
+158. ✅ **The map has had no weather since note 139, and nothing said so.** Found while reading the same code path, not reported — which is the point of writing it down. `/api/events/map` used to answer with a **list**; since the cap notice it answers with `{total, shown, events}`. The second call, the one that fetches weather for the displayed period, still did `wx.map(…)`. On an object that is not a function, so it threw, so it landed in the `catch` that exists for “no network, no weather” — and `MP_WX` had already marked the period as done, so it never came back either.
+
+    Nothing looked broken: a map without weather looks exactly like a map whose entries have no weather yet. **A `catch` that maps two different failures onto the same silence carries the defect instead of reporting it** (note 112 in the same shape, one file over). The failing fetch now releases its marker, so a one-off network error is no longer a permanently weatherless period, and the call carries `photos=0` — it asks for weather for the *pins*, and a photo popup shows none.
+
+    `tools/check-map-weather.js` is new, and it exists because this stretch had no guard at all — the reason a defect could sit in a released path unnoticed. Driven against the broken state it fails on the real bug, on the missing `photos=0`, and on the remembered failure.
+
+159. ✅ **Note 154 (b): the paths switch says when it cannot draw.** Of the four findings in note 154, three are design questions the author has to answer (which is why they are still open). This one is not: `drawTracks` returns immediately above month zoom — correct, tens of thousands of polylines is what froze the week view in note 141 — while the chip stayed lit as though it were drawing. `.filter-chip.inert` exists for exactly this since A40 (note 92) and is already on the route chip and the photo chip; this one was missed.
+
+    Two things worth keeping. The zoom limit now lives in **one** place (`TRACK_ZOOMS`), read by the drawer and by the switch: two copies would be two rules, and here especially quiet ones, because one half is only a label. And **`inert` is not `off`** — off is the user, inert is the view; the choice survives a zoom change and applies again when you zoom back in. The guard asserts that difference, because a switch that simply disabled itself would look identical and mean something else.
+
+    **The guard was green for the wrong reason twice before it was worth anything** (note 108, and this makes three). First it called `mpSyncTrackChip()` itself — then it passes as soon as the function *exists*, whether or not anybody calls it (this is `check-a41-cities.js`'s failure exactly, note 102). Driving `renderPeriod()` instead was still not enough: with an empty map that takes its own branch, which also calls the sync. Only with **points on the map** — the state the complaint came from — does removing the call from the normal path make the check fall over.
+
+    Left open on purpose: (a) one row holding layers, a drawing, a mode and a window control; (c) 🛰️ meaning paths here and auto-detected entries in the timeline; (d) “merge points” secretly also deciding whether the map shows everything. Designs A/B/C and the recommendation stand in note 154.
+
+**And one that stays open with a measurement instead of a change:
+`/api/stats/overview` at 225 ms** (note 140 recorded it, this round profiled
+it). There is no hot spot to remove: about 45 ms is the base query over every
+dated entry, 13 ms the weather metrics, the rest is spread over ten queries and
+the aggregation over every row — and every one of those answers is *about the
+whole holding*, so it has to touch every row. Restricting the base query to
+entries that actually carry weather saves ~19 ms in a corpus where a quarter of
+them do, and nothing in one where most do. The only substantial cut would mean
+restructuring the ranking path that note 156 has just unified into one rule,
+for a cost that is paid once per opening of a tab and that nobody has
+complained about. **Recorded so the profile does not have to be taken a third
+time.**

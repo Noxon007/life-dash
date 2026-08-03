@@ -10,13 +10,13 @@ Datei, Anm. 147). Erst dort gezielt nachlesen statt Code raten.
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI, Geocoding aus)
-  — 575 Tests, ~13 s, SQLite im Arbeitsspeicher
+  — 582 Tests, ~12 s, SQLite im Arbeitsspeicher
 - **Tests gegen echtes PostgreSQL** (das, worauf betrieben wird — `postgres:18-alpine`):
   `pwsh tools/pg-test.ps1` (Container `lifedash-pgtest` auf Port **55432**, danach weg;
   `-Keep` lässt ihn stehen). Setzt `TEST_DATABASE_URL`, das `conftest.py` auswertet;
   **zwei Riegel davor**, weil die Suite das Schema löscht: die URL darf nicht die
   betriebene sein, und der DB-Name muss `test` enthalten.
-- Wächter: `cd tools` → `npm run check` (30 jsdom-Dateien, ~420 Zusicherungen)
+- Wächter: `cd tools` → `npm run check` (31 jsdom-Dateien, ~438 Zusicherungen)
 - **Smoke gegen ein HTTP-Doppel** (Immich): `<python> tools/immich_double.py &`
   dann `<python> tools/smoke_a45.py` — findet, was Unit-Tests prinzipiell nicht
   können (Blättern, Zeitzonen, echte DTOs). Immer aus dem Wurzelverzeichnis.
@@ -68,6 +68,63 @@ mehr in KONZEPT Kap. 15 — das ist jetzt ein Zeiger mit der Tabelle der noch
 OFFENEN Fragen (144–147). Anmerkungen stehen in der Reihenfolge, in der sie
 AUFKAMEN, nicht in der sie gebaut wurden — Neues wird angehängt, auch wenn
 davor noch Offenes steht.
+
+**Dritter Durchgang 2026-08-03 (Anmerkungen 157–159), auf `main`, ohne
+Versionssprung — und diesmal ohne neue Meldung.** Ausgangspunkt war die Liste
+dessen, was frühere Runden **gemessen und liegen gelassen** hatten, gefiltert
+auf das, was keine Entscheidung des Users braucht.
+
+**Anm. 157 — die Kartenlast, der Rest von Anm. 140.** Gemessen (nicht geraten,
+`tools/_measure_api.py`, 20.000 Ereignisse): **643 ms / 6,1 MB → 188 ms /
+2,7 MB**. Zwei Hälften. **(a) Ein Foto ist auf der Leitung kein Ereignis,
+sondern ein Punkt** — Titel („Foto in Detmold", steht nirgends auf der Karte),
+Kategorie, Präzision, Quelle, Ereigniskennung und ein verschachtelter Ort mit
+eigener Kennung für etwas, das einen Kreis zeichnet. Jetzt `photos:
+{places, cats, points}`, je Punkt `[lat, lng, Zeit, Asset, Ort-Index,
+Kat-Index]`; Ortsname und Kategorie werden entdoppelt (der Name ist der längste
+Wert je Punkt und für hunderte derselbe). **Die Ereigniskennung geht bewusst
+NICHT mit** — das Foto-Popup zeigt das Bild, nie den Bearbeiten-Dialog
+(Anm. 139), und die Identität eines Fotos ist sein Asset. Der Foto-Anteil fiel
+4,05 → 0,74 MB. **(b) Die Abfrage war die ältere Lehre:** 20.000 ORM-Objekte
+samt `selectinload(location)` für eine Antwort, die keins behält — Anm. 80 in
+zweiter Auflage (*der Preis ist das ERZEUGEN jeder Zeile*). Jetzt Tupel-Abfrage;
+`even_spread` hat dafür ein optionales `selection` bekommen, gebaut über
+`query.with_entities`, **damit Joins und Filter der übergebenen Abfrage
+erhalten bleiben** — ein frisches `db.query(Location.name, …)` hätte den Join
+verloren und still ein Kreuzprodukt geliefert. Der Deckel gilt über beide Formen
+zusammen: er ist eine Aussage über die Karte, nicht über eine Ebene.
+
+**Anm. 158 — die Karte hatte seit Anm. 139 kein Wetter, und nichts sagte es.**
+Nicht gemeldet, beim Lesen desselben Pfades gefunden. Der Endpunkt antwortete
+früher mit einer LISTE, seit dem Deckel-Hinweis mit `{total, shown, events}` —
+`mpEnsureWeather` las weiter `wx.map(…)`, warf, und landete im `catch`, das für
+„ohne Netz kein Wetter" gedacht war; `MP_WX` hatte den Zeitraum da schon als
+geladen vermerkt. **Ein `catch`, das zwei verschiedene Fehler auf dieselbe
+Stille abbildet, trägt den Defekt statt ihn zu melden** (Anm. 112, gleiche
+Form). Der Fehlschlag löst die Marke jetzt wieder, und der Abruf trägt
+`photos=0`. Neuer Wächter `check-map-weather.js` — die Stelle hatte **gar
+keinen**, und genau deshalb konnte der Defekt in einem ausgelieferten Pfad
+sitzen.
+
+**Anm. 159 — Anm. 154 (b): der Wege-Schalter sagt, wenn er nichts zeichnet.**
+Von den vier Befunden aus 154 sind drei Entwurfsfragen (bleiben offen); dieser
+ist ein Verstoß gegen eine bestehende Regel: `drawTracks` kehrt oberhalb
+Monats-Zoom sofort zurück (richtig — Anm. 141), der Chip leuchtete weiter.
+Die Zoomgrenze steht jetzt in **einer** Konstante (`TRACK_ZOOMS`), gelesen vom
+Zeichner UND vom Schalter. **`inert` ≠ `off`:** aus hat der Nutzer, außer Kraft
+ist die Ansicht. **Der Wächter war zweimal aus dem falschen Grund grün**
+(Anm. 108, drittes Mal): erst rief er `mpSyncTrackChip()` selbst auf (dann ist
+er grün, sobald es die Funktion GIBT — der `check-a41-cities.js`-Fall), dann
+lief er über `renderPeriod()` mit LEERER Karte, die einen eigenen Zweig hat.
+Erst **mit Punkten auf der Karte** fällt er beim herausgenommenen Aufruf um.
+
+**Bewusst stehen gelassen, mit Messung statt Änderung: `/api/stats/overview`
+bei 225 ms.** Kein Hotspot — ~45 ms Basisabfrage über alle datierten Einträge,
+13 ms Wettermetriken, der Rest verteilt über zehn Abfragen und die Aggregation
+über jede Zeile; und jede dieser Auskünfte ist eine über den GESAMTEN Bestand.
+Der einzige nennenswerte Schnitt hieße, den Ranglisten-Pfad umzubauen, den
+Anm. 156 gerade erst zu einer Regel vereinheitlicht hat. Profil in
+`docs/DECISIONS.md`, damit es kein drittes Mal genommen werden muss.
 
 **Feedback-Runde 2026-08-03, zweiter Durchgang (Anmerkungen 152–156), auf
 `main`, ohne Versionssprung.** Vier Punkte: zwei Defekte, eine neue Ansicht,
