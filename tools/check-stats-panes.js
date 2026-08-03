@@ -105,9 +105,18 @@ setTimeout(async () => {
     calls.length = 0;
     await w.loadStats();
     await wait(120);
-    ok('Es gibt drei Ansichten',
-       d.querySelectorAll('#view-stats .stats-pane').length === 3,
-       `${d.querySelectorAll('#view-stats .stats-pane').length} Bereiche`);
+    // **Nicht „es sind drei".** Die Zahl stand hier bis F21 und war ein
+    // Wächter für die Vergangenheit (Anmerkung 114): sie fiel um, als eine
+    // vierte Ansicht dazukam, obwohl nichts kaputt war — und sie hätte
+    // geschwiegen, wenn ein Reiter ohne Bereich (oder umgekehrt) entstanden
+    // wäre, also beim einzigen Defekt, den es hier gibt. Geprüft wird
+    // stattdessen, dass sich Leiste und Bereiche DECKEN, in beide Richtungen.
+    const tabs = [...d.querySelectorAll('#stats-tabs .zoom-btn')].map(b => b.dataset.stats);
+    const panes = [...d.querySelectorAll('#view-stats .stats-pane')].map(p => p.dataset.statsPane);
+    ok('Jeder Reiter hat seinen Bereich — und jeder Bereich seinen Reiter',
+       tabs.length > 0 && tabs.length === panes.length
+       && tabs.every(x => panes.includes(x)) && panes.every(x => tabs.includes(x)),
+       `Reiter: ${tabs.join(', ')} · Bereiche: ${panes.join(', ')}`);
     ok('Die gemerkte Ansicht ist die gezeigte',
        visiblePanes(d).join(',') === 'charts',
        `sichtbar: ${visiblePanes(d).join(', ') || '(nichts)'}`);

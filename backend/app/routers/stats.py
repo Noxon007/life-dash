@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import User
+from app.services import gaps
 from app.services.stats import compute_widgets
 from app.services.stats_overview import compute_overview
 from app.services.stats_toplists import compute_toplists
@@ -36,6 +37,23 @@ def toplists(db: Session = Depends(get_db),
     hat. Eine Ansicht bezahlt, was sie zeigt.
     """
     return compute_toplists(db, user.id)
+
+
+@router.get("/gaps")
+def gaps_report(db: Session = Depends(get_db),
+                user: User = Depends(get_current_user)) -> dict:
+    """F21/Anmerkung 145: wo weiß ich gar nichts?
+
+    Eigener Endpunkt aus demselben Grund wie `/toplists`: eine Ansicht bezahlt,
+    was sie zeigt. Der Kalenderdurchlauf über ein ganzes Leben ist billig, aber
+    er soll nicht bei jedem Öffnen des Statistik-Reiters anfallen.
+
+    **Es wird nichts gespeichert.** Eine Lücke ist eine Ansicht, kein Zustand —
+    stünde sie als Zeile in der Datenbank, müsste sie bei jedem Import, jeder
+    Löschung und jeder Grundort-Änderung nachgeführt werden, und eine veraltete
+    Lückenliste schickt jemanden auf die Suche nach Daten, die längst da sind.
+    """
+    return gaps.report(db, user.id)
 
 
 @router.get("/widgets")

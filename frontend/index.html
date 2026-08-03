@@ -245,6 +245,15 @@
   .event-card.baseline-day { border-style: dashed; opacity: .78; cursor: default; }
   .event-card.baseline-day::before { display: none; }
   .badge-baseline { background: var(--bg-elev); color: var(--text-dim); }
+  /* F21: die Jahresabdeckung. Dieselbe Zeilenform wie die Balken daneben
+     (`bar-row`), aber die Füllung bedeutet etwas anderes — nicht „viel/wenig"
+     im Vergleich, sondern „wie viel von diesem Jahr ist überhaupt bekannt".
+     Deshalb eine eigene Farbe und ein sichtbarer Rest: die LÜCKE ist die
+     Aussage, nicht die Füllung. */
+  .cov-track { flex: 1; height: 10px; border-radius: 5px; background: var(--bg-elev);
+               border: 1px solid var(--border); overflow: hidden; }
+  .cov-fill { height: 100%; background: var(--confirmed); }
+  .cov-fill.derived { background: var(--text-dim); }
   /* ---------- Cards / grid ---------- */
   .grid { display: grid; gap: 16px; }
   .grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
@@ -1433,6 +1442,12 @@
           <div class="zoom-btn active" data-stats="tiles" data-i18n="stats.tab.tiles">🔢 Zahlen</div>
           <div class="zoom-btn" data-stats="charts" data-i18n="stats.tab.charts">📊 Diagramme</div>
           <div class="zoom-btn" data-stats="tops" data-i18n="stats.tab.tops">🏆 Ranglisten</div>
+          <!-- F21 (Anmerkung 145): die vierte Frage. Zahlen sagen „wie viel",
+               Diagramme „wie verteilt", Ranglisten „welche zuerst" — und diese
+               Ansicht als einzige „was FEHLT". Das ist die einzige Frage, die
+               eine Lebensdatenbank nicht beantworten kann, indem sie ansieht,
+               was sie hat. -->
+          <div class="zoom-btn" data-stats="gaps" data-i18n="stats.tab.gaps">🕳️ Lücken</div>
         </div>
         <div class="stats-pane" data-stats-pane="tiles">
         <div class="grid cols-4" style="margin-bottom:24px">
@@ -1580,6 +1595,10 @@
              Ansicht bezahlt, was sie zeigt (A37). -->
         <div class="stats-pane" data-stats-pane="tops" style="display:none">
           <div id="stats-tops"><div class="hint" data-i18n="loading">lade…</div></div>
+        </div>
+
+        <div class="stats-pane" data-stats-pane="gaps" style="display:none">
+          <div id="stats-gaps"><div class="hint" data-i18n="loading">lade…</div></div>
         </div>
 
         <div class="hint" style="margin-top:24px" data-i18n="stats.hint">
@@ -3085,6 +3104,21 @@ const I18N_EN = {
   'bl.card.tip': "Derived from your baseline location — there is no entry on this day.",
   'tl.bl.capped': "Showing {n} of {m} derived baseline days, spread evenly across the period.",
   'tl.agg.derived': "derived",
+  // F21 (Anmerkung 145) — die Lücken-Ansicht
+  'stats.tab.gaps': "🕳️ Gaps",
+  'gaps.fail': "The gaps could not be computed.",
+  'gaps.empty': "Nothing recorded yet — so there is no gap either.",
+  'gaps.sum.title': "🕳️ What is missing",
+  'gaps.head.birth': "Since your birth on {from}, {k} of {total} days are known ({pct} %).",
+  'gaps.head.rec': "Between {from} and {to}, {k} of {total} days are known ({pct} %).",
+  'gaps.head.nobirth': "Add your birth as a milestone and this view covers your whole life instead of just the recorded period.",
+  'gaps.sum.split': "{rec} days recorded · {base} days derived from a baseline · {gap} days unknown",
+  'gaps.years': "📅 Coverage per year",
+  'gaps.top': "📏 Longest gaps",
+  'gaps.none': "no gap — every day is accounted for",
+  'gaps.capped': "Showing {n} of {m} stretches, longest first.",
+  'gaps.row.tip': "Click to enter as a baseline period",
+  'gaps.jumped': "Period taken over — now add the place.",
   'adm.firstrun': "<b>First time here?</b> The sections are in the order that makes sense — each one feeds the next its material: <b>1.</b> pick your modules · <b>2.</b> import the Google timeline · <b>3.</b> resolve place names · <b>4.</b> connect Immich, review its proposals and link photos · <b>5.</b> split multi-day entries · <b>6.</b> add weather · <b>7.</b> take a backup. None of it is mandatory, and every run can be repeated as often as you like — it only ever fills in what is missing.<br><b>A detailed explanation of every step</b> is in the README guide (“Getting started — a sensible order”).",
   'adm.users.title': "Users",
   'adm.modqueue': "Moderation queue",
@@ -6546,6 +6580,7 @@ function showStatsPane(which) {
   // für welchen Bestand die Listen gelten, damit ein Hin- und Herklicken nicht
   // jedes Mal dieselbe Antwort neu erfragt.
   if (which === 'tops') loadStatsTops();
+  if (which === 'gaps') loadStatsGaps();
 }
 document.querySelectorAll('#stats-tabs .zoom-btn').forEach(btn =>
   btn.addEventListener('click', () => showStatsPane(btn.dataset.stats)));
@@ -6663,6 +6698,136 @@ function renderStatsTops(top) {
   box.querySelectorAll('[data-top-day]').forEach(row =>
     row.addEventListener('click', () => tlShowDay(row.dataset.topDay)));
 }
+
+// --------------------------------------------------------------------------- //
+// F21 (Anmerkung 145) — die Lücken-Ansicht
+// --------------------------------------------------------------------------- //
+// **Die einzige Frage, die eine Lebensdatenbank nicht beantworten kann, indem
+// sie ansieht, was sie hat.** Deshalb eine eigene Ansicht und keine weitere
+// Kachel: „was fehlt" ist keine Zusammenfassung des Bestands, sondern seine
+// Umkehrung.
+//
+// Der Deckel und die Herkunft der Zahlen stehen sichtbar dabei (A40): eine
+// Liste der zwanzig längsten Strecken sieht aus wie die ganze Wahrheit, wenn
+// niemand sagt, dass es vierhundert sind.
+let statsGapsFor = null;
+async function loadStatsGaps(force) {
+  const box = document.getElementById('stats-gaps');
+  if (!box) return;
+  let stamp = null;
+  try { stamp = (await fetchIndex(true)).revision || ''; } catch (_) {}
+  if (!force && stamp && stamp === statsGapsFor && box.dataset.filled) return;
+  let r;
+  try { r = await api('/api/stats/gaps'); }
+  catch (err) {
+    // Ein Fehlschlag wird NICHT gemerkt — sonst gälte die leere Ansicht als
+    // „für diesen Stand schon geladen" (dieselbe Umkehrung wie in
+    // `loadStatsTops` und `mpLoadPoints`).
+    statsGapsFor = null;
+    box.innerHTML = `<div class="hint">${esc(t('gaps.fail',
+      'Die Lücken konnten nicht berechnet werden.'))}</div>`;
+    return;
+  }
+  statsGapsFor = stamp;
+  box.dataset.filled = '1';
+  renderStatsGaps(r);
+}
+
+function renderStatsGaps(r) {
+  const box = document.getElementById('stats-gaps');
+  if (!r.total_days) {
+    box.innerHTML = `<div class="hint">${esc(t('gaps.empty',
+      'Noch nichts erfasst — dann gibt es auch noch keine Lücke.'))}</div>`;
+    return;
+  }
+  const n = x => Number(x || 0).toLocaleString(LOC());
+  const pct = Math.round(r.known_days / r.total_days * 100);
+
+  // **Der Kopf sagt, WORÜBER berichtet wird.** Mit Geburts-Meilenstein ist das
+  // ein Leben, ohne ihn nur der Zeitraum, in dem aufgezeichnet wurde. Beides
+  // ist richtig; das eine zu zeigen und das andere zu behaupten wäre der
+  // Fehler, und deshalb steht der Unterschied im Text und nicht im Kleingedruckten.
+  const head = r.since_birth
+    ? t('gaps.head.birth', 'Seit deiner Geburt am {from} sind {k} von {total} Tagen bekannt ({pct} %).')
+    : t('gaps.head.rec', 'Zwischen dem {from} und dem {to} sind {k} von {total} Tagen bekannt ({pct} %).');
+  const sub = r.since_birth ? '' : `<div class="hint" style="margin-top:6px">${esc(
+    t('gaps.head.nobirth', 'Trag die Geburt als Meilenstein ein, dann rechnet diese Ansicht über dein ganzes Leben statt nur über den erfassten Zeitraum.'))}</div>`;
+
+  const summary = `<div class="panel">
+    <h3>${esc(t('gaps.sum.title', '🕳️ Was fehlt'))}</h3>
+    <div>${esc(head.replace('{from}', fmtDay(r.from)).replace('{to}', fmtDay(r.to))
+      .replace('{k}', n(r.known_days)).replace('{total}', n(r.total_days))
+      .replace('{pct}', pct))}</div>
+    <div class="stat-label" style="margin-top:6px">${esc(
+      t('gaps.sum.split', '{rec} Tage erfasst · {base} Tage aus dem Grundort abgeleitet · {gap} Tage unbekannt')
+        .replace('{rec}', n(r.recorded_days)).replace('{base}', n(r.baseline_days))
+        .replace('{gap}', n(r.unknown_days)))}</div>
+    ${sub}
+  </div>`;
+
+  // Jahresabdeckung: beantwortet „wo fange ich an?" besser als jede Liste,
+  // weil sie den ganzen Zeitraum auf einen Blick zeigt, statt zwanzig
+  // Strecken zu nennen und vierhundert zu verschweigen.
+  const years = (r.per_year || []).map(([y, known, total]) => {
+    const share = total ? Math.round(known / total * 100) : 0;
+    return `<div class="bar-row">
+      <div class="bar-label">${y}</div>
+      <div class="cov-track"><div class="cov-fill" style="width:${share}%"></div></div>
+      <div class="bar-val">${share} %</div>
+    </div>`;
+  }).join('');
+
+  const rows = (r.stretches || []).map((s, i) =>
+    topRow(i, `${fmtDay(s.from)} – ${fmtDay(s.to)}`, dayCount(s.days), '',
+           ` data-gap-from="${esc(s.from)}" data-gap-to="${esc(s.to)}" `
+           + `title="${esc(t('gaps.row.tip', 'Klicken: als Grundort-Zeitraum eintragen'))}"`));
+  const capped = r.stretch_count > (r.stretches || []).length
+    ? `<div class="stat-label" style="margin-top:8px">${esc(
+        t('gaps.capped', '{n} von {m} Strecken gezeigt, die längsten zuerst.')
+          .replace('{n}', n(r.stretches.length)).replace('{m}', n(r.stretch_count)))}</div>`
+    : '';
+
+  box.innerHTML = summary
+    + `<div class="grid cols-2">`
+    + topPanel(t('gaps.years', '📅 Abdeckung je Jahr'), years ? [years] : [],
+               t('gaps.none', 'keine Lücke — jeder Tag ist belegt'))
+    + `<div class="panel"><h3>${esc(t('gaps.top', '📏 Längste Lücken'))}</h3>`
+    + (rows.length ? rows.join('')
+       : `<div class="stat-label">${esc(t('gaps.none', 'keine Lücke — jeder Tag ist belegt'))}</div>`)
+    + capped + `</div>`
+    + `</div>`;
+
+  // **Der Klick führt dorthin, wo die Lücke zu schließen ist.** Ein Sprung in
+  // den Zeitstrahl wäre die naheliegende Verdrahtung und die nutzlose: eine
+  // Lücke ist per Definition leer, dort stünde nichts. Was 158 Tage auf einmal
+  // füllt, ist ein Grundort-Zeitraum — also führt die Zeile in genau das
+  // Formular, mit den Daten schon eingetragen.
+  box.querySelectorAll('[data-gap-from]').forEach(row =>
+    row.addEventListener('click', () =>
+      openBaselineFor(row.dataset.gapFrom, row.dataset.gapTo)));
+}
+
+// Die Lücke ins Grundort-Formular übernehmen — Verwaltung, „Meine Daten".
+function openBaselineFor(from, to) {
+  gotoView('admin');
+  showAdminTab('daten');
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  set('bl-from', from);
+  set('bl-to', to);
+  set('bl-label', '');
+  const place = document.getElementById('bl-place');
+  if (place) {
+    place.value = '';
+    // `?.` weil jsdom `scrollIntoView` nicht kennt: ohne das wirft der Klick
+    // im Wächter, und was danach käme (das Fokussieren) liefe nie — eine
+    // Prüfung, die an einer Umgebungslücke scheitert statt an einem Defekt,
+    // ist so wertlos wie eine, die aus dem falschen Grund grün ist.
+    place.scrollIntoView?.({ block: 'center' });
+    place.focus();
+  }
+  toast(t('gaps.jumped', 'Zeitraum übernommen — jetzt noch den Ort eintragen.'), 'ok', 6000);
+}
+
 function fmtDay(iso) {
   if (!iso) return '';
   const d = new Date(iso + (iso.length === 10 ? 'T00:00:00' : ''));
@@ -10422,6 +10587,10 @@ async function clearDayWeather() {
 function refreshAfterBaseline() {
   TL_BASELINE.clear();
   statsTopsFor = null;
+  // F21: Ein neuer Grundort SCHLIESST Lücken — die Ansicht, die sie zeigt, ist
+  // damit die erste, die falsch steht. Ohne dieses Vergessen hätte man gerade
+  // einen Zeitraum eingetragen und bekäme ihn weiter als Lücke gemeldet.
+  statsGapsFor = null;
   fetchIndex(true).catch(() => {});
   if (typeof loadTimeline === 'function') loadTimeline();
 }

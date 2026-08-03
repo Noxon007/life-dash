@@ -23,7 +23,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import Event, Location, Metric, Source
-from app.services import baseline
+from app.services import baseline, gaps
 from app.services import stats_overview as ov
 from app.sqlutil import day_number
 
@@ -171,13 +171,16 @@ def _days(db: Session, user_id: str) -> list[date]:
 def _streaks(db: Session, user_id: str) -> dict:
     """Längste Serie, längste Lücke, längste erfasste Reise.
 
-    **Die Lücke wird nur ZWISCHEN dem ersten und letzten Tag gemessen.** Die
-    Zeit vor dem ersten Eintrag ist keine Lücke, sondern die Zeit vor dem
-    ersten Eintrag — sie als „längste Lücke: 8 000 Tage" auszugeben wäre eine
-    Aussage über den Beginn der Aufzeichnung, verkleidet als Befund über das
-    Leben. Seit F20 kann ein Grundort diese Zeit ausfüllen, und dann ist sie
-    keine Lücke mehr, sondern ein bekannter Abschnitt — genau der Zweck des
-    Pakets (Anmerkung 144/145).
+    **Die Lücke rechnet diese Datei seit F21 nicht mehr selbst** — sie fragt
+    `services/gaps.py`, und zwar dieselbe Funktion, aus der die Lücken-Ansicht
+    ihre Liste zieht. Die Kachel ist damit Platz 1 der Liste, dasselbe Muster
+    wie bei den Wetter-Rekorden (Anmerkung 156): zwei Fassungen von „was ist
+    eine Lücke" liefen beim ersten Sonderfall auseinander, und die Sonderfälle
+    stehen längst da — die Ränder hängen am Geburts-Meilenstein, und ein
+    Grundort-Tag ist keine Lücke mehr (Anmerkung 144/145).
+
+    Die SERIE bleibt hier: sie liest dieselbe Tagesmenge, beantwortet aber die
+    umgekehrte Frage, und für die gibt es keinen zweiten Leser.
     """
     days = _days(db, user_id)
     out: dict = {"longest_run": None, "longest_gap": None, "longest_trip": None}
@@ -186,23 +189,20 @@ def _streaks(db: Session, user_id: str) -> dict:
 
     best_run = (days[0], days[0], 1)
     run_start, run_len = days[0], 1
-    best_gap = None
     for prev, cur in zip(days, days[1:]):
-        step = (cur - prev).days
-        if step == 1:
+        if (cur - prev).days == 1:
             run_len += 1
             if run_len > best_run[2]:
                 best_run = (run_start, cur, run_len)
         else:
             run_start, run_len = cur, 1
-            missing = step - 1
-            if best_gap is None or missing > best_gap[2]:
-                best_gap = (prev + timedelta(days=1), cur - timedelta(days=1), missing)
     out["longest_run"] = {"from": best_run[0].isoformat(),
                           "to": best_run[1].isoformat(), "days": best_run[2]}
-    if best_gap:
-        out["longest_gap"] = {"from": best_gap[0].isoformat(),
-                              "to": best_gap[1].isoformat(), "days": best_gap[2]}
+    # Die Tagesmenge wird weitergereicht statt neu geholt: sie steht hier schon
+    # im Speicher, und ein zweiter Kalenderdurchlauf über vierzig Jahre für
+    # dieselbe Menge wäre der Preis dafür, die Regel an einer Stelle zu haben —
+    # er muss nicht bezahlt werden.
+    out["longest_gap"] = gaps.longest(db, user_id, days=set(days))
 
     # Längste ERFASSTE Reise: das mehrtägige `trip`-Ereignis mit der größten
     # Spanne. Bewusst nicht „die längste Zeit am Stück außerhalb des

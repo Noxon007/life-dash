@@ -23,6 +23,19 @@ any `MINOR`.
 ## [Unreleased]
 
 ### Added
+- **A “Gaps” view in the statistics: where do you know nothing at all?** The
+  fourth tab beside Numbers, Charts and Rankings answers the one question a life
+  database cannot answer by looking at what it has. It shows how much of the
+  period is accounted for, how much of that is recorded versus derived from a
+  baseline location, a coverage bar per year, and the longest stretches with
+  nothing in them. **Clicking a stretch carries its dates into the baseline
+  form** — a gap is empty by definition, so jumping into the timeline there
+  would show nothing, while one baseline period can fill a hundred days at once.
+  If you have entered your birth as a milestone the view covers your whole life;
+  if not it covers only the period you recorded in, and says so rather than
+  quietly reporting a smaller number as if it were the whole story.
+  “Longest gap” in the rankings is now the first row of that list — the same
+  computation, so the two can no longer disagree at the edges.
 - **A baseline location for the years you never recorded.** Under *My data →
   Baseline location* you enter a period and a place — “from my birth until 2006
   I was at my parents' house in Bad Segeberg”. Every day in that period that has

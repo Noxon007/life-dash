@@ -15,7 +15,7 @@ ein Nutzer merkt.
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI, Geocoding aus)
-  — 609 Tests, ~14 s, SQLite im Arbeitsspeicher
+  — 625 Tests, ~15 s, SQLite im Arbeitsspeicher
 - **Tests gegen echtes PostgreSQL** (das, worauf betrieben wird): `pwsh
   tools/pg-test.ps1` — **kein Docker**, das Skript legt mit den installierten
   Binärdateien einen eigenen Cluster in `backend/_pgtest/` auf Port **55432** an
@@ -30,7 +30,7 @@ ein Nutzer merkt.
   mit `lc_messages=C`, weil ein deutsch installiertes PostgreSQL in cp1252
   meldet und `psycopg2` das als UTF-8 dekodiert — **jeder echte Befund käme
   sonst als `UnicodeDecodeError` an**.
-- Wächter: `cd tools` → `npm run check` (32 jsdom-Dateien, ~494 Zusicherungen)
+- Wächter: `cd tools` → `npm run check` (33 jsdom-Dateien, ~506 Zusicherungen)
 - **Smoke gegen ein HTTP-Doppel** (Immich): `<python> tools/immich_double.py &`
   dann `<python> tools/smoke_a45.py` — findet, was Unit-Tests prinzipiell nicht
   können (Blättern, Zeitzonen, echte DTOs). Immer aus dem Wurzelverzeichnis.
@@ -90,6 +90,43 @@ mehr in KONZEPT Kap. 15 — das ist jetzt ein Zeiger mit der Tabelle der noch
 OFFENEN Fragen (144–147). Anmerkungen stehen in der Reihenfolge, in der sie
 AUFKAMEN, nicht in der sie gebaut wurden — Neues wird angehängt, auch wenn
 davor noch Offenes steht.
+
+**F21 gebaut (2026-08-03, Anmerkung 145) — die Lückenprüfung. Direkt hinter
+F20, auf `main`.** Vierte Statistik-Ansicht neben Zahlen · Diagrammen ·
+Ranglisten: **„wo weiß ich gar nichts?"** — die einzige Frage, die eine
+Lebensdatenbank nicht beantworten kann, indem sie ansieht, was sie hat.
+
+**Das FENSTER war der ganze Entwurf.** Anm. 156 hatte entschieden: die Zeit vor
+dem ersten Eintrag ist keine Lücke, sondern die Zeit vor dem ersten Eintrag.
+Mit einem **Geburts-Meilenstein** kehrt sich das um — dann ist bekannt, dass da
+ein Leben war, über das nichts vorliegt, und genau danach wurde gefragt. Also:
+**Geburt→heute mit Meilenstein, erster→letzter bekannter Tag ohne**, und
+`since_birth` reist bis in die Anzeige. Zwei Lesarten derselben Prozentzahl, und
+die eine zu zeigen während man die andere behauptet ist die einzige Art, wie
+diese Ansicht lügen kann. Der Kopf nennt deshalb seinen Bezug und sagt, wie man
+ihn erweitert.
+
+**„Längste Lücke" in den Ranglisten ist jetzt Platz 1 dieser Liste** — dieselbe
+Funktion (`services/gaps.py`), das Anm.-156-Muster. Zwei Rechnungen wären beim
+ersten Sonderfall auseinandergelaufen, und die Sonderfälle SIND hier die Ränder.
+
+**Zukunftstage fliegen an der Quelle raus, und das ist keine Kosmetik:** ein
+Eintrag mit vertipptem Jahr (2999 statt 1999) öffnete sonst ein
+Tausend-Jahre-Fenster — 350.000 Kalenderschritte für eine Kachel, und als Befund
+eine Lücke, die es nie gab. Die Grenze musste auch für ÜBERGEBENE Mengen
+gelten, weil `_streaks` seine eigene, ungefilterte Liste hereinreicht:
+**eine Zusage, die davon abhängt, dass der Aufrufer sie kennt, ist keine.**
+
+**Gespeichert wird nichts** (Anm. 145 hatte den Grund vorweggenommen). Daraus
+folgt auch die AKTION: nicht ein Sprung in den Zeitstrahl — eine Lücke ist per
+Definition leer, dort stünde nichts —, sondern die Übernahme der Daten ins
+Grundort-Formular. F20 und F21 schließen gegenseitig ihre Schleife.
+
+**Nebenbefund:** `check-stats-panes.js` prüfte „es gibt DREI Ansichten". Die
+Zahl fiel um, als eine vierte kam, obwohl nichts kaputt war — und hätte
+geschwiegen bei dem einzigen echten Defekt (ein Reiter ohne Bereich). Prüft
+jetzt, dass Leiste und Bereiche sich in BEIDE Richtungen decken (Anm. 114:
+ein Wächter, der nur seinen Auslöser kennt, ist einer für die Vergangenheit).
 
 **F20 gebaut (2026-08-03, Anmerkung 144) — der Grundort. Auf `main`, ohne
 Versionssprung.** „Ich möchte irgendwann für jeden Tag einen Eintrag haben, auch
@@ -536,10 +573,10 @@ aber nur, wenn man sie wirklich anwendet.**
 
 Umgesetzt bis **v0.39.0** (2026-07-23). **Gruppe A ist komplett** (A1–A48),
 Gruppe B bis **F19**; **P5.1, F1 und P2.1 (alle drei Stufen) sind fertig**. Offen
-ist damit: **F21** (Lückenprüfung, Anm. 145 — durch F20 entsperrt), dazu
-**0.40 (sammelt auf `main`)**, **Demo-Modus (0.41)** und **R1/R2** (1.0, drei
-Etappen auf `main`). **F20 (Grundort) ist seit 2026-08-03 gebaut** und liegt
-auf `main`.
+ist damit nur noch: **0.40 (sammelt auf `main`)**, **Demo-Modus (0.41)** und
+**R1/R2** (1.0, drei Etappen auf `main`). **F20 (Grundort) und F21
+(Lückenprüfung) sind seit 2026-08-03 gebaut** und liegen auf `main` —
+Gruppe B damit vollständig bis F21.
 
 **Arbeitsweise ab 0.40 (vom User festgelegt, 2026-07-23): alles auf `main`,
 kein Versionssprung, bis der User den Demo-Modus ansagt.** Was sich bis dahin

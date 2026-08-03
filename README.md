@@ -104,6 +104,11 @@ default, because twenty years of library is tens of thousands of markers. And
 the timeline's **Condense by** picker decides how coarsely a day is summarised:
 country, city, district, or every entry on its own.
 
+And once a few baseline periods are in, the statistics tab has a **Gaps** view:
+how much of your life is accounted for, a coverage bar per year, and the longest
+stretches with nothing in them at all. Clicking a stretch carries its dates into
+the baseline form, which is the one action that fills a hundred days at once.
+
 ## How this was built
 
 The entire implementation was written by Anthropic's Claude models — **Fable and
