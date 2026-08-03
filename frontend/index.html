@@ -243,6 +243,17 @@
   .panel h3 { margin: 0 0 16px; font-size: 15px; }
   .bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
   .bar-label { width: 105px; font-size: 12px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
+  /* Anmerkung 156: Ranglisten-Zeile. Anders als beim Balken ist hier die
+     BESCHRIFTUNG das Breite — es gibt keinen Balken, der Platz braucht, und
+     „Kaiserstraße 5 · 47 Tage · 312 Einträge" auf 105 px abzuschneiden wäre
+     eine Liste, die ihre eigene Auskunft verschweigt. */
+  .top-row { gap: 10px; }
+  .top-row .bar-label { width: auto; flex: 1; min-width: 0; }
+  .top-row .bar-val { width: auto; flex-shrink: 0; font-weight: 600; color: var(--text); }
+  .top-rank { width: 22px; flex-shrink: 0; text-align: right; font-size: 12px;
+              font-weight: 700; color: var(--accent); }
+  .top-row[data-top-day] { cursor: pointer; border-radius: 6px; padding: 2px 4px; margin: 0 -4px 8px; }
+  .top-row[data-top-day]:hover { background: var(--bg-elev); }
   .action-row { display: flex; gap: 16px; padding: 16px 18px; border-bottom: 1px solid var(--border); align-items: flex-start; }
   .action-row:last-child { border-bottom: none; }
   .action-row .btn { flex-shrink: 0; min-width: 215px; text-align: left; }
@@ -1266,6 +1277,18 @@
 
       <!-- ===== STATS ===== -->
       <div class="view" id="view-stats">
+        <!-- Anmerkung 155: Der Reiter war eine einzige Seite mit vierzig
+             Kacheln, sechs Diagrammen und zwei Tafeln — alles gleichzeitig,
+             alles gleich wichtig. Drei Ansichten stellen die Frage, bevor die
+             Antwort kommt: **Zahlen** (wie viel), **Diagramme** (wie verteilt),
+             **Ranglisten** (welche zuerst). Die Wahl wird gemerkt, wie im
+             Kompendium (Anmerkung 149) — sie beschreibt, wonach jemand sucht. -->
+        <div class="comp-tabs" id="stats-tabs">
+          <div class="zoom-btn active" data-stats="tiles" data-i18n="stats.tab.tiles">🔢 Zahlen</div>
+          <div class="zoom-btn" data-stats="charts" data-i18n="stats.tab.charts">📊 Diagramme</div>
+          <div class="zoom-btn" data-stats="tops" data-i18n="stats.tab.tops">🏆 Ranglisten</div>
+        </div>
+        <div class="stats-pane" data-stats-pane="tiles">
         <div class="grid cols-4" style="margin-bottom:24px">
           <div class="stat-card" data-go="timeline:all"><div class="stat-num" id="stat-events">–</div><div class="stat-label" data-i18n="stat.events">Ereignisse gesamt</div><div class="stat-sub" data-i18n="stat.sub.lifedb" data-i18n="layer.mid.title">Lebensdatenbank</div></div>
           <div class="stat-card" data-go="comp:country" data-req-mod="country"><div class="stat-num" id="stat-countries">–</div><div class="stat-label" data-i18n="stat.countries">Länder besucht</div><div class="stat-sub" data-i18n="stat.sub.collection">Kompendium</div></div>
@@ -1365,6 +1388,9 @@
           <div class="grid cols-4" id="widget-tiles"></div>
           <div id="widget-charts" style="margin-top:8px"></div>
         </div>
+        </div><!-- /Zahlen -->
+
+        <div class="stats-pane" data-stats-pane="charts" style="display:none">
         <div class="grid cols-2">
           <div class="panel" id="panel-rain-years" style="display:none">
             <h3 data-i18n="chart.raindays">Regentage pro Jahr</h3>
@@ -1399,6 +1425,17 @@
             <div id="chart-animals"></div>
           </div>
         </div>
+        </div><!-- /Diagramme -->
+
+        <!-- Anmerkung 156: Ranglisten. Die Kacheln oben zeigen Platz 1, hier
+             stehen die zehn — dieselbe Rangfolge, einmal als Kopf und einmal
+             ganz (`stats_overview._extreme_tops`). Der Inhalt kommt aus einem
+             EIGENEN Endpunkt und erst, wenn diese Ansicht geöffnet wird: eine
+             Ansicht bezahlt, was sie zeigt (A37). -->
+        <div class="stats-pane" data-stats-pane="tops" style="display:none">
+          <div id="stats-tops"><div class="hint" data-i18n="loading">lade…</div></div>
+        </div>
+
         <div class="hint" style="margin-top:24px" data-i18n="stats.hint">
           💡 Statistiken sind <b>berechnete Ansichten</b> — jederzeit neu berechenbar. Jedes Modul (Reisen, Tiere …) liefert eigene Widgets.
         </div>
@@ -2714,8 +2751,8 @@ const I18N_EN = {
   'chart.topplaces': "Top places <span class=\"stat-label\">(days)</span>",
   'chart.topcities': "Most-visited cities",
   'tl.visits': "visits",
-  'tl.group.tip': "Show the individual visits of this day",
-  'tl.group.fail': "Could not load the individual visits.",
+  'tl.group.tip': "Show the individual entries of this day",
+  'tl.group.fail': "Could not load the individual entries.",
   'tl.dayphotos': "Photos from this day",
   'tl.dayphoto': "📷 Photo for a day",
   'tl.dayphoto.tip': "Attach a picture to a day without tying it to a single entry",
@@ -2894,6 +2931,10 @@ const I18N_EN = {
   'n.days': "days",
   'n.entry': "entry",
   'n.entries': "entries",
+  // Anmerkung 152: das Hauptwort einer verdichteten Gruppe folgt ihrer Quelle
+  'n.photo': "photo",
+  'n.photos': "photos",
+  'n.visit': "visit",
   'map.tracks.cap': "{s} of {n} paths shown, spread evenly across the period — pick a smaller period for all of them.",
   'map.photos.nowhere': "no place given",
   'tl.photos': "📷 Photos",
@@ -3257,6 +3298,23 @@ const I18N_EN = {
   'module.trip': "Trips",
   'module.milestone': "Milestones",
   'of': "of",
+
+  // Anmerkung 155/156: drei Statistik-Ansichten und die Ranglisten
+  'stats.tab.tiles': "🔢 Numbers",
+  'stats.tab.charts': "📊 Charts",
+  'stats.tab.tops': "🏆 Rankings",
+  'tops.fail': "The rankings could not be loaded.",
+  'tops.nowx': "no weather data yet",
+  'tops.none': "nothing recorded yet",
+  'tops.streaks': "📏 Longest streaks",
+  'tops.run': "Longest streak with entries",
+  'tops.gap': "Longest gap without entries",
+  'tops.trip': "Longest recorded trip",
+  'tops.places': "📍 Top places",
+  'tops.cities': "🏙️ Top cities",
+  'tops.countries': "🌍 Top countries",
+  'tops.years': "📅 Top years",
+  'tops.categories': "🏷️ Top categories",
 
   // --- Letzte Erklaertexte ---
   'stats.hint': "💡 Statistics are <b>computed views</b> — rebuildable at any time. Every module (trips, animals …) brings its own widgets.",
@@ -4965,6 +5023,25 @@ function ageChip(e) {
 // Datum steht: „12 Besuche" allein wirft die Frage auf, wann eigentlich —
 // beantwortet man sie gleich mit, wird das Aufklappen zur Wahl statt zur
 // Notwendigkeit.
+// Anmerkung 152 — wie eine verdichtete Gruppe heißt.
+//
+// Der Gruppenschlüssel trägt seit Anmerkung 139 die QUELLE (`_visit_group_reps`
+// in `routers/events.py`), es gibt also zwei Sorten Gruppe: zwölf Google-Besuche
+// und zwölf Fotos. Die Karte sagte in beiden Fällen „Besuche" — gemeldet als
+// „Schwerin, 12 Besuche, und dann klappt man auf und es sind 12 Fotos".
+//
+// Gelesen wird die Quelle des VERTRETERS, und das ist zulässig, weil sie im
+// Schlüssel steht: alle Zeilen der Gruppe haben dieselbe. Stünde sie nicht
+// darin, wäre der Vertreter ein zufälliger von zwei Sorten und dieses Wort
+// eine Behauptung (Anmerkung 106 — dieselbe Falle, aus der der Schlüssel
+// überhaupt erst die Quelle bekommen hat).
+function groupNoun(e) {
+  const n = e.group ? e.group.count : 0;
+  if (e.source === 'immich') {
+    return n === 1 ? t('n.photo', 'Foto') : t('n.photos', 'Fotos');
+  }
+  return n === 1 ? t('n.visit', 'Besuch') : t('tl.visits', 'Besuche');
+}
 function groupSpan(g) {
   if (!g.first) return '';
   const d = new Date(g.first);
@@ -4987,8 +5064,13 @@ function eventCard(e) {
   // A39: Diese Karte vertritt mehrere Besuche desselben Tages in derselben
   // Stadt. Dann zeigt sie die Stadt statt des Straßennamens eines beliebigen
   // Einzelbesuchs — der wäre als Titel der Gruppe schlicht falsch.
+  //
+  // **Anmerkung 152: das Hauptwort kommt aus der QUELLE, nicht aus dem Code.**
+  // Seit Anmerkung 139 steht die Quelle im Gruppenschlüssel, es gibt also
+  // Gruppen aus Google-Besuchen UND Gruppen aus Fotos — die Karte sagte aber
+  // in beiden Fällen „12 Besuche" und klappte dann zwölf Fotos auf.
   const g = e.group;
-  const title = g ? `${g.city} · ${g.count} ${t('tl.visits', 'Besuche')}` : e.title;
+  const title = g ? `${g.city} · ${g.count} ${groupNoun(e)}` : e.title;
   return `
     <div class="event-card ${catClass(e.category)}${g ? ' is-group' : ''}" data-id="${esc(e.id)}" title="${esc(t('tl.edit.tip', 'Klicken zum Bearbeiten'))}">
       <div class="ev-head">
@@ -5000,7 +5082,7 @@ function eventCard(e) {
       ${eventPhotos(e)}
       <div class="ev-meta">
         <span class="chip">${catLabel(e.category)}</span>
-        ${g ? `<span class="chip" data-expand-group="${esc(e.id)}" title="${esc(t('tl.group.tip', 'Die einzelnen Besuche dieses Tages zeigen'))}">📍 ${g.count} ${esc(t('tl.visits', 'Besuche'))} ▾</span>` : ''}
+        ${g ? `<span class="chip" data-expand-group="${esc(e.id)}" title="${esc(t('tl.group.tip', 'Die einzelnen Einträge dieses Tages zeigen'))}">📍 ${g.count} ${esc(groupNoun(e))} ▾</span>` : ''}
         ${e.parent_event_id ? `<span class="chip">📅 ${esc(t('tl.daychild', 'Tages-Eintrag'))}</span>` : ''}
         ${kids ? `<span class="chip" data-expand-children="${esc(e.id)}" title="${esc(t('tl.kids.tip', 'Tages-Einträge ein-/ausklappen'))}">📅 ${kids} ${esc(t('tl.daychildren', 'Tages-Einträge'))} ▾</span>` : ''}
         ${ageChip(e)}
@@ -5987,6 +6069,10 @@ async function renderModuleWidgets() {
 // weil ein Client, der nur noch ein Zeitfenster kennt, sonst das Fenster
 // gezählt hätte statt das Leben. Die Regeln selbst sind unverändert.
 async function loadStats() {
+  // Anmerkung 155: Die gemerkte Ansicht herstellen, BEVOR die Zahlen kommen —
+  // sonst steht beim Öffnen eine Sekunde lang die falsche da, und der letzte
+  // Zustand wäre eine Empfehlung statt einer Einstellung.
+  showStatsPane(statsPane);
   const [ov, animals, countries, artists] = await Promise.all([
     api("/api/stats/overview"),
     api("/api/compendium/animal").catch(() => []),
@@ -6081,6 +6167,154 @@ async function loadStats() {
                                    entityId ? `${entityId}|${name}` : null]);
   renderBars('chart-animals', animalData.length ? animalData : [["—", 0]],
     key => { const [id, ...n] = key.split('|'); jumpToEntity('animal', id, n.join('|')); });
+}
+
+// --------------------------------------------------------------------------- //
+// Anmerkung 155 — drei Ansichten statt einer Seite
+// --------------------------------------------------------------------------- //
+// Der Reiter zeigte vierzig Kacheln, sechs Diagramme und zwei Tafeln
+// gleichzeitig. Das ist keine Statistik, das ist ein Inventar: alles da, nichts
+// betont, und die Frage, mit der jemand hergekommen ist, steht irgendwo dazwischen.
+// Die drei Ansichten stellen die Frage, bevor die Antwort kommt — **wie viel**,
+// **wie verteilt**, **welche zuerst**.
+//
+// Die Wahl liegt im localStorage, wie die Sortierung der Sammlung (Anmerkung 149):
+// eine Ansicht, die man bei jedem Öffnen neu wählt, ist keine Einstellung.
+let statsPane = 'tiles';
+try { statsPane = localStorage.getItem('ld_stats_pane') || 'tiles'; } catch (_) {}
+function showStatsPane(which) {
+  statsPane = which;
+  try { localStorage.setItem('ld_stats_pane', which); } catch (_) {}
+  document.querySelectorAll('#stats-tabs .zoom-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.stats === which));
+  document.querySelectorAll('#view-stats .stats-pane').forEach(p => {
+    p.style.display = p.dataset.statsPane === which ? '' : 'none';
+  });
+  // Erst beim Ansehen holen (A37). Und **einmal** — `statsTopsFor` merkt sich,
+  // für welchen Bestand die Listen gelten, damit ein Hin- und Herklicken nicht
+  // jedes Mal dieselbe Antwort neu erfragt.
+  if (which === 'tops') loadStatsTops();
+}
+document.querySelectorAll('#stats-tabs .zoom-btn').forEach(btn =>
+  btn.addEventListener('click', () => showStatsPane(btn.dataset.stats)));
+
+let statsTopsFor = null;
+async function loadStatsTops(force) {
+  const box = document.getElementById('stats-tops');
+  if (!box) return;
+  let stamp = null;
+  try { stamp = (await fetchIndex(true)).revision || ''; } catch (_) {}
+  if (!force && stamp && stamp === statsTopsFor && box.dataset.filled) return;
+  let top;
+  try { top = await api('/api/stats/toplists'); }
+  catch (err) {
+    // **Ein Fehlschlag wird nicht gemerkt** — sonst gälte die leere Ansicht als
+    // „für diesen Stand schon geladen" (dieselbe Umkehrung der Endlos-Falle wie
+    // in `mpLoadPoints`).
+    statsTopsFor = null;
+    box.innerHTML = `<div class="hint">${esc(t('tops.fail',
+      'Die Ranglisten konnten nicht geladen werden.'))}</div>`;
+    return;
+  }
+  statsTopsFor = stamp;
+  box.dataset.filled = '1';
+  renderStatsTops(top);
+}
+// Die elf Rekord-Listen in derselben Reihenfolge und mit denselben Einheiten
+// wie die Kacheln darüber. Die Tabelle steht hier EINMAL — die Kacheln lesen
+// ihre Einheit heute noch einzeln, aber eine zweite Liste in einer zweiten
+// Reihenfolge wäre die Sorte Doppelung, die Anmerkung 106 beschreibt.
+const TOP_WEATHER = [
+  ['hot', 'stat.hot', '🔥 Heißester Tag', ' °C'],
+  ['cold', 'stat.cold', '❄️ Kältester Tag', ' °C'],
+  ['sunny', 'stat.sun', '☀️ Sonnigster Tag', ' h'],
+  ['rainy', 'stat.rain', '🌧️ Nassester Tag', ' mm'],
+  ['windy', 'stat.wind', '💨 Windigster Tag', ' km/h'],
+  ['snowy', 'stat.snow', '❄️ Schneereichster Tag', ' cm'],
+  ['gust', 'stat.gust', '🌪️ Stärkste Böe', ' km/h'],
+  ['felt_hot', 'stat.felthot', '🥵 Gefühlt heißester Tag', ' °C'],
+  ['felt_cold', 'stat.feltcold', '🥶 Gefühlt kältester Tag', ' °C'],
+  ['longest_day', 'stat.longestday', '🌅 Längster Tag', ' h'],
+  ['shortest_day', 'stat.shortestday', '🌆 Kürzester Tag', ' h'],
+];
+// Eine Zeile einer Rangliste. Der Rang steht vorn, weil er die Aussage ist —
+// ohne ihn wäre es eine Liste, keine Rangliste.
+function topRow(i, label, value, sub, attrs = '') {
+  return `<div class="bar-row top-row"${attrs}>
+    <div class="top-rank">${i + 1}</div>
+    <div class="bar-label">${esc(label)}${
+      sub ? `<span class="stat-label"> · ${esc(sub)}</span>` : ''}</div>
+    <div class="bar-val">${esc(value)}</div>
+  </div>`;
+}
+function topPanel(title, rows, empty) {
+  return `<div class="panel">
+    <h3>${esc(title)}</h3>
+    ${rows.length ? rows.join('')
+                  : `<div class="stat-label">${esc(empty)}</div>`}
+  </div>`;
+}
+function renderStatsTops(top) {
+  const box = document.getElementById('stats-tops');
+  const noWx = t('tops.nowx', 'noch keine Wetterdaten');
+  const noData = t('tops.none', 'noch nichts erfasst');
+  // Beide Zahlen, immer in derselben Form (Anmerkung 143/148): Tage führen,
+  // Einträge stehen daneben.
+  const rank = list => (list || []).map((r, i) =>
+    topRow(i, r.name, dayCount(r.days), entryCount(r.events)));
+
+  const streak = top.streaks || {};
+  const span = s => s ? `${fmtDay(s.from)} – ${fmtDay(s.to)}` : '';
+  const streakRows = [
+    streak.longest_run
+      ? topRow(0, t('tops.run', 'Längste Serie mit Einträgen'),
+               dayCount(streak.longest_run.days), span(streak.longest_run)) : '',
+    streak.longest_gap
+      ? topRow(1, t('tops.gap', 'Längste Lücke ohne Einträge'),
+               dayCount(streak.longest_gap.days), span(streak.longest_gap)) : '',
+    streak.longest_trip
+      ? topRow(2, t('tops.trip', 'Längste erfasste Reise'),
+               dayCount(streak.longest_trip.days),
+               `${streak.longest_trip.title} · ${span(streak.longest_trip)}`) : '',
+  ].filter(Boolean);
+
+  box.innerHTML =
+    topPanel(t('tops.streaks', '📏 Längste Serien'), streakRows, noData)
+    + `<div class="grid cols-2">`
+    + topPanel(t('tops.places', '📍 Top-Orte'), rank(top.places), noData)
+    + topPanel(t('tops.cities', '🏙️ Top-Städte'), rank(top.cities), noData)
+    + topPanel(t('tops.countries', '🌍 Top-Länder'), rank(top.countries), noData)
+    + topPanel(t('tops.years', '📅 Top-Jahre'), rank(top.years), noData)
+    + topPanel(t('tops.categories', '🏷️ Top-Kategorien'),
+               (top.categories || []).map((r, i) =>
+                 topRow(i, catLabel(r.name), dayCount(r.days), entryCount(r.events))),
+               noData)
+    + `</div>`
+    + `<div class="grid cols-2">`
+    + TOP_WEATHER.map(([key, i18n, de, unit]) => topPanel(
+        // Dieselben Schlüssel wie die Kacheln darüber — die Liste heißt, wie
+        // ihr Platz 1 heißt. Ein eigener Text wäre ein zweiter Name für
+        // dieselbe Sache, und einer von beiden bliebe beim nächsten Mal stehen.
+        t(i18n, de),
+        (top.weather && top.weather[key] || []).map((r, i) =>
+          // Anmerkung 142: geführt wird zum TAG, nicht in den Bearbeiten-Dialog
+          // eines Eintrags, der zufällig den Messwert trägt.
+          // Der MESSWERT steht rechts, wo in den anderen Listen die Tage
+          // stehen: er ist die Größe, nach der sortiert wurde, und eine
+          // Rangliste soll man von rechts lesen können.
+          topRow(i, fmtDay((r.date_start || '').slice(0, 10)),
+                 `${r.value}${unit}`,
+                 [r.place, r.title].filter(Boolean).join(' — '),
+                 ` data-top-day="${esc((r.date_start || '').slice(0, 10))}"`)),
+        noWx)).join('')
+    + `</div>`;
+  box.querySelectorAll('[data-top-day]').forEach(row =>
+    row.addEventListener('click', () => tlShowDay(row.dataset.topDay)));
+}
+function fmtDay(iso) {
+  if (!iso) return '';
+  const d = new Date(iso + (iso.length === 10 ? 'T00:00:00' : ''));
+  return isNaN(d) ? String(iso) : d.toLocaleDateString(LOC());
 }
 
 function renderBars(id, data, onClick) {
@@ -6913,11 +7147,17 @@ document.querySelector('.content').addEventListener('click', ev => {
     // Bei „district" trägt group.city den Ortsteil („HafenCity"); ein Filter auf
     // Location.city fände ihn nie und die Karte klappte ins Leere auf. `place` +
     // `group` prüfen die Spalte der Stufe, die die Gruppe gebildet hat.
-    fetchEvents({ group: e.group.level || tl.level, place: e.group.city, visits: 1,
+    // Anmerkung 152: **aufgeklappt wird derselbe Schlüssel, der verdichtet
+    // hat** — also auch nach QUELLE. Ohne das holte die Gruppe „12 Fotos"
+    // zusätzlich die Google-Besuche desselben Tages in derselben Stadt: eine
+    // Aufklappung, die mehr zeigt, als die Zahl darüber verspricht.
+    const isPhotos = e.source === 'immich';
+    fetchEvents({ group: e.group.level || tl.level, place: e.group.city,
+                  visits: isPhotos ? 0 : 1, photos: isPhotos ? 1 : 0,
                   from: `${day}T00:00:00`, to: `${day}T23:59:59` })
       .then(rows => card.insertAdjacentHTML('afterend', `<div class="tl-children">${
         rows.map(r => eventCard(r)).join('')}</div>`))
-      .catch(() => toast(t('tl.group.fail', 'Die einzelnen Besuche konnten nicht geladen werden.'), 'warn'))
+      .catch(() => toast(t('tl.group.fail', 'Die einzelnen Einträge konnten nicht geladen werden.'), 'warn'))
       .finally(() => gtog.classList.remove('is-loading'));
     return;
   }
@@ -7124,8 +7364,9 @@ function startVoice() {
 }
 
 // ---------- KARTE ----------
-let mapObj = null, mapMarkers = null, mapCluster = null, mapRoute = null, mapTracks = null,
-    mapPhotos = null;   // A45: Fotopunkte, eigene Ebene
+let mapObj = null, mapMarkers = null, mapCluster = null, mapRoute = null, mapTracks = null;
+// A45/Anmerkung 153: Die Fotopunkte liegen in einem eigenen Layer mit EINER
+// Leinwand (`PHOTO_DOT_LAYER`) — kein LayerGroup mit einem Objekt je Foto.
 const mp = { mode: 'day', periods: [], index: 0, showRoute: true, showTracks: true, condense: true, located: [], catFilter: new Set(FILTER_CATS),
   // A45 — Fotopunkte als eigene Ebene. `showPhotos` ist bewusst AUS: bei
   // zwanzig Jahren Bibliothek sind das zehntausende Marker, und wer die Karte
@@ -7355,11 +7596,11 @@ async function openMapView() {
     if (mapCluster) mapCluster.addTo(mapObj);
     mapRoute = L.layerGroup().addTo(mapObj);
     mapTracks = L.layerGroup().addTo(mapObj);
-    mapPhotos = L.layerGroup().addTo(mapObj);   // A45
-    // Fotopunkte wachsen mit dem Zoom (Anmerkung 120) — beim Hineinzoomen ist
-    // ein Punkt sonst genauso groß wie in der Weltansicht, und dort ist er zu
-    // klein, um neben einem Pin noch aufzufallen.
-    mapObj.on('zoomend', mpPhotoResize);
+    // Anmerkung 153: Die Fotopunkte haben keinen LayerGroup mehr, sondern einen
+    // eigenen Layer mit EINER Leinwand (siehe `PHOTO_DOT_LAYER`). Er wird beim
+    // ersten Zeichnen angelegt und hängt sich selbst ein; die Punktgröße
+    // (Anmerkung 120) fällt bei jedem Neuzeichnen neu an, ein eigener
+    // `zoomend`-Horcher dafür erübrigt sich.
     // Auf Mobil ändert sich die Höhe beim Drehen / Ein-/Ausblenden der Adressleiste
     window.addEventListener('resize', () => mapObj && mapObj.invalidateSize());
     window.addEventListener('orientationchange', () => mapObj && mapObj.invalidateSize());
@@ -7495,7 +7736,7 @@ function renderPeriod() {
   };
   if (!mp.periods.length) {
     mapTracks.clearLayers();
-    if (mapPhotos) mapPhotos.clearLayers();
+    mpDrawPhotos([]);
     mpCapNote(0, 0);
     mpPhotoNote(null);
     setLabel(t('mp.nolocated', 'keine verorteten Events'));
@@ -7655,50 +7896,156 @@ function mpPhotoRadius() {
   const z = mapObj ? mapObj.getZoom() : 6;
   return z >= 14 ? 8 : z >= 11 ? 7 : z >= 8 ? 6 : 5;
 }
-const MP_PHOTO_DOTS = [];
-function mpPhotoResize() {
-  if (!MP_PHOTO_DOTS.length) return;
-  const r = mpPhotoRadius();
-  // Nur bei echter Änderung durch die Liste: bei zehntausend Punkten ist jeder
-  // Zoomschritt sonst zehntausend Neuberechnungen für dasselbe Bild.
-  if (r === MP_PHOTO_DOTS.radius) return;
-  MP_PHOTO_DOTS.radius = r;
-  MP_PHOTO_DOTS.forEach(dot => dot.setRadius(r));
-}
-// Zeichnet die Foto-Ereignisse des Zeitraums als Punkte auf die Leinwand.
+// --------------------------------------------------------------------------- //
+// Anmerkung 153 — EIN Layer für alle Fotopunkte statt eines Objekts je Foto
+// --------------------------------------------------------------------------- //
+// Gemeldet: „Vektorkarte an, dann alles anzeigen — der Tab stürzt ab."
 //
-// Sie kommen aus derselben Liste wie alle anderen Punkte (`mp.located`) — der
-// eigene Abruf ist mit Anmerkung 139 weggefallen. Was bleibt, ist die eigene
-// DARSTELLUNG: Punkt statt Pin, Bild im Popup, unter den Pins.
+// A45 hatte die Zeichenlast bereits auf die Leinwand verschoben, und das war
+// richtig: es spart die zehntausend SVG-Knoten. Was es NICHT spart, ist der
+// Rest eines `L.circleMarker` — jeder ist ein `L.Path` mit eigenem
+// Ereignis-Abonnement und eigenem Popup-Objekt, jeder wird bei jedem
+// Kartenschritt einzeln projiziert, und Leaflets Leinwand geht bei jedem
+// Neuzeichnen ihre komplette Layer-Liste durch. Bei zwanzigtausend Fotos sind
+// das zwanzigtausend Objekte für zwanzigtausend Kreise.
+//
+// **Die Zeichenlast war nie das Problem, die Objektlast war es.** Ein Kreis
+// braucht drei Zahlen, kein Objekt mit Lebenslauf. Dieser Layer hält deshalb
+// EINEN Canvas und malt alle Punkte in einem Durchgang; der Klick sucht den
+// getroffenen Punkt in der Liste, die beim Zeichnen ohnehin entsteht.
+//
+// Warum es ausgerechnet mit der Vektorkarte auffiel: darunter liegt eine
+// lebende WebGL-Leinwand, die jedes Bild neu zusammensetzt — dieselbe Stelle,
+// an der schon die Wege-Ebene umkippte (Anmerkung 141). Der Unterschied ist
+// nur, wie viel Reserve darüber noch bleibt.
+const MP_PHOTO_PAD = 0.2;        // Überstand je Seite, damit Ziehen nichts abschneidet
+const mpPhotoPoints = [];        // die Punkte des Zeitraums — Quelle des Layers
+// Der Popup-Inhalt als eigene, reine Funktion: **hier hängt das Bild** — und
+// nur hier. Der Zeitstrahl zeigt dasselbe Ereignis bewusst als Text (siehe
+// `eventPhotos`): die Karte ist der Ort für das Bild, der Zeitstrahl der für
+// die Tatsache (Anmerkung 139). Als Funktion statt inline, damit die Zusage
+// prüfbar bleibt, seit es keinen Marker mit `bindPopup` mehr gibt.
+function photoPopupHtml(e) {
+  return (e.photo
+      ? `<img src="/api/photos/${encodeURIComponent(e.photo)}/thumb" alt="" `
+        + `style="max-width:180px; border-radius:6px; display:block; margin-bottom:6px" loading="lazy">`
+      : '')
+    + `<b>${esc((e.location && e.location.name) || t('map.photos.nowhere', 'ohne Ortsangabe'))}</b><br>`
+    + esc(new Date(e.date_start).toLocaleString(LOC()));
+}
+const PHOTO_DOT_LAYER = {
+  onAdd(map) {
+    this._map = map;
+    const c = this._canvas = L.DomUtil.create('canvas', 'leaflet-photo-dots leaflet-layer');
+    // Die Leinwand fängt keine Klicks: getroffen wird über die Karte, sonst
+    // läge ein durchsichtiges Rechteck über allem, was darunter anklickbar ist.
+    c.style.pointerEvents = 'none';
+    map.getPanes().overlayPane.appendChild(c);
+    // Während der Zoom-Animation wird sie ausgeblendet statt mitskaliert.
+    // Leaflets eigene Renderer rechnen das über eine private Methode mit; die
+    // hier nachzubauen hieße, sich an Interna zu binden, für ein Zehntel
+    // Sekunde Animation. Neu gezeichnet wird ohnehin sofort danach.
+    L.DomUtil.addClass(c, 'leaflet-zoom-hide');
+    map.on('moveend zoomend resize', this._reset, this);
+    map.on('click', this._onClick, this);
+    this._reset();
+  },
+  onRemove(map) {
+    map.off('moveend zoomend resize', this._reset, this);
+    map.off('click', this._onClick, this);
+    if (this._canvas) L.DomUtil.remove(this._canvas);
+    this._canvas = null;
+  },
+  redraw() { if (this._map && this._canvas) this._reset(); },
+  _reset() {
+    const map = this._map, size = map.getSize();
+    // Größer als der sichtbare Ausschnitt: beim Ziehen wandert die Leinwand mit
+    // der Karte, und ohne Überstand liefe man beim Ziehen aus dem Gezeichneten
+    // heraus, bevor `moveend` neu zeichnet.
+    const w = Math.round(size.x * (1 + MP_PHOTO_PAD * 2));
+    const h = Math.round(size.y * (1 + MP_PHOTO_PAD * 2));
+    this._origin = map.containerPointToLayerPoint(
+      L.point(-size.x * MP_PHOTO_PAD, -size.y * MP_PHOTO_PAD)).round();
+    L.DomUtil.setPosition(this._canvas, this._origin);
+    // Auf einem Bildschirm mit doppelter Punktdichte wäre die Leinwand sonst
+    // unscharf — die Kreise sind klein, das sieht man sofort.
+    const dpr = window.devicePixelRatio || 1;
+    if (this._canvas.width !== w * dpr) this._canvas.width = w * dpr;
+    if (this._canvas.height !== h * dpr) this._canvas.height = h * dpr;
+    this._canvas.style.width = w + 'px';
+    this._canvas.style.height = h + 'px';
+    this._w = w; this._h = h; this._dpr = dpr;
+    this._draw();
+  },
+  _draw() {
+    const ctx = this._canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.setTransform(this._dpr, 0, 0, this._dpr, 0, 0);
+    ctx.clearRect(0, 0, this._w, this._h);
+    const hits = this._hits = [];
+    if (!mp.showPhotos || !mpPhotoPoints.length) return;
+    const r = this._r = mpPhotoRadius();
+    ctx.fillStyle = '#f5921b';
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    for (const e of mpPhotoPoints) {
+      const lp = this._map.latLngToLayerPoint([e.location.lat, e.location.lng]);
+      const x = lp.x - this._origin.x, y = lp.y - this._origin.y;
+      // Was außerhalb liegt, wird nicht gezeichnet UND nicht in die Trefferliste
+      // gelegt: in der Weltansicht sind das fast alle, und die Suche beim Klick
+      // soll die Punkte durchgehen, die man sehen kann.
+      if (x < -r || y < -r || x > this._w + r || y > this._h + r) continue;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      hits.push([x, y, e]);
+    }
+  },
+  _onClick(ev) {
+    if (!mp.showPhotos || !this._hits || !this._hits.length) return;
+    const lp = this._map.latLngToLayerPoint(ev.latlng);
+    const x = lp.x - this._origin.x, y = lp.y - this._origin.y;
+    // Der zuletzt gezeichnete Treffer gewinnt — das ist der, der oben liegt.
+    const reach = (this._r + 3) * (this._r + 3);
+    let found = null;
+    for (const [hx, hy, e] of this._hits) {
+      const dx = hx - x, dy = hy - y;
+      if (dx * dx + dy * dy <= reach) found = e;
+    }
+    if (!found) return;
+    L.popup().setLatLng([found.location.lat, found.location.lng])
+      .setContent(photoPopupHtml(found)).openOn(this._map);
+  },
+};
+// `null` = noch nicht versucht, `false` = geht hier nicht (kein echtes Leaflet).
+// Ohne die Unterscheidung würde bei jedem Neuzeichnen erneut eine Klasse
+// gebaut, die schon einmal nicht getragen hat.
+let MP_PHOTO_LAYER = null;
+function mpPhotoLayer() {
+  if (MP_PHOTO_LAYER !== null) return MP_PHOTO_LAYER;
+  MP_PHOTO_LAYER = false;
+  try {
+    const inst = new (L.Layer.extend(PHOTO_DOT_LAYER))();
+    inst.addTo(mapObj);
+    MP_PHOTO_LAYER = inst;
+  } catch (_) {
+    // Ohne Leaflet (CDN nicht geladen) bleibt die Ebene aus. Die PUNKTE gibt es
+    // trotzdem — `mpPhotoPoints` ist gefüllt, und daran hängen Deckelungs-Hinweis
+    // und Wächter. Eine Ebene, die nicht gezeichnet werden kann, darf nicht die
+    // Auskunft darüber mitreißen, wie viele Punkte es gäbe (A40).
+  }
+  return MP_PHOTO_LAYER;
+}
+// Übergibt die Foto-Ereignisse des Zeitraums an den Layer. Sie kommen aus
+// derselben Liste wie alle anderen Punkte (`mp.located`) — der eigene Abruf ist
+// mit Anmerkung 139 weggefallen. Was bleibt, ist die eigene DARSTELLUNG: Punkt
+// statt Pin, Bild im Popup, unter den Pins.
 function mpDrawPhotos(photos) {
-  if (!mapPhotos) return;
-  mapPhotos.clearLayers();
-  MP_PHOTO_DOTS.length = 0;
-  MP_PHOTO_DOTS.radius = null;
-  if (!mp.showPhotos || !photos.length) return;
-  const radius = mpPhotoRadius();
-  MP_PHOTO_DOTS.radius = radius;
-  photos.forEach(e => {
-    MP_PHOTO_DOTS.push(L.circleMarker([e.location.lat, e.location.lng], {
-      // Kräftiger Rand und volle Deckkraft: der Punkt muss sich gegen eine
-      // helle Kachel UND gegen eine dunkle behaupten, und der weiße Ring
-      // trennt ihn von seinen Nachbarn, wo viele dicht beieinanderliegen.
-      radius, fillColor: '#f5921b', color: '#fff', weight: 2, fillOpacity: 1,
-      // Auf die Leinwand statt in den DOM: Leaflet zeichnet Kreise sonst als
-      // je ein SVG-Element, und zehntausend davon sind zehntausend Knoten,
-      // die der Browser bei jedem Verschieben neu anfassen muss.
-      renderer: mpCanvas(),
-    }).addTo(mapPhotos).bindPopup(
-      // **Hier hängt das Bild** — und nur hier. Der Zeitstrahl zeigt dasselbe
-      // Ereignis bewusst als Text (siehe `eventPhotos`): die Karte ist der Ort
-      // für das Bild, der Zeitstrahl der für die Tatsache (Anmerkung 139).
-      (e.photo
-        ? `<img src="/api/photos/${encodeURIComponent(e.photo)}/thumb" alt="" `
-          + `style="max-width:180px; border-radius:6px; display:block; margin-bottom:6px" loading="lazy">`
-        : '')
-      + `<b>${esc((e.location && e.location.name) || t('map.photos.nowhere', 'ohne Ortsangabe'))}</b><br>`
-      + esc(new Date(e.date_start).toLocaleString(LOC()))));
-  });
+  mpPhotoPoints.length = 0;
+  if (mp.showPhotos) for (const e of photos) mpPhotoPoints.push(e);
+  const layer = mpPhotoLayer();
+  if (layer) layer.redraw();
 }
 // Der Zeitraum als ISO-Grenzen; `null` heißt „alles", also keine Eingrenzung.
 //

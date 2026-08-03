@@ -850,6 +850,7 @@ deliberately *not* decided yet — each entry names the question, not an answer.
 | 145 | **Gap detection** — “eventually have at least one place for every day since birth, and let the system find the gaps”. | Depends on 144: without baselines, every childhood day is a gap and the report is noise. |
 | 146 | **Shared view across accounts** — two independent databases, laid over each other. | Needs an explicit consent and revocation model before any code. A sharing feature built wrong is not a bug, it is a disclosure. |
 | 147 | **Translation workflow** (Weblate or similar). | Evaluated, not adopted: the catalogue would have to leave `index.html` first, and the project has no third-party contributions to serve yet. |
+| 154 | **Map controls** — the display row mixes layers, a drawing and a mode, and “merge points” secretly also decides whether the map shows everything. | Analysed with three worked-out designs (note 154). The choice is the author’s: option B changes a control people already know. |
 
 Each of these is written out in `DECISIONS.md` with the alternatives already
 weighed — the table here is the index, not the argument.

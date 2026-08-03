@@ -57,6 +57,16 @@ any `MINOR`.
   world map already did. “11 203 entries in Germany” was a statement about your
   photo library, not about your life; both numbers stay, because “how many
   films” still wants entries.
+- **The statistics tab is now three views.** *Numbers* (all the tiles),
+  *Charts* (the bar charts) and *Rankings*. It used to be one page with forty
+  tiles, six charts and two panels at once — everything present, nothing
+  emphasised. Your choice of view is remembered.
+- **Rankings: the top ten instead of just the record.** Every weather tile —
+  hottest day, strongest gust, shortest day — now has its full top ten behind
+  it, and clicking a row takes you to that day. Plus top places, cities,
+  countries, years and categories by days, and your longest streaks: the
+  longest run of consecutive days with entries, the longest gap without any,
+  and your longest recorded trip.
 
 ### Fixed
 - **The week and month view no longer freezes the browser** (reported as
@@ -83,6 +93,15 @@ any `MINOR`.
   the things that must survive: photos **you** uploaded are kept and attached
   to the day instead, travelled paths are unlinked rather than deleted, and
   sub-entries are unhooked, exactly as the delete dialog does it.
+- **The map no longer freezes with a vector background and everything shown.**
+  It used to build one drawing object per photo — twenty thousand of them for
+  twenty thousand photos, each recomputed on every mouse move. It now draws all
+  of them in a single pass. Nothing is left out, the popup with its preview
+  picture stays.
+- **A folded-up day of photos no longer says “12 visits”.** It says “12 photos”,
+  and expanding it now shows exactly those twelve — before, it also pulled in
+  that day's Google visits, so the expanded list could be longer than the
+  number above it.
 
 ### Changed
 - **The concept document has been split.** `docs/KONZEPT.md` keeps what

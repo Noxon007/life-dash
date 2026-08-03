@@ -9,6 +9,7 @@ from app.database import get_db
 from app.models import User
 from app.services.stats import compute_widgets
 from app.services.stats_overview import compute_overview
+from app.services.stats_toplists import compute_toplists
 
 router = APIRouter(prefix="/api/stats", tags=["Statistik"])
 
@@ -22,6 +23,19 @@ def overview(db: Session = Depends(get_db),
     Endpunkt würde das Zeitfenster die Kacheln still auf das Fenster
     beziehen, statt auf das Leben."""
     return compute_overview(db, user.id)
+
+
+@router.get("/toplists")
+def toplists(db: Session = Depends(get_db),
+             user: User = Depends(get_current_user)) -> dict:
+    """Anmerkung 156: die Ranglisten der dritten Statistik-Ansicht.
+
+    Eigener Endpunkt statt weiterer Felder in `/overview`: der Überblick wird
+    bei jedem Öffnen des Reiters geholt, diese Listen erst, wenn jemand sie
+    ansieht — dieselbe Regel, mit der A37 die Karte von der Startseite getrennt
+    hat. Eine Ansicht bezahlt, was sie zeigt.
+    """
+    return compute_toplists(db, user.id)
 
 
 @router.get("/widgets")

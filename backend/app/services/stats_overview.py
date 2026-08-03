@@ -216,32 +216,70 @@ def compute_overview(db: Session, user_id: str, *, today: datetime | None = None
     }
 
 
-def _weather_stats(db: Session, user_id: str) -> dict:
-    """Wetter-Extreme (je Ereignis) und Wetter-Bilanz (je KALENDERTAG, A31).
+def _extreme_tops(values: dict, val, card, n: int) -> dict[str, list[dict]]:
+    """Die besten `n` Ereignisse je Extremwert — die Rangfolge an EINER Stelle.
 
-    Beides braucht die Werte je Ereignis, deshalb ein gemeinsamer Durchgang.
+    Die Kachel im Statistik-Reiter nimmt davon den Kopf, die Top-Liste
+    (Anmerkung 156) die ganze Liste. Beide lesen dieselben Regeln: welcher
+    Metrik-Schlüssel gilt, in welche Richtung verglichen wird und ob eine Null
+    ein Rekord sein kann (`positive_only`). Die letzte ist der Grund, warum das
+    hier nicht zweimal stehen darf — bei Regen ist 0 kein Rekord, beim
+    Tageslicht ist die Polarnacht mit 0 h der interessanteste Wert überhaupt.
+
+    Sortiert wird über die ganze Menge statt in einer Schleife das Maximum zu
+    suchen: für n=1 ist das derselbe Aufwand in einer Größenordnung, in der es
+    nicht auffällt (die Werte liegen bereits im Speicher), und für n=10 wäre
+    die Alternative eine zweite Schleife mit einer eigenen Grenze.
+    """
+    out: dict[str, list[dict]] = {}
+    for name, keys, direction, positive_only in _EXTREMES:
+        rows = []
+        for eid in values:
+            v = val(eid, *keys)
+            if v is None or (positive_only and v <= 0):
+                continue
+            rows.append((eid, v))
+        # `eid` als zweites Sortierkriterium: bei gleichen Werten — nach dem
+        # Runden auf eine Nachkommastelle keine Seltenheit — wäre die
+        # Reihenfolge sonst die der Dict-Iteration und damit zwischen zwei
+        # Aufrufen verschieden. Eine Rangliste, die bei jedem Laden anders
+        # aussieht, ist keine.
+        rows.sort(key=lambda r: (-r[1] if direction == "max" else r[1], r[0]))
+        out[name] = [card(eid, v) for eid, v in rows[:n]]
+    return out
+
+
+def weather_values(db: Session, user_id: str):
+    """Die Wetterwerte je Ereignis, plus die zwei Regeln, die auf ihnen gelten.
+
+    Zurück kommen `(events, values, val, card)`: die Ereignisse als Tupel, die
+    Werte je Ereignis, der Zugriff mit Schlüssel-Kette (`temp_max_c`, sonst
+    `temperature_c`) und die Karte, wie eine Rekord-Zeile aussieht.
+
     Geladen werden Tupel, keine ORM-Objekte — das war die Lehre aus
     Anmerkung 80: die Objekterzeugung über eine volle Ergebnismenge ist der
-    teure Teil, nicht das Finden der Zeilen."""
+    teure Teil, nicht das Finden der Zeilen.
+
+    **Öffentlich seit Anmerkung 156**, weil die Top-Listen dieselben Werte
+    brauchen. Sie dort ein zweites Mal zu laden hieße, die Schlüssel-Kette und
+    die Rundung ein zweites Mal aufzuschreiben — und zwei Fassungen einer
+    Rundungsregel laufen still auseinander.
+    """
     base = (db.query(Event.id, Event.title, Event.date_start, Event.date_precision,
                      Event.category, Event.parent_event_id, Location.name)
             .outerjoin(Location, Event.location_id == Location.id)
             .filter(Event.user_id == user_id, Event.date_start.isnot(None)))
     events = {r.id: r for r in base.all()}
-    if not events:
-        return _empty_weather()
-
     values: dict[str, dict[str, float]] = {}
-    rows = (db.query(Metric.event_id, Metric.key, Metric.value)
-            .join(Event, Event.id == Metric.event_id)
-            .filter(Event.user_id == user_id, Metric.source == Source.weather,
-                    Metric.key.in_(_WX_KEYS), Metric.value.isnot(None))
-            .all())
-    for eid, key, value in rows:
-        if eid in events:
-            values.setdefault(eid, {})[key] = value
-    if not values:
-        return _empty_weather()
+    if events:
+        rows = (db.query(Metric.event_id, Metric.key, Metric.value)
+                .join(Event, Event.id == Metric.event_id)
+                .filter(Event.user_id == user_id, Metric.source == Source.weather,
+                        Metric.key.in_(_WX_KEYS), Metric.value.isnot(None))
+                .all())
+        for eid, key, value in rows:
+            if eid in events:
+                values.setdefault(eid, {})[key] = value
 
     def val(eid: str, *keys: str) -> float | None:
         vals = values.get(eid) or {}
@@ -259,22 +297,31 @@ def _weather_stats(db: Session, user_id: str) -> dict:
                 "date_precision": e.date_precision.value,
                 "place": _short_place(e.name)}
 
+    return events, values, val, card
+
+
+def _weather_stats(db: Session, user_id: str) -> dict:
+    """Wetter-Extreme (je Ereignis) und Wetter-Bilanz (je KALENDERTAG, A31).
+
+    Beides braucht die Werte je Ereignis, deshalb ein gemeinsamer Durchgang."""
+    events, values, val, card = weather_values(db, user_id)
+    if not values:
+        return _empty_weather()
+
     # --- Extreme: je Ereignis, nicht je Tag (die heißeste Stunde zählt) ---
     # Anmerkung 114: Eine Schleife über eine Tabelle statt zwölf Blöcke. Die
     # ersten sechs Kacheln standen als zwei getrennte Fassungen desselben
     # Gedankens da; mit sechs weiteren wäre daraus dieselbe stille Doppelregel
     # geworden, an der schon Anmerkung 106 hing.
-    extremes: dict[str, dict | None] = {}
-    for name, keys, direction, positive_only in _EXTREMES:
-        better = (lambda a, b: a > b) if direction == "max" else (lambda a, b: a < b)
-        best = None
-        for eid in values:
-            v = val(eid, *keys)
-            if v is None or (positive_only and v <= 0):
-                continue
-            if best is None or better(v, best[1]):
-                best = (eid, v)
-        extremes[name] = card(*best) if best else None
+    #
+    # Anmerkung 156: Die Kachel ist seitdem **Platz 1 einer Liste** und nicht
+    # mehr ein eigenes Ergebnis. `_extreme_tops` rechnet beides; hier wird
+    # nur der Kopf genommen. Zwei Fassungen derselben Rangfolge — eine für
+    # die Kachel, eine für die Top-Liste — wären dieselbe Doppelregel eine
+    # Ebene höher, und sie liefen genau dann auseinander, wenn jemand eine
+    # Schwelle ändert (etwa „0 zählt nicht").
+    extremes = {name: (rows[0] if rows else None)
+                for name, rows in _extreme_tops(values, val, card, 1).items()}
 
     # --- Bilanz: EIN Datensatz je Kalendertag (A31/Anmerkung 64) ---
     # Ein importierter Tag trägt dutzende Besuche mit demselben Wetter; über

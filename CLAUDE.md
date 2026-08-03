@@ -10,13 +10,13 @@ Datei, Anm. 147). Erst dort gezielt nachlesen statt Code raten.
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI, Geocoding aus)
-  — 560 Tests, ~15 s, SQLite im Arbeitsspeicher
+  — 575 Tests, ~13 s, SQLite im Arbeitsspeicher
 - **Tests gegen echtes PostgreSQL** (das, worauf betrieben wird — `postgres:18-alpine`):
   `pwsh tools/pg-test.ps1` (Container `lifedash-pgtest` auf Port **55432**, danach weg;
   `-Keep` lässt ihn stehen). Setzt `TEST_DATABASE_URL`, das `conftest.py` auswertet;
   **zwei Riegel davor**, weil die Suite das Schema löscht: die URL darf nicht die
   betriebene sein, und der DB-Name muss `test` enthalten.
-- Wächter: `cd tools` → `npm run check` (29 jsdom-Dateien, ~400 Zusicherungen)
+- Wächter: `cd tools` → `npm run check` (30 jsdom-Dateien, ~420 Zusicherungen)
 - **Smoke gegen ein HTTP-Doppel** (Immich): `<python> tools/immich_double.py &`
   dann `<python> tools/smoke_a45.py` — findet, was Unit-Tests prinzipiell nicht
   können (Blättern, Zeitzonen, echte DTOs). Immer aus dem Wurzelverzeichnis.
@@ -68,6 +68,50 @@ mehr in KONZEPT Kap. 15 — das ist jetzt ein Zeiger mit der Tabelle der noch
 OFFENEN Fragen (144–147). Anmerkungen stehen in der Reihenfolge, in der sie
 AUFKAMEN, nicht in der sie gebaut wurden — Neues wird angehängt, auch wenn
 davor noch Offenes steht.
+
+**Feedback-Runde 2026-08-03, zweiter Durchgang (Anmerkungen 152–156), auf
+`main`, ohne Versionssprung.** Vier Punkte: zwei Defekte, eine neue Ansicht,
+und die Kartenschalter **bewusst nur analysiert** (der User entscheidet).
+
+**Anm. 153 — der gemeldete Absturz: Vektorkarte + „Alles".** Die Karte legte
+**ein Leaflet-Objekt je Foto** an. A45 hatte die ZEICHENLAST längst auf die
+Leinwand verschoben, und das war richtig — es spart zehntausend SVG-Knoten.
+Was es nicht spart, ist der Rest eines `L.circleMarker`: jeder ist ein `L.Path`
+mit eigenem Ereignis-Abonnement und eigenem Popup, wird bei jedem Kartenschritt
+einzeln projiziert, und Leaflets Leinwand geht bei jedem Neuzeichnen ihre ganze
+Layer-Liste durch. **Die Zeichenlast war nie das Problem, die OBJEKTLAST war
+es.** Jetzt ein Layer mit EINER Leinwand (`PHOTO_DOT_LAYER`), Klick über
+Trefferliste. **Regel: der Canvas-Renderer ist die halbe Antwort — die andere
+Hälfte ist, kein Objekt je Element zu erzeugen.** Aufgefallen ist es unter der
+Vektorkarte, weil darunter eine lebende WebGL-Leinwand liegt: dieselbe Stelle,
+an der Anm. 141 die Wege-Ebene umkippen ließ. Der Wächter sichert seitdem nicht
+mehr „ein Kreis wird gezeichnet", sondern **„es entsteht KEIN Objekt je Foto"**.
+
+**Anm. 152 — „Schwerin, 12 Besuche" klappte 12 Fotos auf.** Der
+Verdichtungsschlüssel trägt seit Anm. 139 die Quelle, die Karte sagte trotzdem
+immer „Besuche". Zweite, leisere Hälfte desselben Defekts: das Aufklappen
+holte `visits=1` und ließ `photos` auf Standard — **was verdichtet hat und was
+aufklappt, muss derselbe Schlüssel sein**, sonst zeigt die Aufklappung mehr,
+als die Zahl darüber verspricht.
+
+**Anm. 155/156 — Statistik in drei Ansichten** (Zahlen · Diagramme ·
+Ranglisten, Wahl im localStorage wie Anm. 149) plus `/api/stats/toplists`
+(`services/stats_toplists.py`). **Die Kachel ist Platz 1 der Liste** —
+`_extreme_tops` liefert die Rangfolge, der Überblick nimmt den Kopf; zwei
+Rangfolgen liefen beim ersten Sonderfall auseinander, und die stehen längst da
+(0 ist beim Regen kein Rekord, beim Tageslicht schon). Zwei Stellen, an denen
+eine Zahl unehrlich gewesen wäre: die **Lücke** wird nur zwischen erstem und
+letztem Tag gemessen (die Zeit davor ist keine Lücke, sondern die Zeit vor dem
+ersten Eintrag — hängt an der offenen Anm. 144), und die **längste Reise** ist
+die längste ERFASSTE, keine Ableitung aus importierten Besuchen.
+
+**Anm. 154 — Kartenschalter: analysiert, nicht gebaut.** Vier Befunde, drei
+Entwürfe (A/B/C) mit Empfehlung in `docs/DECISIONS.md`. Der teuerste Befund:
+**„Punkte zusammenfassen" tut drei Dinge**, und welches, entscheidet die
+Zoomstufe — und AUSschalten aktiviert zusätzlich den 300er-Deckel. Der
+Kartenhinweis aus Anm. 110 ist ein Pflaster darüber. Dazu: der Wege-Schalter ist
+oberhalb Monats-Zoom still wirkungslos (`.inert` fehlt), und 🛰️ heißt auf der
+Karte etwas anderes als im Zeitstrahl.
 
 **Feedback-Runde 2026-08-03 (Anmerkungen 148–151), auf `main`, ohne
 Versionssprung.** Vier gemeldete Punkte, drei davon in der Sammlung.

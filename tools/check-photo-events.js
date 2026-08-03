@@ -133,6 +133,10 @@ const ok = (n, c, detail = '') => {
   if (!c) fail++;
 };
 const wait = ms => new Promise(r => setTimeout(r, ms));
+// Ein Wächter, der beim kaputten Stand ABSTÜRZT statt zu berichten, sagt zwar
+// „nicht grün", aber nicht warum — und Anmerkung 108 verlangt, ihn genau dort
+// laufen zu lassen.
+const inPage = (w, code) => { try { return w.eval(code); } catch (e) { return `FEHLER: ${e.message}`; } };
 
 setTimeout(async () => {
   // --- 1. Ohne Foto-Ereignisse: sichtbar außer Kraft ---------------------- //
@@ -185,12 +189,31 @@ setTimeout(async () => {
   drawn.marker = 0; drawn.circle = 0; drawn.popups.length = 0;
   w.eval("mp.mode = 'all'; rebuildPeriods(); renderPeriod();");
   await wait(80);
-  ok('Das Foto-Ereignis wird als PUNKT gezeichnet', drawn.circle > 0,
-     `${drawn.circle} Punkte, ${drawn.marker} Pins — zehntausend nummerierte `
-     + 'Marker wären eine unbedienbare Karte');
-  ok('…und das Bild hängt im Popup',
-     drawn.popups.some(c => c.includes(`/api/photos/${ASSET}/thumb`)),
-     `${JSON.stringify(drawn.popups).slice(0, 200)} — die Karte ist der Ort für das Bild`);
+  ok('Das Foto-Ereignis geht auf die Foto-Ebene', inPage(w, 'mpPhotoPoints.length') === 1,
+     `${inPage(w, 'mpPhotoPoints.length')} Punkte, ${drawn.marker} Pins — zehntausend `
+     + 'nummerierte Marker wären eine unbedienbare Karte');
+  // **Anmerkung 153.** Bis dahin war jeder Fotopunkt ein eigener
+  // `L.circleMarker`: ein Objekt mit Ereignis-Abonnement und Popup, das bei
+  // jedem Kartenschritt einzeln projiziert wird. Bei zwanzigtausend Fotos
+  // stürzte der Tab damit ab, sobald eine Vektorkarte darunter lag. Die Zusage
+  // ist deshalb nicht mehr „es wird ein Kreis gezeichnet", sondern **„es
+  // entsteht KEIN Objekt je Foto"** — und das ist die Zusicherung, die beim
+  // nächsten bequemen `L.circleMarker(...)` sofort umfällt.
+  ok('…und dabei entsteht kein Leaflet-Objekt je Foto', drawn.circle === 0,
+     `${drawn.circle} Einzelobjekte — genau die Last, die den Tab umbrachte`);
+  const popup = typeof w.photoPopupHtml === 'function'
+    ? String(w.photoPopupHtml(PHOTO_EVENT)) : '(photoPopupHtml fehlt)';
+  ok('…und das Bild hängt im Popup', popup.includes(`/api/photos/${ASSET}/thumb`),
+     `${popup.slice(0, 200)} — die Karte ist der Ort für das Bild`);
+  // Gegenprobe: die Ebene folgt dem Schalter, nicht der Liste. Ohne diese
+  // Prüfung wäre „geht auf die Foto-Ebene" auch dann grün, wenn der Schalter
+  // gar nichts mehr bewirkt.
+  inPage(w, "mp.showPhotos = false; renderPeriod();");
+  await wait(60);
+  ok('Ausgeschaltet ist die Ebene leer', inPage(w, 'mpPhotoPoints.length') === 0,
+     `${inPage(w, 'mpPhotoPoints.length')} Punkte trotz ausgeschaltetem Schalter`);
+  inPage(w, "mp.showPhotos = true; renderPeriod();");
+  await wait(60);
   const stops = d.getElementById('mp-stops');
   ok('…und steht NICHT in der Stopp-Liste', !/Foto in Detmold/.test(stops.textContent),
      `${stops.textContent.slice(0, 160)} — sonst findet niemand mehr einen von `

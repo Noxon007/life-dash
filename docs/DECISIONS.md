@@ -624,3 +624,54 @@ it built the rows *without the things that hang off them*.
     Three decisions inside the fix, each one a rule that already existed elsewhere: metrics and entity links **go with** the event; tracks are **detached**, not deleted (a track is its own layer-3 recording, not a derivation of this event); and **uploaded** media are detached rather than deleted (note 57: `provider='local'` is the life database, machines never touch it) — they hang off the **day** afterwards (F18), which is why the detach also fills `captured_at`, or it would be a silent discard. Child events are unhooked, not deleted, the same call the delete dialog makes (F7).
 
 151. ✅ **“‘Days with weather’ can go, it is not useful information.”** Agreed and removed. It counted how far the weather run has got — a statement about the **run**, not about the life, and the only tile on that wall that answered a question nobody asks. The number stays in the server's answer, where it does two jobs it is right for: it is the switch that decides whether the weather block exists at all, and it is the denominator of the rainy-day share (“40 % of your recorded days”). `tools/check-weather-summary.js` now asserts the opposite of what it asserted before — that the number does *not* appear as a tile.
+
+**Feedback round 2026-08-03, second pass (notes 152–156), on `main`, no version bump.** Four
+points from use. Two were defects with a single cause each, one is a new view,
+and one — the map controls — was deliberately left as an **analysis without a
+build**, because the honest answer to it is a decision and not a patch.
+
+152. ✅ **“Schwerin, 12 visits — then you expand it and it is 12 photos.”** Since note 139 the condensing key carries the **source** (`_visit_group_reps`), so there are two kinds of group: twelve Google visits and twelve photos. The card said “visits” for both.
+
+    The fix is one word, and the reason it is safe is the key: every row of a group shares its source, so reading the representative's source is a fact rather than a guess. Had the source *not* been in the key, the representative would be an arbitrary one of two kinds and the noun a claim — which is exactly why note 139 put it there.
+
+    **A second, quieter half of the same defect:** expanding fetched `visits=1` and left `photos` at its default, so a photo group resolved into that day's photos *plus* that day's Google visits. **What condensed and what expands have to be the same key**, or the expansion shows more than the number above it promises.
+
+153. ✅ **“With the Immich vector style the map looks great, but if I ask for all entries the tab crashes.”** Cause found and fixed: the map created **one Leaflet object per photo**. A45 had already moved the *drawing* onto a canvas, and that was right — it saves ten thousand SVG nodes. What it does not save is the rest of an `L.circleMarker`: each is an `L.Path` with its own event subscription and its own popup, each is projected individually on every map step, and Leaflet's canvas walks its whole layer list on every redraw. At twenty thousand photos that is twenty thousand objects for twenty thousand circles.
+
+    **The drawing load was never the problem; the object load was.** A circle needs three numbers, not an object with a life cycle. There is now one layer with one canvas that paints every point in a single pass, and a click finds the hit point in the list the drawing produces anyway.
+
+    Why it showed up under the vector style specifically: below it sits a live WebGL canvas that recomposes every frame — the same place the tracks layer tipped over in note 141. The only difference is how much headroom is left above it. **This is the third time the same sentence has had to be applied** (note 141: “a name decides who finds the rule”), and the reason it keeps recurring is that the canvas *renderer* looks like the whole answer. It is only half: the other half is not creating an object per item.
+
+    The guardian changed with it. It used to assert “a circle is drawn”; it now asserts **“no object is created per photo”** — the assertion that falls over the moment someone reaches for a convenient `L.circleMarker(…)` again.
+
+154. 🔲 **The map controls — analysed, deliberately not rebuilt.** “The buttons are not really clear about what they do, and some of the rendering is awkward.” The analysis is below; the choice between the three designs is the author's, because option B changes behaviour people are used to.
+
+    **What is actually wrong — four findings, in increasing order of cost.**
+
+    **(a) One row, three kinds of control.** “Darstellung” holds *data layers* (🛰️ travelled paths, 📷 photos — what is on the map at all), a *drawing over the data* (🧭 connect the order — an interpretation, not a recording), a *mode* (🔁 merge points), and ⛶ fullscreen, which is a window control and not display at all. They look alike because they are all chips, so the row reads as one list of equal things and is four.
+
+    **(b) “Travelled paths” is silently dead above month zoom.** `drawTracks` returns immediately for year, decade and all — correct (tens of thousands of polylines), but the chip stays lit and says nothing. `.filter-chip.inert` exists for exactly this (note 92) and is used for the route chip and the photo chip; this one was missed.
+
+    **(c) The same icon means two things in two tabs.** On the map 🛰️ is *travelled paths*; in the timeline 🛰️ is *auto-detected entries* (Google visits). And the map has **no visits switch at all**, although it has a photo switch — so of the two machine sources, one can be turned off on the map and the other cannot.
+
+    **(d) The real defect: “merge points” does three things, and which one is not the user's choice.** Above month zoom it bundles per place (“59× Home”); in day and week it clusters by proximity; and switching it **off** additionally activates the 300-point cap, because the cap only applies in the un-clustered branch. So the switch labelled “merge points” is also the switch that decides **whether the map shows everything**. That is why note 110 needed a cap notice on the map in the first place — the notice is a plaster over this.
+
+    **Design A — rename and regroup (small).** Two labelled groups: *Layers* (what is drawn) and *Display* (how). Fullscreen moves into the map corner as an icon. The tracks chip goes `inert` above month zoom with the reason in its title. Fixes (a) and (b), leaves (c) and (d).
+
+    **Design B — spell out the mode (medium, changes behaviour).** Replace the on/off switch with three explicit states: *every point on its own* · *merge by proximity* · *merge per place*. The zoom level then chooses the **default**, not the meaning. And the cap is decoupled: it is a property of the *pins*, not of the merge switch. Note 153 makes this cheap — since photos no longer cost an object each, the expensive layer is gone and the remaining pins are hand-entered entries and Google visits, in a very different order of magnitude.
+
+    **Design C — A + B plus a visits switch on the map**, so the map and the timeline answer “which machine sources am I seeing” the same way, with the same icons. This is the only one that closes (c), and (c) is the finding most likely to be reported again by someone else.
+
+    *Recommendation:* C, built in the order A → C → B, so the cheap clarity lands first and the behaviour change last. *Cost of B, stated plainly:* everyone who knows the current switch has to relearn one control, and the cap note becomes correct instead of necessary.
+
+155. ✅ **“Subdivide the statistics tab further.”** It showed forty tiles, six charts and two panels at once. That is not a statistic, it is an inventory: everything present, nothing emphasised, and the question someone arrived with is somewhere in the middle of it. Three views now ask the question before the answer comes — **Numbers** (how much), **Charts** (how distributed), **Rankings** (which first). The choice is remembered, like the collection sort (note 149).
+
+    The module panel (P3.1) stays whole in *Numbers* even though it contains a chart. It is one declared unit with one heading; splitting it would produce two panels with the same title, which is a worse answer than a chart in the wrong view.
+
+156. ✅ **The third view: rankings.** Weather top tens for all eleven record tiles, places, cities, countries, years and categories by days, and longest streaks.
+
+    **The tile is row one of the list**, and that is enforced rather than intended: `_extreme_tops` produces the ranking and the overview takes its head. Two rankings would diverge at the first special case, and the special cases are already written down — a zero is no record for rain and *is* one for daylight (notes 104/114). The lists carry **both numbers** (days and entries, notes 143/148) and ten rows instead of the charts' eight, because a chart is a picture and a list is an answer.
+
+    **Own endpoint, fetched only when the view is opened** (A37: a view pays for what it shows). Ties are broken by days, then entries, then name — the second stage is the statement (of two categories tied at one day, the one with more entries is the intended answer), the third is what makes the ranking the same on the next load.
+
+    **Two places where a number would have been dishonest.** The longest **gap** is measured only between the first and the last recorded day: the time before the first entry is not a gap, it is the time before the first entry, and reporting it as “longest gap: 8 000 days” would be a statement about when recording started, dressed as a finding about a life (what to do with it depends on note 144, which is open). And the longest **trip** is the longest *recorded* trip — the longest multi-day `trip` event — not “the longest stretch away from home”, which would be an inference from imported visits and answers a different question.
