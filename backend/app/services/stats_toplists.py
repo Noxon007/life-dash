@@ -206,13 +206,17 @@ def compute_toplists(db: Session, user_id: str, n: int = TOP_N) -> dict:
 
 
 def _weather_tops(db: Session, user_id: str, n: int) -> dict[str, list[dict]]:
-    """Zu jeder Rekord-Kachel die vollen `n` Plätze.
+    """Zu jeder Rekord-Kachel die vollen `n` Plätze — ein Tag je Zeile.
 
     Die Rangfolge selbst steht in `stats_overview._extreme_tops` — dieselbe
     Funktion, die die Kachel füllt. Hier wird nur mit einem anderen `n`
-    gefragt (Anmerkung 156).
+    gefragt (Anmerkung 156). **Dass ein Tag nur einmal vorkommt, ist deshalb
+    keine Regel dieser Datei** (Anmerkung 161): stünde sie hier, hätte die
+    Kachel darüber sie nicht, und Platz 1 der Liste wäre wieder ein anderes
+    Ereignis als die Kachel — genau die Trennung, gegen die Anmerkung 156
+    diese Funktion zusammengelegt hat.
     """
     events, values, val, card = ov.weather_values(db, user_id)
     if not values:
         return {name: [] for name, *_ in ov._EXTREMES}
-    return ov._extreme_tops(values, val, card, n)
+    return ov._extreme_tops(events, values, val, card, n)

@@ -69,6 +69,13 @@ any `MINOR`.
   and your longest recorded trip.
 
 ### Fixed
+- **The weather record lists show each day once.** “Coldest day” listed the
+  same 11 January ten times over, once per photo taken that day — a ranking of
+  entries under a heading that says *day*, and since every photo became an
+  entry of its own, a busy day pushed every other day off the list. Each day now
+  takes one line, represented by its most extreme place: the coldest spot for
+  the coldest day, the hottest for the hottest. The record tiles above the lists
+  are unchanged — they always showed the same extreme value.
 - **The week and month view no longer freezes the browser** (reported as
   “everything crashes, no error in the log”). Travelled paths were sent up to a
   thousand at a time with every recorded point, and each was drawn as a

@@ -216,8 +216,9 @@ def compute_overview(db: Session, user_id: str, *, today: datetime | None = None
     }
 
 
-def _extreme_tops(values: dict, val, card, n: int) -> dict[str, list[dict]]:
-    """Die besten `n` Ereignisse je Extremwert — die Rangfolge an EINER Stelle.
+def _extreme_tops(events: dict, values: dict, val, card,
+                  n: int) -> dict[str, list[dict]]:
+    """Die besten `n` **Tage** je Extremwert — die Rangfolge an EINER Stelle.
 
     Die Kachel im Statistik-Reiter nimmt davon den Kopf, die Top-Liste
     (Anmerkung 156) die ganze Liste. Beide lesen dieselben Regeln: welcher
@@ -226,19 +227,44 @@ def _extreme_tops(values: dict, val, card, n: int) -> dict[str, list[dict]]:
     hier nicht zweimal stehen darf — bei Regen ist 0 kein Rekord, beim
     Tageslicht ist die Polarnacht mit 0 h der interessanteste Wert überhaupt.
 
-    Sortiert wird über die ganze Menge statt in einer Schleife das Maximum zu
-    suchen: für n=1 ist das derselbe Aufwand in einer Größenordnung, in der es
-    nicht auffällt (die Werte liegen bereits im Speicher), und für n=10 wäre
-    die Alternative eine zweite Schleife mit einer eigenen Grenze.
+    **Anmerkung 161: ein Tag steht genau einmal in der Liste.** Bis hierher war
+    die Rangfolge eine über EREIGNISSE, und das war schon immer eine Antwort auf
+    eine Frage, die niemand gestellt hat: die Kachel heißt „Kältester **Tag**",
+    der Klick führt seit Anmerkung 142 zum Tag, und die Liste darunter zeigte
+    zehnmal denselben 11.1.2026, weil an dem Tag zehn Fotos liegen. Mit
+    Anmerkung 139 ist jedes Foto ein Ereignis geworden — damit hat sich nicht
+    die Regel geändert, sondern das, was sie zählt. Ein Bestand entscheidet
+    darüber, ob eine Rangliste eine Auskunft ist oder eine Zählung der Zufuhr
+    (dieselbe Verschiebung wie in Anmerkung 143).
+
+    **Welcher Ort den Tag vertritt, entscheidet die Richtung des Rekords.** Beim
+    kältesten Tag der kälteste Ort, beim heißesten der heißeste — das ist keine
+    zweite Regel neben Anmerkung 119 („der Tageswert ist der vorsichtige"),
+    sondern eine andere Frage: 119 beantwortet, was ein Tag BEISTEUERT, ein
+    Rekord, wie extrem es an diesem Tag überhaupt wurde. Den vorsichtigen Wert
+    hier zu nehmen hieße, den heißesten Tag am kühlsten seiner Orte zu messen.
+    `direction` steht schon in `_EXTREMES`, es kommt also keine Angabe dazu.
     """
     out: dict[str, list[dict]] = {}
     for name, keys, direction, positive_only in _EXTREMES:
-        rows = []
+        best: dict[object, tuple[str, float]] = {}
         for eid in values:
             v = val(eid, *keys)
             if v is None or (positive_only and v <= 0):
                 continue
-            rows.append((eid, v))
+            when = getattr(events.get(eid), "date_start", None)
+            if when is None:
+                continue
+            day = when.date()
+            cur = best.get(day)
+            # Bei Gleichstand innerhalb eines Tages gewinnt die kleinere
+            # Kennung — aus demselben Grund wie bei der Sortierung unten: ohne
+            # eine zweite Stufe entschiede die Reihenfolge der Dict-Iteration,
+            # welcher Ort neben dem Datum steht.
+            if cur is None or (v > cur[1] if direction == "max" else v < cur[1]) \
+                    or (v == cur[1] and eid < cur[0]):
+                best[day] = (eid, v)
+        rows = list(best.values())
         # `eid` als zweites Sortierkriterium: bei gleichen Werten — nach dem
         # Runden auf eine Nachkommastelle keine Seltenheit — wäre die
         # Reihenfolge sonst die der Dict-Iteration und damit zwischen zwei
@@ -321,7 +347,7 @@ def _weather_stats(db: Session, user_id: str) -> dict:
     # Ebene höher, und sie liefen genau dann auseinander, wenn jemand eine
     # Schwelle ändert (etwa „0 zählt nicht").
     extremes = {name: (rows[0] if rows else None)
-                for name, rows in _extreme_tops(values, val, card, 1).items()}
+                for name, rows in _extreme_tops(events, values, val, card, 1).items()}
 
     # --- Bilanz: EIN Datensatz je Kalendertag (A31/Anmerkung 64) ---
     # Ein importierter Tag trägt dutzende Besuche mit demselben Wetter; über

@@ -75,6 +75,59 @@ def test_the_tile_is_the_first_row_of_the_list(db, user):
     assert [r["value"] for r in rows] == [38.4, 31.5, 27.3, 12.0]
 
 
+def test_one_day_appears_once_in_a_record_list(db, user):
+    """Anmerkung 161 — der gemeldete Fall: „Kältester Tag" listete zehnmal
+    denselben 11.1.2026, einmal je Foto dieses Tages.
+
+    Seit Anmerkung 139 ist jedes Foto ein Ereignis; an der Rangfolge hat sich
+    nichts geändert, wohl aber an dem, was sie zählt. Ein Rekord ist eine
+    Auskunft über einen TAG — die Kachel heißt so, und der Klick führt seit
+    Anmerkung 142 dorthin.
+    """
+    cold_day = datetime(2026, 1, 11)
+    for i in range(10):
+        ev = _event(db, user, cold_day.replace(hour=i),
+                    title="Foto in Ehestorf", loc=_loc(db, user, "Ehestorf"))
+        db.add(Metric(event_id=ev.id, key="temp_min_c", value=-14.3 - i * 0.2,
+                      source=Source.weather))
+    ev = _event(db, user, datetime(2026, 1, 12), loc=_loc(db, user, "Kiel"))
+    db.add(Metric(event_id=ev.id, key="temp_min_c", value=-3.0,
+                  source=Source.weather))
+    db.commit()
+
+    rows = compute_toplists(db, user.id)["weather"]["cold"]
+    assert [r["date_start"].date().isoformat() for r in rows] == \
+        ["2026-01-11", "2026-01-12"]
+    # Und der Tag steht mit seinem KÄLTESTEN Ort da, nicht mit einem beliebigen.
+    assert rows[0]["value"] == -16.1
+    # Die Kachel bleibt Platz 1 der Liste — auch mit der Verdichtung.
+    assert compute_overview(db, user.id)["extremes"]["cold"] == rows[0]
+
+
+def test_the_direction_of_the_record_picks_the_place_of_the_day(db, user):
+    """Der heißeste Tag wird am heißesten seiner Orte gemessen, der kälteste am
+    kältesten. Das ist keine zweite Regel neben Anmerkung 119 („der Tageswert
+    ist der vorsichtige"), sondern eine andere Frage: dort geht es darum, was
+    ein Tag beisteuert, hier darum, wie extrem es an ihm wurde.
+    """
+    day = datetime(2024, 7, 20)
+    for hour, (name, warm, cold) in enumerate([
+            ("Hamburg", 26.0, 14.0), ("Sevilla", 41.0, 22.0)]):
+        ev = _event(db, user, day.replace(hour=hour), loc=_loc(db, user, name))
+        db.add_all([
+            Metric(event_id=ev.id, key="temp_max_c", value=warm,
+                   source=Source.weather),
+            Metric(event_id=ev.id, key="temp_min_c", value=cold,
+                   source=Source.weather),
+        ])
+    db.commit()
+
+    wx = compute_toplists(db, user.id)["weather"]
+    assert len(wx["hot"]) == 1 and len(wx["cold"]) == 1
+    assert wx["hot"][0]["place"] == "Sevilla" and wx["hot"][0]["value"] == 41.0
+    assert wx["cold"][0]["place"] == "Hamburg" and wx["cold"][0]["value"] == 14.0
+
+
 def test_a_zero_is_no_record_for_rain_but_is_one_for_daylight(db, user):
     """Die Sonderfälle aus `_EXTREMES` gelten auch in der Liste — sonst wären
     sie beim ersten Blick daneben widerlegt (Anmerkung 104)."""

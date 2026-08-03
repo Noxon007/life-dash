@@ -3,9 +3,14 @@
 ## Was ist das
 Life-Dash: self-hosted „Lebensdatenbank" (FastAPI + SQLAlchemy/SQLite; Vanilla-JS-PWA
 komplett in `frontend/index.html`, wird vom Backend unter `/` ausgeliefert). AGPL-3.0.
-**Führendes Dokument: `docs/KONZEPT.md`** — Roadmap in Kap. 14.2 (Paket-Nummern A*/F*/P*),
-Entscheidungen/Anmerkungen in **`docs/DECISIONS.md`** (seit 2026-08-02 eigene
-Datei, Anm. 147). Erst dort gezielt nachlesen statt Code raten.
+**Führendes Dokument: `docs/KONZEPT.md`** — Vision/Architektur + Roadmap in
+Kap. 14.2, aber **nur noch OFFENE Pakete** (F20/F21/R1/R2 vor 1.0, P6.1/P5.2 +
+Konnektoren danach). Entscheidungen/Anmerkungen in **`docs/DECISIONS.md`**;
+**was gebaut wurde und in welcher Version, steht dort in Anhang A**
+(seit 2026-08-03, Anm. 161 — vorher KONZEPT 14.1/14.2/14.3). Erst dort gezielt
+nachlesen statt Code raten. Drei Dokumente, drei Fragen: KONZEPT = was noch
+offen ist, DECISIONS = warum es so gebaut ist + wann es kam, CHANGELOG = was
+ein Nutzer merkt.
 
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
@@ -52,7 +57,10 @@ Datei, Anm. 147). Erst dort gezielt nachlesen statt Code raten.
   Version also nur, wenn ein NUTZER einen Unterschied merkt — mehrere Pakete
   dürfen sich eine teilen. Nicht mehr je Arbeitspaket eine Nummer vergeben.
 - Jede Version: `backend/app/version.py` + `CHANGELOG.md` (verständliche Produktsprache,
-  **keine Paketkürzel** wie „A25") + KONZEPT-Tabelle abhaken (✅ + „fertig vX.Y.Z")
+  **keine Paketkürzel** wie „A25") + Paket abhaken. **Abgehakt wird seit
+  Anm. 161 in `docs/DECISIONS.md` Anhang A** (✅ + „fertig vX.Y.Z"), nicht mehr
+  in KONZEPT — dort steht nur noch Offenes; ein fertiges Paket wird aus 14.2
+  ENTFERNT und wandert in den Anhang
 - Commit-Stil: deutsch, `feat(bereich): X.Y.Z — Beschreibung` (Historie ansehen)
 - Doku derzeit deutsch; Paket F10 stellt sie später einmalig auf Englisch um
 - Neue Event-Kategorie? Drei Stellen: KI-Prompt/Module-YAML, Frontend (catLabels/Farben/
@@ -68,6 +76,58 @@ mehr in KONZEPT Kap. 15 — das ist jetzt ein Zeiger mit der Tabelle der noch
 OFFENEN Fragen (144–147). Anmerkungen stehen in der Reihenfolge, in der sie
 AUFKAMEN, nicht in der sie gebaut wurden — Neues wird angehängt, auch wenn
 davor noch Offenes steht.
+
+**Fünfter Durchgang 2026-08-03 (Anmerkung 161) — ein Defekt, vier
+Entscheidungen, ein Doku-Umbau.**
+
+**Anm. 161 — „Kältester Tag" listete zehnmal denselben 11.1.2026.** Am
+Rangfolge-Code hat sich seit Anm. 156 nichts geändert; geändert hat sich der
+BESTAND darunter. `_extreme_tops` ordnete EREIGNISSE — solange nur die Kachel
+(Platz 1) sichtbar war, fiel das nie auf; Anm. 156 stellte eine Liste von zehn
+darunter, und Anm. 139 hatte drei Tage vorher jedes Foto zu einem Ereignis
+gemacht. Ein Fototag füllt die Liste allein. **Das ist Anm. 143 zum dritten
+Mal: eine Zahl wird zur Aussage über die ZUFUHR, ohne dass jemand den Code
+anfasst.** Der Hinweis stand in der Überschrift — die Kachel heißt „…ster
+**Tag**", der Klick führt seit Anm. 142 zum Tag, nur die Rangfolge zählte noch
+Einträge. **Regel: wo Überschrift und Rechnung sich über die Einheit uneinig
+sind, ist die Überschrift meist die ältere und die wahre.**
+**Welcher Ort den Tag vertritt, entscheidet die RICHTUNG des Rekords** (kältester
+Ort beim kältesten Tag) — kein Widerspruch zu Anm. 119 („der Tageswert ist der
+vorsichtige"), sondern eine andere Frage: 119 sagt, was ein Tag BEISTEUERT, ein
+Rekord, wie extrem es wurde. `direction` steht schon in `_EXTREMES`, also keine
+neue Angabe. Die Verdichtung sitzt in `_extreme_tops`, **nicht im Toplisten-
+Aufrufer** — eine Ebene höher wäre die Kachel wieder das Extrem einer anderen
+Rangfolge als Platz 1, und der Test, der beide zusammenhält, bliebe grün.
+
+**Anm. 144 entschieden (→ Paket F20), und die Menge war NICHT der Einwand.**
+Wunsch: für jeden Tag ein Eintrag, damit Wetter angereichert werden kann.
+14.600 Zeilen sind gemessen unkritisch (Anm. 140). **Der eine, entscheidende
+Einwand: ein erzeugter Tag wäre `confirmed`** — und Schicht 2 darf keine
+Maschine mehr anfassen; eine spätere Zeitraum-Korrektur ließe tausend falsche
+Zeilen stehen, die niemand reparieren darf. Gebaut wird deshalb **eine Zeile je
+Zeitraum + Tagesableitung in Schicht 4**. Vier Festlegungen des Users:
+abgeleitete Tage **zählen voll** (Welt/Top-Orte/Abzeichen), **nur Lücken
+füllen**, **ein Grundort zur Zeit**, im Zeitstrahl als abgeleitet markiert.
+**Der Aufwand steckt nicht im Grundort, sondern im Wetter:** das hängt an
+`Metric.event_id`, ein Tag ohne Ereignis hat keinen Platz dafür → F20 braucht
+einen tagesgeschlüsselten Wetter-Speicher (Schicht 4, Geschwister von
+`weather_day.day_values`). **Anm. 145 → F21**, danach, nicht davor.
+**Anm. 146 (Partner-Ansicht) bestätigt für nach 1.0 → P6.1; vorbereitet wird
+NICHTS** — die Vorbereitung, die zählt, ist längst da und besteht aus
+Unterlassungen (nichts wird zwischen Konten kopiert, `user_id` filtert an der
+Abfrage). **Anm. 147 (Weblate): nein, mit benanntem Auslöser** — dritte Sprache
+oder Fremdbeitrag.
+
+**Doku umgebaut (Entscheidung des Users): KONZEPT trägt nur noch OFFENES.**
+Kap. 14 war zwei Dokumente unter einer Überschrift — ein Plan und, dreimal so
+lang, ein Protokoll von Paketen, über die niemand mehr entscheiden muss.
+14.1 („What already works"), die Gruppe-A/B-Tabellen und die Release-Zeilen
+0.21–0.39 stehen jetzt **wörtlich** in `docs/DECISIONS.md` **Anhang A**
+(A.1–A.4); 14.2 heißt „Open packages" und enthält F20/F21/R1/R2 vor 1.0 und
+P6.1/P5.2 + Konnektoren danach. **Nichts wurde beim Verschieben umgeschrieben**
+— eine Anmerkung, die „14.1" zitiert, findet ihren Satz weiter. Kap. 15 behält
+die Fragen MIT ihrer Antwort statt sie zu löschen: eine Frage, die beim
+Beantworten aus dem Index verschwindet, nimmt mit, dass sie je gestellt wurde.
 
 **Vierter Durchgang 2026-08-03 (Anmerkung 160) — die Kartenschalter, gebaut.**
 Anm. 154 lag als Analyse mit drei Entwürfen da; entschieden wurde an einem
@@ -354,8 +414,12 @@ aber nur, wenn man sie wirklich anwendet.**
 
 Umgesetzt bis **v0.39.0** (2026-07-23). **Gruppe A ist komplett** (A1–A48),
 Gruppe B bis **F19**; **P5.1, F1 und P2.1 (alle drei Stufen) sind fertig**. Offen
-ist damit nur noch: **0.40 (offen, sammelt auf `main`)**, **Demo-Modus (0.41)**
-und **R1** (1.0, drei Etappen auf `main`).
+ist damit: **F20** (Grundort, Anm. 144 — entschieden, ungebaut) und **F21**
+(Lückenprüfung, danach), dazu **0.40 (sammelt auf `main`)**, **Demo-Modus
+(0.41)** und **R1/R2** (1.0, drei Etappen auf `main`). **F20 ist nach Anm. 101
+ein 1.0-Kandidat** (verbessert das Erfassen, nicht die Zufuhr) und das größte
+verbliebene Paket vor dem Demo-Modus — ob eigene Version oder in 0.40, ist eine
+Größenfrage und die Entscheidung des Users.
 
 **Arbeitsweise ab 0.40 (vom User festgelegt, 2026-07-23): alles auf `main`,
 kein Versionssprung, bis der User den Demo-Modus ansagt.** Was sich bis dahin
