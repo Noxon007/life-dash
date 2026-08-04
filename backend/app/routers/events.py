@@ -8,7 +8,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import false as sa_false
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth import get_current_user
@@ -874,35 +874,66 @@ def on_this_day(
     nebeneinander wären dieselbe Erinnerung doppelt.
     """
     today = date or datetime.now().date()
-    query = (db.query(Event).options(*_EAGER)
-             .filter(Event.user_id == user.id,
-                     Event.date_start.isnot(None),
-                     Event.date_precision.in_(_ON_THIS_DAY_PRECISIONS)))
+    # ── Anmerkung 174: erst AUSWÄHLEN, dann LADEN ──────────────────────────
+    #
+    # Gemeldet: „Heute wird geladen …" hing sichtbar auf Schritt „Rückblick an
+    # diesem Tag" — auf der STARTANSICHT, also der Ansicht, die als erste
+    # dasteht.
+    #
+    # A37 hatte hier bereits die Vorauswahl nach SQL verlegt und dabei die
+    # richtige Ursache benannt (Anmerkung 80: jedes Ereignis samt seiner
+    # vierzehn Metrik-Zeilen als ORM-Objekt, nur um ein Dutzend zu zeigen) —
+    # aber nur die HÄLFTE davon behoben. Der Zweig `date_end IS NOT NULL` lädt
+    # weiterhin jedes mehrtägige Ereignis vollständig, mit allen vier
+    # vorgeladenen Beziehungen, um es anschließend in Python zu verwerfen. Ein
+    # Bestand mit vielen Reisen, Fototagen oder importierten Besuchen (der
+    # Schalter „Besuche mitzeigen") zieht damit Tausende Objekte für eine
+    # Ansicht, die höchstens ein paar Dutzend zeigt.
+    #
+    # Jetzt zwei Schritte. Erst eine SPALTEN-Abfrage — vier Werte je Zeile,
+    # keine ORM-Objekte, keine Beziehungen: sie beantwortet allein die Frage
+    # „welche Ereignisse berühren diesen Kalendertag?". Erst die Handvoll, die
+    # danach wirklich gezeigt wird, wird als Objekt geladen. Die Auswahl ist
+    # unverändert; was sich ändert, ist ihr Preis.
+    cols = (db.query(Event.id, Event.date_start, Event.date_end,
+                     Event.parent_event_id, Event.title)
+            .filter(Event.user_id == user.id,
+                    Event.date_start.isnot(None),
+                    Event.date_precision.in_(_ON_THIS_DAY_PRECISIONS)))
     if not include_imported:
         # Anmerkung 138: MACHINE_SOURCES statt nur google_timeline (siehe
         # dieselbe Begründung bei `visits` oben).
-        query = query.filter(Event.source.notin_(MACHINE_SOURCES))
-    # A37 (zweite Runde): Vorauswahl in SQL statt „alles laden und in Python
-    # aussieben". Gemessen bei 3.000 eigenen Einträgen: 660 ms — auf der
-    # STARTANSICHT, und mit dem Bestand wachsend. Ursache war dieselbe wie in
-    # Anmerkung 80: jedes Ereignis samt seiner vierzehn Metrik-Zeilen als
-    # ORM-Objekt, nur um am Ende ein Dutzend davon zu zeigen.
-    #
-    # Die Auswahl ist EXAKT dieselbe wie vorher, nur früher: Eintägiges kann
-    # den Kalendertag nur treffen, wenn Tag und Monat passen; alles mit einem
-    # Enddatum kann ihn überspannen und wird weiterhin vollständig geprüft
-    # (die Python-Schleife unten entscheidet unverändert).
-    query = query.filter(
+        cols = cols.filter(Event.source.notin_(MACHINE_SOURCES))
+    # Eintägiges kann den Kalendertag nur treffen, wenn Tag und Monat passen;
+    # alles mit einem Enddatum kann ihn überspannen und wird weiterhin
+    # vollständig geprüft (die Python-Schleife unten entscheidet unverändert).
+    cols = cols.filter(
         Event.date_end.isnot(None)
         | ((func.extract("month", Event.date_start) == today.month)
            & (func.extract("day", Event.date_start) == today.day))
     )
-    events = query.all()
+    # Und die zweite Hälfte der Vorauswahl, die bis hier fehlte: „an diesem
+    # Tag" fragt nach FRÜHEREN Jahren. Alles, was frühestens am 1. Januar
+    # dieses Jahres beginnt, kann keinen Jahrgang mit `years_ago >= 1`
+    # treffen — und genau dort liegt bei einem laufenden Timeline-Import der
+    # Großteil der mehrtägigen Zeilen. Nach hinten begrenzt `max_years` die
+    # Spanne ebenso; beides sind Bedingungen, die die Schleife danach ohnehin
+    # stellt, nur bezahlt sie sie bisher mit geladenen Objekten.
+    #
+    # Gefragt wird über BEIDE Enden: ein Ereignis, dessen Enddatum vor seinem
+    # Startdatum liegt, gibt es in echten Daten (die Schleife unten dreht es
+    # seit jeher um) — eine Bedingung nur auf `date_start` verlöre es still.
+    year_start = datetime(today.year, 1, 1)
+    oldest = datetime(max(today.year - max_years, 1), 1, 1)
+    cols = cols.filter(
+        or_(Event.date_start < year_start, Event.date_end < year_start),
+        or_(Event.date_start >= oldest, Event.date_end >= oldest),
+    )
 
-    by_year: dict[int, list[Event]] = {}
-    for e in events:
-        start = e.date_start.date()
-        end = (e.date_end or e.date_start).date()
+    by_year: dict[int, list[tuple]] = {}
+    for row in cols.all():
+        start = row.date_start.date()
+        end = (row.date_end or row.date_start).date()
         if end < start:
             start, end = end, start
         # Jahrgänge, in denen dieser Event den Kalendertag berührt. Über die
@@ -914,23 +945,31 @@ def on_this_day(
         while d <= end:
             years_ago = today.year - d.year
             if d.month == today.month and d.day == today.day and 1 <= years_ago <= max_years:
-                by_year.setdefault(years_ago, []).append(e)
+                by_year.setdefault(years_ago, []).append(row)
                 break
             d += timedelta(days=1)
 
-    groups: list[OnThisDayGroup] = []
-    for years_ago in sorted(by_year):
-        chosen = by_year[years_ago]
+    # Was am Ende gezeigt wird — erst jetzt lohnt sich ein ORM-Objekt.
+    picked: dict[int, list[tuple]] = {}
+    for years_ago, rows in by_year.items():
         # F7: Eltern verwerfen, deren Tages-Kind schon in diesem Jahrgang steht
-        child_parents = {e.parent_event_id for e in chosen if e.parent_event_id}
-        chosen = [e for e in chosen if e.id not in child_parents]
-        chosen.sort(key=lambda e: (e.date_start, e.title or ""))
-        total = len(chosen)
+        child_parents = {r.parent_event_id for r in rows if r.parent_event_id}
+        rows = [r for r in rows if r.id not in child_parents]
+        rows.sort(key=lambda r: (r.date_start, r.title or ""))
+        picked[years_ago] = rows
+    wanted = [r.id for rows in picked.values() for r in rows[:max_per_year]]
+    loaded = {e.id: e for e in (db.query(Event).options(*_EAGER)
+                                .filter(Event.id.in_(wanted)).all())} if wanted else {}
+
+    groups: list[OnThisDayGroup] = []
+    for years_ago in sorted(picked):
+        rows = picked[years_ago]
         groups.append(OnThisDayGroup(
             years_ago=years_ago,
             date=today.replace(year=today.year - years_ago),
-            events=[event_to_read(e) for e in chosen[:max_per_year]],
-            total=total,
+            events=[event_to_read(loaded[r.id]) for r in rows[:max_per_year]
+                    if r.id in loaded],
+            total=len(rows),
         ))
     return groups
 

@@ -1295,19 +1295,31 @@
             <div class="stat-sub" id="today-span">–</div>
           </div>
         </div>
-        <!-- A35/Anmerkung 73: Startformular für die ersten Einträge, nur bei leerer
-             Lebensdatenbank. Legt bestätigte Ereignisse an (u. a. „Geburt", das F17
-             später fürs Alter liest) — überspringbar, kein Zwang. -->
+        <!-- A35/Anmerkung 73: Startformular für den ersten Eintrag, nur bei leerer
+             Lebensdatenbank. Legt ein bestätigtes Ereignis an („Geburt", das F17
+             später fürs Alter liest) — überspringbar, kein Zwang.
+
+             Anmerkung 175: Die zweite Zeile fragte den WOHNORT und legte daraus
+             einen zweiten Meilenstein an („Wohnort: Hamburg"). Das war eine
+             andere Sorte Aussage als die daneben: ein Geburtsdatum ist ein
+             Zeitpunkt, ein Wohnort ist ein ZEITRAUM — und für Zeiträume gibt es
+             seit F20 den Grundort, mit Von-Bis und eigener Ansicht. Als
+             datumsloser Meilenstein landete er im Zeitstrahl an keiner Stelle
+             und in der Statistik als „Umzug".
+
+             Jetzt fragt das Formular EINEN Eintrag: wann und wo geboren. Beides
+             gehört zu demselben Ereignis, also ist es auch eines. -->
         <div class="panel" id="seed-form" style="display:none; margin-bottom:20px">
-          <h3 data-i18n="seed.title">👋 Die ersten Einträge</h3>
-          <div class="action-desc" style="margin-bottom:12px"><span data-i18n="seed.desc">Ein paar Angaben genügen,
-            und die Lebensdatenbank ist nicht mehr leer. Alles freiwillig und jederzeit änderbar.</span></div>
+          <h3 data-i18n="seed.title">👋 Der erste Eintrag</h3>
+          <div class="action-desc" style="margin-bottom:12px"><span data-i18n="seed.desc">Wann und wo hat alles
+            angefangen? Daraus wird ein Meilenstein „Geburt" — er trägt später dein Alter und den Anfang deiner
+            Zeitachse. Freiwillig und jederzeit änderbar.</span></div>
           <div style="display:flex; flex-direction:column; gap:10px; max-width:420px">
             <label class="stat-label"><span data-i18n="seed.birth">Geburtsdatum</span>
               <input type="date" id="seed-birth" class="mf-select" style="display:block; margin-top:4px; width:100%"></label>
-            <label class="stat-label"><span data-i18n="seed.home">Wohnort</span>
-              <input type="text" id="seed-home" class="mf-select" style="display:block; margin-top:4px; width:100%"
-                     data-i18n-ph="seed.home.ph" placeholder="z. B. Hamburg"></label>
+            <label class="stat-label"><span data-i18n="seed.birthplace">Geburtsort</span>
+              <input type="text" id="seed-birthplace" class="mf-select" style="display:block; margin-top:4px; width:100%"
+                     data-i18n-ph="seed.birthplace.ph" placeholder="z. B. Hamburg"></label>
             <div style="display:flex; gap:10px; margin-top:6px">
               <button class="btn" id="seed-save" data-i18n="seed.save">Anlegen</button>
               <button class="btn ghost" id="seed-skip" data-i18n="seed.skip">Überspringen</button>
@@ -3524,16 +3536,15 @@ const I18N_EN = {
   'age.at': "at",
   'age.tip': "Your age at this point",
   'widgets.title': "📊 From your modules",
-  'seed.title': "👋 Your first entries",
-  'seed.desc': "A few details and the life database is no longer empty. All optional and changeable at any time.",
+  'seed.title': "👋 Your first entry",
+  'seed.desc': "When and where did it all start? That becomes a “Birth” milestone — it carries your age later on, and the beginning of your timeline. Optional and changeable at any time.",
   'seed.birth': "Date of birth",
-  'seed.home': "Home town",
-  'seed.home.ph': "e.g. Hamburg",
+  'seed.birthplace': "Place of birth",
+  'seed.birthplace.ph': "e.g. Hamburg",
   'seed.save': "Create",
   'seed.skip': "Skip",
   'seed.birth.title': "Birth",
-  'seed.home.title': "Home: {t}",
-  'seed.done': "✓ {n} entry/entries created.",
+  'seed.done': "✓ Milestone “Birth” created.",
   'login.local.claim': "Your searchable life database.",
   'login.email': "Email",
   'login.password': "Password",
@@ -3576,6 +3587,8 @@ const I18N_EN = {
   'today.empty': "Nothing has been recorded on this calendar day in earlier years yet. That changes as the life database grows — or with your next import.",
   'otd.more': "+{n} more",
   'otd.title': "🕰️ On this day",
+  'otd.loading': "Looking through …",
+  'otd.failed': "The look-back could not be loaded.",
   'otd.year': "one year ago",
   'otd.years': "{n} years ago",
   'act.namerun': "📍 Resolve place names",
@@ -3671,7 +3684,18 @@ const I18N_EN = {
   'fg.view': "Loading {v} …",
   'fg.today': "📅 Loading today …",
   'fg.today.counts': "Counters and time span",
-  'fg.today.otd': "“On this day” look-back",
+  'fg.admin.work': "The server is working …",
+  'fg.admin.tab': "Loading the tab …",
+  'fg.refresh': "Rebuilding the views …",
+  'fg.map.points': "Fetching points",
+  'fg.map.baseline': "Baseline periods",
+  'fg.map.photos': "Photo stock",
+  'fg.map.draw': "Drawing the map",
+  'fg.stats.numbers': "Numbers and collections",
+  'fg.stats.pane': "The open panel",
+  'adm.fg.left': "{r} {u} to go",
+  'adm.fg.prepare': "Counting what needs doing …",
+  'wipemine.running': "Deleting entries, items, places, routes, photos and raw records …",
   'logout': "Sign out",
   'ver.local': "Local build (not from CI)",
   'field.time.tip': "Time (optional)",
@@ -5108,6 +5132,19 @@ async function renderOnThisDay() {
   const box = document.getElementById('otd-block');
   const empty = document.getElementById('otd-empty');
   if (!box) return;
+  // **Anmerkung 174: der Rückblick sagt SELBST, dass er noch lädt.**
+  //
+  // Bis 0.39 hielt er die ganze Startansicht hinter dem Vollbild-Overlay auf
+  // („Heute wird geladen … · Rückblick an diesem Tag · 1/2"), obwohl die drei
+  // Kacheln daneben längst dastanden. F23 wollte das Gegenteil von „lädt still
+  // weiter" — aber die Antwort darauf ist nicht, ALLES zu blockieren, sondern
+  // dort zu sagen, was fehlt, wo es fehlt (dieselbe Regel wie bei den
+  // Karten-Hinweisen). Ein Platzhalter an der Stelle des Blocks ist eine
+  // Aussage; ein Overlay über der fertigen Ansicht ist eine Sperre.
+  box.innerHTML = `<div class="panel"><h3>${t('otd.title', '🕰️ An diesem Tag')}</h3>
+    <div class="hint" style="margin:12px 0 2px">${
+      esc(t('otd.loading', 'Wird durchgesehen …'))}</div></div>`;
+  empty.style.display = 'none';
   let groups = [];
   try {
     // F16: Der Server deckelt auf 3 Einträge je Jahrgang und lässt importierte
@@ -5126,7 +5163,16 @@ async function renderOnThisDay() {
     // die Funktion (mit dem richtigen Namen), nie die Adresse.
     groups = await api('/api/events/on-this-day'
       + (otdVisits ? '?include_imported=1' : ''));
-  } catch (err) { box.innerHTML = ''; return; }
+  } catch (err) {
+    // Ein Fehlschlag ist kein Nichts. Bis hier stand danach ein LEERER Block
+    // da, und der sieht aus wie „an diesem Tag war nie etwas" — zwei völlig
+    // verschiedene Auskünfte auf derselben leeren Fläche (ein `catch`, das
+    // zwei Ausgänge auf dieselbe Stille abbildet).
+    box.innerHTML = `<div class="panel"><h3>${t('otd.title', '🕰️ An diesem Tag')}</h3>
+      <div class="hint" style="margin:12px 0 2px">⚠ ${
+        esc(t('otd.failed', 'Der Rückblick konnte nicht geladen werden.'))}</div></div>`;
+    return;
+  }
   if (!groups.length) {
     // Der Schalter bleibt stehen: „hier ist nichts" und „hier ist nichts, weil
     // die Besuche ausgeblendet sind" sind zwei verschiedene Auskünfte, und die
@@ -5207,12 +5253,20 @@ function renderGreeting() {
 
 async function loadToday() {
   renderGreeting();
-  // F23: Bis 0.39 lief `renderOnThisDay()` hier ohne `await` nebenher. Die
-  // Ansicht stand sofort und füllte sich danach still weiter — genau das
-  // „lädt noch ein bisschen", das von außen nicht zu bemessen war. Jetzt
-  // gehören beide Teile zu EINEM Vorgang, der sagt, woran er gerade ist.
+  // **Anmerkung 174 — die Startansicht wartet nicht mehr auf den Rückblick.**
+  //
+  // F23 hatte `renderOnThisDay()` in denselben Vorgang gezogen, weil es vorher
+  // ohne `await` nebenher lief und die Ansicht sich still weiterfüllte. Der
+  // Befund war richtig, die Abhilfe eine Nummer zu groß: seither hing die
+  // ERSTE Ansicht der App hinter einem Vollbild-Overlay, bis der Server einen
+  // Rückblick durchgerechnet hatte, den man vielleicht gar nicht ansieht.
+  //
+  // Der Unterschied zu vorher ist der Platzhalter: der Block sagt an SEINER
+  // Stelle, dass er noch arbeitet (siehe `renderOnThisDay`). Damit ist das
+  // Nachladen keine Stille mehr, sondern eine Ansage — und die Kacheln,
+  // Startformular und Begrüßung stehen, sobald sie stehen können.
   await runForeground(t('fg.today', '📅 Heute wird geladen …'), async op => {
-    op.step(0, 2, t('fg.today.counts', 'Zählwerk und Zeitraum'));
+    op.step(0, 1, t('fg.today.counts', 'Zählwerk und Zeitraum'));
     try {
       const idx = await fetchIndex();
       document.getElementById('today-events').textContent = idx.total.toLocaleString(LOC());
@@ -5229,15 +5283,22 @@ async function loadToday() {
       const empty = idx.total === 0 && localStorage.getItem('seed-done') !== '1';
       document.getElementById('seed-form').style.display = empty ? '' : 'none';
     } catch (_) { /* Kacheln bleiben auf „–" */ }
-    op.step(1, 2, t('fg.today.otd', 'Rückblick „an diesem Tag"'));
-    await renderOnThisDay();
-    op.step(2, 2);
+    op.step(1, 1);
   });
+  // Ohne `await`: der Block trägt seinen eigenen Ladezustand. Fehlschläge
+  // landen dort als Hinweis, nicht in der Konsole — deshalb braucht es hier
+  // keinen `catch`, der sie verschluckt.
+  renderOnThisDay();
 }
 
-// A35/Anmerkung 73: aus den Startangaben werden bestätigte Ereignisse. Das
-// Geburtsdatum wird ein Meilenstein „Geburt" — genau das liest F17 fürs Alter
-// (Anmerkung 72), eine Wahrheit, kein Profilfeld.
+// A35/Anmerkung 73: aus den Startangaben wird ein bestätigtes Ereignis — der
+// Meilenstein „Geburt", genau das liest F17 fürs Alter (Anmerkung 72), eine
+// Wahrheit, kein Profilfeld.
+//
+// Anmerkung 175: EIN Ereignis, nicht zwei. Wann und wo jemand geboren wurde,
+// sind zwei Angaben über denselben Vorgang — als getrennte Meilensteine wären
+// es zwei Zeilen im Zeitstrahl für ein Ereignis, und die zweite hätte kein
+// Datum, an dem sie stehen könnte.
 function dismissSeed() {
   localStorage.setItem('seed-done', '1');
   document.getElementById('seed-form').style.display = 'none';
@@ -5245,27 +5306,24 @@ function dismissSeed() {
 document.getElementById('seed-skip').addEventListener('click', dismissSeed);
 document.getElementById('seed-save').addEventListener('click', async () => {
   const birth = document.getElementById('seed-birth').value;
-  const home = document.getElementById('seed-home').value.trim();
-  if (!birth && !home) { dismissSeed(); return; }
+  const place = document.getElementById('seed-birthplace').value.trim();
+  if (!birth && !place) { dismissSeed(); return; }
   const btn = document.getElementById('seed-save');
   btn.disabled = true;
-  let made = 0;
   try {
-    if (birth) {
-      await api('/api/events', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: t('seed.birth.title', 'Geburt'), date_start: birth + 'T00:00:00',
-          date_precision: 'day', category: 'milestone' }) });
-      made++;
-    }
-    if (home) {
-      await api('/api/events', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: t('seed.home.title', 'Wohnort: {t}').replace('{t}', home),
-          date_precision: 'year', category: 'milestone', location_name: home }) });
-      made++;
-    }
+    // Ohne Datum bleibt es trotzdem ein Meilenstein — nur ein unscharf
+    // datierter. Die Kachel „Unscharf datiert" führt ihn dann auf, und das ist
+    // die richtige Auskunft: der Ort steht fest, das Datum fehlt.
+    await api('/api/events', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: t('seed.birth.title', 'Geburt'),
+        category: 'milestone',
+        ...(birth ? { date_start: birth + 'T00:00:00', date_precision: 'day' } : {}),
+        ...(place ? { location_name: place } : {}),
+      }) });
     dismissSeed();
-    invalidateEvents();  // damit die neuen Einträge überall auftauchen
-    toast(t('seed.done', '✓ {n} Eintrag/Einträge angelegt.').replace('{n}', made));
+    invalidateEvents();  // damit der neue Eintrag überall auftaucht
+    toast(t('seed.done', '✓ Meilenstein „Geburt" angelegt.'));
     await loadToday();
   } catch (err) { toast(err.message, 'error'); btn.disabled = false; }
 });
@@ -6733,11 +6791,15 @@ async function renderModuleWidgets() {
 // Server (/api/stats/overview, rund 2 kB) — nicht aus Sparsamkeit, sondern
 // weil ein Client, der nur noch ein Zeitfenster kennt, sonst das Fenster
 // gezählt hätte statt das Leben. Die Regeln selbst sind unverändert.
-async function loadStats() {
+async function loadStats(op) {
   // Anmerkung 155: Die gemerkte Ansicht herstellen, BEVOR die Zahlen kommen —
   // sonst steht beim Öffnen eine Sekunde lang die falsche da, und der letzte
   // Zustand wäre eine Empfehlung statt einer Einstellung.
   showStatsPane(statsPane);
+  // Anmerkung 176: vier Endpunkte auf einmal — der Overlay sagt das, statt
+  // einen Kreisel zu drehen. Ein Schritt, weil sie parallel laufen: zwei
+  // Balkenstände für einen einzigen Wartevorgang wären eine erfundene Ordnung.
+  if (op) op.step(0, 2, t('fg.stats.numbers', 'Zahlen und Sammlungen'));
   const [ov, animals, countries, artists] = await Promise.all([
     api("/api/stats/overview"),
     api("/api/compendium/animal").catch(() => []),
@@ -6832,6 +6894,14 @@ async function loadStats() {
                                    entityId ? `${entityId}|${name}` : null]);
   renderBars('chart-animals', animalData.length ? animalData : [["—", 0]],
     key => { const [id, ...n] = key.split('|'); jumpToEntity('animal', id, n.join('|')); });
+  // Anmerkung 176: Ranglisten und Lücken holt `showStatsPane` erst beim
+  // Ansehen (A37) — sie hängen aber am selben Ansichtswechsel. Ohne dieses
+  // Abwarten schließt der Overlay, und die offene Tafel füllt sich danach
+  // still weiter: genau der Zustand, gegen den F23 gebaut ist.
+  if (op) op.step(1, 2, t('fg.stats.pane', 'Die geöffnete Tafel'));
+  if (statsPane === 'tops') await loadStatsTops();
+  if (statsPane === 'gaps') await loadStatsGaps();
+  if (op) op.step(2, 2);
 }
 
 // --------------------------------------------------------------------------- //
@@ -8844,19 +8914,27 @@ async function mpLoadPoints(force) {
   }
 }
 
-async function openMapView() {
+async function openMapView(op) {
+  // Anmerkung 176: Vier Etappen, und der Overlay nennt sie. Ohne die Namen ist
+  // ein Kartenaufbau über 20.000 Punkte eine Sanduhr — mit ihnen sieht man,
+  // ob es die Punkte, die Grundorte oder das Zeichnen ist.
+  const at = (n, note) => op && op.step(n, 4, note);
+  at(0, t('fg.map.points', 'Punkte werden geholt'));
   // A37: eigener schlanker Endpunkt statt der Zeitstrahl-Liste — und erst
   // jetzt, beim Öffnen des Reiters, statt beim Start der App.
   // Anmerkung 135: wie im Zeitstrahl — unbestätigte Google-/Immich-Vorschläge
   // sind Beleg, kein Ereignis, und tauchen erst nach der Moderation auf.
   await mpLoadPoints();
+  at(1, t('fg.map.baseline', 'Grundort-Zeiträume'));
   // F20: die Grundort-Zeiträume — eine Handvoll Zeilen, aus derselben Liste
   // wie das Formular unter „Meine Daten". Sie kommen VOR dem ersten Zeichnen,
   // sonst fehlt die Ebene beim Öffnen und erscheint erst beim nächsten Klick.
   await mpLoadBaselines();
+  at(2, t('fg.map.photos', 'Foto-Bestand'));
   // Wie viele Foto-Ereignisse es ÜBERHAUPT gibt — das entscheidet, ob der
   // Foto-Schalter etwas bewirken kann (A40).
   await ensurePhotoIndex();
+  at(3, t('fg.map.draw', 'Karte wird gezeichnet'));
   if (!mapObj) {
     mapObj = L.map('map').setView([50, 6], 4);
     addTiles(mapObj, 19);                   // F13: wählbare Hintergrundkarte
@@ -8889,6 +8967,7 @@ async function openMapView() {
   [60, 300, 700].forEach(t => setTimeout(() => mapObj.invalidateSize(), t));
   rebuildPeriods();
   renderPeriod();
+  at(4);
 }
 // ---------- Timeline-Routen (Tracks, P2.2) ----------
 const trackCache = new Map();
@@ -10165,38 +10244,64 @@ function gotoView(v) {
 }
 // Was ein Ansichtswechsel nachlädt. Als Tabelle und nicht als Kette von
 // `if`s: eine neue Ansicht ohne Eintrag fällt hier auf, eine ohne `if` nicht.
+// Anmerkung 176: Jeder Lader bekommt das Steuerobjekt durchgereicht. Bis hier
+// nahm es nur `loadToday` — die übrigen sechs zeigten einen Kreisel mit Titel
+// und sonst nichts, obwohl gerade sie die langen sind (die Karte holt Punkte,
+// Grundorte und den Foto-Index, die Statistik vier Endpunkte auf einmal).
+// Ein Balken, der SAGT, woran er hängt, ist der Unterschied zwischen „es
+// dauert" und „es hängt".
 const VIEW_LOADERS = {
-  today: () => loadToday(),
+  today: op => loadToday(op),
   // Die Karte braucht den Moment, in dem ihr Container sichtbar ist —
-  // Leaflet misst sonst in eine Fläche der Höhe 0.
-  map: () => new Promise(r => setTimeout(() => { openMapView(); r(); }, 40)),
-  stats: () => loadStats(),
+  // Leaflet misst sonst in eine Fläche der Höhe 0. Das Versprechen löst sich
+  // erst auf, wenn die Karte WIRKLICH steht: vorher war der Aufruf darin nicht
+  // abgewartet, und der Overlay verschwand, während die Karte noch lud.
+  map: op => new Promise(r => setTimeout(() => r(openMapView(op)), 40)),
+  stats: op => loadStats(op),
   compendium: () => {
     const tab = document.querySelector('#comp-tabs .zoom-btn.active');
     return tab ? loadCompendium(tab.dataset.type) : null;
   },
   world: () => loadWorld(),
   achievements: () => loadAchievements(),
-  admin: () => loadAdminTab(adminTab),
+  admin: op => loadAdminTab(adminTab, op),
 };
 
 // ---------- VERWALTUNGS-REITER (A14) ----------
 let adminTab = 'moderation';
-function loadAdminTab(t) {
-  if (t === 'moderation') { loadModQueue(); loadFuzzyDates(); }
-  if (t === 'daten') { loadPlaceFormat(); pollDataJobs(); loadBaselines(); }
-  if (t === 'jobs') { loadJobs(); renderSchedule(); }
-  if (t === 'nutzer') loadUsers();
-  if (t === 'db') loadDbTables();
-  if (t === 'logs') { loadLogs(); followLogs(); }
+// Anmerkung 176: `tab` statt `t` — der Parameter verdeckte die
+// Übersetzungsfunktion, und jeder `t('…')` in dieser Funktion hätte einen
+// Reiternamen aufgerufen. Genau die Sorte Fehler, die erst auffällt, wenn
+// jemand hier einen Text einfügt (`tools/check-shadowing.js`).
+//
+// Und: awaiten. Sechs Aufrufe ohne `await` sind sechs Ansichten, die sich
+// nach dem Wechsel still weiterfüllen.
+async function loadAdminTab(tab, op) {
+  if (op) op.note(t('fg.admin.tab', 'Der Reiter wird geladen …'));
+  if (tab === 'moderation') await Promise.all([loadModQueue(), loadFuzzyDates()]);
+  if (tab === 'daten') await Promise.all([loadPlaceFormat(), pollDataJobs(), loadBaselines()]);
+  if (tab === 'jobs') { await loadJobs(); renderSchedule(); }
+  if (tab === 'nutzer') await loadUsers();
+  if (tab === 'db') await loadDbTables();
+  // `followLogs` startet eine Dauerbeobachtung — auf die wartet niemand.
+  if (tab === 'logs') { await loadLogs(); followLogs(); }
 }
-function showAdminTab(t) {
-  adminTab = t;
+function showAdminTab(tab) {
+  adminTab = tab;
   document.querySelectorAll('#admin-tabs [data-atab]').forEach(b =>
-    b.classList.toggle('active', b.dataset.atab === t));
+    b.classList.toggle('active', b.dataset.atab === tab));
   document.querySelectorAll('[data-tabpane]').forEach(p =>
-    p.style.display = p.dataset.tabpane === t ? '' : 'none');
-  loadAdminTab(t);
+    p.style.display = p.dataset.tabpane === tab ? '' : 'none');
+  // Anmerkung 176: derselbe Overlay wie beim Ansichtswechsel — ein
+  // Verwaltungsreiter ist einer, und „Datenbank" mit vierzig Tabellen dauert
+  // genauso lange wie eine Ansicht. Der Name kommt aus dem Knopf und nicht aus
+  // einem zweiten Katalogeintrag: er steht dort schon übersetzt, und zwei
+  // gepflegte Namen für denselben Reiter liefen auseinander (Anm. 106).
+  const chip = document.querySelector(`#admin-tabs [data-atab="${tab}"]`);
+  runForeground(t('fg.view', '{v} wird geladen …')
+                  .replace('{v}', (chip ? chip.textContent : tab).trim()),
+                op => loadAdminTab(tab, op))
+    .catch(err => { if (!isAbort(err)) console.warn('Reiter', tab, err); });
 }
 document.querySelectorAll('#admin-tabs [data-atab]').forEach(b =>
   b.addEventListener('click', () => showAdminTab(b.dataset.atab)));
@@ -10678,13 +10783,30 @@ function jobFinish(job, status, result) {
 }
 
 // Admin-Aktionen (Neuberechnung / Enrichment)
-async function runAdmin(btn, fn, doneMsg) {
+// Anmerkung 176: EIN Griff, und jede Verwaltungsaktion zeigt, dass sie läuft.
+//
+// Gemeldet an „Alle meine Daten löschen": kein Balken, kein abgeblendeter
+// Hintergrund — der Knopf sagte „… läuft" und sonst nichts, während der Server
+// zehntausende Zeilen abräumte. Das war kein Einzelfall, sondern die Regel:
+// alles, was durch `runAdmin` geht, sah so aus. Der Overlay hier statt an
+// jedem Aufrufer ist genau der Punkt — sonst hätte jede neue Aktion die Wahl,
+// ihn zu vergessen, und die Uneinheitlichkeit von F23 begänne von vorn.
+//
+// **Nicht abbrechbar, und das mit Absicht.** Ein Abbruch hält hier nur den
+// BROWSER an; der Server räumt weiter. Danach stünde eine Ansicht da, die
+// Daten zeigt, die es nicht mehr gibt — schlimmer als warten.
+async function runAdmin(btn, fn, doneMsg, opts = {}) {
   const label = btn.textContent;
   btn.disabled = true; btn.textContent = t('adm.running', '… läuft');
   try {
-    const res = await fn();
+    const res = await runForeground(opts.title || label.trim(), async op => {
+      op.note(opts.note || t('fg.admin.work', 'Der Server arbeitet …'));
+      const r = await fn(op);
+      op.note(t('fg.refresh', 'Ansichten werden neu aufgebaut …'));
+      await Promise.all([loadTimeline(), loadModQueue(), loadDbTables()]);
+      return r;
+    }, { cancellable: false });
     toast(doneMsg(res));
-    await Promise.all([loadTimeline(), loadModQueue(), loadDbTables()]);
   } catch (err) {
     toast(t('toast.error', 'Fehler: ') + err.message, 'error');
   } finally {
@@ -10720,41 +10842,66 @@ async function runBatchedAdmin(btn, { reset, step, unit, doneMsg, jobType }) {
         return;
       }
     }
-    if (reset) {
-      btn.textContent = t('adm.preparing', '… bereite vor');
-      remaining = await reset();
-    }
-    ticker();
-    while (!op.stop) {
-      const r = await step();
-      total += r.done;
-      remaining = r.remaining;
-      jobProgress(job, total, remaining);  // Heartbeat (best effort)
-      if (r.aborted) {
-        endState = 'stopped';
-        endResult = t('adm.aborted', 'abgebrochen (KI nicht erreichbar)');
-        toast(t('adm.aborted.long', 'Abgebrochen (KI nicht erreichbar): {n} {u} verarbeitet, {r} offen — später erneut starten.')
-          .replace('{n}', total).replace('{u}', unit).replace('{r}', remaining), 'warn', 8000);
-        break;
-      }
-      if (remaining === 0) { endResult = doneMsg(total); toast(endResult); break; }
-      if (r.done === 0) {
-        endState = 'stopped';
-        endResult = t('adm.stuck', '{r} nicht verarbeitbar').replace('{r}', remaining);
-        toast(t('adm.stuck.long', 'Kein Fortschritt mehr: {n} {u} verarbeitet, {r} nicht verarbeitbar (Konfiguration/Netz prüfen).')
-          .replace('{n}', total).replace('{u}', unit).replace('{r}', remaining), 'warn', 8000);
-        break;
+    // **Anmerkung 176 — diese Läufe wissen ihre Zahlen und sagten sie nur dem
+    // Knopf.** `total` und `remaining` liegen hier seit jeher vor; damit kann
+    // der Overlay genau das, was am Timeline-Import gefällt: Balken, „X von Y",
+    // Rest-Schätzung und ein Satz darunter, was gerade dran ist. Was fehlte,
+    // war nicht die Auskunft, sondern der Ort, an dem man sie sieht — eine
+    // Knopfbeschriftung, die man nicht ansieht, während man wartet.
+    //
+    // Abbrechen geht über BEIDE Wege, und beide setzen dieselbe Marke: der
+    // Overlay-Knopf und der Aktionsknopf darunter. Zwei Schalter für dieselbe
+    // Sache dürfen nicht zwei Zustände haben.
+    await runForeground(label.trim(), async fg => {
+      const show = note => fg.step(
+        total, remaining != null ? total + remaining : 0,
+        note != null ? note
+          : (remaining != null
+             ? t('adm.fg.left', 'noch {r} {u}').replace('{r}', remaining).replace('{u}', unit)
+             : ''));
+      if (reset) {
+        btn.textContent = t('adm.preparing', '… bereite vor');
+        show(t('adm.fg.prepare', 'Es wird gezählt, was zu tun ist …'));
+        remaining = await reset();
       }
       ticker();
-    }
-    if (op.stop) {
-      endState = 'stopped';
-      endResult = t('adm.stopped.by', 'vom Nutzer gestoppt');
-      toast(t('adm.stopped.long', 'Gestoppt: {n} {u} verarbeitet, {r} offen — derselbe Knopf setzt fort.')
-        .replace('{n}', total).replace('{u}', unit).replace('{r}', remaining ?? '?'), 'warn');
-    }
-    await refreshAll();
-    if (isAdmin()) loadDbTables();
+      show();
+      while (!op.stop) {
+        // Der Abbruch des Overlays wirkt wie der Stopp-Knopf: zwischen den
+        // Etappen, das Erreichte bleibt stehen.
+        if (fg.aborted) { op.stop = true; break; }
+        const r = await step();
+        total += r.done;
+        remaining = r.remaining;
+        jobProgress(job, total, remaining);  // Heartbeat (best effort)
+        if (r.aborted) {
+          endState = 'stopped';
+          endResult = t('adm.aborted', 'abgebrochen (KI nicht erreichbar)');
+          toast(t('adm.aborted.long', 'Abgebrochen (KI nicht erreichbar): {n} {u} verarbeitet, {r} offen — später erneut starten.')
+            .replace('{n}', total).replace('{u}', unit).replace('{r}', remaining), 'warn', 8000);
+          break;
+        }
+        if (remaining === 0) { endResult = doneMsg(total); toast(endResult); break; }
+        if (r.done === 0) {
+          endState = 'stopped';
+          endResult = t('adm.stuck', '{r} nicht verarbeitbar').replace('{r}', remaining);
+          toast(t('adm.stuck.long', 'Kein Fortschritt mehr: {n} {u} verarbeitet, {r} nicht verarbeitbar (Konfiguration/Netz prüfen).')
+            .replace('{n}', total).replace('{u}', unit).replace('{r}', remaining), 'warn', 8000);
+          break;
+        }
+        ticker();
+        show();
+      }
+      if (op.stop) {
+        endState = 'stopped';
+        endResult = t('adm.stopped.by', 'vom Nutzer gestoppt');
+        toast(t('adm.stopped.long', 'Gestoppt: {n} {u} verarbeitet, {r} offen — derselbe Knopf setzt fort.')
+          .replace('{n}', total).replace('{u}', unit).replace('{r}', remaining ?? '?'), 'warn');
+      }
+      show(t('fg.refresh', 'Ansichten werden neu aufgebaut …'));
+      await refreshAll();
+      if (isAdmin()) loadDbTables();
+    }, { unit });
   } catch (err) {
     endState = 'error'; endResult = err.message.slice(0, 250);
     toast(t('toast.error', 'Fehler: ') + err.message, 'error');
@@ -11573,14 +11720,25 @@ document.getElementById('btn-wipe-mine').addEventListener('click', async () => {
       danger: true, placeholder: word });
   if (typed === null) return;
   try {
-    const r = await api('/api/data/wipe-mine', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ confirm: typed }),
-    });
+    // Anmerkung 176: derselbe Overlay wie überall. Dieser Knopf war der
+    // gemeldete Fall — er räumt bei einem vollen Bestand zehntausende Zeilen
+    // ab und zeigte dabei nichts. Nicht abbrechbar, siehe `runAdmin`: ein
+    // Abbruch hielte nur den Browser an.
+    const r = await runForeground(t('act.wipemine', '🗑️ Alle meine Daten löschen'),
+      async op => {
+        op.note(t('wipemine.running', 'Ereignisse, Objekte, Orte, Routen, Fotos und '
+                                    + 'Roh-Einträge werden gelöscht …'));
+        const res = await api('/api/data/wipe-mine', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirm: typed }),
+        });
+        op.note(t('fg.refresh', 'Ansichten werden neu aufgebaut …'));
+        await refreshAll();
+        await loadToday();
+        return res;
+      }, { cancellable: false });
     toast(t('wipemine.done', '✓ {rows} Zeilen und {files} Bilddateien gelöscht.')
       .replace('{rows}', r.total).replace('{files}', r.media_files), 'ok', 9000);
-    await refreshAll();
-    await loadToday();
   } catch (err) { toast(err.message, 'error', 9000); }
 });
 

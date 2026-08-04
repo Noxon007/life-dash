@@ -80,6 +80,12 @@ with TestClient(app):
     timed("…mit Fotos + verdichtet",
           "/api/events?slim=1&limit=300&offset=0&machine_proposals=0&visits=1&photos=1&condense=1&group=city")
     timed("/api/events/on-this-day", "/api/events/on-this-day")
+    # Anmerkung 174: derselbe Endpunkt mit eingeschaltetem Schalter „Besuche
+    # mitzeigen". Das ist der Fall, der gemeldet wurde — und der einzige, in
+    # dem die Vorauswahl überhaupt etwas zu tun hat: ohne ihn fällt der ganze
+    # importierte Bestand schon an der Quellen-Bedingung weg, und eine Messung
+    # über nichts misst nichts.
+    timed("…mit importierten Besuchen", "/api/events/on-this-day?include_imported=1")
     timed("/api/moderation/queue", "/api/moderation/queue")
     print("\n=== Auf Klick ===")
     timed("/api/stats/overview", "/api/stats/overview")
