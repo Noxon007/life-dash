@@ -90,18 +90,35 @@ function makeDom(state) {
         };
         return g;
       };
-      const shape = () => {
+      // **Das Doppel muss das ZEICHEN behalten, nicht nur seine Zahl.** Seit
+      // der Grundort ein Tropfen mit eigener Farbe ist statt eines grauen
+      // Rings, ist „wie sieht es aus?" eine prüfbare Aussage — und ein Doppel,
+      // das `marker(ll, opt)` die Argumente wegwirft, kann sie nicht zeigen
+      // (Anmerkung 116/150: ein Doppel, das ein Feld auslässt, ist eine andere
+      // Funktion). Deshalb hält jede Form ihre Koordinate und ihre Optionen.
+      const shape = (kind) => (ll, opt) => {
         const s = {
+          kind, ll, opt,
           addTo: (g) => { if (g && g._push) g._push(s); return s; },
-          bindPopup: () => s, bindTooltip: () => s, setRadius: () => s, on: () => s,
+          bindPopup: (h) => { s.popup = h; return s; },
+          bindTooltip: () => s, setRadius: () => s, on: () => s,
         };
         return s;
       };
+      // `latLngBounds(...).pad(...)` muss die Koordinaten BEHALTEN — sonst
+      // steht in `state.fits` der Auffang-Proxy, und „springt der Ausschnitt
+      // auf den Grundort?" ist keine Frage mehr, die eine Antwort hat.
+      const bounds = (ll) => { const b = { ll, pad: () => b }; return b; };
       const base = new Proxy(function () { return base; }, {
         get: (_t, k) => {
           if (k === 'getZoom') return () => 6;
           if (k === 'layerGroup' || k === 'featureGroup') return group;
-          if (k === 'circleMarker' || k === 'marker') return shape;
+          if (k === 'circleMarker' || k === 'marker') return shape(k);
+          if (k === 'divIcon') return (o) => o;      // das Symbol selbst lesen
+          if (k === 'latLngBounds') return bounds;
+          if (k === 'fitBounds') return (b) => {
+            (state.fits || (state.fits = [])).push(b); return base;
+          };
           return base;
         },
         apply: () => base,
@@ -367,6 +384,93 @@ setTimeout(async () => {
 
     w.eval('mp.showBaseline = false;');
     ok('Der Schalter blendet sie aus', drawn('1989') === 0);
+    w.close();
+  }
+
+  // --- 2d. Ein Zeitraum, in dem NUR der Grundort steht ----------------------
+  //
+  // **Gemeldet als „auf 1993 kann ich gar nicht gehen".** Die Zeiträume der
+  // Karte entstanden aus den EREIGNISSEN — und genau die Jahre, für die der
+  // Grundort gemacht ist, haben keine. Die Ebene war gebaut, gezeichnet und
+  // geprüft, nur nicht erreichbar: dieselbe Falle wie bei den Fototagen (A45),
+  // und ebenso unsichtbar, weil eine Ansicht ohne diesen Zeitraum aussieht wie
+  // eine Ansicht, in der es ihn nicht gibt.
+  //
+  // Vier Zusagen, und jede davon gegen den kaputten Stand gefahren:
+  //   1. der Zeitraum steht in der Leiste — in JEDER Stufe,
+  //   2. das Zeichen ist der TROPFEN in eigener Farbe (kein grauer Ring, der
+  //      auf der Leinwand unter allem liegt, was nach ihm kommt),
+  //   3. der Ausschnitt springt darauf (sonst liegt es außerhalb des Bildes,
+  //      und sichtbar ist eine leere Karte),
+  //   4. die Liste daneben sagt es (nicht „0 Stopps" und sonst Stille).
+  {
+    const state = { calls: [], fits: [] };
+    const w = makeDom(state).window, d = w.document;
+    await wait(200);
+    await w.openMapView();
+    await wait(120);
+
+    // Der einzige verortete Eintrag liegt 1990-06-15; der Grundort läuft von
+    // 1986-04-02 bis 1992-08-31. 1989 hat also keinen einzigen Eintrag.
+    // (1989-03-07 liegt in KW 10 — der 2. Januar 1989 war ein Montag.)
+    [['year', '1989'], ['month', '1989-03'], ['week', '1989-W10'],
+     ['day', '1989-03-07']].forEach(([mode, key]) => {
+      w.eval(`mp.mode = ${JSON.stringify(mode)}; rebuildPeriods();`);
+      const has = w.eval(`mp.periods.includes(${JSON.stringify(key)})`);
+      ok(`Nur-Grundort-Zeitraum ist ansteuerbar (${mode})`, has === true,
+         `${key} fehlt in ${w.eval('mp.periods.length')} Zeiträumen — die `
+         + 'Ebene ist dann gebaut und gezeichnet, aber nicht erreichbar');
+    });
+
+    // Und derselbe Weg mit dem Schalter AUS: die Zeiträume dürfen dann nicht
+    // stehen bleiben. Ohne diese Gegenrichtung prüfte die Zusicherung oben nur,
+    // dass es die Schlüssel GIBT — nicht, dass sie vom Grundort kommen.
+    w.eval("mp.mode = 'year'; mp.showBaseline = false; rebuildPeriods();");
+    ok('…und mit ausgeschalteter Ebene nicht mehr',
+       w.eval("mp.periods.includes('1989')") === false,
+       `${JSON.stringify(w.eval('mp.periods'))}`);
+    w.eval('mp.showBaseline = true; rebuildPeriods();');
+
+    // Jetzt wirklich hingehen.
+    w.eval("mp.index = mp.periods.indexOf('1989');");
+    state.fits.length = 0;
+    w.eval('renderPeriod();');
+    await wait(80);
+
+    const marks = w.eval('mapBaseline.getLayers()');
+    ok('Auf 1989 steht das Grundort-Zeichen', marks.length === 1,
+       `${marks.length} Zeichen`);
+
+    // (2) Der Tropfen — dieselbe Zeichnung wie überall, nur in eigener Farbe.
+    // Geprüft am SYMBOL, nicht an der Funktion: ein `circleMarker` in der
+    // gedämpften Textfarbe war der gemeldete Zustand („der graue Ring geht
+    // unter"), und beides ist hier zu sehen.
+    const mark = marks[0] || {};
+    const html = (mark.opt && mark.opt.icon && mark.opt.icon.html) || '';
+    ok('…als Tropfen, nicht als Ring', mark.kind === 'marker'
+       && /<path d="M12 32/.test(html),
+       `${mark.kind} / ${String(html).slice(0, 80)} — ein Kreis auf der `
+       + 'Leinwand liegt unter allem, was nach ihm gezeichnet wird');
+    ok('…in einer eigenen Farbe, nicht in der Textfarbe',
+       /fill="[^"]+"/.test(html) && !/8a95ad/i.test(html),
+       String(html).slice(0, 120));
+    ok('…und ohne Ziffer darin', !/<b[ >]/.test(html),
+       'die Größe eines Tropfens sagt „so viele Einträge" — die Tageszahl '
+       + 'eines Grundorts ist gerade keine Zahl über Einträge');
+
+    // (3) Der Ausschnitt. Ohne Ereignisse gibt es sonst nichts, worauf die
+    // Karte springen könnte, und das Bild bleibt beim vorigen Zeitraum stehen.
+    const fitLL = state.fits.map(b => JSON.stringify(b && b.ll)).join(' ');
+    ok('…und der Ausschnitt springt darauf', /53\.93/.test(fitLL),
+       `${fitLL || '(kein fitBounds)'} — sonst liegt das Zeichen außerhalb `
+       + 'des Bildes, und sichtbar ist eine leere Karte');
+
+    // (4) Die Liste daneben.
+    const stops = d.getElementById('mp-stops').textContent;
+    ok('…und die Liste daneben nennt ihn', /Elternhaus/.test(stops)
+       && /(abgeleitet|derived)/i.test(stops),
+       `${stops.slice(0, 160)} — „0 Stopps" über einem Jahr, für das es sehr `
+       + 'wohl eine Auskunft gibt, ist die Stille aus A40');
     w.close();
   }
 

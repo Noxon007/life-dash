@@ -54,6 +54,18 @@
        ihren Untergrund mit dem Theme wechselt (F13) und ein Ton, der auf
        Nachtkarten leuchtet, auf der hellen verschwindet. */
     --photo-dot: #22d3ee;
+    /* F20 — der Grundort bekommt eine eigene Farbe, aus demselben Grund wie
+       die Foto-Ebene: er ist keine Kategorie, sondern eine andere SORTE
+       Aussage, und ein Ton, der einer Kategoriefarbe nahe liegt, macht aus
+       „gefolgert" versehentlich „erfasst".
+       Vorher war das Zeichen ein gestrichelter grauer RING in `--text-dim`.
+       Gemeldet als „geht unter, wenn man rauszoomt", und das war kein
+       Geschmacksurteil: eine hohle Form in der gedämpften TEXTfarbe ist genau
+       die Farbe, in der auch die Beschriftungen der Karte stehen. Grün liegt
+       weit von allen Kategoriefarben, vom Cyan der Fotos und von den
+       Wege-Farben. Eigener heller Wert wie bei `--photo-dot`: was auf der
+       Nachtkarte leuchtet, verschwindet auf der hellen. */
+    --baseline-dot: #4cb96b;
   }
   /* F9 — helles Theme: dieselben Variablen mit hellen Werten. Das data-theme-
      Attribut setzt JS (Auto nach Systemeinstellung, manuell übersteuerbar). */
@@ -67,6 +79,7 @@
     --accent: #3a6ce0;
     /* Dunkler, weil ein leuchtendes Cyan auf der hellen Karte verschwindet */
     --photo-dot: #0e8ba8;
+    --baseline-dot: #2f8f4f;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
@@ -1407,7 +1420,7 @@
                    anderen — „woher kommt, was hier liegt?". Eigene Marke, weil
                    das, was sie zeigt, weder erfasst noch importiert ist,
                    sondern gefolgert. -->
-              <span class="filter-chip active" id="mp-baseline-toggle" data-i18n-title="map.baseline.tip" title="Deine Grundort-Zeiträume — ein Zeichen je Zeitraum, dort wo du in dieser Zeit normalerweise warst. Abgeleitet, nicht erfasst."><span class="fdot" style="background:var(--text-dim); border:1px dashed var(--text)"></span><span data-i18n="map.baseline">🏠 Grundort</span></span>
+              <span class="filter-chip active" id="mp-baseline-toggle" data-i18n-title="map.baseline.tip" title="Deine Grundort-Zeiträume — ein Zeichen je Zeitraum, dort wo du in dieser Zeit normalerweise warst. Abgeleitet, nicht erfasst."><span class="fdot" style="background:var(--baseline-dot)"></span><span data-i18n="map.baseline">🏠 Grundort</span></span>
               <span class="filter-chip off" id="mp-photos-toggle" data-i18n-title="map.photos.tip" title="Jedes Foto mit Koordinaten als eigener Punkt — dort, wo es aufgenommen wurde. Muss zuerst unter „Meine Daten → Immich“ verortet werden."><span class="fdot" style="background:var(--photo-dot)"></span><span data-i18n="map.photos">📷 Fotos</span></span>
               <!-- A40 (Anm. 92): gemessene Wege gegen gedachte Verbindung —
                    die beiden hießen bis 0.33 beide „Route“. Das Sinnbild ist
@@ -8233,6 +8246,13 @@ function rebuildPeriods(keepKey) {
   // ein Foto ein Ereignis ist, bringt es seinen Zeitraum selbst mit. Die
   // Sonderbehandlung fällt damit weg, und mit ihr eine zweite Quelle für
   // dieselbe Frage.
+  //
+  // **Anmerkung 167: der Grundort bringt seine Zeiträume ebenfalls selbst mit.**
+  // Er kann es nicht wie ein Foto tun — er ist kein Ereignis, sondern eine
+  // stehende Tatsache über eine Spanne. Ohne diese Zeile ist ein Jahr, in dem
+  // NUR der Grundort steht, nicht ansteuerbar, und die Ebene, die dafür gebaut
+  // wurde, bleibt genau dort unerreichbar, wo sie das Einzige ist, was es gibt.
+  mpBaselineKeys().forEach(k => keys.add(k));
   const sorted = [...keys].sort();
   mp.periods = sorted;
   mp.index = keepKey && sorted.includes(keepKey) ? sorted.indexOf(keepKey) : sorted.length - 1;
@@ -8342,36 +8362,121 @@ function mpPeriodRange(key) {
   return ['0000-01-01', '9999-12-31'];
 }
 
-function mpDrawBaselines(key) {
-  if (!mapBaseline) return 0;
-  mapBaseline.clearLayers();
-  if (!mp.showBaseline || !MP_BASELINES || !MP_BASELINES.length) return 0;
+// Welche Grundort-Zeiträume in einen Zeitraum-Schlüssel fallen. EINE Antwort,
+// gelesen vom Zeichner, von der Stopp-Liste und vom Zeitraum-Aufbau — drei
+// Stellen, und drei Kopien dieser Bedingung wären drei Regeln (Anmerkung 106).
+function mpBaselinesIn(key) {
+  if (!mp.showBaseline || !MP_BASELINES || !MP_BASELINES.length) return [];
   const [from, to] = mpPeriodRange(key);
-  const rows = MP_BASELINES.filter(b => b.lat != null && b.lng != null
+  return MP_BASELINES.filter(b => b.lat != null && b.lng != null
     // Überschneidung, nicht Enthaltensein: ein Zeitraum von 1986 bis 1992
     // gehört in JEDE Jahresansicht dazwischen, nicht nur in seine Ränder.
     && b.date_start <= to && (b.date_end || '9999-12-31') >= from);
+}
+function mpBaselineName(b) { return b.label || b.place; }
+function mpBaselineSpan(b) {
+  return `${fmtDay(b.date_start)} – ${b.date_end ? fmtDay(b.date_end)
+    : t('bl.until', 'heute')}`;
+}
+// Die Koordinaten der gerade gezeichneten Zeichen — der Ausschnitt braucht sie
+// (siehe `renderPeriod`): ein Zeitraum ohne Ereignisse hat sonst nichts, worauf
+// die Karte springen könnte, und das Zeichen läge irgendwo außerhalb des Bildes.
+let MP_BASELINE_LL = [];
+
+function mpDrawBaselines(key) {
+  if (!mapBaseline) return 0;
+  mapBaseline.clearLayers();
+  MP_BASELINE_LL = [];
+  const rows = mpBaselinesIn(key);
   rows.forEach(b => {
-    const name = b.label || b.place;
-    const span = `${fmtDay(b.date_start)} – ${b.date_end ? fmtDay(b.date_end)
-      : t('bl.until', 'heute')}`;
-    // Gestrichelt und in der gedämpften Textfarbe — dieselbe Bildsprache wie
-    // die abgeleitete Zeile im Zeitstrahl. Was gefolgert ist, soll nicht
-    // aussehen wie etwas, das jemand erfasst hat.
-    L.circleMarker([b.lat, b.lng], {
-      radius: 11, weight: 2, dashArray: '3 3',
-      color: getComputedStyle(document.documentElement)
-        .getPropertyValue('--text-dim').trim() || '#888',
-      fillOpacity: 0.12, renderer: mpCanvas(),
+    // **Anmerkung 167 — derselbe Tropfen wie überall, nur in eigener Farbe.**
+    //
+    // Vorher: ein gestrichelter, fast durchsichtiger Ring in der gedämpften
+    // TEXTfarbe, gezeichnet auf dieselbe Leinwand wie die Punkte. Gemeldet als
+    // „der graue Ring geht unter, wenn man rauszoomt" — und er ging tatsächlich
+    // unter, gleich doppelt: die Farbe ist die der Kartenbeschriftungen, und
+    // eine Leinwand zeichnet in Aufrufreihenfolge, also lag er unter allem, was
+    // danach kam. Ein Marker liegt in der Marker-Ebene, immer über der Leinwand.
+    //
+    // Feste Größe, keine Zahl: die Größe eines Tropfens sagt sonst „so viele
+    // Einträge", und die Tageszahl ist gerade keine Zahl über Einträge. Sie
+    // steht im Popup, wo auch „abgeleitet" steht.
+    L.marker([b.lat, b.lng], {
+      icon: mpDropIconColor(getComputedStyle(document.documentElement)
+        .getPropertyValue('--baseline-dot').trim() || '#4cb96b', 0, 13),
+      // Über den Ereignis-Punkten, aber unter einem geöffneten Popup: der
+      // Grundort ist die Auskunft für den Zeitraum, in dem sonst nichts steht.
+      zIndexOffset: -100, title: mpBaselineName(b),
     }).bindPopup(
-      `<b>${esc(name)}</b><br>${esc(b.place)}<br>`
-      + `<span class="stat-label">${esc(span)} · ${
+      `<b>${esc(mpBaselineName(b))}</b><br>${esc(b.place)}<br>`
+      + `<span class="stat-label">${esc(mpBaselineSpan(b))} · ${
         esc(dayCount(b.day_count || 0))} ${
         esc(t('map.bl.derived', 'abgeleitet'))}</span>`
     ).addTo(mapBaseline);
+    MP_BASELINE_LL.push([b.lat, b.lng]);
   });
   return rows.length;
 }
+
+// --------------------------------------------------------------------------- //
+// **Anmerkung 167 — ein Zeitraum, in dem NUR der Grundort steht, muss
+// ansteuerbar sein.**
+// --------------------------------------------------------------------------- //
+// Die Zeiträume der Karte entstanden aus den EREIGNISSEN. Genau die Jahre, für
+// die der Grundort gemacht ist, haben keine — 1993 ließ sich damit gar nicht
+// ansteuern, und der einzige Ort, der über dieses Jahr etwas zu sagen hat, war
+// nirgends erreichbar. Dieselbe Falle wie bei den Fototagen in A45, und aus
+// demselben Grund unsichtbar: die Ansicht sieht vollständig aus.
+//
+// Der Grundort ist eine STEHENDE Tatsache mit Gültigkeitszeitraum, nicht eine
+// Zeile je Tag — die Schlüssel entstehen deshalb aus der SPANNE, nicht aus den
+// abgeleiteten Tagen. Ein Tag innerhalb der Spanne, an dem etwas erfasst wurde,
+// bringt seinen Schlüssel ohnehin selbst mit; die Vereinigung ist dieselbe
+// Menge, und ein zweiter Abruf für die Tagesliste wäre eine zweite Quelle für
+// dieselbe Frage (die Zeiträume kommen aus `/api/baselines`, wie das Zeichen).
+function mpBaselineKeys() {
+  if (!mp.showBaseline || !MP_BASELINES || !MP_BASELINES.length) return [];
+  if (mp.mode === 'all') return ['alle'];
+  const today = new Date().toISOString().slice(0, 10);
+  const keys = new Set();
+  MP_BASELINES.forEach(b => {
+    if (b.lat == null || b.lng == null || !b.date_start) return;
+    const to = b.date_end || today;
+    if (to < b.date_start) return;
+    if (mp.mode === 'year' || mp.mode === 'decade') {
+      for (let y = +b.date_start.slice(0, 4); y <= +to.slice(0, 4); y++)
+        keys.add(keyForDate(`${y}-01-01`));
+      return;
+    }
+    if (mp.mode === 'month') {
+      const d = new Date(Date.UTC(+b.date_start.slice(0, 4),
+                                  +b.date_start.slice(5, 7) - 1, 1));
+      while (d.toISOString().slice(0, 7) <= to.slice(0, 7)) {
+        keys.add(d.toISOString().slice(0, 7));
+        d.setUTCMonth(d.getUTCMonth() + 1);
+      }
+      return;
+    }
+    // Tag und Woche: Tag für Tag. Zwanzig Jahre sind 7 300 Schleifendurchläufe
+    // und ebenso viele Zeichenketten — das ist nichts, aber es ist auch nicht
+    // unbegrenzt: ein Zeitraum ohne Ende ist bis heute begrenzt, und ein
+    // vertippter Anfang („0190") wäre es nicht. Deshalb der Riegel.
+    const d = new Date(`${b.date_start}T00:00:00Z`);
+    for (let i = 0; i < MP_BL_KEY_MAX; i++) {
+      const iso = d.toISOString().slice(0, 10);
+      if (iso > to) break;
+      keys.add(keyForDate(iso));
+      d.setUTCDate(d.getUTCDate() + (mp.mode === 'week' ? 7 : 1));
+    }
+    // Das ENDE gehört dazu, auch wenn der Siebener-Schritt darüber hinweggeht:
+    // endet die Spanne mittwochs, liegt der letzte Schritt schon hinter ihr,
+    // und die letzte Woche fehlte — eine Lücke von einer Woche am Rand, also
+    // genau dort, wo niemand sie sucht.
+    keys.add(keyForDate(to));
+  });
+  return [...keys];
+}
+const MP_BL_KEY_MAX = 40000;   // ~110 Jahre in Tagen
 
 // Holt die Kartenpunkte. Anmerkung 139: der Foto-Schalter geht MIT — ein
 // ausgeschalteter Schalter soll zehntausende Punkte gar nicht erst über die
@@ -8679,15 +8784,25 @@ function mpGroupColor(items) { return catColor(mpGroupColorCat(items)); }
 // sobald jemand eine davon anfasst — das war Anmerkung 161 in ihrer letzten
 // Hälfte, und der Weg dahin war ein Plugin-Blau neben einer Kategoriefarbe.
 const MP_DROP_PATH = 'M12 32 C12 32 24 20 24 12 A12 12 0 1 0 0 12 C0 20 12 32 12 32 Z';
-function mpDropIcon(cat, n) {
-  const r = mpDropRadius(n);
+function mpDropIcon(cat, n) { return mpDropIconColor(catColor(cat), n); }
+// Derselbe Tropfen mit einer Farbe, die keine Kategoriefarbe ist — der
+// Grundort (F20) braucht ihn. **Eine zweite Zeichnung desselben Zeichens wären
+// zwei Zeichen**, sobald jemand eine davon anfasst; deshalb geht der Weg über
+// die Farbe und nicht über eine eigene Funktion mit eigenem Pfad.
+// `r` übersteuert die Größe: die Größe eines Tropfens sagt sonst „so viele
+// Einträge", und die Tageszahl eines Grundorts ist gerade KEINE Zahl über
+// Einträge (dieselbe Verwechslung, gegen die die Sammelzeile im Zeitstrahl
+// zwei getrennte Marken führt).
+function mpDropIconColor(color, n, r) {
+  r = r || mpDropRadius(n);
   const w = Math.round(r * 2), h = Math.round(r * 2 * (32 / 24));
-  const color = catColor(cat);
   // Die Zahl steht als HTML über dem Kopf und nicht im SVG: im `viewBox`
   // skalierte sie mit der Tropfengröße mit, und über einer großen Gruppe
   // stünde eine riesige Ziffer. Erst ab einem Kopf, in den sie hineinpasst —
   // die Größe sagt es ohnehin schon.
-  const num = r >= 13 ? `<b style="height:${w}px">${n.toLocaleString(LOC())}</b>` : '';
+  // `n` ohne Zahl (der Grundort zeichnet EIN Zeichen, keine Menge) lässt die
+  // Ziffer weg — sonst stünde dort eine 0 oder ein „undefined".
+  const num = (r >= 13 && n) ? `<b style="height:${w}px">${n.toLocaleString(LOC())}</b>` : '';
   return L.divIcon({
     className: 'mp-drop',
     iconSize: [w, h],
@@ -8836,8 +8951,20 @@ function renderPeriod() {
   if (!clustered && mp.showRoute && latlngs.length > 1) {
     L.polyline(latlngs, { color: '#5b8cff', weight: 3, opacity: .8, dashArray: '6 6' }).addTo(mapRoute);
   }
+  // **Anmerkung 167: der Ausschnitt kennt auch den Grundort.** Ohne diese
+  // Zeile wäre ein Zeitraum ohne Ereignisse zwar ansteuerbar und die Ebene
+  // gezeichnet — nur läge das Zeichen irgendwo außerhalb des Bildes, das vom
+  // vorigen Zeitraum stehen geblieben ist. Sichtbar wäre eine leere Karte, und
+  // das ist genau der Zustand, den dieser Umbau beseitigen sollte.
   if (latlngs.length) {
     try { mapObj.fitBounds(L.latLngBounds(latlngs).pad(0.35)); } catch (_) {}
+  } else if (MP_BASELINE_LL.length) {
+    // Mit Deckel: ein einzelner Punkt hat keine Ausdehnung, und `fitBounds`
+    // zöge dann auf die höchste Stufe — auf einen Häuserblock. Der Grundort
+    // ist eine Aussage über Jahre, nicht über eine Hausnummer.
+    try {
+      mapObj.fitBounds(L.latLngBounds(MP_BASELINE_LL).pad(0.35), { maxZoom: 12 });
+    } catch (_) {}
   }
   // **Anmerkung 161: Die KARTE lässt nichts mehr weg** — der Hinweis gilt seit
   // dieser Anmerkung nur noch der Liste daneben, und deshalb steht er auch
@@ -8859,7 +8986,27 @@ function renderPeriod() {
         <div class="stat-label" style="margin-top:3px">${fmtDate(e)} · ${esc(e.location.name)}</div>
         ${w ? `<div class="stat-sub" style="margin-top:4px">🌤️ ${esc(w)}</div>` : ''}
       </div>`;
-    }).join('');
+    }).join('')
+    + mpBaselineStopsHtml(key);
+}
+// **Anmerkung 167 — was die Karte zeigt, muss die Liste daneben auch sagen.**
+// Seit ein Zeitraum ohne Einträge ansteuerbar ist, stünde dort sonst „0 Stopps"
+// über einem Jahr, für das es sehr wohl eine Auskunft gibt: die Sorte Stille,
+// gegen die A40 geschrieben ist. Der Block steht auch dann da, wenn Einträge
+// vorhanden sind — er beantwortet „und wo warst du sonst?", und eine Regel
+// „nur wenn leer" wäre eine zweite Bedingung neben der des Zeichens.
+function mpBaselineStopsHtml(key) {
+  return mpBaselinesIn(key).map(b => `
+    <div style="padding:10px 0; border-bottom:1px solid var(--border)">
+      <div style="display:flex; gap:8px; align-items:baseline">
+        <span style="color:var(--baseline-dot); font-weight:700">🏠</span>
+        <b style="font-size:14px">${esc(mpBaselineName(b))}</b>
+        <span class="chip badge-baseline">${esc(t('map.bl.derived', 'abgeleitet'))}</span>
+      </div>
+      <div class="stat-label" style="margin-top:3px">${esc(mpBaselineSpan(b))} · ${
+        esc(dayCount(b.day_count || 0))}</div>
+      <div class="stat-sub" style="margin-top:4px">${esc(b.place)}</div>
+    </div>`).join('');
 }
 // Sagt auf der KARTE, wie viele Punkte sie gerade weglässt — und bietet den
 // einen Klick an, der sie zurückholt. Vorher stand das nur in der Stopp-Liste
@@ -9305,7 +9452,12 @@ function renderGroupedPeriod(all, key, stops, level) {
           <b style="font-size:14px">${esc(r.short)}</b>
         </div>
         <div class="stat-label" style="margin-top:3px">${r.range} · ${esc(r.loc.name)}</div>
-      </div>`).join('');
+      </div>`).join('')
+    // Anmerkung 167: dieselbe Zeile wie im ungebündelten Zweig. Die Karte
+    // zeichnet den Grundort in JEDER Stufe (der Aufruf steht vor der
+    // Verzweigung) — eine Liste, die ihn nur in einer davon nennt, wäre die
+    // Hälfte einer Regel, und die läuft still von der anderen weg.
+    + mpBaselineStopsHtml(key);
 }
 function mpGo(delta) {
   if (!mp.periods.length) return;
@@ -9334,6 +9486,11 @@ document.getElementById('mp-baseline-toggle')?.addEventListener('click', functio
   mp.showBaseline = !mp.showBaseline;
   this.classList.toggle('active', mp.showBaseline);
   this.classList.toggle('off', !mp.showBaseline);
+  // Anmerkung 167: der Schalter ändert seit dem Grundort-Zeitraum nicht nur,
+  // WAS gezeichnet wird, sondern WELCHE Zeiträume es überhaupt gibt — ohne den
+  // Neuaufbau bliebe ein Jahr in der Leiste stehen, das nichts mehr zeigt.
+  const keep = mp.periods[mp.index];
+  rebuildPeriods(keep);
   renderPeriod();
 });
 document.getElementById('mp-manual-toggle').addEventListener('click', function () {
@@ -9418,7 +9575,12 @@ document.querySelectorAll('[data-mode]').forEach(chip => {
     if (mp.periods.length) {
       const key = mp.periods[mp.index];
       const item = mpFiltered().find(e => periodKey(e) === key);
-      if (item) anchor = item.date_start.slice(0, 10);
+      // Anmerkung 167: hat der Zeitraum gar keine Ereignisse — der Normalfall
+      // für einen Grundort —, liefert der Schlüssel selbst das Datum. Ohne
+      // diesen Rückfall springt ein Moduswechsel aus 1993 heraus ans Ende der
+      // Zeit, und zwar genau in den Jahren, in denen nichts erfasst wurde.
+      anchor = item ? item.date_start.slice(0, 10) : mpPeriodRange(key)[0];
+      if (anchor === '0000-01-01') anchor = null;   // „alle" hat kein Datum
     }
     mp.mode = chip.dataset.mode;
     document.querySelectorAll('[data-mode]').forEach(c => c.classList.toggle('active', c === chip));

@@ -47,8 +47,15 @@ any `MINOR`.
   parents' house are two thousand derived days at a single coordinate, and
   drawing them individually would be a dot with weight rather than a map; the
   number of days is in the popup. A period appears in every view its span
-  overlaps, dashed and muted, so what was inferred never looks like something
-  you recorded.
+  overlaps, as the same teardrop the map uses everywhere else but in a colour
+  of its own, so what was inferred never looks like something you recorded.
+  **Years in which only the baseline exists can now be reached.** The map's
+  period strip used to be built from entries alone, so 1993 — a year with a
+  baseline location and nothing recorded — could not be selected at all, in any
+  zoom level: the one layer that had something to say about that year was
+  unreachable. Day, week, month, year and decade now all offer those periods,
+  the map moves to the mark instead of staying where the last period left it,
+  and the list beside the map names the place rather than reporting “0 stops”.
 - **A baseline location for the years you never recorded.** Under *My data →
   Baseline location* you enter a period and a place — “from my birth until 2006
   I was at my parents' house in Bad Segeberg”. Every day in that period that has
