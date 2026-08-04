@@ -178,6 +178,15 @@ any `MINOR`.
   and your longest recorded trip.
 
 ### Fixed
+- **A residence can be corrected after the fact.** Label, place and period — all
+  three, from the same form you entered it with, including picking the place on
+  the map again. Until now a typo in the label meant deleting the period and
+  entering it anew. Moving a period is genuinely cheap, because the days it
+  fills are never stored: change the row and everything recomputes on the next
+  look. Two things it takes care of quietly: clearing the “until” date really
+  does reopen the period to *today* rather than leaving the old end in place,
+  and editing only the label leaves your place untouched — a point you picked on
+  the map is not silently replaced by the town centre.
 - **Every category chip now says how many entries it stands for.** Until now
   only the residence did, and it sits in the same row — a row where one
   switch carries a number and the rest do not reads as if something were broken

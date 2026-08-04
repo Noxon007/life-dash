@@ -440,6 +440,57 @@ def test_the_revision_moves_when_a_period_changes(client, db, user):
     assert client.get("/api/events/index").json()["revision"] != first
 
 
+def test_clearing_the_end_reopens_the_period(client, db, user):
+    """Anmerkung 184: `clear_end` ist der Unterschied zwischen „unverändert
+    lassen" und „das Ende soll weg".
+
+    In JSON heißt ein fehlendes Feld dasselbe wie `null`, nämlich nichts.
+    Ohne das eigene Feld wäre „bis heute" nachträglich nicht mehr einstellbar —
+    genau der Fall, der beim Umzug in die aktuelle Wohnung eintritt: das
+    Formular zeigte „bis heute" und der Zeitraum behielte sein altes Ende.
+    """
+    loc = _loc(db, user, "Kiel")
+    row = _base(db, user, loc, date(2024, 1, 1), date(2024, 1, 5))
+    db.commit()
+
+    # Ohne das Feld bleibt das Ende stehen, auch wenn `date_end: null` kommt.
+    client.patch(f"/api/baselines/{row.id}", json={"date_end": None})
+    db.refresh(row)
+    assert row.date_end == date(2024, 1, 5)
+
+    r = client.patch(f"/api/baselines/{row.id}", json={"clear_end": True})
+    assert r.status_code == 200
+    db.refresh(row)
+    assert row.date_end is None
+    # Und ab jetzt füllt er bis heute, nicht bis zum 5. Januar.
+    assert max(baseline.inferred_days(db, user.id, today=TODAY)) == TODAY
+
+
+def test_changing_only_the_label_keeps_the_chosen_point(client, db, user):
+    """Anmerkung 184: der Ort bleibt unberührt, wenn er nicht mitkommt.
+
+    „Das Elternhaus" ist oft eine Adresse, die Nominatim nicht kennt — sein
+    Punkt kommt aus einem Klick auf die Karte. Würde die Oberfläche den
+    unveränderten Namen beim Ändern der BEZEICHNUNG mitschicken, geocodierte
+    der Server ihn neu und ersetzte den Punkt durch den Ortsmittelpunkt. Der
+    Endpunkt muss das aushalten: kein `place`, keine Berührung.
+    """
+    loc = _loc(db, user, "Elternhaus", lat=53.93, lng=10.31)
+    row = _base(db, user, loc, date(2024, 1, 1), date(2024, 1, 5))
+    db.commit()
+
+    client.patch(f"/api/baselines/{row.id}", json={"label": "Zuhause"})
+    db.refresh(row)
+    assert row.label == "Zuhause"
+    assert row.location_id == loc.id
+    assert (row.location.lat, row.location.lng) == (53.93, 10.31)
+
+    # Und die leere Bezeichnung ist eine Aussage, kein Auslassen: sie löscht.
+    client.patch(f"/api/baselines/{row.id}", json={"label": ""})
+    db.refresh(row)
+    assert row.label is None
+
+
 def test_another_account_sees_nothing(client, db, user):
     other = User(oidc_subject="other", email="o@example.org", role=UserRole.user)
     db.add(other)

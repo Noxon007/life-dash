@@ -1156,6 +1156,17 @@ and no change, and one that turned out to be the same defect in two places.
 
     The one hole the simple rule leaves is documented rather than closed: an entry occupies only its starting day, so an unsplit multi-day entry lets the residence fill the rest. The *split* run is the answer, it already stands before the residence form in the recommended order, and the form now says so.
 
+184. ✅ **A residence you can correct.** Reported: “make the residence editable after the fact — at least the label, but the address too; the period will probably be difficult.” The period turned out to be the easy part, and not by accident: `PATCH /api/baselines/{id}` has existed since F20, overlap check included. Only the interface was missing. **Because the days are stored nowhere, moving a period is one changed field rather than a thousand rows to be corrected** — that is the whole argument of note 144, arriving where it was meant to.
+
+    The same form does both. A second one beside it would have been a second copy of one rule, and the map-based place picker — where most of the value sits, because “my parents' house” is rarely an address Nominatim knows — would have existed in only one of them. The form says which period it is editing, the button stops saying “add”, and there is a cancel.
+
+    **Two silent traps, both of which the guard now holds shut:**
+
+    - **An empty “until” means two things.** In JSON a missing field and `null` both mean “leave it alone”, which is why the endpoint has `clear_end`. Without sending it, a period would keep its old end while the form shows “until today”. The end is therefore always stated explicitly when editing.
+    - **An unchanged place must not be sent at all.** Send it and the server re-geocodes the name — so editing the *label* would silently replace a point chosen on the map with the town centre. The period would look untouched and sit in the wrong place. The frontend sends `place` only when it actually differs or a point was picked; the backend test pins the endpoint's half of that.
+
+    Two smaller things fell out of building it. A gap taken over from the statistics now cancels an active edit — otherwise the next “save” would have overwritten the edited period with the gap's dates, wordlessly. And `runForeground` restored `fgOp.title` in a `finally` through the module variable: if the outer run finished first, the cleanup threw **instead of** whatever the inner run produced. It now holds a reference to its own operation.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

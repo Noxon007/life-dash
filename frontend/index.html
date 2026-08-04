@@ -2418,6 +2418,13 @@
                 Wohnort die übrigen dreizehn Tage füllen, du wärst also laut Statistik zu Hause.
                 Aufgeteilt stimmt es.</span>
               <div id="bl-list" style="margin-top:10px"></div>
+              <!-- Anmerkung 184: Beim Ändern trägt DASSELBE Formular die Werte.
+                   Ein zweites daneben wäre eine zweite Fassung derselben Regel
+                   (Anmerkung 106) — und die Ortswahl auf der Karte, an der hier
+                   das meiste hängt, gäbe es dann nur in einer der beiden.
+                   Diese Zeile sagt, welcher Zeitraum gerade gemeint ist; ohne
+                   sie sähe das gefüllte Formular aus wie ein neuer Eintrag. -->
+              <div id="bl-editing" class="hint" style="display:none; margin-top:10px"></div>
               <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end">
                 <label style="display:flex; flex-direction:column; gap:3px">
                   <span class="stat-label" data-i18n="bl.f.label">Bezeichnung</span>
@@ -2439,6 +2446,7 @@
                   <input id="bl-to" type="date">
                 </label>
                 <button class="btn" id="bl-add" data-i18n="bl.add">Zeitraum eintragen</button>
+                <button class="btn secondary" id="bl-cancel" style="display:none" data-i18n="bl.cancel">Abbrechen</button>
               </div>
               <div id="bl-result" class="hint action-result" style="display:none"></div>
             </div>
@@ -3041,10 +3049,17 @@ async function runForeground(title, fn, opts = {}) {
   // Verschachtelt: den laufenden Vorgang weiterbenutzen. Nur der Titel wird
   // übernommen, damit man sieht, woran es gerade hängt.
   if (fgOp) {
-    const prev = fgOp.title;
-    if (title) { fgOp.title = title; fgRender(fgOp); }
-    try { return await fn(fgOp); }
-    finally { fgOp.title = prev; fgRender(fgOp); }
+    // **Der äußere Lauf kann zu Ende sein, bevor der innere es ist.** Dann
+    // steht in `fgOp` null, und das Zurücksetzen des Titels warf — in einem
+    // `finally`, also ANSTELLE dessen, was `fn` ergeben hat: der Fehler des
+    // Aufräumens verdrängt das Ergebnis, und was der innere Lauf wirklich
+    // gemeldet hätte, sieht niemand mehr. Deshalb die feste Bezugnahme statt
+    // der Modulvariablen (aufgefallen beim Wächter zu Anmerkung 184).
+    const outer = fgOp;
+    const prev = outer.title;
+    if (title) { outer.title = title; fgRender(outer); }
+    try { return await fn(outer); }
+    finally { outer.title = prev; if (fgOp === outer) fgRender(outer); }
   }
   const ctl = typeof AbortController === 'function' ? new AbortController() : null;
   const op = {
@@ -3446,6 +3461,10 @@ const I18N_EN = {
   'bl.del.ask': "Remove this period? The place and every real entry stay.",
   'bl.added': "Period added — {n} days filled.",
   'bl.removed': "Period removed.",
+  // Anmerkung 184: nachträglich ändern
+  'bl.edit': "Edit", 'bl.cancel': "Cancel",
+  'bl.save': "Save changes", 'bl.editing': "You are editing: {n}",
+  'bl.saved': "Saved — {n} days filled.",
   'bl.need': "Place and start date are required.",
   'bl.nocoords': "no coordinates — the days count, but stay without weather.",
   'bl.wx.clear': "Discard day weather",
@@ -7667,6 +7686,11 @@ function renderStatsGaps(r) {
 function openBaselineFor(from, to) {
   gotoView('admin');
   showAdminTab('daten');
+  // Anmerkung 184: Eine Lücke ist immer ein NEUER Zeitraum. Stand das Formular
+  // gerade im Ändern-Modus, überschriebe der nächste Klick auf „speichern"
+  // sonst einen bestehenden Wohnort mit den Daten der Lücke — und zwar
+  // wortlos, weil das Formular danach genauso aussieht.
+  blResetForm();
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
   set('bl-from', from);
   set('bl-to', to);
@@ -12090,6 +12114,7 @@ function renderBaselines() {
       <div class="bar-label"><b>${esc(name)}</b>
         <span class="stat-label"> · ${esc(b.place)} · ${esc(fmtDay(b.date_start))} – ${esc(to)}</span>${nocoords}</div>
       <div class="bar-val">${esc(dayCount(b.day_count || 0))}</div>
+      <button class="btn" data-bl-edit="${esc(b.id)}">${esc(t('bl.edit', 'Ändern'))}</button>
       <button class="btn" data-bl-del="${esc(b.id)}">${esc(t('bl.del', 'Entfernen'))}</button>
     </div>`;
   }).join('')
@@ -12101,8 +12126,95 @@ function renderBaselines() {
         esc(t('bl.wx.clear', 'Tageswetter verwerfen'))}</button></div>` : '');
   box.querySelectorAll('[data-bl-del]').forEach(btn =>
     btn.addEventListener('click', () => removeBaseline(btn.dataset.blDel)));
+  box.querySelectorAll('[data-bl-edit]').forEach(btn =>
+    btn.addEventListener('click', () => editBaseline(btn.dataset.blEdit)));
   document.getElementById('bl-wx-clear')?.addEventListener('click', clearDayWeather);
+  // Der geänderte Zeitraum steht danach neu in der Liste — der Hinweis oben
+  // muss seinen neuen Namen tragen, sonst zeigt er auf die alte Bezeichnung.
+  blSyncEditHint();
 }
+
+// --------------------------------------------------------------------------- //
+// **Anmerkung 184 — einen Wohnort nachträglich ändern.**
+//
+// Gemeldet: „Wohnort bearbeitbar machen im Nachgang. Zumindest die
+// Bezeichnung, aber auch die Adresse; Zeitraum wird wahrscheinlich schwierig."
+//
+// Der Zeitraum ist der EINFACHSTE Teil, und das ist kein Zufall: genau dafür
+// ist F20 so gebaut. Die Tage sind nirgends gespeichert, also ist eine
+// Verschiebung ein geändertes Feld und keine tausend nachzuführenden Zeilen
+// (Anmerkung 144). `PATCH /api/baselines/{id}` gibt es seit F20 samt
+// Überschneidungsprüfung — es fehlte nur die Oberfläche dazu.
+//
+// **Zwei Fallen, und beide sind stumm:**
+//
+// 1. **Ein leeres „Bis" heißt zweierlei.** In JSON ist ein fehlendes Feld
+//    „unverändert lassen" und `null` genauso — deshalb hat der Endpunkt
+//    `clear_end`. Ohne dieses Feld behielte ein Zeitraum sein altes Ende, und
+//    das Formular zeigte „bis heute", während der Server etwas anderes weiß.
+//    Hier wird das Ende deshalb IMMER ausdrücklich geschickt.
+// 2. **Ein unveränderter Ort darf gar nicht mitgeschickt werden.** Sonst
+//    geocodiert der Server den Namen neu — und ein auf der Karte gewählter
+//    Punkt („das Elternhaus", eine Adresse, die Nominatim nicht kennt) würde
+//    beim Ändern der BEZEICHNUNG durch den Ortsmittelpunkt ersetzt. Der
+//    Zeitraum sähe unverändert aus und läge in der Stadtmitte.
+let BL_EDIT = null;              // Kennung des Zeitraums, der gerade bearbeitet wird
+let BL_EDIT_PLACE = '';          // sein Ortsname, wie er geladen wurde (siehe Falle 2)
+function editBaseline(id) {
+  const b = BASELINES.find(x => x.id === id);
+  if (!b) return;
+  BL_EDIT = id;
+  BL_EDIT_PLACE = b.place || '';
+  const set = (elId, v) => { const el = document.getElementById(elId); if (el) el.value = v; };
+  set('bl-label', b.label || '');
+  set('bl-place', BL_EDIT_PLACE);
+  set('bl-from', (b.date_start || '').slice(0, 10));
+  set('bl-to', (b.date_end || '').slice(0, 10));
+  // Eine Marke aus einer früheren Ortswahl gehört nicht zu diesem Zeitraum.
+  PICKED.delete('bl-place');
+  blSyncEditHint();
+  document.getElementById('bl-label')?.scrollIntoView?.({ block: 'center' });
+  document.getElementById('bl-label')?.focus();
+}
+// Aus dem Ändern zurück ins Eintragen. EINE Stelle, weil es drei Auslöser gibt
+// (Abbrechen, gespeichert, eine Lücke aus der Statistik übernommen) — und der
+// dritte ist der, den man vergisst: wer eine Lücke anklickt, während ein
+// Zeitraum in Bearbeitung ist, überschriebe sonst still den falschen.
+function blResetForm() {
+  BL_EDIT = null;
+  BL_EDIT_PLACE = '';
+  PICKED.delete('bl-place');
+  ['bl-label', 'bl-place', 'bl-from', 'bl-to'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  blSyncEditHint();
+}
+function blSyncEditHint() {
+  const hint = document.getElementById('bl-editing');
+  const add = document.getElementById('bl-add');
+  const cancel = document.getElementById('bl-cancel');
+  const row = BL_EDIT ? BASELINES.find(x => x.id === BL_EDIT) : null;
+  // Der bearbeitete Zeitraum kann inzwischen weg sein (gelöscht, oder in einem
+  // zweiten Fenster). Bliebe die Kennung stehen, ginge das nächste Speichern
+  // als PATCH an etwas, das es nicht mehr gibt — und die Antwort wäre ein 404
+  // auf ein Formular, an dem nichts falsch ist.
+  if (BL_EDIT && !row) { BL_EDIT = null; BL_EDIT_PLACE = ''; }
+  if (hint) {
+    hint.style.display = row ? '' : 'none';
+    if (row) {
+      hint.textContent = t('bl.editing', 'Du änderst: {n}')
+        .replace('{n}', row.label || row.place);
+    }
+  }
+  if (cancel) cancel.style.display = row ? '' : 'none';
+  // A40: Der Knopf muss sagen, was er tut. „Zeitraum eintragen" über einem
+  // gefüllten Formular legte scheinbar einen zweiten an — und das Ergebnis
+  // wäre eine Überschneidungsmeldung statt einer Erklärung.
+  if (add) add.textContent = row ? t('bl.save', 'Änderungen speichern')
+                                 : t('bl.add', 'Zeitraum eintragen');
+}
+document.getElementById('bl-cancel')?.addEventListener('click', () => blResetForm());
 async function removeBaseline(id) {
   if (!await uiConfirm(t('bl.del.ask',
       'Diesen Zeitraum entfernen? Der Ort und alle echten Einträge bleiben.'))) return;
@@ -12152,31 +12264,49 @@ document.getElementById('bl-add')?.addEventListener('click', async ev => {
     return;
   }
   const btn = ev.target;
+  const editing = BL_EDIT;
+  const to = document.getElementById('bl-to').value;
+  // Gerade hier zählt der gewählte Punkt am meisten: „das Elternhaus" hat oft
+  // keine Adresse, die Nominatim findet — und ohne Koordinate bekämen seine
+  // Tausende abgeleiteter Tage nie ein Wetter.
+  const pick = pickedFor('bl-place');
   btn.disabled = true;
   try {
-    const row = await api('/api/baselines', {
-      method: 'POST',
+    // Anmerkung 184, Falle 1: das Ende wird beim Ändern IMMER ausdrücklich
+    // gesagt. Ein weggelassenes Feld hieße „unverändert", und wer das Datum aus
+    // dem Feld löscht, meint „bis heute".
+    // Falle 2: den Ort nur mitschicken, wenn er wirklich ein anderer ist —
+    // sonst geocodiert der Server den unveränderten Namen neu und ersetzt einen
+    // gewählten Punkt durch den Ortsmittelpunkt.
+    const body = editing
+      ? {
+          date_start: from,
+          ...(to ? { date_end: to } : { clear_end: true }),
+          label: document.getElementById('bl-label').value.trim() || '',
+          ...(pick ? { place, lat: pick.lat, lng: pick.lng }
+                   : (place !== BL_EDIT_PLACE ? { place } : {})),
+        }
+      : {
+          place,
+          date_start: from,
+          date_end: to || null,
+          label: document.getElementById('bl-label').value.trim() || null,
+          lat: pick?.lat ?? null,
+          lng: pick?.lng ?? null,
+        };
+    const row = await api(editing ? `/api/baselines/${editing}` : '/api/baselines', {
+      method: editing ? 'PATCH' : 'POST',
       // `api()` setzt den Content-Type NICHT — jeder JSON-Aufruf hier setzt ihn
       // selbst. Ohne ihn schickt der Browser `text/plain`, FastAPI sieht keinen
       // JSON-Body und antwortet 422: eine Fehlermeldung, die auf das Formular
       // zeigt, obwohl am Formular nichts falsch ist.
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        place,
-        date_start: from,
-        date_end: document.getElementById('bl-to').value || null,
-        label: document.getElementById('bl-label').value.trim() || null,
-        // Gerade hier zählt der gewählte Punkt am meisten: „das Elternhaus" hat
-        // oft keine Adresse, die Nominatim findet — und ohne Koordinate
-        // bekämen seine Tausende abgeleiteter Tage nie ein Wetter.
-        lat: pickedFor('bl-place')?.lat ?? null,
-        lng: pickedFor('bl-place')?.lng ?? null,
-      }),
+      body: JSON.stringify(body),
     });
-    toast(t('bl.added', 'Zeitraum eingetragen — {n} Tage gefüllt.')
+    toast((editing ? t('bl.saved', 'Geändert — {n} Tage gefüllt.')
+                   : t('bl.added', 'Zeitraum eingetragen — {n} Tage gefüllt.'))
       .replace('{n}', (row.day_count || 0).toLocaleString(LOC())), 'ok', 6000);
-    ['bl-label', 'bl-place', 'bl-from', 'bl-to'].forEach(id =>
-      document.getElementById(id).value = '');
+    blResetForm();
     await loadBaselines();
     refreshAfterBaseline();
   } catch (err) { toast(err.message, 'error', 9000); }

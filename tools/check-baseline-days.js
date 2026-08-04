@@ -131,7 +131,17 @@ function makeDom(state) {
         const p = String(u);
         state.calls.push([(opt && opt.method) || 'GET', p]);
         if (opt && opt.method === 'POST') (state.posts || []).push({ url: p, opt });
+        // Anmerkung 184: das Ändern ist ein PATCH und muss deshalb eigens
+        // mitgeschrieben werden. In `state.posts` mitzuzählen hieße, dass
+        // „schickt das Formular einen POST?" auch dann grün wäre, wenn es
+        // beides tut — und ein zweiter, ungewollter Neu-Eintrag ist genau der
+        // Defekt, den die Prüfung finden soll.
+        if (opt && opt.method === 'PATCH') (state.patches || []).push({ url: p, opt });
         let body = [];
+        if (/\/api\/baselines\/[^/]+$/.test(p) && opt && opt.method === 'PATCH') {
+          return Promise.resolve({ ok: true, status: 200,
+                                   json: () => Promise.resolve({ id: 'b1', day_count: 2190 }) });
+        }
         if (/\/api\/baselines$/.test(p) && opt && opt.method === 'POST') {
           return Promise.resolve({ ok: true, status: 201,
                                    json: () => Promise.resolve({ id: 'b9', day_count: 2192 }) });
@@ -352,6 +362,119 @@ setTimeout(async () => {
        body && body.place === 'Bad Segeberg' && body.date_start === '1986-04-02'
        && body.date_end === '1992-08-31',
        JSON.stringify(body));
+    w.close();
+  }
+
+  // --- 2c. Anmerkung 184 — einen Wohnort nachträglich ändern ---------------
+  //
+  // Zwei der Zusagen hier sind gegen STILLE Defekte gerichtet, und beide sähe
+  // man dem Bildschirm nicht an:
+  //
+  //   * **Der unveränderte Ort darf nicht mitgeschickt werden.** Tut er es,
+  //     geocodiert der Server den Namen neu — und ein auf der Karte gewählter
+  //     Punkt („das Elternhaus") wird beim Ändern der BEZEICHNUNG durch den
+  //     Ortsmittelpunkt ersetzt. Das Formular sieht danach richtig aus.
+  //   * **Ein geleertes „Bis" muss `clear_end` schicken.** In JSON heißt ein
+  //     fehlendes Feld „unverändert"; ohne das eigene Feld behielte der
+  //     Zeitraum sein altes Ende, während das Formular „bis heute" zeigt.
+  {
+    const state = { calls: [], posts: [], patches: [] };
+    const w = makeDom(state).window, d = w.document;
+    await wait(200);
+    await w.loadBaselines();
+    await wait(60);
+
+    const editBtn = d.querySelector('[data-bl-edit]');
+    ok('Die Liste bietet einen Ändern-Knopf', !!editBtn,
+       'bis 0.39 war ein Wohnort nur eintragbar und entfernbar — eine '
+       + 'vertippte Bezeichnung bedeutete: löschen und neu anlegen');
+    editBtn.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    await wait(60);
+    ok('…und der Klick füllt DASSELBE Formular',
+       d.getElementById('bl-label').value === LABEL
+       && d.getElementById('bl-place').value === PLACE
+       && d.getElementById('bl-from').value === '1986-04-02'
+       && d.getElementById('bl-to').value === '1992-08-31',
+       [d.getElementById('bl-label').value, d.getElementById('bl-place').value,
+        d.getElementById('bl-from').value, d.getElementById('bl-to').value].join(' | '));
+    // Geprüft an der ANZEIGE: unter jsdom startet die Seite englisch, ein ins
+    // deutsche Markup gebauter Defekt erreichte die Zusicherung nie.
+    ok('…und sagt, welcher Zeitraum gemeint ist',
+       d.getElementById('bl-editing').style.display !== 'none'
+       && d.getElementById('bl-editing').textContent.includes(LABEL),
+       `„${d.getElementById('bl-editing').textContent}" — ein gefülltes `
+       + 'Formular ohne diesen Satz sieht aus wie ein neuer Eintrag');
+    ok('…und der Knopf heißt nicht mehr „eintragen"',
+       /Save|speichern/i.test(d.getElementById('bl-add').textContent),
+       `„${d.getElementById('bl-add').textContent}" — A40: ein Knopf muss `
+       + 'sagen, was er tut');
+
+    // Nur die Bezeichnung ändern — der Ort bleibt, wie er geladen wurde.
+    d.getElementById('bl-label').value = 'Elternhaus (neu)';
+    d.getElementById('bl-add').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    await wait(150);
+    const patch = (state.patches || [])[0];
+    ok('Speichern schickt einen PATCH auf DIESEN Zeitraum',
+       !!patch && /\/api\/baselines\/b1$/.test(patch.url),
+       `${JSON.stringify((state.patches || []).map(x => x.url))}`);
+    ok('…und legt keinen zweiten an',
+       !state.posts.some(p => /\/api\/baselines$/.test(p.url)),
+       'ein POST daneben hieße: der geänderte Zeitraum steht danach zweimal da, '
+       + 'und der Server meldete eine Überschneidung statt einer Erklärung');
+    let pb = null;
+    try { pb = JSON.parse(patch.opt.body); } catch (_) {}
+    ok('…mit der neuen Bezeichnung', pb && pb.label === 'Elternhaus (neu)',
+       JSON.stringify(pb));
+    ok('…und OHNE den unveränderten Ort', pb && pb.place === undefined
+       && pb.lat === undefined && pb.lng === undefined,
+       `${JSON.stringify(pb)} — mitgeschickt geocodiert der Server ihn neu, und `
+       + 'ein gewählter Punkt wird still durch den Ortsmittelpunkt ersetzt');
+    ok('…das Ende bleibt, wie es war', pb && pb.date_end === '1992-08-31'
+       && !pb.clear_end, JSON.stringify(pb));
+    ok('…und danach steht das Formular wieder auf „eintragen"',
+       d.getElementById('bl-editing').style.display === 'none'
+       && !d.getElementById('bl-label').value,
+       'bliebe es im Ändern-Modus, ginge der nächste neue Zeitraum als '
+       + 'Änderung an den alten');
+
+    // Zweite Runde: Ort ÄNDERN und das Ende leeren.
+    state.patches.length = 0;
+    d.querySelector('[data-bl-edit]').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    await wait(60);
+    d.getElementById('bl-place').value = 'Detmold';
+    d.getElementById('bl-to').value = '';
+    d.getElementById('bl-add').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    await wait(150);
+    let pb2 = null;
+    try { pb2 = JSON.parse(state.patches[0].opt.body); } catch (_) {}
+    ok('Ein GEÄNDERTER Ort geht mit', pb2 && pb2.place === 'Detmold',
+       JSON.stringify(pb2));
+    ok('…und ein geleertes „Bis" sagt ausdrücklich `clear_end`',
+       pb2 && pb2.clear_end === true && pb2.date_end === undefined,
+       `${JSON.stringify(pb2)} — ohne das Feld heißt „nicht mitgeschickt" `
+       + 'unverändert, und der Zeitraum behielte sein altes Ende, während das '
+       + 'Formular „bis heute" zeigt');
+
+    // Abbrechen führt zurück ins Eintragen — und eine Lücke aus der Statistik
+    // ebenfalls, sonst überschriebe sie den gerade bearbeiteten Zeitraum.
+    d.querySelector('[data-bl-edit]').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    await wait(60);
+    d.getElementById('bl-cancel').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    await wait(60);
+    ok('Abbrechen räumt das Formular', !d.getElementById('bl-label').value
+       && d.getElementById('bl-editing').style.display === 'none'
+       && !/Save|speichern/i.test(d.getElementById('bl-add').textContent),
+       [d.getElementById('bl-label').value,
+        d.getElementById('bl-add').textContent].join(' | '));
+    d.querySelector('[data-bl-edit]').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    await wait(60);
+    w.openBaselineFor('2001-01-01', '2001-12-31');
+    await wait(60);
+    ok('Eine übernommene Lücke bricht das Ändern ab',
+       d.getElementById('bl-editing').style.display === 'none'
+       && d.getElementById('bl-from').value === '2001-01-01',
+       'sonst ginge der nächste Klick auf „speichern" an den bearbeiteten '
+       + 'Wohnort — mit den Daten der Lücke, und wortlos');
     w.close();
   }
 
