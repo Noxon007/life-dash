@@ -76,8 +76,35 @@ function makeDom(state) {
     runScripts: 'dangerously', pretendToBeVisual: true, url: 'http://localhost:8000/',
     beforeParse(w) {
       w.matchMedia = () => ({ matches: false, addEventListener() {}, addListener() {} });
+      // **Das Leaflet-Doppel muss `layerGroup` wirklich können.** Ein
+      // Auffang-Proxy gibt für JEDE Eigenschaft sich selbst zurück — auch für
+      // `getLayers().length`, und dann ist „wie viele Objekte hat die Ebene?"
+      // keine Zahl, sondern der Proxy. Eine Zusicherung darüber prüfte nichts
+      // (dieselbe Falle wie beim `getZoom()`-Doppel, Anmerkung 120).
+      const group = () => {
+        const layers = [];
+        const g = {
+          addTo: () => g, clearLayers: () => { layers.length = 0; return g; },
+          getLayers: () => layers, addLayer: (x) => { layers.push(x); return g; },
+          _push: (x) => layers.push(x),
+        };
+        return g;
+      };
+      const shape = () => {
+        const s = {
+          addTo: (g) => { if (g && g._push) g._push(s); return s; },
+          bindPopup: () => s, bindTooltip: () => s, setRadius: () => s, on: () => s,
+        };
+        return s;
+      };
       const base = new Proxy(function () { return base; }, {
-        get: (_t, k) => (k === 'getZoom' ? () => 6 : base), apply: () => base,
+        get: (_t, k) => {
+          if (k === 'getZoom') return () => 6;
+          if (k === 'layerGroup' || k === 'featureGroup') return group;
+          if (k === 'circleMarker' || k === 'marker') return shape;
+          return base;
+        },
+        apply: () => base,
       });
       w.L = base;
       w.fetch = (u, opt) => {
@@ -91,7 +118,11 @@ function makeDom(state) {
         }
         if (/\/api\/baselines$/.test(p)) {
           return Promise.resolve({ ok: true, status: 200,
-                                   json: () => Promise.resolve([]) });
+            json: () => Promise.resolve(state.noBaseline ? [] : [{
+              id: 'b1', label: LABEL, place: PLACE, city: 'Bad Segeberg',
+              country: 'Deutschland', lat: 53.93, lng: 10.31,
+              date_start: '1986-04-02', date_end: '1992-08-31',
+              day_count: 2190 }]) });
         }
         if (/days\/baseline/.test(p)) {
           const [from, to] = span(p);
@@ -108,6 +139,13 @@ function makeDom(state) {
           body = (day >= from && day <= to)
             ? { [day]: { values: { temp_min_c: TEMP, temp_max_c: TEMP }, regions: 1 } }
             : {};
+        } else if (/events\/map/.test(p)) {
+          body = { total: 1, shown: 1, photos: { places: [], cats: [], points: [] },
+                   events: [{ id: 'm1', title: 'Einschulung', category: 'milestone',
+                              date_start: `${ENTRY_DAY}T09:00:00`,
+                              date_precision: 'day', source: 'manual',
+                              location: { id: 'l1', name: 'Schule',
+                                          lat: 53.9, lng: 10.3 } }] };
         } else if (/days\/media/.test(p)) body = {};
         else if (/events\/index/.test(p)) {
           body = { total: 1, dated: 1, undated: 0, unconfirmed: 0, fuzzy: 0,
@@ -266,6 +304,69 @@ setTimeout(async () => {
        body && body.place === 'Bad Segeberg' && body.date_start === '1986-04-02'
        && body.date_end === '1992-08-31',
        JSON.stringify(body));
+    w.close();
+  }
+
+  // --- 2c. Auf der Karte: EIN Zeichen je Zeitraum ---------------------------
+  //
+  // Sechs Jahre Elternhaus sind 2 190 abgeleitete Tage an EINER Koordinate.
+  // Sie einzeln zu zeichnen ergäbe zweitausend deckungsgleiche Punkte — keine
+  // Karte, sondern ein Punkt mit Gewicht. Die Zahl gehört ins Popup.
+  //
+  // Und: der Zeitraum muss ÜBERSCHNEIDEN, nicht enthalten sein. 1986–1992
+  // gehört in jede Jahresansicht dazwischen, nicht nur in seine Ränder — das
+  // ist der Fehler, den ein `>=`/`<=` an der falschen Seite macht.
+  {
+    const state = { calls: [], posts: [] };
+    const w = makeDom(state).window;
+    await wait(200);
+    await w.openMapView();
+    await wait(120);
+
+    const drawn = k => {
+      w.eval(`mpDrawBaselines(${k === null ? 'null' : JSON.stringify(k)})`);
+      return w.eval('mapBaseline.getLayers().length');
+    };
+    ok('Ein Zeichen je Zeitraum, nicht je Tag', drawn('1989') === 1,
+       `${drawn('1989')} Objekte für 2 190 abgeleitete Tage`);
+    ok('…auch mitten im Zeitraum (Überschneidung, nicht Enthaltensein)',
+       drawn('1990-06') === 1, 'ein Jahr innerhalb der Spanne muss ihn zeigen');
+    ok('…und außerhalb steht keins', drawn('2020') === 0);
+    // **Nicht `mpDrawBaselines` selbst aufrufen.** Im ersten Anlauf stand hier
+    // `drawn(null) >= 0` — trivial wahr, und geprüft wurde die Funktion statt
+    // ihres Aufrufs: nimmt man den Aufruf aus dem leeren Zweig heraus, bleibt
+    // die Zusicherung grün (Anmerkung 108, und der `check-a41-cities.js`-Fall
+    // in seiner reinsten Form). Geprüft wird deshalb über `renderPeriod` mit
+    // LEERER Karte — und das ist gerade der Normalfall für einen Grundort:
+    // ein Zeitraum, in dem nichts erfasst wurde, hat keine verorteten
+    // Ereignisse und trotzdem einen Ort.
+    w.eval('mp.located = []; rebuildPeriods(); renderPeriod();');
+    await wait(60);
+    ok('Ohne verortete Ereignisse zeichnet die Ansicht die Ebene trotzdem',
+       w.eval('mapBaseline.getLayers().length') === 1,
+       `${w.eval('mapBaseline.getLayers().length')} — ein Zeichenaufruf hinter `
+       + 'einem `return` ist die Sorte Ebene, die in einer der Ansichten still fehlt');
+
+    // Und derselbe Weg mit PUNKTEN auf der Karte: der Normalzweig von
+    // `renderPeriod` muss die Ebene ebenso zeichnen. Ohne diesen Fall prüfen
+    // die Zusicherungen oben nur, dass es `mpDrawBaselines` GIBT — nimmt man
+    // den Aufruf dort heraus, bleiben sie grün (Anmerkung 108, drittes Mal in
+    // dieser Datei).
+    await w.mpLoadPoints(true);   // die Prüfung davor hat sie geleert
+    // **Die Ebene VORHER leeren.** Sonst steht das Zeichen aus dem vorigen
+    // Aufruf noch da, und die Zusicherung ist auch dann grün, wenn
+    // `renderPeriod` gar nichts zeichnet — genau der Fall, den sie prüfen soll.
+    w.eval('mapBaseline.clearLayers();');
+    w.eval("mp.mode = 'all'; mp.density = 'point'; rebuildPeriods(); renderPeriod();");
+    await wait(80);
+    ok('…und mit Punkten auf der Karte ebenso',
+       w.eval('mp.located.length') > 0
+       && w.eval('mapBaseline.getLayers().length') === 1,
+       `Punkte: ${w.eval('mp.located.length')}, Grundort-Zeichen: `
+       + `${w.eval('mapBaseline.getLayers().length')}`);
+
+    w.eval('mp.showBaseline = false;');
+    ok('Der Schalter blendet sie aus', drawn('1989') === 0);
     w.close();
   }
 

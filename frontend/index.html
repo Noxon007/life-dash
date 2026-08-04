@@ -1373,6 +1373,11 @@
                    Eintrag in der Lebensdatenbank, sondern ein Beleg dafür,
                    dass jemand dort war — und es sind zu viele, um sie
                    ungefragt einzublenden. -->
+              <!-- F20 auf der Karte: der Grundort ist eine EBENE wie die
+                   anderen — „woher kommt, was hier liegt?". Eigene Marke, weil
+                   das, was sie zeigt, weder erfasst noch importiert ist,
+                   sondern gefolgert. -->
+              <span class="filter-chip active" id="mp-baseline-toggle" data-i18n-title="map.baseline.tip" title="Deine Grundort-Zeiträume — ein Zeichen je Zeitraum, dort wo du in dieser Zeit normalerweise warst. Abgeleitet, nicht erfasst."><span class="fdot" style="background:var(--text-dim); border:1px dashed var(--text)"></span><span data-i18n="map.baseline">🏠 Grundort</span></span>
               <span class="filter-chip off" id="mp-photos-toggle" data-i18n-title="map.photos.tip" title="Jedes Foto mit Koordinaten als eigener Punkt — dort, wo es aufgenommen wurde. Muss zuerst unter „Meine Daten → Immich“ verortet werden."><span class="fdot" style="background:var(--photo-dot)"></span><span data-i18n="map.photos">📷 Fotos</span></span>
               <!-- A40 (Anm. 92): gemessene Wege gegen gedachte Verbindung —
                    die beiden hießen bis 0.33 beide „Route“. Das Sinnbild ist
@@ -3104,6 +3109,8 @@ const I18N_EN = {
   'bl.card.tip': "Derived from your baseline location — there is no entry on this day.",
   'tl.bl.capped': "Showing {n} of {m} derived baseline days, spread evenly across the period.",
   'tl.agg.derived': "derived",
+  'map.baseline': "🏠 Baseline", 'map.bl.derived': "derived",
+  'map.baseline.tip': "Your baseline periods — one mark per period, where you normally were during that time. Derived, not recorded.",
   // F21 (Anmerkung 145) — die Lücken-Ansicht
   'stats.tab.gaps': "🕳️ Gaps",
   'gaps.fail': "The gaps could not be computed.",
@@ -7882,6 +7889,10 @@ function startVoice() {
 
 // ---------- KARTE ----------
 let mapObj = null, mapMarkers = null, mapCluster = null, mapRoute = null, mapTracks = null;
+// F20: eigene Ebene für den Grundort. Erst beim Aufbau der Karte angelegt
+// wie die anderen — ein `L.layerGroup()` beim Laden des Skripts hinge an
+// keiner Karte und zeichnete nie.
+let mapBaseline = null;
 // A45/Anmerkung 153: Die Fotopunkte liegen in einem eigenen Layer mit EINER
 // Leinwand (`PHOTO_DOT_LAYER`) — kein LayerGroup mit einem Objekt je Foto.
 // **Anmerkung 160 — `condense` ist weg, `density` ist da.**
@@ -7910,6 +7921,9 @@ const mp = { mode: 'day', periods: [], index: 0, showRoute: true, showTracks: tr
   // ausblenden" sinnlos (das IST die Liste), auf einer Karte mit 6.000
   // importierten Besuchen ist es die nützlichste Ansicht überhaupt.
   showManual: true, showVisits: true, visitTotal: 0,
+  // F20: eigene Ebene, eigener Schalter — sie zeigt weder Erfasstes noch
+  // Importiertes, sondern Gefolgertes.
+  showBaseline: true,
   // A45 — Fotopunkte als eigene Ebene. `showPhotos` ist bewusst AUS: bei
   // zwanzig Jahren Bibliothek sind das zehntausende Marker, und wer die Karte
   // öffnet, will zuerst seine Ereignisse sehen. `total` ist die Zahl aus dem
@@ -8187,6 +8201,86 @@ async function mpEnsureWeather(key, items) {
   }
 }
 
+
+// --------------------------------------------------------------------------- //
+// F20 auf der Karte — der Grundort als eigene Ebene
+// --------------------------------------------------------------------------- //
+// **EIN Zeichen je ZEITRAUM, nicht je Tag.** Sechs Jahre Elternhaus sind 2 190
+// abgeleitete Tage an EINER Koordinate; sie einzeln zu zeichnen ergäbe
+// zweitausend deckungsgleiche Punkte — keine Karte, sondern ein Punkt mit
+// Gewicht. Die Zahl der Tage gehört deshalb ins Popup und nicht auf die
+// Leinwand. (Der Zeitstrahl macht es umgekehrt und aus demselben Grund richtig:
+// er ist eine Liste von TAGEN, die Karte eine von ORTEN.)
+//
+// Die Zeiträume kommen aus `/api/baselines` — dieselbe Liste, die das Formular
+// unter „Meine Daten" führt, mit Koordinate, Spanne und Tageszahl. Ein eigener
+// Kartenabruf wäre eine zweite Quelle für dieselbe Handvoll Zeilen.
+let MP_BASELINES = null;
+async function mpLoadBaselines(force) {
+  if (MP_BASELINES && !force) return MP_BASELINES;
+  try { MP_BASELINES = await api('/api/baselines'); }
+  catch (_) { MP_BASELINES = null; }   // Fehlschlag nicht merken (wie mpLoadPoints)
+  return MP_BASELINES;
+}
+
+// Die Grenzen des gerade gezeigten Zeitraums als ISO-Tage — abgeleitet aus dem
+// Schlüssel, den `periodKey` gebaut hat. Eine zweite Fassung dieser Zuordnung
+// wäre die Doppelregel, an der die Karte schon einmal hing (Anmerkung 106);
+// deshalb liest diese Funktion denselben Schlüssel, statt sich aus den
+// Ereignissen einen eigenen Zeitraum zu bauen.
+function mpPeriodRange(key) {
+  if (!key || key === 'alle') return ['0000-01-01', '9999-12-31'];
+  let m;
+  if ((m = key.match(/^(\d{4})-(\d{2})-(\d{2})$/))) return [key, key];
+  if ((m = key.match(/^(\d{4})-W(\d{2})$/))) {
+    // ISO-Woche: der Donnerstag entscheidet, in welchem Jahr sie liegt.
+    const jan4 = new Date(Date.UTC(+m[1], 0, 4));
+    const mon = new Date(jan4);
+    mon.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() + 6) % 7) + (+m[2] - 1) * 7);
+    const sun = new Date(mon);
+    sun.setUTCDate(mon.getUTCDate() + 6);
+    return [mon.toISOString().slice(0, 10), sun.toISOString().slice(0, 10)];
+  }
+  if ((m = key.match(/^(\d{4})-(\d{2})$/))) {
+    const last = new Date(Date.UTC(+m[1], +m[2], 0)).getUTCDate();
+    return [`${m[1]}-${m[2]}-01`, `${m[1]}-${m[2]}-${String(last).padStart(2, '0')}`];
+  }
+  if ((m = key.match(/^(\d{4})$/))) return [`${key}-01-01`, `${key}-12-31`];
+  if ((m = key.match(/^(\d{3}0)$/))) return [`${key}-01-01`, `${+key + 9}-12-31`];
+  return ['0000-01-01', '9999-12-31'];
+}
+
+function mpDrawBaselines(key) {
+  if (!mapBaseline) return 0;
+  mapBaseline.clearLayers();
+  if (!mp.showBaseline || !MP_BASELINES || !MP_BASELINES.length) return 0;
+  const [from, to] = mpPeriodRange(key);
+  const rows = MP_BASELINES.filter(b => b.lat != null && b.lng != null
+    // Überschneidung, nicht Enthaltensein: ein Zeitraum von 1986 bis 1992
+    // gehört in JEDE Jahresansicht dazwischen, nicht nur in seine Ränder.
+    && b.date_start <= to && (b.date_end || '9999-12-31') >= from);
+  rows.forEach(b => {
+    const name = b.label || b.place;
+    const span = `${fmtDay(b.date_start)} – ${b.date_end ? fmtDay(b.date_end)
+      : t('bl.until', 'heute')}`;
+    // Gestrichelt und in der gedämpften Textfarbe — dieselbe Bildsprache wie
+    // die abgeleitete Zeile im Zeitstrahl. Was gefolgert ist, soll nicht
+    // aussehen wie etwas, das jemand erfasst hat.
+    L.circleMarker([b.lat, b.lng], {
+      radius: 11, weight: 2, dashArray: '3 3',
+      color: getComputedStyle(document.documentElement)
+        .getPropertyValue('--text-dim').trim() || '#888',
+      fillOpacity: 0.12, renderer: mpCanvas(),
+    }).bindPopup(
+      `<b>${esc(name)}</b><br>${esc(b.place)}<br>`
+      + `<span class="stat-label">${esc(span)} · ${
+        esc(dayCount(b.day_count || 0))} ${
+        esc(t('map.bl.derived', 'abgeleitet'))}</span>`
+    ).addTo(mapBaseline);
+  });
+  return rows.length;
+}
+
 // Holt die Kartenpunkte. Anmerkung 139: der Foto-Schalter geht MIT — ein
 // ausgeschalteter Schalter soll zehntausende Punkte gar nicht erst über die
 // Leitung schicken, und ein eingeschalteter braucht sie vollständig.
@@ -8270,6 +8364,10 @@ async function openMapView() {
   // Anmerkung 135: wie im Zeitstrahl — unbestätigte Google-/Immich-Vorschläge
   // sind Beleg, kein Ereignis, und tauchen erst nach der Moderation auf.
   await mpLoadPoints();
+  // F20: die Grundort-Zeiträume — eine Handvoll Zeilen, aus derselben Liste
+  // wie das Formular unter „Meine Daten". Sie kommen VOR dem ersten Zeichnen,
+  // sonst fehlt die Ebene beim Öffnen und erscheint erst beim nächsten Klick.
+  await mpLoadBaselines();
   // Wie viele Foto-Ereignisse es ÜBERHAUPT gibt — das entscheidet, ob der
   // Foto-Schalter etwas bewirken kann (A40).
   await ensurePhotoIndex();
@@ -8291,6 +8389,7 @@ async function openMapView() {
     if (mapCluster) mapCluster.addTo(mapObj);
     mapRoute = L.layerGroup().addTo(mapObj);
     mapTracks = L.layerGroup().addTo(mapObj);
+    mapBaseline = L.layerGroup().addTo(mapObj);   // F20
     // Anmerkung 153: Die Fotopunkte haben keinen LayerGroup mehr, sondern einen
     // eigenen Layer mit EINER Leinwand (siehe `PHOTO_DOT_LAYER`). Er wird beim
     // ersten Zeichnen angelegt und hängt sich selbst ein; die Punktgröße
@@ -8555,6 +8654,7 @@ function renderPeriod() {
     // Ansicht auf dem Stand von vorhin stehen.
     mpSyncTrackChip();
     mpDrawPhotos([]);
+    mpDrawBaselines(null);
     mpCapNote(0, 0);
     mpPhotoNote(null);
     setLabel(t('mp.nolocated', 'keine verorteten Events'));
@@ -8586,6 +8686,11 @@ function renderPeriod() {
   // Zeichenaufruf hinter einem `return` ist genau die Sorte Ebene, die in
   // einer der drei Ansichten still fehlt (A45).
   mpDrawPhotos(photos);
+  // Wie die Foto-Ebene: IMMER hier, vor jeder Verzweigung in Bündelung,
+  // Cluster oder Stufe. Sie hat mit alldem nichts zu tun, und ein
+  // Zeichenaufruf hinter einem `return` ist genau die Sorte Ebene, die in
+  // einer der Ansichten still fehlt (A45).
+  mpDrawBaselines(key);
   mpPhotoNote(mp.mapTotal > mp.mapShown
     ? { total: mp.mapTotal, shown: mp.mapShown } : null);
   // ══════════════════════════════════════════════════════════════════════
@@ -9133,6 +9238,12 @@ document.getElementById('mp-route-toggle').addEventListener('click', function ()
   renderPeriod();
 });
 // Anmerkung 160 — die beiden Quellen-Schalter der Karte.
+document.getElementById('mp-baseline-toggle')?.addEventListener('click', function () {
+  mp.showBaseline = !mp.showBaseline;
+  this.classList.toggle('active', mp.showBaseline);
+  this.classList.toggle('off', !mp.showBaseline);
+  renderPeriod();
+});
 document.getElementById('mp-manual-toggle').addEventListener('click', function () {
   mp.showManual = !mp.showManual;
   mpSyncSourceChips();
@@ -10586,6 +10697,9 @@ async function clearDayWeather() {
 // und täten nichts, während die Seite vollständig aussieht.
 function refreshAfterBaseline() {
   TL_BASELINE.clear();
+  // Die Karte hält die Zeiträume in einer eigenen Liste — ohne das Vergessen
+  // zeigte sie den Stand von vor der Änderung und sähe dabei vollständig aus.
+  MP_BASELINES = null;
   statsTopsFor = null;
   // F21: Ein neuer Grundort SCHLIESST Lücken — die Ansicht, die sie zeigt, ist
   // damit die erste, die falsch steht. Ohne dieses Vergessen hätte man gerade

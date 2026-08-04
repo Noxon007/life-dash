@@ -36,6 +36,13 @@ any `MINOR`.
   quietly reporting a smaller number as if it were the whole story.
   “Longest gap” in the rankings is now the first row of that list — the same
   computation, so the two can no longer disagree at the edges.
+- **Baseline periods show on the map too**, as their own layer with its own
+  switch (🏠 Baseline). **One mark per period, not per day** — six years at your
+  parents' house are two thousand derived days at a single coordinate, and
+  drawing them individually would be a dot with weight rather than a map; the
+  number of days is in the popup. A period appears in every view its span
+  overlaps, dashed and muted, so what was inferred never looks like something
+  you recorded.
 - **A baseline location for the years you never recorded.** Under *My data →
   Baseline location* you enter a period and a place — “from my birth until 2006
   I was at my parents' house in Bad Segeberg”. Every day in that period that has

@@ -91,6 +91,23 @@ OFFENEN Fragen (144–147). Anmerkungen stehen in der Reihenfolge, in der sie
 AUFKAMEN, nicht in der sie gebaut wurden — Neues wird angehängt, auch wenn
 davor noch Offenes steht.
 
+**Grundort auf der Karte (2026-08-03, nachgereicht):** eigene Ebene, eigener
+Schalter (🏠), **EIN Zeichen je ZEITRAUM, nicht je Tag** — sechs Jahre
+Elternhaus sind 2.190 abgeleitete Tage an EINER Koordinate; einzeln gezeichnet
+wären das zweitausend deckungsgleiche Punkte, also ein Punkt mit Gewicht statt
+einer Karte. Die Tageszahl gehört ins Popup. **Der Zeitstrahl macht es
+umgekehrt und aus demselben Grund richtig: er ist eine Liste von TAGEN, die
+Karte eine von ORTEN.** Gezeigt wird bei ÜBERSCHNEIDUNG, nicht bei
+Enthaltensein (1986–1992 gehört in jede Jahresansicht dazwischen). Die
+Zeiträume kommen aus `/api/baselines` — dieselbe Liste wie das Formular.
+**Drei Wächter-Zusicherungen waren dabei aus dem falschen Grund grün**
+(Anm. 108): zwei riefen `mpDrawBaselines` selbst auf statt zu prüfen, ob
+`renderPeriod` es TUT, und eine sah ein Zeichen, das aus dem vorigen Aufruf
+stehen geblieben war. Dazu: das Leaflet-Doppel war ein Auffang-Proxy und gab
+für `getLayers().length` sich selbst zurück — „wie viele Objekte hat die
+Ebene?" war damit keine Zahl (dieselbe Falle wie beim `getZoom()`-Doppel,
+Anm. 120).
+
 **F21 gebaut (2026-08-03, Anmerkung 145) — die Lückenprüfung. Direkt hinter
 F20, auf `main`.** Vierte Statistik-Ansicht neben Zahlen · Diagrammen ·
 Ranglisten: **„wo weiß ich gar nichts?"** — die einzige Frage, die eine
