@@ -112,7 +112,16 @@
     padding: 0 12px 20px;
     letter-spacing: -0.3px;
   }
-  .logo .dot { width: 12px; height: 12px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+  /* Anmerkung 180: Das Zeichen statt eines Punktes. Der Punkt war eine
+     Platzhalter-Marke — hübsch, aber austauschbar; er sagte über die Sache
+     nichts. Die eigenen Ecken bleiben (`rx` im Zeichen selbst), damit die
+     Marke in der Leiste wie das Programmsymbol aussieht und nicht wie eine
+     ausgeschnittene Zeichnung. */
+  .logo .mark { width: 26px; height: 26px; flex-shrink: 0; display: block; }
+  .login-box .logo .mark { width: 34px; height: 34px; }
+  /* Die Wabe als Beizeichen — überall dort, wo eine leere Sammlung anfängt.
+     Gedämpft, weil sie eine Illustration ist und keine Auskunft. */
+  .comb-mark { width: 72px; height: 72px; display: block; margin: 0 auto 12px; opacity: .55; }
   .nav-item {
     display: flex;
     align-items: center;
@@ -1054,10 +1063,57 @@
 </style>
 </head>
 <body>
+  <!-- ══════════════════════════════════════════════════════════════════════
+       Anmerkung 180 — das Zeichen (Zeichenwahl vom 2026-08-04, Entwurf 06/23)
+       ══════════════════════════════════════════════════════════════════════
+       Die Biene sammelt, legt in Zellen ab und teilt im Tanz mit, WO etwas
+       war — die drei Sätze, die auch dieses Werkzeug beschreiben. Die Wabe
+       ist ihr Gegenstück: die Sammlung als Form, gefüllte und leere Zellen
+       nebeneinander. Sie tritt nur dort auf, wo es um das GESAMMELTE geht;
+       ein zweites Hauptzeichen wäre kein Zeichen mehr.
+
+       EINMAL definiert und über `<use>` benutzt: zwei Kopien desselben SVG
+       hätten zwei Verlaufs-Kennungen, und die zweite gewinnt still — der
+       Klassiker bei inline eingebetteten Grafiken. Die Dateien daneben
+       (`icon.svg`, `icon-maskable.svg`, `icon-comb.svg`) sind dieselben
+       Zeichen für alles außerhalb dieser Seite (PWA, Browser-Reiter).
+       ══════════════════════════════════════════════════════════════════════ -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="brand-g" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#5b8cff"/><stop offset="1" stop-color="#35c4a7"/>
+      </linearGradient>
+      <clipPath id="brand-bee-clip"><ellipse cx="64" cy="80" rx="24" ry="30"/></clipPath>
+      <symbol id="brand-bee" viewBox="0 0 128 128">
+        <rect width="128" height="128" rx="28" fill="#0f1420"/>
+        <ellipse cx="34" cy="50" rx="19" ry="11" fill="#5b8cff" opacity=".5" transform="rotate(-30 34 50)"/>
+        <ellipse cx="94" cy="50" rx="19" ry="11" fill="#5b8cff" opacity=".5" transform="rotate(30 94 50)"/>
+        <path d="M54 26 L48 14 M74 26 L80 14" stroke="url(#brand-g)" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="64" cy="40" r="15" fill="url(#brand-g)"/>
+        <ellipse cx="64" cy="80" rx="24" ry="30" fill="url(#brand-g)"/>
+        <g clip-path="url(#brand-bee-clip)">
+          <rect x="36" y="62" width="56" height="9" fill="#0f1420"/>
+          <rect x="36" y="80" width="56" height="9" fill="#0f1420"/>
+          <rect x="36" y="98" width="56" height="9" fill="#0f1420"/>
+        </g>
+      </symbol>
+      <symbol id="brand-comb" viewBox="0 0 128 128">
+        <g stroke="var(--bg)" stroke-width="2.5">
+          <path d="M64 44 L81 54 L81 74 L64 84 L47 74 L47 54 Z" fill="url(#brand-g)"/>
+          <path d="M29.4 44 L46.4 54 L46.4 74 L29.4 84 L12.4 74 L12.4 54 Z" fill="#2b3550"/>
+          <path d="M98.6 44 L115.6 54 L115.6 74 L98.6 84 L81.6 74 L81.6 54 Z" fill="#5b8cff"/>
+          <path d="M46.7 14 L63.7 24 L63.7 44 L46.7 54 L29.7 44 L29.7 24 Z" fill="#4aa8d8"/>
+          <path d="M81.3 14 L98.3 24 L98.3 44 L81.3 54 L64.3 44 L64.3 24 Z" fill="#2b3550"/>
+          <path d="M46.7 74 L63.7 84 L63.7 104 L46.7 114 L29.7 104 L29.7 84 Z" fill="#35c4a7"/>
+          <path d="M81.3 74 L98.3 84 L98.3 104 L81.3 114 L64.3 104 L64.3 84 Z" fill="#2b3550"/>
+        </g>
+      </symbol>
+    </defs>
+  </svg>
   <!-- LOGIN (nur AUTH_MODE=oidc) -->
   <div class="login-overlay" id="login-overlay">
     <div class="login-box">
-      <div class="logo"><span class="dot"></span> Life-Dash</div>
+      <div class="logo"><svg class="mark" viewBox="0 0 128 128"><use href="#brand-bee"/></svg> Life-Dash</div>
       <!-- OIDC/SSO -->
       <div id="login-sso">
         <!-- A27: kein hart verdrahteter Provider-Name — kommt aus der Config -->
@@ -1205,7 +1261,7 @@
        Leiste bleiben (plus „Mehr"). Am Schreibtisch ändert die Klasse nichts —
        dort stehen weiterhin alle neun untereinander. -->
   <nav class="sidebar">
-    <div class="logo"><span class="dot"></span> Life-Dash</div>
+    <div class="logo"><svg class="mark" viewBox="0 0 128 128"><use href="#brand-bee"/></svg> Life-Dash</div>
     <div class="nav-item nav-primary active" data-view="today"><span class="ico">🕰️</span> <span class="lbl" data-i18n="nav.today">Heute</span></div>
     <div class="nav-item nav-primary" data-view="timeline"><span class="ico">📅</span> <span class="lbl" data-i18n="nav.timeline">Zeitstrahl</span></div>
     <div class="nav-item nav-primary" data-view="map"><span class="ico">🗺️</span> <span class="lbl" data-i18n="nav.map">Karte</span></div>
@@ -6738,8 +6794,16 @@ async function loadCompendium(type) {
   catch { items = []; }
   if (!items.length) {
     compSortBar(false);
-    grid.innerHTML = `<div class="hint">${t('comp.empty',
-      'Für diese Kategorie gibt es noch keine Einträge.')}</div>`;
+    // Anmerkung 180: Hier passt die Wabe — eine Sammlung, in der noch keine
+    // Zelle gefüllt ist. Sie steht als Bild und nicht als Auskunft; der Satz
+    // darunter sagt weiterhin, was Sache ist.
+    // Über die ganze Breite: der Behälter ist ein Raster, und zwei einzelne
+    // Kinder wären zwei Zellen nebeneinander statt eines leeren Zustands.
+    grid.innerHTML = `<div style="grid-column:1/-1; padding:28px 0">`
+      + `<svg class="comb-mark" viewBox="0 0 128 128" aria-hidden="true">`
+      + `<use href="#brand-comb"/></svg>`
+      + `<div class="hint" style="text-align:center">${t('comp.empty',
+      'Für diese Kategorie gibt es noch keine Einträge.')}</div></div>`;
     return;
   }
   compSortBar(true);

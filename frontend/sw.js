@@ -14,8 +14,12 @@
 // ohne Netz überhaupt öffnen lassen — auch unter `/share`, wohin das
 // Teilen-Menü navigiert, und mit `?view=input` aus der Verknüpfung. Beide
 // Adressen stehen in keinem Cache, deshalb der Navigations-Rückfall unten.
-const CACHE = "lifedash-shell-v2";
-const SHELL = ["/", "/index.html", "/manifest.json", "/icon.svg", "/icon-maskable.svg"];
+// v3 (Anmerkung 180): das Zeichen ist neu. Ohne den Sprung behielte jeder,
+// der die App schon einmal geöffnet hat, das alte Symbol — der Shell-Cache
+// liefert es aus, und zwar so lange, bis dieser Name sich ändert.
+const CACHE = "lifedash-shell-v3";
+const SHELL = ["/", "/index.html", "/manifest.json", "/icon.svg", "/icon-maskable.svg",
+               "/icon-comb.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)));

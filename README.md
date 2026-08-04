@@ -1,7 +1,26 @@
+<img src="frontend/icon.svg" alt="" width="88" align="right">
+
 # Life-Dash
 
 Your searchable personal life database — memories, places, trips, concerts and
 more, as a responsive PWA with AI-assisted capture and search.
+
+### Why a bee
+
+A honeybee **forages** — it goes out and brings something back. It **stores what
+it brings in cells**, one at a time, and the comb keeps them long after the trip
+is over. And when it returns it **dances the location**: direction and distance
+to the place it just came from, told to everyone else in the hive.
+
+Foraging, storing in cells, and saying *where* — that is the whole program. It
+collects what you write down and what your phone recorded, it keeps each of them
+as its own record instead of blending them into a summary, and its two main
+views are a timeline and a map.
+
+The **honeycomb** ([`frontend/icon-comb.svg`](frontend/icon-comb.svg)) is the
+companion mark: seven cells, some filled and some not. It stands for the
+collection rather than the collecting, so it appears where the app talks about
+what has been gathered — never as a replacement for the bee.
 
 - **Deployment:** [docs/DEPLOY.md](docs/DEPLOY.md)
 - **All settings:** [.env.example](.env.example)
