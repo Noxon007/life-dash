@@ -256,9 +256,24 @@ class EventGeo(BaseModel):
     weather: dict | None = None
 
 
+class DayCount(BaseModel):
+    """Wie viele TAGE ein Jahr beisteuert — für die abgeleiteten Grundort-Tage."""
+    year: int
+    count: int
+
+
 class YearCount(BaseModel):
     year: int
     count: int
+    # Anmerkung 179: dieselbe Zahl, aufgeteilt nach dem, was die Oberfläche
+    # ein- und ausblenden kann. Ohne die Aufteilung stünde am Jahr 2016 „4.812
+    # Einträge", und wer die automatisch erfassten ausgeblendet hat, klickt es
+    # auf und findet drei — genau die stille Falschaussage, gegen die A40 und
+    # Anmerkung 92 gebaut sind. Der Zeitstrahl rechnet sich seine Zahl aus
+    # `manual` plus dem, was gerade eingeblendet ist.
+    manual: int = 0     # weder Google-Besuch noch Immich-Foto
+    visits: int = 0     # google_timeline
+    photos: int = 0     # immich
 
 
 class EventsIndex(BaseModel):
@@ -312,7 +327,13 @@ class EventsIndex(BaseModel):
     # und Abgeleitetes vermischt, kann keine Ansicht mehr auseinanderhalten
     # (Anmerkung 143 in seiner allgemeinen Form).
     baseline_days: int = 0
-    baseline_years: list[YearCount] = []
+    # Anmerkung 179: eigene Form, nicht `YearCount`. Seit dieser Anmerkung
+    # trägt ein Jahres-Eintrag der EREIGNISSE die Aufteilung „von Hand /
+    # importiert / Fotos" — auf abgeleitete TAGE lässt sich davon kein einziges
+    # Feld anwenden, und drei Nullen daneben behaupteten, es gäbe hier nichts
+    # Importiertes, statt zu sagen, dass die Frage nicht gilt. Es ist genau die
+    # Trennung, die zwei Zeilen weiter oben schon steht (Anmerkung 143).
+    baseline_years: list[DayCount] = []
 
 
 # --------------------------------------------------------------------------- #

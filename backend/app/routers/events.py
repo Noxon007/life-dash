@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import case
 from sqlalchemy import false as sa_false
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, selectinload
@@ -16,8 +17,8 @@ from app.database import get_db
 from app.models import (ConfirmState, DatePrecision, Event, EventEntityLink,
                         Location, Metric, Source, User)
 from app.routers._serialize import EAGER, EAGER_SLIM, event_to_read
-from app.schemas import (EventGeo, EventManualCreate, EventRead, EventsIndex,
-                         LocationGeo, OnThisDayGroup, YearCount)
+from app.schemas import (DayCount, EventGeo, EventManualCreate, EventRead,
+                         EventsIndex, LocationGeo, OnThisDayGroup, YearCount)
 from app.services import baseline, visitsplit
 from app.services.immich_link import MACHINE_SOURCES
 from app.services.photo_points import asset_of as photo_asset_of
@@ -986,10 +987,19 @@ def events_index(
     hier kostet drei Aggregat-Abfragen statt einer vollen Liste; der Heute-
     Reiter holt seine drei Kacheln aus derselben Antwort."""
     year = func.extract("year", Event.date_start)
-    rows = (db.query(year.label("y"), func.count(Event.id))
+    # Anmerkung 179: die Jahreszahlen kommen aufgeteilt nach dem, was der
+    # Zeitstrahl ein- und ausblenden kann — in EINER Abfrage, mit bedingten
+    # Summen statt drei Durchgängen. `case` gibt es in beiden Dialekten; die
+    # Summe kann NULL sein (leere Gruppe), deshalb `or 0` beim Auspacken.
+    def _when(src):
+        return func.sum(case((Event.source == src, 1), else_=0))
+    machine = _when(Source.google_timeline), _when(Source.immich)
+    rows = (db.query(year.label("y"), func.count(Event.id), *machine)
             .filter(Event.user_id == user.id, Event.date_start.isnot(None))
             .group_by("y").order_by("y").all())
-    years = [YearCount(year=int(y), count=n) for y, n in rows]
+    years = [YearCount(year=int(y), count=n, visits=int(v or 0), photos=int(p or 0),
+                       manual=n - int(v or 0) - int(p or 0))
+             for y, n, v, p in rows]
     dated = sum(y.count for y in years)
     total = (db.query(func.count(Event.id))
              .filter(Event.user_id == user.id).scalar() or 0)
@@ -1083,7 +1093,7 @@ def events_index(
         year_max=years[-1].year if years else None,
         years=years,
         baseline_days=b_counts["total"],
-        baseline_years=[YearCount(year=int(y), count=n)
+        baseline_years=[DayCount(year=int(y), count=n)
                         for y, n in sorted(b_counts["years"].items())],
         # F17 fährt hier mit: das Geburtsdatum kommt aus einem Meilenstein, der
         # in aller Regel außerhalb der geladenen Seiten liegt. Der Zeitstrahl

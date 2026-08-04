@@ -3178,6 +3178,11 @@ const I18N_EN = {
   // Anmerkung 178: die Zahlen AUF den Ebenen-Schaltern meinen den gezeigten
   // Zeitraum, der Bestand steht daneben im Titel.
   'map.n.total': "In the whole database: {n}",
+  // Anmerkung 179 — die Sammel-Ansichten kommen aus dem Index
+  'tl.year.pending': "not loaded yet",
+  'tl.year.tip': "Click to fetch this year",
+  'tl.year.loading': "Fetching {y} …",
+  'tl.end.index': "Every year of your story is listed above — one click fetches its entries.",
   'map.tracks.n': "tracks travelled",
   'map.baseline.n': "baseline",
   'map.baseline.none': "No baseline location entered yet — the form is under “My data”.",
@@ -5025,6 +5030,12 @@ async function loadTimeline(more = false) {
     // außerhalb der geladenen Seiten liegt — es kommt aus dem Index.
     fetchIndex().then(idx => {
       BIRTH_DATE = idx.birth ? new Date(idx.birth.date_start) : null;
+      // Anmerkung 179: die Verteilung über die Jahre — der Zeitstrahl baut
+      // seine Sammel-Ansichten daraus, statt sie aus der geladenen Seite zu
+      // schätzen. Ein `renderTimeline()` hinterher, weil dieser Abruf
+      // absichtlich NICHT abgewartet wird (er hängt sonst an der Seite).
+      TL_INDEX_YEARS = idx.years || [];
+      if (tl.zoom === 'year' || tl.zoom === 'decade') renderTimeline();
       TL_VISIT_COUNT = idx.visits || 0;
       TL_PENDING_COUNT = idx.machine_proposals || 0;
       // A47: Die Stufe „Ortsteil" liest `Location.address`, und die gibt es
@@ -5157,8 +5168,17 @@ function tlVisibleCount() {
 // Gedeckelt, damit ein Filter, der gar nichts trifft, nicht die ganze
 // Datenbank in Einzelseiten nachholt — dann bleibt der Knopf im Fuß.
 const TL_AUTO_PAGES = 5;
+// **Anmerkung 179: Blättern ist nur noch in den Detail-Zoomstufen der Weg in
+// die Vergangenheit.** In Jahr und Jahrzehnt steht sie vollständig da — jedes
+// Jahr, das es gibt, mit seiner echten Zahl aus dem Index. Eine nachgeladene
+// Seite brächte dort nichts Neues auf den Schirm, sondern füllte nur Zeilen,
+// die schon sichtbar sind: hundert Anfragen für null zusätzliche Überschriften.
+function tlSkeletonMode() {
+  return (tl.zoom === 'year' || tl.zoom === 'decade')
+    && !tl.query && !tl.day && !tl.city && TL_INDEX_YEARS.length > 0;
+}
 function tlEnsureVisible() {
-  if (tl.loading || tl.done || tl.query) return;
+  if (tl.loading || tl.done || tl.query || tlSkeletonMode()) return;
   if (tlVisibleCount() >= 12 || tl.autoPages >= TL_AUTO_PAGES) return;
   tl.autoPages++;
   loadTimeline(true);
@@ -5178,7 +5198,7 @@ function tlRefilter() {
 document.querySelector('.content').addEventListener('scroll', ev => {
   const box = ev.target;
   if (!document.getElementById('view-timeline').classList.contains('active')) return;
-  if (tl.loading || tl.done || tl.query) return;
+  if (tl.loading || tl.done || tl.query || tlSkeletonMode()) return;
   if (box.scrollTop + box.clientHeight >= box.scrollHeight - 600) loadTimeline(true);
 });
 function renderTimeline() {
@@ -5464,6 +5484,7 @@ function renderTimelineList() {
     if (!groups[g.key]) groups[g.key] = { key: g.key, label: g.label, sort: g.sort, items: [] };
     groups[g.key].items.push(e);
   });
+  tlIndexSkeleton(groups);
   // A5 (Besuchs-Verdichtung): Wiederholte Google-Besuche desselben Orts
   // innerhalb einer Zeitgruppe zu EINER Sammelkarte bündeln („59× Besuch: X")
   // — sonst füllen Alltagsorte (Zuhause/Arbeit) die 25er-Kappe komplett.
@@ -5481,7 +5502,7 @@ function renderTimelineList() {
     // Monat; F18/A45/compressVisits laufen erst beim Aufklappen — auf dieser
     // Ebene reicht die Zahl, nicht die Karte.
     if ((tl.zoom === 'year' || tl.zoom === 'decade') && g.key !== 'unbekannt') {
-      g.agg = tlAggBuckets(g.items, tl.zoom === 'year' ? 'month' : 'year');
+      g.agg = tlMergeIndexRows(g, tlAggBuckets(g.items, tl.zoom === 'year' ? 'month' : 'year'));
       return;
     }
     g.items = compressVisits(g.items);
@@ -5570,6 +5591,115 @@ function renderTimelineList() {
 // Eimer zur gewohnten Detailansicht — EIN Foto-Streifen für die ganze Spanne,
 // wie im echten Monats-Zoom.
 const TL_AGG_GROUPS = [];   // Index -> { items, unit, label }
+
+// --------------------------------------------------------------------------- //
+// **Anmerkung 179 — die Sammel-Ansichten kommen aus dem INDEX, nicht aus der
+// geladenen Seite.**
+// --------------------------------------------------------------------------- //
+// Gemeldet: „ältere Einträge laden finde ich schwierig umgesetzt. man kann
+// nicht einfach runterscrollen und es dauert alles lange."
+//
+// Gemessen (`tools/measure-timeline.js`) war die erste Hälfte davon NICHT das,
+// was ich vermutet hatte: im Jahres-Zoom — der Voreinstellung — besteht die
+// ganze Liste aus 24 Knoten und ist in 4 ms gebaut. Genau das IST das Problem.
+// Eine Seite sind 300 Ereignisse; bei einem Bestand mit importierten Besuchen
+// deckt sie ein paar Tage ab und wird zu einer einzigen Zeile „Dezember 2026".
+// Die Seite ist damit zu kurz zum Scrollen (der Nachlade-Auslöser 600 px vor
+// dem Ende feuert nie), `tlEnsureVisible` hört nach fünf Seiten auf, und wer
+// bis 2004 will, drückt „▼ Ältere Einträge laden" hundertmal — für jedes Mal
+// eine Anfrage über 300 Zeilen, die eine Überschrift ergeben.
+//
+// **Die Verteilung über die Jahre steht seit A37 im Index.** Sie ist drei
+// Aggregat-Abfragen, kostet nichts und ist VOLLSTÄNDIG. Der Zeitstrahl hat sie
+// bis hier nur für die Kacheln benutzt und seine eigenen Überschriften weiter
+// aus dem Fenster geschätzt — die Zahl, die alles weiß, lag neben der Ansicht,
+// die nichts weiß (dieselbe Form wie Anmerkung 167 auf der Karte).
+//
+// Jetzt: Jahr und Jahrzehnt zeigen SOFORT jedes Jahr, das es gibt, mit seiner
+// echten Zahl. Geladen wird beim Aufklappen, und zwar genau die Spanne, die
+// aufgeklappt wurde — statt sich Seite um Seite dorthin zu blättern.
+let TL_INDEX_YEARS = [];
+// Wie viele Einträge ein Jahr beisteuert — je nachdem, was gerade eingeblendet
+// ist. Ohne diese Rechnung stünde am Jahr 2016 „4.812", und wer die automatisch
+// erfassten ausgeblendet hat, klappt es auf und findet drei: die stille
+// Falschaussage aus Anmerkung 92, nur eine Ebene höher.
+function tlYearCount(y) {
+  return (y.manual || 0)
+    + (tlShowsSource('google_timeline') ? (y.visits || 0) : 0)
+    + (tlShowsSource('immich') ? (y.photos || 0) : 0);
+}
+// Das Gerüst: für jedes Jahr des Index eine Gruppe, auch wenn davon nichts
+// geladen ist. Bei einer Suche oder einem gesetzten Tag-/Stadtfilter NICHT —
+// das sind Auswahlen über EINTRÄGE, und der Index kennt sie nicht; ein Gerüst
+// aus allen Jahren behauptete dort Treffer, die es nicht gibt.
+function tlIndexSkeleton(groups) {
+  if (tl.query || tl.day || tl.city) return;
+  if (tl.zoom !== 'year' && tl.zoom !== 'decade') return;
+  TL_INDEX_YEARS.forEach(y => {
+    const n = tlYearCount(y);
+    if (!n) return;
+    const key = tl.zoom === 'year' ? String(y.year)
+                                   : String(Math.floor(y.year / 10) * 10);
+    if (!groups[key]) {
+      groups[key] = {
+        key, items: [],
+        label: tl.zoom === 'year' ? key : `${key}${t('date.decade.suffix', 'er')}`,
+        sort: +key,
+      };
+    }
+    (groups[key].indexYears || (groups[key].indexYears = [])).push(y);
+  });
+}
+// Die Zeilen einer Sammelgruppe: was geladen ist, kommt als gewohnter Eimer;
+// was der Index kennt und die Seite nicht, als Zeile mit echter Zahl und dem
+// Vermerk, dass sie erst geholt wird. Beides in EINER Liste, chronologisch —
+// zwei Listen untereinander wären zwei Zeitachsen in einer Ansicht.
+function tlMergeIndexRows(g, buckets) {
+  if (!g.indexYears || !g.indexYears.length) return buckets;
+  const loaded = new Set(buckets.map(b => b.key));
+  const rows = [...buckets];
+  g.indexYears.forEach(y => {
+    // Im Jahres-Zoom sind die Eimer MONATE — ein Jahr, von dem irgendein Monat
+    // geladen ist, hat schon Zeilen; die fehlenden Monate kennt der Index
+    // nicht, und eine Zeile „der Rest von 2016" wäre eine Spanne, die man
+    // nicht anfassen kann. Deshalb greift der Nachtrag nur für Jahre, von
+    // denen GAR NICHTS geladen ist.
+    const key = String(y.year);
+    if (tl.zoom === 'year' ? rows.length : loaded.has(key)) return;
+    rows.push({ key, unit: 'year', label: key, sort: y.year, items: [],
+                pending: { year: y.year, count: tlYearCount(y) } });
+  });
+  return rows.sort((a, b) => b.sort - a.sort);
+}
+// Ein Jahr nachholen, das nur der Index kannte. Gezielt über `from`/`to` statt
+// über Seiten — das ist der ganze Unterschied: eine Anfrage für das, was man
+// aufgeklappt hat, gegen hundert Anfragen auf dem Weg dorthin.
+// Wie viele Zeilen ein aufgeklapptes Jahr höchstens bringt. Der Server
+// verdichtet vorher (A39/A47), ein volles Jahr importierter Besuche wird damit
+// zu ein paar hundert Sammelkarten — der Deckel ist der Notnagel für den Fall,
+// dass jemand die Verdichtung ausgeschaltet hat. Weniger als die Serverobergrenze
+// (5.000), damit nicht der Server ablehnt, sondern wir deckeln.
+const TL_YEAR_MAX = 3000;
+async function tlLoadYear(year) {
+  const known = new Set(tl.events.map(e => e.id));
+  const rows = await runForeground(
+    t('tl.year.loading', '{y} wird geholt …').replace('{y}', year),
+    () => fetchEvents({
+      limit: TL_YEAR_MAX, offset: 0, machine_proposals: 0,
+      visits: tlShowsSource('google_timeline') ? 1 : 0,
+      photos: tlShowsSource('immich') ? 1 : 0,
+      group: tl.level, condense: 1,
+      from: `${year}-01-01T00:00:00`, to: `${year}-12-31T23:59:59`,
+    }), { cancellable: false });
+  // Angehängt und nicht ersetzt: die geladenen Seiten bleiben, wo sie sind.
+  // Die Kennung entscheidet, was neu ist — eine verdichtete Sammelkarte hat
+  // keine, die bringt der Server je Abruf frisch mit.
+  tl.events = tl.events.concat(rows.filter(e => !e.id || !known.has(e.id)));
+  await loadDayMedia(rows);
+  await loadDayWeather(rows);
+  renderTimeline();
+}
+
 function tlAggBuckets(items, unit) {
   const buckets = new Map();
   const pad = n => String(n).padStart(2, '0');
@@ -5600,6 +5730,25 @@ function tlAggTopPlace(items) {
 }
 function aggRowCard(bucket) {
   const idx = TL_AGG_GROUPS.push(bucket) - 1;
+  // **Anmerkung 179: die Zeile, die der Index kennt und die Seite nicht.**
+  // Sie sieht aus wie ihre Geschwister und sagt trotzdem, was sie ist — die
+  // Zahl kommt aus dem Server und stimmt, die Karten dahinter kommen beim
+  // Aufklappen. Eine Zeile ohne diesen Vermerk wäre eine Behauptung darüber,
+  // was hier steht, bevor jemand nachgesehen hat.
+  if (bucket.pending) {
+    return `
+    <div class="event-card" data-agg-group="${idx}" title="${esc(
+      t('tl.year.tip', 'Klicken, um dieses Jahr zu holen'))}">
+      <div class="ev-head">
+        <span class="ev-title">▸ ${esc(bucket.label)}</span>
+      </div>
+      <div class="ev-meta">
+        <span class="chip">${bucket.pending.count.toLocaleString(LOC())} ${
+          esc(t('tl.agg.events', 'Ereignisse'))}</span>
+        <span class="chip">${esc(t('tl.year.pending', 'noch nicht geladen'))}</span>
+      </div>
+    </div>`;
+  }
   const days = new Set(bucket.items.map(e => (e.date_start || '').slice(0, 10))).size;
   const place = tlAggTopPlace(bucket.items);
   // F20: Ein abgeleiteter Grundort-Tag zählt als TAG, aber nicht als Ereignis.
@@ -5646,6 +5795,13 @@ document.getElementById('timeline-list').addEventListener('click', ev => {
   if (!row) return;
   const bucket = TL_AGG_GROUPS[+row.dataset.aggGroup];
   if (!bucket) return;
+  // Anmerkung 179: Eine Zeile, die nur der Index kennt, holt erst ihr Jahr —
+  // danach ist sie eine gewöhnliche Sammelzeile und klappt wie jede andere auf.
+  if (bucket.pending) {
+    tlLoadYear(bucket.pending.year)
+      .catch(err => { if (!isAbort(err)) toast(err.message, 'error'); });
+    return;
+  }
   row.outerHTML = bucket.unit === 'year'
     ? tlAggBuckets(bucket.items, 'month').map(aggRowCard).join('')
     : tlAggDetailHtml(bucket.items);
@@ -5688,6 +5844,13 @@ function tlFooter() {
   if (tl.done) {
     return bl + `<div class="hint" style="text-align:center">${
       t('tl.end', 'Das ist der Anfang deiner Geschichte.')}</div>`;
+  }
+  // Anmerkung 179: In Jahr und Jahrzehnt steht oben schon alles. Ein Knopf
+  // „Ältere Einträge laden" darunter wäre ein Angebot, das nichts Neues bringt
+  // — und genau der Knopf, den hundertmal zu drücken die Beschwerde war.
+  if (tlSkeletonMode()) {
+    return bl + `<div class="hint" style="text-align:center">${
+      esc(t('tl.end.index', 'Jedes Jahr deiner Geschichte steht oben — ein Klick holt seine Einträge.'))}</div>`;
   }
   return bl + `<div class="hint" id="tl-load-more" style="text-align:center; cursor:pointer">${
     tl.loading ? t('tl.loading', 'Lade …') : t('tl.more', '▼ Ältere Einträge laden')}</div>`;
