@@ -16,6 +16,23 @@ any `MINOR`.
 ## [Unreleased]
 
 ### Added
+- **The timeline lists every year of your life at once.** In the *Year* and
+  *Decade* views you no longer page your way backwards: every year that has
+  anything in it is listed straight away, with its real count, and clicking one
+  fetches exactly that year. Before, a page was 300 entries — which, after a
+  timeline import, covers a few days and produces a single heading, so the list
+  stayed too short to scroll and reaching 2004 meant pressing “load older
+  entries” a hundred times. The count beside each year matches what you have
+  switched on: hide the automatically recorded entries and the year says how
+  many are left, not how many exist. Paging still works exactly as before in
+  *Day*, *Week* and *Month*, where there is no such overview to build.
+- **The baseline location can be switched off in the timeline.** Until now the
+  derived days were always there — in a year without any entries the timeline
+  consisted of nothing else, and there was no handle. The switch sits with the
+  categories, in the timeline and on the map, and says how many days it is
+  contributing. Both views now have the same three groups of controls
+  (*Layers*, *How dense*, *Categories*) instead of one flat row of chips in one
+  and a tidy panel in the other.
 - **Place names in Greek or Cyrillic script are now written out in Latin
   letters.** OpenStreetMap only has a German or English name for the well-known
   places; a lane on Antipaxos or a chapel near Gaios has just its local name,
@@ -161,6 +178,23 @@ any `MINOR`.
   and your longest recorded trip.
 
 ### Fixed
+- **“Today” opens right away.** The greeting, the tiles and the first-entry form
+  are there immediately; the “On this day” look-back fills itself in underneath
+  and says so while it works, instead of holding the whole first view of the app
+  behind a progress panel. The look-back itself also got much faster — measured
+  at 20,000 entries with imported visits included, it went from 852 ms to 79 ms
+  for exactly the same result. It was loading every multi-day entry in the
+  database in full in order to throw almost all of them away again.
+- **The mouse pointer changes over clickable points on the map.** Entries and
+  photos are drawn on a single canvas — that is what made twenty thousand of
+  them possible at all — but a canvas brings no cursor with it, so thousands of
+  points gave no hint that they could be opened. Clicking and pointing now use
+  the same hit test, so the pointer changes exactly where the click lands.
+- **“Delete all my data” shows what it is doing.** It cleared tens of thousands
+  of rows while the button just said “… running”. It now uses the same progress
+  panel as everything else. It cannot be cancelled, on purpose: cancelling would
+  only stop your browser waiting — the server would keep deleting, and you would
+  be looking at data that no longer exists.
 - **“Delete all my data” and “Delete all data” actually delete now.** Both
   returned a server error, and the log said the data was gone while it was still
   there — the deletion stopped halfway on a table nobody had listed, and
@@ -237,6 +271,37 @@ any `MINOR`.
   change.
 
 ### Changed
+- **A new mark: a bee.** It forages, stores what it brings in cells, and dances
+  the location of where it has just been — collecting, keeping each thing as its
+  own record, and saying *where*. The honeycomb beside it stands for the
+  collection rather than the collecting and turns up where the app talks about
+  what has been gathered. Both are explained in the README. If your browser or
+  phone still shows the old symbol, it is coming from the offline cache and will
+  be replaced on the next visit.
+- **The map's layer buttons count the period you are looking at.** They used to
+  name the whole database — “🛰️ 13,291 auto-detected”, in a month that holds
+  forty of them. Each button now says how much of its layer is on the map right
+  now; the total is still there, in the tooltip. A layer you have switched off
+  reads zero, because that is how much of it you are seeing.
+- **The map starts by showing everything.** Every point on its own instead of
+  merged bubbles, all layers and categories on, photos included — and the
+  connecting line between places *off*, because over a thousand points it is a
+  tangle rather than a route. Photos were off by default because they used to be
+  tens of thousands of individual map markers; they have been drawn on a single
+  canvas for a while now, so the reason had gone and only the habit was left.
+  Everything is still one click away, and a choice you make is remembered.
+- **The first-entry form asks for your place of birth, not your home town.** A
+  home town is a period of time, and periods of time belong to the baseline
+  location, which has proper from/to dates and a view of its own — as a dateless
+  milestone it landed nowhere in the timeline and counted as a “move” in the
+  statistics. Date and place of birth now make **one** entry, because that is
+  what they are.
+- **Long-running actions show their numbers everywhere.** The weather run, the
+  place-name run, the AI passes and the recompute already knew how far along
+  they were; they only ever told the button, which is the one thing you do not
+  look at while waiting. They now use the same panel as the timeline import:
+  bar, “34,523 / 39,662”, an estimate, and a line saying what is happening.
+  Switching an admin tab or a view shows what it is fetching, too.
 - **Both delete buttons ask for the same word.** “My data” wanted `LOESCHEN`,
   “System” wanted `LÖSCHEN`. Both now ask for the word in your interface
   language — `LÖSCHEN` in German, `DELETE` in English — and the server accepts

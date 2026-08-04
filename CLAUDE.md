@@ -21,7 +21,7 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI,
-  Geocoding aus) — 667 Tests, ~21 s, SQLite im Arbeitsspeicher
+  Geocoding aus) — 691 Tests, ~17 s, SQLite im Arbeitsspeicher
 - **Tests gegen echtes PostgreSQL** (das, worauf betrieben wird): `pwsh
   tools/pg-test.ps1` — **kein Docker**, legt mit den installierten Binärdateien
   einen eigenen Cluster in `backend/_pgtest/` auf Port **55432** an und stoppt
@@ -34,12 +34,16 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
   der Server?) statt auf `pg_ctl` — das beendet sich auf Windows nicht
   verlässlich, und der gestartete Server erbt die Ausgabekanäle: hängt stdout an
   einer Pipe, bleibt der Lauf nach erfolgreichem Start stumm stehen.
-- Wächter: `cd tools` → `npm run check` (36 jsdom-Dateien)
+- Wächter: `cd tools` → `npm run check` (38 jsdom-Dateien)
 - **Smoke gegen ein HTTP-Doppel** (Immich): `<python> tools/immich_double.py &`
   dann `<python> tools/smoke_a45.py` — findet, was Unit-Tests prinzipiell nicht
   können (Blättern, Zeitzonen, echte DTOs). Immer aus dem Wurzelverzeichnis.
 - **API-Kosten messen** statt raten: `<python> tools/_measure_api.py` legt
   20.000 Ereignisse an und misst die Endpunkte
+- **Zeitstrahl messen**: `node tools/measure-timeline.js` — Aufbauzeit und
+  Knotenzahl je nachgeladener Seite, für alle drei Zoomstufen. Der Kopf der
+  Datei trägt die zuletzt gemessenen Zahlen; der nächste Umbau wird daran
+  gemessen und nicht an einem Gefühl (Anmerkung 179).
 - **CI** (`.github/workflows/tests.yml`): bei jedem Push/PR pytest auf SQLite
   *und* PostgreSQL plus die Wächter. Bewusst ohne Pfadfilter und ohne
   `cancel-in-progress`: ein übersprungener Test sieht aus wie ein bestandener.
@@ -73,10 +77,11 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
   moderation, tracks = Timeline-Import + Ortsnamen, jobs = Hintergrund-Worker
   mit Lock pro Typ, admin, data = Export/Import, auth, baselines, world,
   achievements) · `services/` (ingestion, enrichment = Wetter, geocode =
-  Nominatim/LocationIQ mit 429-Backoff, weather = Open-Meteo, baseline, gaps,
+  Nominatim/LocationIQ mit 429-Backoff, translit = Umschrift Griechisch/
+  Kyrillisch für Ortsnamen, weather = Open-Meteo, baseline, gaps,
   weather_day, stats_*) · `data/countries.py` (passt zu
   `frontend/world-countries.geojson`)
-- `frontend/index.html`: EIN File (CSS+HTML+JS, ~7.500 Zeilen) — **gezielt per
+- `frontend/index.html`: EIN File (CSS+HTML+JS, ~13.000 Zeilen) — **gezielt per
   Grep und Read mit offset/limit lesen, nie komplett**
 - Module deklarativ: `backend/modules/*.yaml`
 - **Nicht im Einsatz, obwohl das alte Konzept sie nannte:** PostGIS, pgvector,
@@ -202,13 +207,23 @@ Stufen), P3.1, P5.1 und F1. Offen bis 1.0 sind nur noch **R1** (Demo-Modus,
 Härtung, Projektoberfläche) und **R2** (Doku-Seite) — Einzelheiten in
 `ROADMAP.md`.
 
-**Offen aus der Rückmeldung vom 2026-08-04** (Anmerkungen 168–172 sind erledigt):
-Der **LCP-Wert der Vektorkarte** (>4,9 s beim Wechsel auf Woche/Monat) ist NICHT
-behoben — nur der `styleimagemissing`-Fehler daneben. Der Moduswechsel baut die
-Basisebene nicht neu, eine offensichtliche Ursache steht nicht im Code; es fehlt
-eine Messung im Browser des Users (welches Element markiert das Performance-Panel
-als LCP?). Ebenfalls offen: die **Wahl des neuen Zeichens** (Icon), Vorschläge
-liegen als Mockup vor.
+**Offen aus den Rückmeldungen vom 2026-08-04** (Anmerkungen 168–180 sind
+erledigt, die zweite Rückmeldung mit elf Punkten vollständig):
+
+- Der **LCP-Wert der Vektorkarte** (>4,9 s beim Wechsel auf Woche/Monat) ist
+  NICHT behoben — nur der `styleimagemissing`-Fehler daneben. Der Moduswechsel
+  baut die Basisebene nicht neu, eine offensichtliche Ursache steht nicht im
+  Code; es fehlt eine Messung im Browser des Users (welches Element markiert das
+  Performance-Panel als LCP?).
+- **Zeitstrahl im Tages-Zoom**: jede nachgeladene Seite baut die GANZE Liste neu
+  — gemessen 26 ms bei 300 Karten, 172 ms bei 1.800, also mit jeder Seite mehr
+  (`node tools/measure-timeline.js`). Anmerkung 179 hat den gemeldeten Fall
+  (Jahr/Jahrzehnt) über den Index gelöst; dieser hier ist bewusst stehen
+  geblieben, weil der Umbau (Gruppen einzeln ersetzen statt `innerHTML`) an den
+  index-basierten Registern `VISIT_GROUPS`/`TL_STRIP_MEDIA` hängt.
+- **Das Zeichen ist gewählt** (Anmerkung 180): Biene als Hauptzeichen, Wabe als
+  Beizeichen. Erledigt, hier nur noch als Hinweis, dass die Frage keine offene
+  mehr ist.
 
 **Doku-Umbau 2026-08-04.** `KONZEPT.md` ist aufgelöst: was das System IST steht
 in `ARCHITECTURE.md`, was OFFEN ist in `ROADMAP.md`, die geschlossenen Kapitel
