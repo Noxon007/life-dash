@@ -1341,13 +1341,84 @@
           <div class="zoom-btn active" data-zoom="year" data-i18n="zoom.year">Jahr</div>
           <div class="zoom-btn" data-zoom="decade" data-i18n="zoom.decade">Jahrzehnt</div>
         </div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:-8px 0 20px">
-          <div class="filter-chips" id="tl-filters" style="margin:0"></div>
+        <!-- ══════════════════════════════════════════════════════════════
+             **Anmerkung 178 — Karte und Zeitstrahl beantworten dieselben
+             Fragen und stellten sie verschieden.**
+
+             Hier stand EINE lange Zeile: Kategorien, Stadt- und Tagfilter,
+             zwei Ebenen-Schalter, ein Auswahlfeld und vier Werkzeuge — alles
+             als Chips nebeneinander, also alles gleich wichtig aussehend. Die
+             Karte hatte diese Aufräumung mit Anmerkung 160 schon bekommen
+             („Ebenen" = woher kommt es, „Wie dicht" = wie wird es
+             zusammengefasst, „Kategorien" = was ist es). Es sind dieselben
+             drei Fragen, also ist es dieselbe Leiste.
+
+             Was der Zeitstrahl NICHT bekommt: „Von Hand" (das IST die Liste —
+             ein Schalter, der sie leerte, wäre kein Angebot) und „Wege" (ein
+             Zeitstrahl zeichnet keine Linien). Ein Bedienelement, das nichts
+             tun kann, gehört nicht hin — auch nicht der Symmetrie zuliebe.
+             ══════════════════════════════════════════════════════════════ -->
+        <div class="map-filters" id="tl-filters-box">
+          <div class="filter-group">
+            <label data-i18n="map.layers">Ebenen</label>
+            <div class="filter-chips">
+              <span class="filter-chip off" id="tl-visits-toggle" data-i18n-title="tl.visits.tip" title="Automatisch erfasste Einträge (Google-Besuche, Immich-Fototage) im Zeitstrahl anzeigen — auf der Karte sind sie immer sichtbar" data-i18n="tl.visits.chip">🛰️ Automatisch erfasst</span>
+              <!-- A45: Fotopunkte als eigene, ausblendbare Ebene — genau wie die
+                   importierten Besuche daneben, und aus demselben Grund: es sind
+                   zu viele, um sie ungefragt in den Zeitstrahl zu kippen. -->
+              <span class="filter-chip off" id="tl-photos-toggle" data-i18n-title="tl.photos.tip" title="Verortete Fotos als eigene Zeilen im Zeitstrahl, je Tag und Ort zusammengefasst — muss zuerst unter „Meine Daten → Immich“ verortet werden" data-i18n="tl.photos">📷 Fotos</span>
+              <!-- Anmerkung 135: unbestätigte Google-/Immich-Vorschläge sind
+                   Beleg, kein Ereignis — sie stehen nicht mehr zwischen den
+                   bestätigten Karten. Dieser Hinweis sagt, dass es sie gibt, und
+                   führt zu ihrer Liste (Moderation), statt es zu verschweigen. -->
+              <span class="filter-chip" id="tl-pending-hint" style="display:none"
+                    data-i18n-title="tl.pending.tip"
+                    title="Unbestätigte Vorschläge aus Google/Immich — sie werden erst nach der Prüfung in der Moderation zu Ereignissen"></span>
+            </div>
+          </div>
+          <div class="filter-group">
+            <label data-i18n="map.density">Wie dicht</label>
+            <div class="filter-chips">
+              <!-- A47: Auf welcher Ebene zusammengefasst wird. Bewusst ein
+                   Auswahlfeld und kein Schieberegler: vier benannte Stufen sind
+                   eine Auswahl, und ein Schieber ohne beschriftete Rasterung wäre
+                   wieder die Sorte Bedienelement, die man ausprobieren muss, statt
+                   sie zu lesen. Gilt für Besuche UND Fotos — eine Einstellung,
+                   nicht zwei nebeneinander. -->
+              <label class="stat-label" style="display:inline-flex; align-items:center; gap:6px">
+                <span data-i18n="tl.level">Zusammenfassen nach</span>
+                <select id="tl-level" class="mf-select" data-i18n-title="tl.level.tip"
+                        title="Wie fein die Einträge eines Tages zusammengefasst werden — vom Land bis zum einzelnen Punkt">
+                  <option value="country" data-i18n="tl.level.country">Land</option>
+                  <option value="city" selected data-i18n="tl.level.city">Stadt</option>
+                  <option value="district" data-i18n="tl.level.district">Ortsteil</option>
+                  <option value="point" data-i18n="tl.level.point">Exakter Punkt</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <div class="filter-group" style="flex-basis:100%">
+            <label data-i18n="map.cats">Kategorien</label>
+            <div class="filter-chips">
+              <!-- Anmerkung 178: derselbe Chip wie auf der Karte, an derselben
+                   Stelle. Bis hier waren die abgeleiteten Grundort-Tage im
+                   Zeitstrahl gar nicht abschaltbar — in einem Jahr ohne
+                   Einträge bestand er ausschließlich aus ihnen, und wer das
+                   nicht wollte, hatte keinen Griff. -->
+              <span class="filter-chip active" id="tl-baseline-toggle" data-i18n-title="map.baseline.tip" title="Deine Grundort-Zeiträume — ein Zeichen je Zeitraum, dort wo du in dieser Zeit normalerweise warst. Abgeleitet, nicht erfasst."><span class="fdot" style="background:var(--baseline-dot)"></span><span data-i18n="map.baseline">🏠 Grundort</span></span>
+              <span id="tl-filters" style="display:contents"></span>
+            </div>
+          </div>
+          <span class="hint" id="tl-level-note" style="display:none; flex-basis:100%"></span>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:-4px 0 20px">
           <!-- A41: Der Stadtfilter ist kein Dauerschalter, sondern ein Zustand,
                in den man aus Statistik oder Kompendium hineinspringt. Er ist
                deshalb nur sichtbar, wenn er gesetzt ist — aber dann sichtbar
                UND abwerfbar, denn ein Zeitstrahl, der ohne Grund fast leer
-               aussieht, ist genau die stille Falschaussage aus Anmerkung 92. -->
+               aussieht, ist genau die stille Falschaussage aus Anmerkung 92.
+               Er steht bei den WERKZEUGEN und nicht bei den Kategorien: er ist
+               kein Dauerschalter, sondern ein Zustand mit Ausgang. -->
           <span class="filter-chip active" id="tl-city-chip" style="display:none"
                 data-i18n-title="tl.city.tip"
                 title="Zeitstrahl auf diese Stadt eingeschränkt — klicken, um wieder alles zu zeigen"></span>
@@ -1358,35 +1429,6 @@
           <span class="filter-chip active" id="tl-day-chip" style="display:none"
                 data-i18n-title="tl.day.tip"
                 title="Zeitstrahl auf diesen Tag eingeschränkt — klicken, um wieder alles zu zeigen"></span>
-          <span class="filter-chip off" id="tl-visits-toggle" data-i18n-title="tl.visits.tip" title="Automatisch erfasste Einträge (Google-Besuche, Immich-Fototage) im Zeitstrahl anzeigen — auf der Karte sind sie immer sichtbar" data-i18n="tl.visits.chip">🛰️ Automatisch erfasst</span>
-          <!-- Anmerkung 135: unbestätigte Google-/Immich-Vorschläge sind
-               Beleg, kein Ereignis — sie stehen nicht mehr zwischen den
-               bestätigten Karten. Dieser Hinweis sagt, dass es sie gibt, und
-               führt zu ihrer Liste (Moderation), statt es zu verschweigen. -->
-          <span class="filter-chip" id="tl-pending-hint" style="display:none"
-                data-i18n-title="tl.pending.tip"
-                title="Unbestätigte Vorschläge aus Google/Immich — sie werden erst nach der Prüfung in der Moderation zu Ereignissen"></span>
-          <!-- A45: Fotopunkte als eigene, ausblendbare Ebene — genau wie die
-               importierten Besuche daneben, und aus demselben Grund: es sind
-               zu viele, um sie ungefragt in den Zeitstrahl zu kippen. -->
-          <span class="filter-chip off" id="tl-photos-toggle" data-i18n-title="tl.photos.tip" title="Verortete Fotos als eigene Zeilen im Zeitstrahl, je Tag und Ort zusammengefasst — muss zuerst unter „Meine Daten → Immich“ verortet werden" data-i18n="tl.photos">📷 Fotos</span>
-          <!-- A47: Auf welcher Ebene zusammengefasst wird. Bewusst ein
-               Auswahlfeld und kein Schieberegler: vier benannte Stufen sind
-               eine Auswahl, und ein Schieber ohne beschriftete Rasterung wäre
-               wieder die Sorte Bedienelement, die man ausprobieren muss, statt
-               sie zu lesen. Gilt für Besuche UND Fotos — eine Einstellung,
-               nicht zwei nebeneinander. -->
-          <label class="stat-label" style="display:inline-flex; align-items:center; gap:6px">
-            <span data-i18n="tl.level">Zusammenfassen nach</span>
-            <select id="tl-level" class="mf-select" data-i18n-title="tl.level.tip"
-                    title="Wie fein die Einträge eines Tages zusammengefasst werden — vom Land bis zum einzelnen Punkt">
-              <option value="country" data-i18n="tl.level.country">Land</option>
-              <option value="city" selected data-i18n="tl.level.city">Stadt</option>
-              <option value="district" data-i18n="tl.level.district">Ortsteil</option>
-              <option value="point" data-i18n="tl.level.point">Exakter Punkt</option>
-            </select>
-          </label>
-          <span class="hint" id="tl-level-note" style="display:none; flex-basis:100%"></span>
           <span class="filter-chip" id="tl-journal-btn" data-i18n-title="tl.journal.tip" title="Tagebuch-Eintrag für einen Tag schreiben (Markdown) — erscheint als Tageskopf über den Ereignissen des Tages" data-i18n="tl.journal">📖 Tagebuch schreiben</span>
           <span class="filter-chip" id="tl-print-btn" data-i18n-title="tl.print.tip" title="Zeitraum wählen und drucken oder als PDF sichern — gedruckt wird hell, ohne Navigation und mit allen Ereignissen des Zeitraums" data-i18n="tl.print">🖨️ Drucken</span>
           <!-- F18: Ein Foto gehört oft zu einem Tag, nicht zu einem einzelnen
@@ -1459,14 +1501,10 @@
               <span class="filter-chip active" id="mp-visits-toggle" data-i18n-title="map.visits.tip" title="Aus dem Google-Timeline-Import übernommene Besuche — dieselbe Ebene, die der Zeitstrahl unter 🛰️ führt"><span class="fdot" style="background:var(--cat-media)"></span><span data-i18n="tl.visits.chip">🛰️ Automatisch erfasst</span></span>
               <!-- A45: eine EIGENE Ebene, kein Ereignis. Ein Foto ist kein
                    Eintrag in der Lebensdatenbank, sondern ein Beleg dafür,
-                   dass jemand dort war — und es sind zu viele, um sie
-                   ungefragt einzublenden. -->
-              <!-- F20 auf der Karte: der Grundort ist eine EBENE wie die
-                   anderen — „woher kommt, was hier liegt?". Eigene Marke, weil
-                   das, was sie zeigt, weder erfasst noch importiert ist,
-                   sondern gefolgert. -->
-              <span class="filter-chip active" id="mp-baseline-toggle" data-i18n-title="map.baseline.tip" title="Deine Grundort-Zeiträume — ein Zeichen je Zeitraum, dort wo du in dieser Zeit normalerweise warst. Abgeleitet, nicht erfasst."><span class="fdot" style="background:var(--baseline-dot)"></span><span data-i18n="map.baseline">🏠 Grundort</span></span>
-              <span class="filter-chip off" id="mp-photos-toggle" data-i18n-title="map.photos.tip" title="Jedes Foto mit Koordinaten als eigener Punkt — dort, wo es aufgenommen wurde. Muss zuerst unter „Meine Daten → Immich“ verortet werden."><span class="fdot" style="background:var(--photo-dot)"></span><span data-i18n="map.photos">📷 Fotos</span></span>
+                   dass jemand dort war.
+                   Anmerkung 178: eingeschaltet — siehe die Begründung bei
+                   `mp.showPhotos`. -->
+              <span class="filter-chip active" id="mp-photos-toggle" data-i18n-title="map.photos.tip" title="Jedes Foto mit Koordinaten als eigener Punkt — dort, wo es aufgenommen wurde. Muss zuerst unter „Meine Daten → Immich“ verortet werden."><span class="fdot" style="background:var(--photo-dot)"></span><span data-i18n="map.photos">📷 Fotos</span></span>
               <!-- A40 (Anm. 92): gemessene Wege gegen gedachte Verbindung —
                    die beiden hießen bis 0.33 beide „Route“. Das Sinnbild ist
                    seit Anmerkung 160 🛣️, weil 🛰️ dem Zeitstrahl gehört. -->
@@ -1486,12 +1524,29 @@
                 <button type="button" data-level="place" data-i18n-title="map.dens.place.tip" title="Alles am selben Ort wird eine Blase („59× Zuhause“)" data-i18n="map.dens.place">Je Ort</button>
                 <button type="button" data-level="city" data-i18n-title="map.dens.city.tip" title="Alles in derselben Stadt wird eine Blase — für die Frage „in welchen Städten war ich?“" data-i18n="map.dens.city">Je Stadt</button>
               </div>
-              <span class="filter-chip active" id="mp-route-toggle" data-i18n-title="map.route.tip" title="Verbindet die Orte dieses Zeitraums in ihrer zeitlichen Reihenfolge — eine gedachte Linie, kein gefahrener Weg. Bei zusammengefassten Punkten gibt es keine Reihenfolge zu zeigen." data-i18n="map.route">🧭 Reihenfolge verbinden</span>
+              <!-- Anmerkung 178: AUSgeschaltet voreingestellt — eine Linie
+                   über tausend Punkte ist ein Knäuel, und wer sie sehen will,
+                   fragt ausdrücklich danach. -->
+              <span class="filter-chip off" id="mp-route-toggle" data-i18n-title="map.route.tip" title="Verbindet die Orte dieses Zeitraums in ihrer zeitlichen Reihenfolge — eine gedachte Linie, kein gefahrener Weg. Bei zusammengefassten Punkten gibt es keine Reihenfolge zu zeigen." data-i18n="map.route">🧭 Reihenfolge verbinden</span>
             </div>
           </div>
           <div class="filter-group" style="flex-basis:100%">
-            <label>Kategorien</label>
-            <div class="filter-chips" id="mp-filters"></div>
+            <label data-i18n="map.cats">Kategorien</label>
+            <!-- **Anmerkung 178 — der Grundort steht bei den Kategorien.**
+                 Er stand in „Ebenen", und das war eine vertretbare Lesart
+                 („woher kommt, was hier liegt?"). Beim Benutzen ist er aber
+                 keine Herkunft, sondern eine SORTE Eintrag neben Reise,
+                 Konzert und Meilenstein — man blendet ihn aus demselben Grund
+                 aus wie eine Kategorie: er soll die Karte gerade nicht füllen.
+                 Die eigene Marke bleibt: was hier steht, ist gefolgert.
+
+                 `display:contents` statt eines eigenen Kastens, damit
+                 `buildCatFilter` weiterhin genau EINEN Behälter füllt und die
+                 Chips trotzdem in derselben Reihe umbrechen. -->
+            <div class="filter-chips">
+              <span class="filter-chip active" id="mp-baseline-toggle" data-i18n-title="map.baseline.tip" title="Deine Grundort-Zeiträume — ein Zeichen je Zeitraum, dort wo du in dieser Zeit normalerweise warst. Abgeleitet, nicht erfasst."><span class="fdot" style="background:var(--baseline-dot)"></span><span data-i18n="map.baseline">🏠 Grundort</span></span>
+              <span id="mp-filters" style="display:contents"></span>
+            </div>
           </div>
         </div>
         <div class="map-layout">
@@ -3115,6 +3170,19 @@ const I18N_EN = {
   'map.route.blocked': "Not possible while points are merged — there is no order left to show.",
   'map.layers': "Layers",
   'map.density': "How dense",
+  // Anmerkung 178: „Kategorien" stand als einzige Gruppenüberschrift der
+  // Kartenleiste ohne `data-i18n` im Markup — in der englischen Oberfläche
+  // war es der einzige deutsche Wort in der Reihe. Genau die Sorte Lücke,
+  // die auffällt, sobald dieselbe Leiste ein zweites Mal auftaucht.
+  'map.cats': "Categories",
+  // Anmerkung 178: die Zahlen AUF den Ebenen-Schaltern meinen den gezeigten
+  // Zeitraum, der Bestand steht daneben im Titel.
+  'map.n.total': "In the whole database: {n}",
+  'map.tracks.n': "tracks travelled",
+  'map.baseline.n': "baseline",
+  'map.baseline.none': "No baseline location entered yet — the form is under “My data”.",
+  'tl.baseline.n': "baseline days",
+  'tl.baseline.tip': "Days with no entry but a baseline location that applies — derived, not recorded. The number is how many rows are shown; the footer says how many there are in total.",
   'map.manual': "By hand",
   'map.manual.tip': "Entries you recorded yourself — trips, concerts, milestones. On the map the numbered points in their category colour.",
   'map.visits.tip': "Visits taken from the Google Timeline import — the same layer the timeline lists under 🛰️",
@@ -4682,7 +4750,11 @@ const tl = { zoom: 'year', query: '', events: [], catFilter: new Set(FILTER_CATS
              // nicht mehr: die Gruppen sind seitdem gewöhnliche verdichtete
              // Ereignisse, und der Server bildet sie (A39/A47) — eine zweite
              // Gruppierung daneben wären zwei Regeln für dieselbe Frage.
-             showPhotos: false, level: 'city' };
+             // Anmerkung 178: Der Grundort ist im Zeitstrahl ein- und
+             // ausblendbar wie auf der Karte. Voreingestellt AN — die
+             // abgeleiteten Tage waren bis hier gar nicht abschaltbar, und
+             // ihre Abwesenheit wäre die überraschendere Änderung.
+             showPhotos: false, showBaseline: true, level: 'city' };
 
 function isoWeek(d) {
   const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -4874,7 +4946,10 @@ let TL_BASELINE_SHOWN = 0;
 // einsortiert und (im Jahr/Jahrzehnt) mitgezählt werden. Ein eigener
 // Gruppierungsweg wäre eine zweite Fassung derselben Regel.
 function tlBaselineRows() {
-  if (!TL_BASELINE.size) { TL_BASELINE_SHOWN = 0; return []; }
+  // Anmerkung 178: ausgeschaltet heißt keine Zeilen UND keine Fußnote —
+  // „300 von 7.300 gezeigt" unter einer Liste ohne eine einzige davon wäre
+  // eine Auskunft über etwas, das gerade nicht da ist.
+  if (!tl.showBaseline || !TL_BASELINE.size) { TL_BASELINE_SHOWN = 0; return []; }
   const all = [...TL_BASELINE.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1));
   const pick = all.length > TL_BASELINE_CAP ? spreadPick(all, TL_BASELINE_CAP) : all;
   TL_BASELINE_SHOWN = pick.length;
@@ -5483,6 +5558,10 @@ function renderTimelineList() {
     }));
   el.insertAdjacentHTML('beforeend', tlFooter());
   tlBindFooter(el);
+  // Anmerkung 178: Erst hier steht fest, wie viele abgeleitete Tage gezeigt
+  // werden (`tlBaselineRows` setzt `TL_BASELINE_SHOWN` beim Bauen) — der
+  // Schalter kann seine Zahl also nicht früher kennen.
+  tlSyncBaselineChip();
 }
 // Anmerkung 135: eine Sammelzeile (Jahr in einem Jahrzehnt, Monat in einem
 // Jahr) klappt an Ort und Stelle auf — kein Sprung, kein Neuladen, denn die
@@ -5916,6 +5995,43 @@ document.getElementById('tl-photos-toggle')?.addEventListener('click', function 
   this.classList.toggle('off', !tl.showPhotos);
   loadTimeline();
 });
+// **Anmerkung 178 — der Grundort im Zeitstrahl, endlich mit Schalter.**
+//
+// Die abgeleiteten Tage waren hier nie abschaltbar: in einem Jahr ohne
+// Einträge besteht der Zeitstrahl ausschließlich aus ihnen, und wer die
+// erfassten Ereignisse suchte, hatte keinen Griff. Auf der Karte gab es den
+// Schalter seit F20 — dieselbe Sorte Aussage, zwei Ansichten, ein Schalter
+// fehlte.
+//
+// Anders als bei Besuchen und Fotos wird hier NICHT neu abgefragt: die Tage
+// sind eine Ableitung im Browser (`tlBaselineRows`), kein Fenster im Server.
+document.getElementById('tl-baseline-toggle')?.addEventListener('click', function () {
+  if (this.classList.contains('inert')) {
+    toast(t('map.baseline.none', 'Noch kein Grundort eingetragen — das Formular steht unter „Meine Daten".'), 'warn', 7000);
+    return;
+  }
+  tl.showBaseline = !tl.showBaseline;
+  tlSyncBaselineChip();
+  renderTimeline();
+});
+// Derselbe Satz wie bei den Kartenschaltern (A40): kann er gerade nichts
+// bewirken, muss er das ZEIGEN — und er nennt, wie viele Tage er beisteuert.
+function tlSyncBaselineChip() {
+  const chip = document.getElementById('tl-baseline-toggle');
+  if (!chip) return;
+  const empty = !TL_BASELINE_TOTAL;
+  chip.classList.toggle('inert', empty);
+  chip.classList.toggle('active', !empty && tl.showBaseline);
+  chip.classList.toggle('off', !empty && !tl.showBaseline);
+  const label = chip.querySelector('[data-i18n]') || chip;
+  label.textContent = empty
+    ? `🏠 ${t('map.baseline.n', 'Grundort')}`
+    : `🏠 ${(tl.showBaseline ? TL_BASELINE_SHOWN : 0).toLocaleString(LOC())} ${
+        t('tl.baseline.n', 'Grundort-Tage')}`;
+  chip.title = empty
+    ? t('map.baseline.none', 'Noch kein Grundort eingetragen — das Formular steht unter „Meine Daten".')
+    : t('tl.baseline.tip', 'Tage, an denen kein Eintrag steht, aber ein Grundort gilt — abgeleitet, nicht erfasst. Die Zahl ist die der gezeigten Zeilen; wie viele es insgesamt sind, steht in der Fußzeile.');
+}
 // A47: Stufe wechseln = neu abfragen. Verdichtet wird auf dem Server, also
 // ist das keine Anzeige-Einstellung (A39: verdichtet wird VOR dem Blättern).
 document.getElementById('tl-level')?.addEventListener('change', function () {
@@ -8370,14 +8486,25 @@ let mapBaseline = null;
 // Gemerkt wird sie wie die Sortierung der Sammlung (Anmerkung 149): wer einmal
 // „je Stadt" gewählt hat, meint das auch beim nächsten Öffnen.
 const MP_DENSITY_LEVELS = ['point', 'near', 'place', 'city'];
+// **Anmerkung 178 — die Karte zeigt zuerst alles.**
+//
+// Voreingestellt war „je Ort" (Blasen) mit Reihenfolge-Linie und ohne Fotos.
+// Das ist eine Deutung, bevor jemand danach gefragt hat: wer die Karte
+// aufmacht, will erst sehen, was da IST, und dann verdichten. Seit Anmerkung
+// 161 gibt es dafür auch keinen Grund mehr — der 300er-Deckel ist weg, und
+// zwanzigtausend Punkte kosten eine Leinwand, kein Objekt je Punkt.
 function mpStoredDensity() {
   try {
     const v = localStorage.getItem('ld_map_density');
     if (MP_DENSITY_LEVELS.includes(v)) return v;
   } catch (_) { /* privater Modus: dann eben die Voreinstellung */ }
-  return 'place';
+  return 'point';
 }
-const mp = { mode: 'day', periods: [], index: 0, showRoute: true, showTracks: true,
+// `showRoute` ist AUS: die gedachte Verbindungslinie über tausend Punkte eines
+// Jahres ist ein Knäuel, und sie behauptet eine Reihenfolge, die auf dieser
+// Zoomstufe nichts erklärt. Wer sie will, schaltet sie ein — und bekommt dann
+// auch die Nummern dazu (Anmerkung 161).
+const mp = { mode: 'day', periods: [], index: 0, showRoute: false, showTracks: true,
   density: mpStoredDensity(), located: [], catFilter: new Set(FILTER_CATS),
   // Anmerkung 160: die beiden maschinellen Quellen sind auf der Karte getrennt
   // schaltbar — wie im Zeitstrahl, mit demselben Sinnbild und derselben Zahl.
@@ -8388,15 +8515,18 @@ const mp = { mode: 'day', periods: [], index: 0, showRoute: true, showTracks: tr
   // F20: eigene Ebene, eigener Schalter — sie zeigt weder Erfasstes noch
   // Importiertes, sondern Gefolgertes.
   showBaseline: true,
-  // A45 — Fotopunkte als eigene Ebene. `showPhotos` ist bewusst AUS: bei
-  // zwanzig Jahren Bibliothek sind das zehntausende Marker, und wer die Karte
-  // öffnet, will zuerst seine Ereignisse sehen. `total` ist die Zahl aus dem
-  // Index (der GESAMTE Bestand) — sie entscheidet, ob der Schalter überhaupt
-  // etwas bewirken kann (A40).
+  // A45 — Fotopunkte als eigene Ebene. `showPhotos` war AUS, weil zwanzig
+  // Jahre Bibliothek zehntausende MARKER waren. Seit Anmerkung 153 sind es
+  // keine Marker mehr, sondern Kreise auf einer Leinwand — der Grund ist
+  // damit weg, und der Schalter stand nur noch aus Gewohnheit auf „aus"
+  // (Anmerkung 178). `photoTotal` ist die Zahl aus dem Index (der GESAMTE
+  // Bestand) — sie entscheidet, ob der Schalter überhaupt etwas bewirken kann
+  // (A40), und ist damit etwas anderes als die Zahl AUF dem Schalter, die den
+  // Zeitraum meint.
   // Anmerkung 139: `photoDays` gibt es nicht mehr — Fotos SIND Ereignisse und
   // liefern ihre Zeiträume selbst. `mapTotal`/`mapShown` tragen den Hinweis,
   // wenn die Karte deckelt.
-  showPhotos: false, photoTotal: 0, photoScanned: [],
+  showPhotos: true, photoTotal: 0, photoScanned: [],
   // Anmerkung 140: für welchen Bestand die Punkte in `located` gelten.
   mapTotal: 0, mapShown: 0, loadedFor: null };
 // A18: Cluster-Schwelle — vom Nutzer einstellbar (10–300, in User.settings)
@@ -8426,16 +8556,59 @@ function mpSyncChips(condensed) {
   mpSyncTrackChip();
   mpSyncPhotoChip();
   mpSyncSourceChips();
+  mpSyncBaselineChip();
   mpSyncDensity();
 }
+
+// --------------------------------------------------------------------------- //
+// **Anmerkung 178 — jeder Ebenen-Schalter nennt die Zahl DIESES Zeitraums.**
+// --------------------------------------------------------------------------- //
+// Auf den Schaltern stand der Gesamtbestand: „🛰️ 13.291 automatisch erfasst"
+// — auch im Juli 2015, in dem vierzig davon liegen. Die Zahl war richtig und
+// beantwortete die falsche Frage. Wer auf eine Karte sieht, fragt nach dem,
+// was auf ihr liegt; der Bestand ist die Antwort auf eine Frage aus der
+// Verwaltung.
+//
+// **Ist eine Ebene aus, ist ihre Zahl 0 — und das ist keine Notlüge.** Die
+// abgeschalteten Quellen holt `mpLoadPoints` gar nicht erst vom Server
+// (Anmerkung 160), wir KÖNNTEN sie also nicht zählen. Aber wir müssten es
+// auch nicht: die Zahl sagt „so viel davon liegt gerade auf der Karte", und
+// das sind dann null. Der Gesamtbestand steht weiter im Titel, wo er die
+// Frage beantwortet, für die er gemacht ist.
+function mpPeriodEvents() {
+  const key = mp.periods[mp.index];
+  if (key == null) return [];
+  return mpFiltered().filter(e => periodKey(e) === key);
+}
+// Die Zahl in die Beschriftung schreiben — NUR in sie. `chip.textContent`
+// räumte die Farbmarke daneben weg (Anmerkung 160, schon einmal passiert).
+function mpChipCount(id, text, title) {
+  const chip = document.getElementById(id);
+  if (!chip) return;
+  const label = chip.querySelector('[data-i18n]') || chip;
+  label.textContent = text;
+  if (title != null) chip.title = title;
+}
+const mpNum = n => (n || 0).toLocaleString(LOC());
+// Wie viele Wege dieser Zeitraum gerade zeigt. Steht hier und nicht in
+// `drawTracks`, weil es zwei Leser hat (der Schalter und der Hinweis auf der
+// Karte) — und weil es eine Zahl ÜBER DIE ANZEIGE ist, keine über den Bestand.
+mp.trackShown = 0;
+
 // Anmerkung 160: die beiden übrigen Quellen-Schalter. „Von Hand" kann nicht
 // außer Kraft treten — es ist die Lebensdatenbank, und die gibt es immer;
 // „Automatisch erfasst" schon, nämlich solange nichts importiert wurde.
 function mpSyncSourceChips() {
+  const here = mpPeriodEvents();
   const man = document.getElementById('mp-manual-toggle');
   if (man) {
     man.classList.toggle('active', mp.showManual);
     man.classList.toggle('off', !mp.showManual);
+    const n = mp.showManual
+      ? here.filter(e => !MACHINE_SOURCES.includes(e.source)).length : 0;
+    mpChipCount('mp-manual-toggle',
+      `${mpNum(n)} ${t('map.manual', 'Von Hand')}`,
+      t('map.manual.tip', 'Selbst erfasste Einträge — Reisen, Konzerte, Meilensteine. Auf der Karte die nummerierten Punkte in ihrer Kategoriefarbe.'));
   }
   const vis = document.getElementById('mp-visits-toggle');
   if (!vis) return;
@@ -8443,18 +8616,34 @@ function mpSyncSourceChips() {
   vis.classList.toggle('inert', empty);
   vis.classList.toggle('active', !empty && mp.showVisits);
   vis.classList.toggle('off', !empty && !mp.showVisits);
-  const label = vis.querySelector('[data-i18n]');
-  if (label) {
-    // Der Schalter nennt SEINE Zahl — dieselbe, die im Zeitstrahl steht
-    // (Anmerkung 139). Nur das Beschriftungs-Element wird angefasst, sonst
-    // löschte der Text die Farbmarke daneben.
-    label.textContent = empty
-      ? `🛰️ ${t('tl.visits.chip.short', 'Automatisch erfasst')}`
-      : `🛰️ ${mp.visitTotal.toLocaleString(LOC())} ${t('tl.visits.n', 'automatisch erfasst')}`;
-  }
-  vis.title = empty
-    ? t('map.visits.none', 'Noch nichts importiert — der Google-Timeline-Import steht unter „Meine Daten".')
-    : t('map.visits.tip', 'Aus dem Google-Timeline-Import übernommene Besuche — dieselbe Ebene, die der Zeitstrahl unter 🛰️ führt');
+  const n = mp.showVisits
+    ? here.filter(e => e.source === 'google_timeline').length : 0;
+  mpChipCount('mp-visits-toggle',
+    empty ? `🛰️ ${t('tl.visits.chip.short', 'Automatisch erfasst')}`
+          : `🛰️ ${mpNum(n)} ${t('tl.visits.n', 'automatisch erfasst')}`,
+    empty
+      ? t('map.visits.none', 'Noch nichts importiert — der Google-Timeline-Import steht unter „Meine Daten".')
+      : `${t('map.visits.tip', 'Aus dem Google-Timeline-Import übernommene Besuche — dieselbe Ebene, die der Zeitstrahl unter 🛰️ führt')}\n`
+        + t('map.n.total', 'Insgesamt im Bestand: {n}').replace('{n}', mpNum(mp.visitTotal)));
+}
+// Der Grundort — seit Anmerkung 178 ein Kategorie-Chip, aber mit derselben
+// Pflicht wie jede Ebene: sagen, wie viel er gerade beiträgt, und sagen, wenn
+// er nichts beitragen KANN (A40).
+function mpSyncBaselineChip() {
+  const chip = document.getElementById('mp-baseline-toggle');
+  if (!chip) return;
+  const empty = !(MP_BASELINES && MP_BASELINES.length);
+  chip.classList.toggle('inert', empty);
+  chip.classList.toggle('active', !empty && mp.showBaseline);
+  chip.classList.toggle('off', !empty && !mp.showBaseline);
+  const key = mp.periods[mp.index];
+  const n = (!empty && mp.showBaseline && key != null) ? mpBaselinesIn(key).length : 0;
+  mpChipCount('mp-baseline-toggle',
+    empty ? `🏠 ${t('map.baseline', '🏠 Grundort').replace('🏠 ', '')}`
+          : `🏠 ${mpNum(n)} ${t('map.baseline.n', 'Grundort')}`,
+    empty
+      ? t('map.baseline.none', 'Noch kein Grundort eingetragen — das Formular steht unter „Meine Daten".')
+      : t('map.baseline.tip', 'Deine Grundort-Zeiträume — ein Zeichen je Zeitraum, dort wo du in dieser Zeit normalerweise warst. Abgeleitet, nicht erfasst.'));
 }
 // **Der Kern von Anmerkung 154 (d).** Vier benannte Stufen, und die Zoomstufe
 // entscheidet daran nichts mehr. „Je Stadt" tritt außer Kraft, wenn zu keinem
@@ -8493,9 +8682,17 @@ function mpSyncTrackChip() {
   chip.classList.toggle('inert', blocked);
   chip.classList.toggle('active', !blocked && mp.showTracks);
   chip.classList.toggle('off', !blocked && !mp.showTracks);
-  chip.title = blocked
-    ? t('map.tracks.blocked', 'Nur bis zur Monats-Ansicht — ein Jahr Wege sind zehntausende Linien, und die zu zeichnen friert den Browser ein. Näher heranzoomen, dann sind sie da.')
-    : t('map.tracks.tip', 'Die tatsächlich zurückgelegten Wege aus dem Timeline-Import — echte Aufzeichnungen, eingefärbt nach Fortbewegungsart');
+  // Anmerkung 178: auch dieser Schalter nennt seine Zahl — die der GEZEICHNETEN
+  // Wege. Sie kommt nach, weil die Wege nachgeladen werden; bis dahin steht die
+  // vom vorigen Zeitraum, und das wäre eine Falschaussage. Deshalb setzt
+  // `drawTracks` sie vor jedem Abruf auf 0 zurück.
+  mpChipCount('mp-tracks-toggle',
+    blocked ? t('map.tracks', 'Zurückgelegte Wege')
+            : `${mpNum(mp.showTracks ? mp.trackShown : 0)} ${
+                t('map.tracks.n', 'zurückgelegte Wege')}`,
+    blocked
+      ? t('map.tracks.blocked', 'Nur bis zur Monats-Ansicht — ein Jahr Wege sind zehntausende Linien, und die zu zeichnen friert den Browser ein. Näher heranzoomen, dann sind sie da.')
+      : t('map.tracks.tip', 'Die tatsächlich zurückgelegten Wege aus dem Timeline-Import — echte Aufzeichnungen, eingefärbt nach Fortbewegungsart'));
 }
 // A40, derselbe Satz für die Foto-Ebene: Ein Bedienelement, das gerade nichts
 // bewirken kann, muss das ZEIGEN. Solange kein Foto verortet ist, wäre der
@@ -8522,13 +8719,27 @@ function mpSyncPhotoChip() {
       // gibt. Der Kartenschalter trägt seit dieser Anmerkung eine Farbmarke
       // daneben — die Farbe der Ebene auf der Karte —, und `chip.textContent`
       // hätte sie bei jedem Neuzeichnen weggeräumt.
+      //
+      // **Anmerkung 178: zwei Ansichten, zwei Fragen, zwei Zahlen.** Die Karte
+      // zeigt einen ZEITRAUM und nennt deshalb, was in ihm liegt; der
+      // Zeitstrahl hat keinen Zeitraum, sondern blättert durch alles, und
+      // nennt weiterhin den Bestand. Das ist kein Rückfall in zwei Wahrheiten
+      // (Anm. 106): der `inert`-Zustand, also die Frage „gibt es überhaupt
+      // verortete Fotos?", bleibt für beide EINE Antwort — nur die Zahl daneben
+      // beantwortet in jeder Ansicht die Frage, die man dort stellt.
+      const n = id === 'mp-photos-toggle'
+        ? (on ? mpPeriodEvents().filter(e => e.source === 'immich').length : 0)
+        : mp.photoTotal;
       const label = chip.querySelector('[data-i18n]') || chip;
       label.textContent = empty
         ? `📷 ${t('tl.photos', 'Fotos')}`
-        : `📷 ${mp.photoTotal.toLocaleString(LOC())} ${t('tl.photos.n2', 'Fotos')}`;
+        : `📷 ${mpNum(n)} ${t('tl.photos.n2', 'Fotos')}`;
       chip.title = empty
         ? t('map.photos.none', 'Noch kein Foto als Ereignis angelegt — der Lauf steht unter „Meine Daten → Immich → Ereignisse aus Fotos".')
-        : t('map.photos.tip', 'Jedes Foto mit Koordinaten als eigenes Ereignis — auf der Karte ein Punkt mit Vorschaubild, im Zeitstrahl eine Zeile ohne Bild.');
+        : (id === 'mp-photos-toggle'
+           ? `${t('map.photos.tip', 'Jedes Foto mit Koordinaten als eigenes Ereignis — auf der Karte ein Punkt mit Vorschaubild, im Zeitstrahl eine Zeile ohne Bild.')}\n`
+             + t('map.n.total', 'Insgesamt im Bestand: {n}').replace('{n}', mpNum(mp.photoTotal))
+           : t('map.photos.tip', 'Jedes Foto mit Koordinaten als eigenes Ereignis — auf der Karte ein Punkt mit Vorschaubild, im Zeitstrahl eine Zeile ohne Bild.'));
     });
 }
 // Der Fotozähler wird an drei Stellen gebraucht (Karte, Zeitstrahl,
@@ -9019,6 +9230,11 @@ const TRACK_MAX = 400;
 async function drawTracks(key) {
   mapTracks.clearLayers();
   mpTrackNote(null);
+  // Anmerkung 178: erst auf null, dann zählen. Bliebe die Zahl des vorigen
+  // Zeitraums stehen, während dieser noch lädt, stünde am Schalter eine
+  // Auskunft über eine Karte, die man gerade nicht mehr sieht.
+  mp.trackShown = 0;
+  mpSyncTrackChip();
   if (!mp.showTracks) return;
   // Routen nur bis Monats-Zoom — bei Jahr/Jahrzehnt/Alles wären es nach einem
   // Timeline-Import zehntausende Polylinien (Browser friert ein). Die Grenze
@@ -9040,6 +9256,7 @@ async function drawTracks(key) {
   if (!res || (mp.periods.length && mp.periods[mp.index] !== key)) return;
   (res.tracks || []).forEach(t => {
     if (!t.points || t.points.length < 2) return;
+    mp.trackShown++;
     const km = t.distance_m ? `${(t.distance_m/1000).toFixed(1)} km · ` : '';
     L.polyline(t.points, {
       color: TRACK_COLORS[t.activity_type] || TRACK_COLORS.unknown,
@@ -9054,6 +9271,7 @@ async function drawTracks(key) {
         + `${km}${t.date_start.slice(0,10)} ${t.date_start.slice(11,16)}–${t.date_end.slice(11,16)}`);
   });
   mpTrackNote(res);
+  mpSyncTrackChip();   // Anmerkung 178: jetzt steht die Zahl fest
 }
 // Was die Wege-Ebene weglässt, sagt sie — auf der Karte, wo hingeschaut wird
 // (A40 / Anmerkung 110, jetzt zum dritten Mal in derselben Ansicht).
@@ -9519,11 +9737,16 @@ function dotLayerProto(cfg) {
     L.DomUtil.addClass(c, 'leaflet-zoom-hide');
     map.on('moveend zoomend resize', this._reset, this);
     map.on('click', this._onClick, this);
+    map.on('mousemove', this._onMove, this);
+    map.on('mouseout dragstart', this._unhover, this);
     this._reset();
   },
   onRemove(map) {
     map.off('moveend zoomend resize', this._reset, this);
     map.off('click', this._onClick, this);
+    map.off('mousemove', this._onMove, this);
+    map.off('mouseout dragstart', this._unhover, this);
+    this._unhover();
     if (this._canvas) L.DomUtil.remove(this._canvas);
     this._canvas = null;
   },
@@ -9591,9 +9814,13 @@ function dotLayerProto(cfg) {
       hits.push([x, y, e]);
     }
   },
-  _onClick(ev) {
-    if (!this._hits || !this._hits.length) return;
-    const lp = this._map.latLngToLayerPoint(ev.latlng);
+  // Welcher Punkt liegt unter dieser Koordinate? EINE Antwort für Klick und
+  // Mauszeiger — zwei Treffersuchen mit je eigener Reichweite wären ein Zeiger,
+  // der Anklickbarkeit an einer anderen Stelle behauptet, als der Klick sie
+  // einlöst (Anm. 106, die leiseste Form: beide Hälften stimmen für sich).
+  _at(latlng) {
+    if (!this._hits || !this._hits.length || !this._origin) return null;
+    const lp = this._map.latLngToLayerPoint(latlng);
     const x = lp.x - this._origin.x, y = lp.y - this._origin.y;
     // Der zuletzt gezeichnete Treffer gewinnt — das ist der, der oben liegt.
     const reach = (this._r + 3) * (this._r + 3);
@@ -9602,11 +9829,52 @@ function dotLayerProto(cfg) {
       const dx = hx - x, dy = hy - y;
       if (dx * dx + dy * dy <= reach) found = e;
     }
+    return found;
+  },
+  _onClick(ev) {
+    const found = this._at(ev.latlng);
     if (!found) return;
     L.popup().setLatLng([found.location.lat, found.location.lng])
       .setContent(this._cfg.popup(found)).openOn(this._map);
   },
+  // **Anmerkung 177 — der Zeiger sagt, was anklickbar ist.**
+  //
+  // Leaflets eigene Marker bringen das mit (`.leaflet-interactive`). Genau die
+  // gibt es hier aber nicht mehr: seit Anmerkung 153/161 liegen Fotos UND
+  // Einträge auf einer Leinwand, und die fängt bewusst keine Klicks
+  // (`pointer-events: none`) — sonst läge ein durchsichtiges Rechteck über
+  // allem darunter. Der Klick wird über die Karte gefunden, der Zeiger blieb
+  // dabei stehen: tausende anklickbare Punkte, an denen nichts darauf
+  // hindeutet, dass sie es sind.
+  _onMove(ev) {
+    // Beim Ziehen ist der Zeiger die geschlossene Hand, und die gehört der
+    // Karte. Ein „pointer" darüber wäre eine Auskunft über etwas, das gerade
+    // niemand anklicken will.
+    const drag = this._map.dragging;
+    if (drag && typeof drag.moving === 'function' && drag.moving() === true) {
+      mpHover(this, false);
+      return;
+    }
+    mpHover(this, !!this._at(ev.latlng));
+  },
+  _unhover() { mpHover(this, false); },
   };
+}
+
+// Wer gerade einen Punkt unter dem Zeiger hat. Eine Menge und nicht ein
+// Boolescher Wert, weil ZWEI Ebenen dieselbe Fläche belegen: setzte jede den
+// Zeiger für sich, nähme die Foto-Ebene ihn der Eintrags-Ebene sofort wieder
+// weg, sobald die Maus über einem Eintrag steht, unter dem kein Foto liegt.
+const MP_HOVER = new Set();
+function mpHover(who, on) {
+  const had = MP_HOVER.size > 0;
+  if (on) MP_HOVER.add(who); else MP_HOVER.delete(who);
+  const has = MP_HOVER.size > 0;
+  if (had === has) return;
+  const box = mapObj && mapObj.getContainer && mapObj.getContainer();
+  // Leer statt „grab": der Zeiger der Karte steht in Leaflets Stilvorlage, und
+  // ihn hier zu wiederholen wäre dieselbe Regel an zwei Orten.
+  if (box && box.style) box.style.cursor = has ? 'pointer' : '';
 }
 
 const PHOTO_DOT_LAYER = dotLayerProto({
@@ -9851,9 +10119,11 @@ document.getElementById('mp-route-toggle').addEventListener('click', function ()
 });
 // Anmerkung 160 — die beiden Quellen-Schalter der Karte.
 document.getElementById('mp-baseline-toggle')?.addEventListener('click', function () {
+  if (this.classList.contains('inert')) {
+    toast(t('map.baseline.none', 'Noch kein Grundort eingetragen — das Formular steht unter „Meine Daten".'), 'warn', 7000);
+    return;
+  }
   mp.showBaseline = !mp.showBaseline;
-  this.classList.toggle('active', mp.showBaseline);
-  this.classList.toggle('off', !mp.showBaseline);
   // Anmerkung 167: der Schalter ändert seit dem Grundort-Zeitraum nicht nur,
   // WAS gezeichnet wird, sondern WELCHE Zeiträume es überhaupt gibt — ohne den
   // Neuaufbau bliebe ein Jahr in der Leiste stehen, das nichts mehr zeigt.

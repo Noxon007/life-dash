@@ -188,18 +188,45 @@ setTimeout(async () => {
   await wait(140);
   ok('Mit Foto-Ereignissen ist der Schalter benutzbar',
      !mapChip.classList.contains('inert'));
-  ok('…und steht auf AUS', mapChip.classList.contains('off') && !w.eval('mp.showPhotos'),
-     'zehntausende Punkte sind nicht das, was jemand beim Öffnen sehen will');
-  ok('…und nennt SEINE Zahl', /12[.,]481/.test(mapChip.textContent),
-     `${mapChip.textContent} — ein gemeinsamer Zähler mit den Google-Besuchen `
-     + 'passte zu keinem der beiden Schalter');
+  // **Anmerkung 178 kehrt die Voreinstellung um.** Sie stand auf AUS, weil
+  // zwanzigtausend Fotos zwanzigtausend MARKER waren — und genau das sind sie
+  // seit Anmerkung 153 nicht mehr (eine Leinwand, kein Objekt je Punkt). Der
+  // Grund für das „aus" ist damit weg; geblieben war die Gewohnheit.
+  ok('…und steht auf AN', mapChip.classList.contains('active') && !!w.eval('mp.showPhotos'),
+     'seit die Ebene eine Leinwand ist, kostet „alles zeigen" keine Objektlast mehr');
 
-  // --- 3. Der Schalter filtert im SERVER ---------------------------------- //
+  // **Anmerkung 178: zwei Ansichten, zwei Fragen, zwei Zahlen.** Der
+  // Kartenschalter meint den gezeigten ZEITRAUM (hier: ein Foto), der
+  // Zeitstrahl-Schalter den Bestand (12.481). Beides wird geprüft, und zwar
+  // gegeneinander: stünde auf der Karte weiterhin der Bestand, wäre die erste
+  // Prüfung allein grün.
+  ok('Der Kartenschalter nennt die Zahl DIESES Zeitraums',
+     /📷\s*1\s/.test(mapChip.textContent) && !/12[.,]481/.test(mapChip.textContent),
+     `${mapChip.textContent} — der Bestand beantwortet eine Frage aus der Verwaltung, `
+     + 'nicht die Frage „was liegt auf dieser Karte?"');
+  ok('…und der Bestand steht im Titel', /12[.,]481/.test(mapChip.title),
+     `${mapChip.title} — verschwiegen werden darf er nicht (A40)`);
+  ok('Der Zeitstrahl-Schalter nennt weiterhin den Bestand',
+     /12[.,]481/.test(tlChip.textContent),
+     `${tlChip.textContent} — ein Zeitstrahl hat keinen Zeitraum, durch den er blättert`);
+
+  // --- 3. Der Schalter filtert im SERVER, in BEIDE Richtungen ------------- //
+  // Ein Filter, der nur in eine Richtung wirkt, macht aus einem der beiden
+  // Klicks eine Aktion ohne Wirkung — welcher es ist, hängt an der
+  // Voreinstellung, also wird beides gefahren (Anm. 108).
   calls.length = 0;
-  mapChip.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  mapChip.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));   // → AUS
   await wait(160);
-  const mapCalls = calls.filter(([, p]) => /events\/map/.test(p)).map(c => c[1]);
-  ok('Einschalten holt die Punkte NEU', mapCalls.length > 0,
+  let mapCalls = calls.filter(([, p]) => /events\/map/.test(p)).map(c => c[1]);
+  ok('Ausschalten holt die Punkte NEU', mapCalls.length > 0,
+     'sonst bliebe die volle Nutzlast trotzdem über die Leitung gegangen');
+  ok('…und zwar mit photos=0', mapCalls.length > 0
+     && mapCalls.every(p => /photos=0/.test(p)), JSON.stringify(mapCalls));
+  calls.length = 0;
+  mapChip.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));   // → AN
+  await wait(160);
+  mapCalls = calls.filter(([, p]) => /events\/map/.test(p)).map(c => c[1]);
+  ok('Einschalten holt sie wieder', mapCalls.length > 0,
      'ein Filter, der nur ausblendet, macht aus dem Einschalten eine Aktion '
      + 'ohne Wirkung');
   ok('…ohne photos=0 im Gepäck', mapCalls.length > 0
