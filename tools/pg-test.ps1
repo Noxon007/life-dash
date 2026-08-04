@@ -81,10 +81,39 @@ if (-not $running) {
     # Meldung jemanden erreicht. Jeder echte Befund dieses Laufs — genau die
     # Klasse, für die es ihn gibt — käme so als Kodierungsfehler an. Kostet
     # nichts und macht den Lauf erst lesbar.
-    & $pg_ctl -D $Data -l $Log -o "-p $Port -h 127.0.0.1 -F -c lc_messages=C" -w start 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) {
+    # **Auf die BEDINGUNG warten, nicht auf den Prozess.** Zwei Fallen liegen
+    # hier übereinander, und beide enden in einem Skript, das nach einem
+    # erfolgreichen Start einfach stehenbleibt — ohne eine Zeile Ausgabe.
+    #
+    # 1. Der gestartete Server erbt die Ausgabekanäle von `pg_ctl`. Hängt
+    #    stdout an einer Pipe (CI, Werkzeuge, `| Out-String`), wartet die Shell
+    #    auf deren Schließen — und die schließt der Server erst beim Beenden.
+    #    Deshalb eigene Ausgabedateien; `-NoNewWindow` allein reicht nicht.
+    # 2. `pg_ctl start` beendet sich auf Windows NICHT verlässlich, nachdem es
+    #    „Server gestartet" gemeldet hat. Auf seinen Prozess zu warten
+    #    (`-w`, `-Wait`) wartet also auf etwas, das gar nicht eintreten muss.
+    #
+    # Die Frage lautet ohnehin nicht „ist pg_ctl fertig?", sondern „antwortet
+    # der Server?". Genau die wird hier gestellt — und sie hat den Vorteil,
+    # dass ein bereits laufender Cluster sie ebenso beantwortet.
+    $ctlOut = Join-Path (Split-Path $Data) "pg_ctl.out"
+    $ctlErr = Join-Path (Split-Path $Data) "pg_ctl.err"
+    $ctlArgs = @('-D', "`"$Data`"", '-l', "`"$Log`"",
+                 '-o', "`"-p $Port -h 127.0.0.1 -F -c lc_messages=C`"", 'start')
+    Start-Process -FilePath $pg_ctl -ArgumentList $ctlArgs -NoNewWindow `
+        -RedirectStandardOutput $ctlOut -RedirectStandardError $ctlErr | Out-Null
+
+    $ready = $false
+    foreach ($i in 1..60) {
+        Start-Sleep -Milliseconds 500
+        & $psql -U postgres -h 127.0.0.1 -p $Port -d postgres -tAc "SELECT 1" 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) { $ready = $true; break }
+        Write-Host -NoNewline "."
+    }
+    if (-not $ready) {
+        Get-Content $ctlErr -ErrorAction SilentlyContinue
         Get-Content $Log -Tail 20 -ErrorAction SilentlyContinue
-        throw "Server-Start fehlgeschlagen (siehe $Log)."
+        throw "Server antwortet nach 30 s nicht auf Port $Port (siehe $Log)."
     }
     Write-Host "ok"
 }

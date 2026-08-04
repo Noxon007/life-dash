@@ -259,6 +259,27 @@ entries stand beside them** (“47 days · 312 entries”).
 - **Export/import:** a full ZIP backup, and a JSON export that carries media
   *metadata* — the media directory is a separate backup.
 
+#### Where a running thing shows up — two questions, not one
+
+Every long-running action answers these separately, and conflating them is what
+made the interface inconsistent until note 172.
+
+1. **Who paces it?**
+   - *The server* — a job runner keeps going after the page is closed. It shows
+     up in the **Jobs tab**: weather, place names, recompute, Immich.
+   - *The browser* — it ends with the page. It shows up in the **progress
+     overlay**: the blurred backdrop with a title, the sentence saying what is
+     happening right now, a bar, an estimate and a cancel button.
+2. **Is it registered?** `startJob` takes a per-type lock and writes a record.
+   This is **independent of question 1**. The backup and timeline imports are
+   paced by the browser *and* registered, so a second tab cannot start the same
+   import — so they appear in both places, which is two answers to two
+   questions rather than a contradiction.
+
+Below both: a single short request gets the thin net bar at the top of the
+window and nothing else. The overlay waits 300 ms before appearing, so a view
+change that finishes in 120 ms never flashes one.
+
 ---
 
 ## 5. Data model
@@ -526,6 +547,12 @@ once.
   and every other request fails with it.
 - **Never one drawing object per element.** A canvas renderer is half the
   answer; the other half is not creating an object per point.
+- **Deleting rows in bulk needs one table list, not one per caller.** SQLite
+  does not enforce foreign keys, so a forgotten child table is green in every
+  test and fails only on PostgreSQL — after the per-table log lines have
+  already claimed success. `app/wipe.py` holds the order; `WIPE_KEEPS` holds
+  what stays, with a reason, so “forgotten” and “left on purpose” stay
+  distinguishable.
 
 ---
 

@@ -21,7 +21,7 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI,
-  Geocoding aus) — 638 Tests, ~18 s, SQLite im Arbeitsspeicher
+  Geocoding aus) — 667 Tests, ~21 s, SQLite im Arbeitsspeicher
 - **Tests gegen echtes PostgreSQL** (das, worauf betrieben wird): `pwsh
   tools/pg-test.ps1` — **kein Docker**, legt mit den installierten Binärdateien
   einen eigenen Cluster in `backend/_pgtest/` auf Port **55432** an und stoppt
@@ -30,8 +30,11 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
   sein, und der DB-Name muss `test` enthalten. Der Cluster läuft mit
   `lc_messages=C` — ein deutsch installiertes PostgreSQL meldet in cp1252, und
   `psycopg2` dekodiert das als UTF-8, sodass **jeder echte Befund als
-  `UnicodeDecodeError` ankäme**.
-- Wächter: `cd tools` → `npm run check` (33 jsdom-Dateien)
+  `UnicodeDecodeError` ankäme**. Das Skript wartet auf die BEDINGUNG (antwortet
+  der Server?) statt auf `pg_ctl` — das beendet sich auf Windows nicht
+  verlässlich, und der gestartete Server erbt die Ausgabekanäle: hängt stdout an
+  einer Pipe, bleibt der Lauf nach erfolgreichem Start stumm stehen.
+- Wächter: `cd tools` → `npm run check` (36 jsdom-Dateien)
 - **Smoke gegen ein HTTP-Doppel** (Immich): `<python> tools/immich_double.py &`
   dann `<python> tools/smoke_a45.py` — findet, was Unit-Tests prinzipiell nicht
   können (Blättern, Zeitzonen, echte DTOs). Immer aus dem Wurzelverzeichnis.
@@ -55,8 +58,18 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
   Tagesmengen sind disjunkt** — der Grundort füllt nur Lücken. Wer eine Zahl
   über TAGE bildet, muss ihn mitzählen; wer eine über EINTRÄGE bildet, darf es
   nicht.
+- **Löschen hat EINE Liste:** `app/wipe.py` (`WIPE_ORDER` = Reihenfolge und
+  Besitz-Bezug, `WIPE_KEEPS` = was mit Begründung stehen bleibt, `DELETE_WORDS`
+  = das Losungswort). Drei Aufrufer lesen sie: „meine Daten", „alle Daten",
+  „Nutzer löschen". Neue Tabelle mit Nutzerdaten → hier eintragen, sonst wird
+  `test_wipe_completeness.py` rot.
+- **Wo ein Lauf erscheint, sind ZWEI Fragen** (ARCHITECTURE Kap. 4.6): *wer
+  taktet?* (Server → Jobs-Reiter, überlebt das Schließen der Seite; Browser →
+  `runForeground()`-Overlay) und *ist er registriert?* (`startJob` = Sperre je
+  Typ, unabhängig von der ersten Frage). Registrierte Vordergrund-Läufe stehen
+  an beiden Stellen — Backup- und Timeline-Import sind genau das.
 - `backend/app/`: `models.py` · `migrate.py` (handgeschriebene ALTER-TABLE-
-  Schritte: `_MISSING_COLUMNS`, `_DROPPED_TABLES`) · `routers/` (events,
+  Schritte: `_MISSING_COLUMNS`, `_DROPPED_TABLES`) · `wipe.py` · `routers/` (events,
   moderation, tracks = Timeline-Import + Ortsnamen, jobs = Hintergrund-Worker
   mit Lock pro Typ, admin, data = Export/Import, auth, baselines, world,
   achievements) · `services/` (ingestion, enrichment = Wetter, geocode =
@@ -70,7 +83,10 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
   Alembic, Redis, semantische Suche. Nicht vergessen — bewusst gelassen.
 
 ## Arbeitsregeln (vom User festgelegt)
-- **NIE pushen oder taggen** — Commits ja; Push/Tag macht der User selbst
+- **Committen ja, und zwar immer — NIE pushen oder taggen.** Fertige Arbeit
+  gehört ohne Nachfrage in einen Commit (2026-08-04 ausdrücklich bestätigt:
+  „ruhig immer committen, nur nicht pushen"). Push und Tag macht der User
+  selbst; Push-Befehle nur nennen, nie ausführen.
 - **Zwei Gleise:** Push auf `main` → Image `:main` (Testen, ohne Version).
   SemVer-Tag → `:X.Y.Z`/`:latest` (Veröffentlichung). Eine neue Version also
   nur, wenn ein NUTZER einen Unterschied merkt — mehrere Pakete dürfen sich
@@ -143,6 +159,13 @@ Der wiederkehrende Defekt in diesem Projekt ist nicht Kaputtheit, sondern
 - **Wer eine Zahl über den GESAMTEN Bestand braucht, holt sie vom Server.**
 - **`query().delete()` verliert die ORM-Kaskade** — sichtbar nur dort, wo
   Fremdschlüssel erzwungen werden (PostgreSQL), still auf SQLite.
+- **SQLite erzwingt keine Fremdschlüssel — eine vergessene Kindtabelle ist
+  deshalb in JEDEM Test grün.** Sie fällt erst auf PostgreSQL um, und dann
+  NACHDEM die Zeilen davor schon „gelöscht" ins Log geschrieben haben: ein
+  Protokoll, das einen Erfolg meldet, den es nicht gab, ist teurer als keins.
+  Deshalb ist die Löschreihenfolge in `app/wipe.py` eine Liste, und der Test
+  prüft gegen `Base.metadata` statt gegen Beispiele — eine Tabelle, nach der
+  niemand fragt, kann kein Test vermissen.
 - **Dialektklasse SQLite ↔ PostgreSQL:** `round()` nur für `numeric`,
   `DISTINCT` nicht über JSON-Spalten, `concat` erst ab SQLite 3.44, `extract`
   liefert auf PG Fließkomma. Dafür ist `pwsh tools/pg-test.ps1` da.
@@ -178,6 +201,14 @@ Gruppe A (A1–A48) und Gruppe B bis F21 sind gebaut, ebenso P2.1 (alle drei
 Stufen), P3.1, P5.1 und F1. Offen bis 1.0 sind nur noch **R1** (Demo-Modus,
 Härtung, Projektoberfläche) und **R2** (Doku-Seite) — Einzelheiten in
 `ROADMAP.md`.
+
+**Offen aus der Rückmeldung vom 2026-08-04** (Anmerkungen 168–172 sind erledigt):
+Der **LCP-Wert der Vektorkarte** (>4,9 s beim Wechsel auf Woche/Monat) ist NICHT
+behoben — nur der `styleimagemissing`-Fehler daneben. Der Moduswechsel baut die
+Basisebene nicht neu, eine offensichtliche Ursache steht nicht im Code; es fehlt
+eine Messung im Browser des Users (welches Element markiert das Performance-Panel
+als LCP?). Ebenfalls offen: die **Wahl des neuen Zeichens** (Icon), Vorschläge
+liegen als Mockup vor.
 
 **Doku-Umbau 2026-08-04.** `KONZEPT.md` ist aufgelöst: was das System IST steht
 in `ARCHITECTURE.md`, was OFFEN ist in `ROADMAP.md`, die geschlossenen Kapitel

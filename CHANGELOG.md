@@ -16,6 +16,28 @@ any `MINOR`.
 ## [Unreleased]
 
 ### Added
+- **Everything that takes a moment now says so, the same way everywhere.** One
+  progress panel over a blurred page: what is running, what it is doing right
+  now, how far along it is, roughly how much longer, and a cancel button. It
+  covers the backup import, the Google Timeline import, the AI analysis and
+  every view that has to fetch something — including “Today”, which used to keep
+  filling itself in after the page already looked finished. Cancelling stops
+  between steps and keeps what has been done; starting again continues from
+  there. Short waits are unaffected: the panel only appears once something takes
+  longer than a third of a second, so a quick view change looks exactly as it
+  did. Runs that continue on the server when you close the page — weather, place
+  names, recompute, Immich — are unchanged and stay in the *Jobs* tab, which is
+  now the actual dividing line: **the Jobs tab is what survives closing the
+  page; the panel is what does not.**
+- **The place names that cannot be resolved are now listed by name.** “9
+  unresolvable” was true and led nowhere — running again gives the same nine,
+  because a spot OpenStreetMap does not know will not be known tomorrow either.
+  *My data → Place names* now lists them with their coordinates, a link to that
+  point on the map, how many entries hang there, and the reason: never asked
+  yet, asked and nothing came back, name in a foreign script, or an answer that
+  does not fit your chosen format. **You can type the name yourself** — a forest
+  hut, a field track, a plot with no address — and a name you typed is never
+  overwritten by a later run. The visits at that place are renamed with it.
 - **Pick a place on the map instead of typing its name.** A 🗺️ button sits next
   to the place field when you record something, when you edit an entry and when
   you enter a baseline location: click the map, and *that* point is what gets
@@ -122,6 +144,26 @@ any `MINOR`.
   and your longest recorded trip.
 
 ### Fixed
+- **“Delete all my data” and “Delete all data” actually delete now.** Both
+  returned a server error, and the log said the data was gone while it was still
+  there — the deletion stopped halfway on a table nobody had listed, and
+  everything before it was rolled back. Deleting a user account failed the same
+  way. Three separate lists of what to delete have become one, so the next table
+  added to the system cannot go missing from only some of them. Two things that
+  were being left behind now go too: derived baseline weather, and photos that
+  belong to your account without hanging on any entry — those kept a row after
+  their file had already been deleted.
+- **Your baseline periods are part of the backup.** They were missing from both
+  the JSON export and the ZIP archive: the one table that exists purely because
+  you typed it in, unrecoverable from anything else, absent from the very backup
+  the delete dialog tells you to make first.
+- **The vector basemap no longer floods the browser console.** A third-party
+  style that asks for icons its own sprite sheet does not contain produced one
+  error message per icon *per map tile*. It is now said once, and the settings
+  page names which icons the style is missing — the map itself works, only that
+  icon is absent from those spots.
+- **The share entry in the app manifest declares its encoding**, which silences
+  a browser warning when the app is installed.
 - **The weather record lists show each day once.** “Coldest day” listed the
   same 11 January ten times over, once per photo taken that day — a ranking of
   entries under a heading that says *day*, and since every photo became an
@@ -178,6 +220,13 @@ any `MINOR`.
   change.
 
 ### Changed
+- **Both delete buttons ask for the same word.** “My data” wanted `LOESCHEN`,
+  “System” wanted `LÖSCHEN`. Both now ask for the word in your interface
+  language — `LÖSCHEN` in German, `DELETE` in English — and the server accepts
+  either along with the umlaut-free spelling. A typed confirmation is a brake
+  against a misclick, not a password, and a brake you cannot operate on your
+  keyboard is a wall. The system-wide delete is also checked by the server now,
+  not only by the browser.
 - **The effect badges under *My data* all sit in the same spot now** — at the
   right-hand end of the heading of whatever they describe. They used to be in
   three different places (beside the section heading, at the end of a card
