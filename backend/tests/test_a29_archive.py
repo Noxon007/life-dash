@@ -267,7 +267,7 @@ def test_wipe_removes_rows_and_files(db, user, media_tmp, monkeypatch):
     monkeypatch.setattr(admin, "SessionLocal", lambda: db)
     monkeypatch.setattr(admin, "engine", db.get_bind())
 
-    result = admin.wipe_data()
+    result = admin.wipe_data(confirm="LÖSCHEN")
 
     assert result["total"] > 0
     assert result["media_files"] == 1
@@ -292,7 +292,7 @@ def test_wipe_deletes_files_only_after_the_database(db, user, media_tmp, monkeyp
     monkeypatch.setattr(admin, "engine", _Boom())
 
     with pytest.raises(RuntimeError):
-        admin.wipe_data()
+        admin.wipe_data(confirm="LÖSCHEN")
 
     assert original.is_file()          # Foto überlebt den Fehlschlag
 

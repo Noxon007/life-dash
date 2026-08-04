@@ -152,7 +152,10 @@ def test_wipe_leaves_other_users_untouched(db, user, other):
 
 def test_wipe_needs_the_typed_confirmation(db, user):
     _populate(db, user)
-    for wrong in ("", "ja", "loeschen bitte", "DELETE"):
+    # „DELETE" fehlt hier bewusst: es IST seit 0.40 gültig (die englische
+    # Oberfläche verlangt genau das). Welche Wörter zählen, steht in
+    # `app.wipe` und wird in test_wipe_completeness.py geprüft.
+    for wrong in ("", "ja", "loeschen bitte", "LÖSCH"):
         with pytest.raises(HTTPException) as exc:
             wipe_my_data(confirm=wrong, db=db, user=user)
         assert exc.value.status_code == 400

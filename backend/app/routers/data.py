@@ -9,14 +9,14 @@ from __future__ import annotations
 
 import logging
 import zipfile
-from datetime import datetime, timezone
+from datetime import date as date_type, datetime, timezone
 from pathlib import Path
 from typing import Annotated, Any
 
 from dateutil import parser as dateparser
 from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
-from sqlalchemy import DateTime
+from sqlalchemy import Date, DateTime
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
@@ -25,7 +25,9 @@ from app.database import get_db
 from app.joblog import Progress
 from app.services import archive
 from app.services import media as media_svc
+from app.wipe import is_delete_word, wipe_user_rows
 from app.models import (
+    BaselineLocation,
     Entity,
     Event,
     EventEntityLink,
@@ -45,11 +47,15 @@ EXPORT_VERSION = 1
 
 
 def _row_to_dict(obj) -> dict:
-    """ORM-Zeile -> JSON-fähiges Dict (Datetimes als ISO-Strings)."""
+    """ORM-Zeile -> JSON-fähiges Dict (Zeitpunkte und Tage als ISO-Strings)."""
     out: dict[str, Any] = {}
     for col in obj.__table__.columns:
         val = getattr(obj, col.name)
+        # Reihenfolge ist Pflicht: `datetime` IST ein `date`. Andersherum
+        # geprüft verlöre jeder Zeitstempel seine Uhrzeit.
         if isinstance(val, datetime):
+            val = val.isoformat()
+        elif isinstance(val, date_type):
             val = val.isoformat()
         elif hasattr(val, "value"):  # Enum
             val = val.value
@@ -58,7 +64,7 @@ def _row_to_dict(obj) -> dict:
 
 
 def _dict_to_kwargs(model, data: dict) -> dict:
-    """JSON-Dict -> Spalten-Werte (ISO-Strings zurück zu Datetimes)."""
+    """JSON-Dict -> Spalten-Werte (ISO-Strings zurück zu Zeitpunkten/Tagen)."""
     kwargs: dict[str, Any] = {}
     for col in model.__table__.columns:
         if col.name not in data:
@@ -66,6 +72,12 @@ def _dict_to_kwargs(model, data: dict) -> dict:
         val = data[col.name]
         if val is not None and isinstance(col.type, DateTime):
             val = dateparser.parse(str(val))
+        elif val is not None and isinstance(col.type, Date):
+            # Ein reiner Tag muss auch als `date` ankommen und nicht als
+            # `datetime` mit 00:00 — sonst steht in `baseline_locations`
+            # etwas, das die Grundort-Rechnung anders vergleicht als das,
+            # was sie selbst schreibt.
+            val = dateparser.parse(str(val)).date()
         kwargs[col.name] = val
     return kwargs
 
@@ -107,6 +119,13 @@ def export_data(
                        .filter(Entity.user_id == user.id).all())
     events = _loaded("Ereignisse", _kept(db.query(Event), Event))
     tracks = _loaded("Wege", _kept(db.query(Track), Track))
+    # F20: Die Grundort-Zeiträume sind Lebensdatenbank — eine Zeile, von Hand
+    # eingetragen, aus nichts wiederherstellbar. Bis hierher fehlten sie im
+    # Export: eine Sicherung, die vollständig AUSSIEHT und die einzige
+    # handgepflegte Tabelle auslässt. `exclude_source` gilt für sie nicht, sie
+    # haben keine Quelle — sie sind selbst die Quelle.
+    baselines = _loaded("Grundorte", db.query(BaselineLocation)
+                        .filter(BaselineLocation.user_id == user.id).all())
     event_ids = {e.id for e in events}
     links = [
         l for l in db.query(EventEntityLink).all() if l.event_id in event_ids
@@ -132,7 +151,7 @@ def export_data(
     # der Doku. Das schließt A29 (ZIP-Export mit Dateien) später sauber ab.
     uploads = sum(1 for m in media if m.provider == "local")
     total = sum(len(x) for x in (fragments, locations, entities, events,
-                                 links, media, metrics, tracks))
+                                 links, media, metrics, tracks, baselines))
     log.info("Export fertig: %d Zeilen, davon %d Bilder als Verweis "
              "(Dateien liegen nicht im JSON)", total, uploads)
     return {
@@ -154,6 +173,11 @@ def export_data(
         "media_refs": [_row_to_dict(x) for x in media],
         "metrics": [_row_to_dict(x) for x in metrics],
         "tracks": [_row_to_dict(x) for x in tracks],
+        # Neuer Schlüssel, aber KEINE neue Export-Version: der Import liest
+        # jeden Block mit `payload.get(key, [])`, ein älterer Export bringt
+        # den Schlüssel eben nicht mit. Eine Versionsnummer hochzuzählen
+        # hieße „ab hier inkompatibel", und das ist es nicht.
+        "baseline_locations": [_row_to_dict(x) for x in baselines],
     }
 
 
@@ -257,31 +281,20 @@ def wipe_my_data(
     Reihenfolge wie in Anmerkung 59: erst die Dateinamen einsammeln, dann die
     Zeilen löschen, **dann** die Dateien. Andersherum hinterließe ein Fehler
     mittendrin den schlimmsten Zustand — Bilder weg, Daten noch da.
-    """
-    if confirm.strip().upper() != "LOESCHEN":
-        raise HTTPException(
-            400, "Zum Bestätigen bitte LOESCHEN eingeben — das lässt sich nicht rückgängig machen.")
 
-    event_ids = [i for (i,) in db.query(Event.id).filter(Event.user_id == user.id).all()]
+    WELCHE Tabellen und in welcher Reihenfolge, steht in `app.wipe` — dieselbe
+    Liste, die der Admin-Weg liest.
+    """
+    if not is_delete_word(confirm):
+        raise HTTPException(
+            400, "Zum Bestätigen bitte LÖSCHEN eingeben — das lässt sich nicht rückgängig machen.")
+
+    events = db.query(Event).filter(Event.user_id == user.id).count()
     doomed = media_svc.list_uploads_for_user(db, user.id)
 
-    # A34: je Tabelle protokollieren — bei großen Beständen dauert das
-    deleted: dict[str, int] = {}
     log.warning("Eigene Daten löschen: beginne (%d Events, %d Bilddateien, user=%s)",
-                len(event_ids), len(doomed), user.email or user.id)
-    if event_ids:
-        for model, key in ((Metric, "metrics"), (MediaRef, "media_refs"),
-                           (EventEntityLink, "event_entity_links")):
-            deleted[key] = (db.query(model)
-                            .filter(model.event_id.in_(event_ids))
-                            .delete(synchronize_session=False))
-            log.info("  %s: %d Zeilen gelöscht", key, deleted[key])
-    for model, key in ((Track, "tracks"),
-                       (Event, "events"), (Entity, "entities"),
-                       (Location, "locations"), (Fragment, "fragments")):
-        deleted[key] = (db.query(model).filter(model.user_id == user.id)
-                        .delete(synchronize_session=False))
-        log.info("  %s: %d Zeilen gelöscht", key, deleted[key])
+                events, len(doomed), user.email or user.id)
+    deleted = wipe_user_rows(db, user.id, log)
     db.commit()
     files = media_svc.purge_files(doomed)
 
@@ -316,6 +329,8 @@ def import_data(
         ("media_refs", MediaRef, True),
         ("metrics", Metric, False),
         ("tracks", Track, True),
+        # Nach `locations`: die Zeile zeigt per Fremdschlüssel auf einen Ort.
+        ("baseline_locations", BaselineLocation, True),
     ]
     imported: dict[str, int] = {}
     skipped = 0

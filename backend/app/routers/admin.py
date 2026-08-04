@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import Annotated, Any
 
 from dateutil import parser as dateparser
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -35,6 +35,7 @@ from app.services.enrichment import auto_enrich_events, enrich_weather
 from app.schemas import AdminCreateUser
 from app.services.ingestion import reprocess_pending, reset_reprocess
 from app.services import media as media_svc
+from app.wipe import WIPE_ORDER, is_delete_word, wipe_user_rows
 
 log = logging.getLogger("lifedash.admin")
 
@@ -299,11 +300,19 @@ def enrich_weather_endpoint(limit: int = Query(25, ge=1, le=200)) -> dict:
 
 
 @router.post("/wipe-data")
-def wipe_data() -> dict:
+def wipe_data(confirm: Annotated[str, Body(embed=True)] = "") -> dict:
     """Löscht ALLE Lebensdaten (Stufe 1–3) unwiderruflich. Nutzer-Konten bleiben.
 
-    Die Bestätigungs-Nachfrage passiert im Frontend; dieser Endpoint ist
-    nur für Admins erreichbar (Router-Dependency)."""
+    Erreichbar nur für Admins (Router-Dependency) — und seit 0.40 auch nur mit
+    getipptem Losungswort. Bis dahin stand die Nachfrage allein im Frontend:
+    ein einzelnes `POST` ohne Rumpf leerte die Instanz. Für den unwiderruflichsten
+    Endpunkt des Systems war das die falsche Stelle für die einzige Bremse.
+    Welche Wörter gelten, steht in `app.wipe` — dieselbe Regel wie beim
+    Konto-Weg, der sie vorher anders schrieb.
+    """
+    if not is_delete_word(confirm):
+        raise HTTPException(
+            400, "Zum Bestätigen bitte LÖSCHEN eingeben — das lässt sich nicht rückgängig machen.")
     deleted: dict[str, int] = {}
     # F15: Erst merken, WELCHE Dateien es gibt — nach dem Löschen der Zeilen
     # ist das nicht mehr feststellbar. Gelöscht werden sie aber erst danach:
@@ -314,9 +323,11 @@ def wipe_data() -> dict:
         doomed = media_svc.list_uploads(db)
     finally:
         db.close()
-    # Reihenfolge beachtet die Fremdschlüssel (Kinder zuerst)
-    order = ["metrics", "media_refs", "event_entity_links", "tracks", "events",
-             "entities", "locations", "fragments"]
+    # Reihenfolge beachtet die Fremdschlüssel (Kinder zuerst) — sie steht in
+    # `app.wipe`, weil der Konto-Weg dieselbe braucht und eine zweite Kopie
+    # genau so auseinanderläuft, wie sie es getan hat: `baseline_locations`
+    # fehlte in beiden, aufgefallen ist es erst auf PostgreSQL.
+    order = [table for _model, table, _scope in WIPE_ORDER]
     # A34: je Tabelle eine Zeile ins Log. Ein Rundumschlag über eine große
     # Datenbank dauert; ohne Spur ist er von einem Hänger nicht zu unterscheiden.
     log.warning("Alle Daten löschen: beginne (%d Bilddateien vorgemerkt)", len(doomed))
@@ -488,34 +499,17 @@ def delete_user(
     if not target:
         raise HTTPException(404, "Nutzer nicht gefunden")
 
-    event_ids = select(Event.id).where(Event.user_id == user_id).scalar_subquery()
-    deleted: dict[str, int] = {}
     # F15: Bilddateien vor den Datensätzen — sonst bleiben sie auf der Platte.
     # F18: über den NUTZER, nicht über seine Ereignisse — Bilder können an
     # einem Tag statt an einem Ereignis hängen und wären sonst übersehen worden.
-    deleted["media_files"] = media_svc.purge_for_user(db, user_id)
-    # Kinder zuerst (Fremdschlüssel): Metriken/Medien/Links hängen an Events
-    deleted["metrics"] = (db.query(Metric)
-                          .filter(Metric.event_id.in_(event_ids))
-                          .delete(synchronize_session=False))
-    # F18: ebenfalls über den Nutzer — ein Bild am Tag hat kein Ereignis, über
-    # das es hier erwischt würde, und bliebe als Datensatz ohne Besitzer zurück.
-    deleted["media_refs"] = (db.query(MediaRef)
-                             .filter(MediaRef.user_id == user_id)
-                             .delete(synchronize_session=False))
-    deleted["event_entity_links"] = (db.query(EventEntityLink)
-                                     .filter(EventEntityLink.event_id.in_(event_ids))
-                                     .delete(synchronize_session=False))
-    deleted["tracks"] = (db.query(Track).filter(Track.user_id == user_id)
-                         .delete(synchronize_session=False))
-    deleted["events"] = (db.query(Event).filter(Event.user_id == user_id)
-                         .delete(synchronize_session=False))
-    deleted["entities"] = (db.query(Entity).filter(Entity.user_id == user_id)
-                           .delete(synchronize_session=False))
-    deleted["locations"] = (db.query(Location).filter(Location.user_id == user_id)
-                            .delete(synchronize_session=False))
-    deleted["fragments"] = (db.query(Fragment).filter(Fragment.user_id == user_id)
-                            .delete(synchronize_session=False))
+    deleted: dict[str, int] = {"media_files": media_svc.purge_for_user(db, user_id)}
+    # Reihenfolge und Tabellenliste stehen in `app.wipe` — hier stand bis 0.39
+    # die dritte handgeschriebene Kopie derselben Regel, und sie hatte
+    # dieselbe Lücke wie die beiden anderen (`baseline_locations`,
+    # `day_metrics`). Hier wog sie am schwersten: die Zeilen zeigen auch auf
+    # `users`, das gleich darauf gelöscht wird — auf PostgreSQL scheiterte
+    # also nicht nur ein Teil, sondern der ganze Vorgang.
+    deleted |= wipe_user_rows(db, user_id, log)
     db.delete(target)
     db.commit()
     log.warning("Nutzer gelöscht: %s (%d Datenzeilen: %s)",
