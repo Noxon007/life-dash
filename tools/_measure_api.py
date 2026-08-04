@@ -5,7 +5,7 @@ import os
 import random
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 sys.path.insert(0, os.path.abspath("backend"))
 DB = "_measure.db"
@@ -19,8 +19,9 @@ from fastapi.testclient import TestClient   # noqa: E402
 
 from app.database import SessionLocal       # noqa: E402
 from app.main import app                    # noqa: E402
-from app.models import (ConfirmState, DatePrecision, Event,  # noqa: E402
-                        Location, Metric, Source, User)
+from app.models import (BaselineLocation, ConfirmState,  # noqa: E402
+                        DatePrecision, DayMetric, Event, Location, Metric,
+                        Source, User)
 
 N_EVENTS = int(os.environ.get("N", "20000"))
 CITIES = [("Detmold", 51.93, 8.87), ("London", 51.50, -0.12), ("Palma", 39.57, 2.65),
@@ -59,6 +60,28 @@ with TestClient(app):
             db.commit()
     db.commit()
     print(f"{N_EVENTS} Ereignisse angelegt in {time.monotonic() - t:.1f}s")
+
+    # Anmerkung 185: ein Wohnort VOR den Ereignissen, mit Tageswetter — der
+    # Fall, für den `weather_day` seit dieser Anmerkung prüft, ob ein Tag
+    # überhaupt noch einer ist, den der Wohnort füllt. Ohne diese Zeilen misst
+    # der Lauf die Bedingung über einer leeren Tabelle, also nichts.
+    home = Location(user_id=user.id, name="Elternhaus", city="Bad Segeberg",
+                    lat=53.93, lng=10.31, country="X")
+    db.add(home)
+    db.flush()
+    db.add(BaselineLocation(user_id=user.id, location_id=home.id,
+                            date_start=date(1990, 1, 1), date_end=date(2005, 12, 31)))
+    day = date(1990, 1, 1)
+    n_days = 0
+    while day <= date(2005, 12, 31):
+        for key, value in (("temp_max_c", 18.0), ("temp_min_c", 7.0),
+                           ("sunshine_h", 5.0)):
+            db.add(DayMetric(user_id=user.id, day=day, key=key, value=value,
+                             source=Source.weather))
+        day += timedelta(days=1)
+        n_days += 1
+    db.commit()
+    print(f"{n_days} Wohnort-Tage mit je 3 Wetterwerten angelegt")
     db.close()
 
     client = TestClient(app)
@@ -87,7 +110,16 @@ with TestClient(app):
     # über nichts misst nichts.
     timed("…mit importierten Besuchen", "/api/events/on-this-day?include_imported=1")
     timed("/api/moderation/queue", "/api/moderation/queue")
+    # Anmerkung 185: die Tagesauskunft prüft seitdem je Zeile, ob der Tag noch
+    # einer ist, den der Wohnort füllt. Beide Spannen messen — die eines
+    # Zeitstrahl-Fensters und die des ganzen Lebens, weil die Erfolge und die
+    # Statistik ohne Fenster fragen.
+    timed("/api/days/weather (ein Monat)",
+          "/api/days/weather?from=2001-06-01&to=2001-06-30")
+    timed("/api/days/weather (alles)",
+          "/api/days/weather?from=1990-01-01&to=2026-12-31")
     print("\n=== Auf Klick ===")
+    timed("/api/achievements", "/api/achievements")
     timed("/api/stats/overview", "/api/stats/overview")
     timed("/api/events/map (ohne Fotos)", "/api/events/map?machine_proposals=0&photos=0")
     timed("/api/events/map (mit Fotos)", "/api/events/map?machine_proposals=0")

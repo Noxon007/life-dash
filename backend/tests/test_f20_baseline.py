@@ -29,7 +29,7 @@ from app.database import get_db
 from app.main import app
 from app.models import (BaselineLocation, ConfirmState, DatePrecision, DayMetric,
                         Event, Location, Source, User, UserRole)
-from app.services import baseline
+from app.services import baseline, weather_day
 from app.services.enrichment import enrich_weather
 from app.services.stats_overview import compute_overview
 from app.services.stats_toplists import compute_toplists
@@ -349,20 +349,110 @@ def test_day_weather_survives_a_moved_period_and_can_be_cleared(client, db, user
                                                                fake_weather):
     """Es ist eine Tatsache über (Tag, Ort), nicht über den Zeitraum — also
     bleibt es stehen und wird nur nicht mehr gelesen. Weg kommt es auf
-    ausdrücklichen Knopfdruck, weil Schicht 4 verwerfbar ist."""
+    ausdrücklichen Knopfdruck, weil Schicht 4 verwerfbar ist.
+
+    **Anmerkung 185: die zweite Hälfte dieses Satzes war unbelegt.** Der Test
+    prüfte, dass die Zeilen STEHEN BLEIBEN, und nicht, dass sie nicht mehr
+    gelesen werden — und gelesen wurden sie. Ein Tag, der aus dem Zeitraum
+    gefallen ist, steht in keiner Ansicht mehr; die Erfolge zählen aber TAGE,
+    und er zählte weiter als Sonnentag.
+    """
     loc = _loc(db, user, "Kiel")
     row = _base(db, user, loc, date(2024, 9, 1), date(2024, 9, 3))
     db.commit()
     enrich_weather(db)
     before = db.query(DayMetric).count()
     assert before > 0
+    assert "2024-09-03" in weather_day.day_values(db, user.id)
 
     client.patch(f"/api/baselines/{row.id}", json={"date_end": "2024-09-01"})
     assert db.query(DayMetric).count() == before
+    # …und ab jetzt schweigt der Tag, obwohl seine Zeile noch da ist.
+    vals = weather_day.day_values(db, user.id)
+    assert "2024-09-01" in vals
+    assert "2024-09-03" not in vals
+
+    # Und er gilt wieder, sobald der Zeitraum ihn zurückholt — das ist der
+    # Grund, aus dem die Zeilen liegen bleiben statt gelöscht zu werden.
+    client.patch(f"/api/baselines/{row.id}", json={"date_end": "2024-09-03"})
+    assert "2024-09-03" in weather_day.day_values(db, user.id)
 
     r = client.post("/api/baselines/weather/clear")
     assert r.status_code == 200 and r.json()["removed"] == before
     assert db.query(DayMetric).count() == 0
+
+
+def test_a_later_entry_takes_the_day_back_from_the_residence(db, user,
+                                                             fake_weather):
+    """Anmerkung 185 — der gemeldete Fall: eine Reise mit zwölf Tages-Einträgen.
+
+    Die zwölf Tage gehören danach der Reise. Ihr am Wohnort geholtes Wetter
+    steht noch in der Datenbank, darf aber nicht mehr in die Tagesauskunft —
+    sonst zeigte ein Tag auf Paxos das Wetter von zu Hause, und über das
+    `min()` gewänne der kältere Wert sogar gegen das echte Reisewetter.
+    """
+    home = _loc(db, user, "Elternhaus", lat=53.93, lng=10.31)
+    away = _loc(db, user, "Gaios", lat=39.20, lng=20.18)
+    _base(db, user, home, date(2024, 8, 1), date(2024, 8, 31))
+    db.commit()
+    enrich_weather(db)
+    assert "2024-08-10" in weather_day.day_values(db, user.id)
+
+    for day in range(5, 17):
+        _event(db, user, datetime(2024, 8, day, 12), loc=away, title="Paxos")
+    db.commit()
+
+    vals = weather_day.day_values(db, user.id)
+    assert "2024-08-10" not in vals, (
+        "der Tag gehört jetzt der Reise — das Wetter zu Hause ist keine "
+        "Auskunft über ihn")
+    assert "2024-08-20" in vals, "die übrigen Tage des Zeitraums bleiben"
+
+    # Und mit Wetter am Reise-Eintrag steht dessen Wert da, nicht der alte.
+    enrich_weather(db)
+    assert weather_day.day_values(db, user.id)["2024-08-10"]
+
+
+def test_the_two_forms_of_the_gap_rule_agree(db, user):
+    """Anmerkung 185: `inferred_days` (Python) und `inferred_day_clause` (SQL).
+
+    Zwei Fassungen einer Regel laufen still auseinander — deshalb werden sie
+    hier auf DEMSELBEN Bestand gegeneinander geprüft, mit allem, worin sie sich
+    unterscheiden könnten: ein offener Zeitraum, ein Tag mit Eintrag mitten
+    darin, ein Tag außerhalb jedes Zeitraums und ein Zeitraum, dessen Ende in
+    der Zukunft liegt (er darf nur bis heute füllen).
+    """
+    loc = _loc(db, user, "Kiel")
+    today = date.today()
+    _base(db, user, loc, date(2024, 1, 1), date(2024, 1, 10))
+    _base(db, user, loc, today - timedelta(days=5), None)          # offen
+    _event(db, user, datetime(2024, 1, 5, 9), loc=loc)             # nimmt einen Tag
+    db.commit()
+
+    # Kandidaten: jeder Tag, über den überhaupt gestritten werden kann.
+    days = ([date(2023, 12, 31) + timedelta(days=i) for i in range(14)]
+            + [today - timedelta(days=i) for i in range(-3, 9)])
+    for day in days:
+        db.add(DayMetric(user_id=user.id, day=day, key="temp_max_c",
+                         value=1.0, source=Source.weather))
+    db.commit()
+
+    from_sql = {d for (d,) in db.query(DayMetric.day)
+                .filter(DayMetric.user_id == user.id,
+                        baseline.inferred_day_clause(db, user.id, DayMetric.day))
+                .all()}
+    from_sql = {d if isinstance(d, date) else date.fromisoformat(str(d)[:10])
+                for d in from_sql}
+    from_python = set(baseline.inferred_days(db, user.id, today=today))
+
+    assert from_sql == from_python & set(days), (
+        f"SQL: {sorted(from_sql)}\nPython: {sorted(from_python & set(days))}")
+    # Und die Fälle sind wirklich drin, nicht bloß beide leer:
+    assert date(2024, 1, 5) not in from_sql        # Tag mit Eintrag
+    assert date(2024, 1, 6) in from_sql            # Tag ohne
+    assert today in from_sql                       # offenes Ende reicht bis heute
+    assert today + timedelta(days=1) not in from_sql   # …und nicht weiter
+    assert date(2024, 2, 1) not in from_sql        # außerhalb jedes Zeitraums
 
 
 # --------------------------------------------------------------------------- #

@@ -142,6 +142,12 @@ Der wiederkehrende Defekt in diesem Projekt ist nicht Kaputtheit, sondern
   → `JSON(none_as_null=True)`, sonst findet `IS NULL` die Zeile nie.
 
 **Regeln, die sich verdoppeln**
+- **Eine Voraussetzung, die beim SCHREIBEN galt, gilt beim LESEN nicht mehr.**
+  Der Lauf legte die Zeile nur an, weil die Bedingung damals stimmte — und die
+  lesende Stelle berief sich darauf, dass sie stimmt. Dazwischen liegt jede
+  Änderung des Nutzers (Anmerkung 185: ein Wohnort-Tag, der nachträglich einen
+  Eintrag bekommt, brachte sein Wetter mit). Bedingungen über ABLEITUNGEN
+  gehören in die Abfrage, nicht in die Geschichte der Zeile.
 - **Eine Regel an zwei Orten läuft auseinander, und zwar still.** Bekommt ein
   Paket eine zweite Stufe oder eine zweite Quelle: die ältere Hälfte mit den
   Regeln der neueren lesen. EINE Liste, von beiden gelesen (`MACHINE_SOURCES`,

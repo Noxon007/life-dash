@@ -178,6 +178,17 @@ any `MINOR`.
   and your longest recorded trip.
 
 ### Fixed
+- **Days you take back from your residence no longer keep its weather.** Enter a
+  two-week trip as single days — or shorten a residence period — and those days
+  stop belonging to the residence. Their weather, fetched at home, used to stay
+  behind and keep counting: a day on a Greek island reported the temperature in
+  your home town, and because the day rule takes the more cautious of two
+  values, the stale one even won against the real weather of the trip once that
+  arrived. Days that had dropped out of a shortened period were counted towards
+  badges as well, although nothing placed you anywhere that day. Nothing is
+  deleted, so the values come back by themselves if you remove the entry or
+  extend the period again. The day counts in the statistics were never affected
+  — those are recomputed from scratch every time you look.
 - **A residence can be corrected after the fact.** Label, place and period — all
   three, from the same form you entered it with, including picking the place on
   the map again. Until now a typo in the label meant deleting the period and

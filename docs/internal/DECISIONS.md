@@ -1167,6 +1167,21 @@ and no change, and one that turned out to be the same defect in two places.
 
     Two smaller things fell out of building it. A gap taken over from the statistics now cancels an active edit — otherwise the next “save” would have overwritten the edited period with the gap's dates, wordlessly. And `runForeground` restored `fgOp.title` in a `finally` through the module variable: if the outer run finished first, the cleanup threw **instead of** whatever the inner run produced. It now holds a reference to its own operation.
 
+185. ✅ **An assumption that held when the row was written did not hold when it was read.** Asked: “what happens to the weather and the statistics if I now enter a trip as twelve single days and take those days away from my residence?”
+
+    **The statistics were already right.** Days per place, city and country, the gap report, the streaks — all of it is recomputed from `baseline.inferred_days` on every request, so the twelve days move from home to Paxos the moment the entries exist. Nothing is stored, nothing needs updating. That half of F20 did exactly what it was built for.
+
+    **The weather was wrong, silently.** `weather_day._rows` unions event weather and day weather, and its own docstring justified that with the disjointness: a residence only fills gaps, so no day carries both. True — *at the moment the day weather is written*. The run only creates rows for days that are gaps right then. A day can lose that status afterwards, in two ways:
+
+    - **It gets an entry.** The twelve `DayMetric` rows, fetched at the residence's coordinates, stayed and kept being counted. Reproduced: the day on Paxos reported 22 °C from Bad Segeberg — and once the trip entries had their own weather, the `min()` rule made the *stale* value win at 22 °C against the real 31.5 °C.
+    - **The period shrinks or is deleted.** Then the day appears in no view at all — but the badges count *days*, and such a day still counted as a sunny one, with nothing placing anybody anywhere that day. The neighbouring test's docstring claimed the rows “are only no longer read”; it asserted that they survive and never that they are ignored. A test whose prose is ahead of its assertions is the expensive kind.
+
+    The fix is to **ask** the condition rather than assume it: a day value counts only while that day is one the residence actually fills. Since `weather_day`'s answer has to stay a *query* — the badges count and sum over it in SQL — the rule now exists twice, in Python (`inferred_days`) and as a SQL clause (`inferred_day_clause`). Two copies of one rule drift apart silently, which is why they sit **next to each other in the same file** and `test_f20_baseline.py` runs them against each other on one dataset, with an open period, a day with an entry, a day outside every period and a period ending in the future.
+
+    Nothing is deleted: the rows stay and count again by themselves if the entry is removed or the period grows back. That is what layer 4 means, and it is why the manual *discard day weather* button remains the only thing that throws them away.
+
+    Measured with `tools/_measure_api.py` (20,000 entries, 5,844 residence days, now part of what the tool builds): `/api/days/weather` for one month 21 → 30 ms, for a whole life 192 → 204 ms, `/api/stats/overview` 345 → 367 ms, `/api/achievements` 125 → 196 ms. The badges pay the most because they run the query once per badge; a wrong badge is worse than a slow one, and the numbers are now reproducible rather than argued about.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

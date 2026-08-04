@@ -47,6 +47,7 @@ from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from app.models import ConfirmState, DayMetric, Event, Location, Metric, Source
+from app.services import baseline
 from app.sqlutil import day_parts, weather_cell
 
 # Wetterwerte, die als Text gespeichert sind (`Metric.value_text`). Für sie
@@ -125,6 +126,34 @@ def _day_rows(db: Session, user_id: str, *, keys: tuple[str, ...] | None,
          .filter(DayMetric.user_id == user_id,
                  DayMetric.source == Source.weather,
                  DayMetric.key != REVISION_KEY))
+    # **Anmerkung 185 — ein Tageswert gilt nur, solange der Tag wirklich einer
+    # ist, den der Wohnort füllt.**
+    #
+    # Die Vereinigung in `_rows` beruht darauf, dass es zu keinem Tag beides
+    # gibt. Beim SCHREIBEN stimmte das (der Lauf legt nur für Lücken an), und
+    # deshalb galt es hier als bewiesen. Ein Tag kann seine Lage aber
+    # NACHTRÄGLICH verlieren, auf zwei Wegen:
+    #
+    #   * Er bekommt einen Eintrag. Wer eine zwölftägige Reise einträgt, nimmt
+    #     dem Wohnort zwölf Tage weg — deren am Wohnort geholtes Wetter blieb
+    #     stehen und wurde weitergerechnet. Das Ergebnis war das Wetter zu
+    #     Hause an einem Tag auf Paxos, und über das `min()` gewann es sogar
+    #     gegen das echte Reisewetter.
+    #   * Der Zeitraum schrumpft oder verschwindet. Dann steht der Tag in gar
+    #     keiner Ansicht mehr — aber die Erfolge zählen TAGE, und ein solcher
+    #     zählte als Sonnentag, ohne dass irgendetwas jemanden an dem Tag
+    #     irgendwohin stellt.
+    #
+    # Für die Erfolge ist es dieselbe Zeile mit umgekehrtem Vorzeichen: die
+    # Schwellenprüfung nimmt den GRÖSSTEN Wert des Tages, ein alter Wert konnte
+    # ein Abzeichen also auch verdienen.
+    #
+    # Die Bedingung wird deshalb ABGEFRAGT statt vorausgesetzt, und sie steht
+    # neben ihrer Python-Fassung in `services/baseline.py`. Sie ist eine
+    # Eigenschaft der Ableitung (Schicht 4), und eine Ableitung wird gerechnet,
+    # nicht nachgeführt (Anmerkung 144/145) — die Zeilen bleiben liegen und
+    # gelten von selbst wieder, sobald der Tag zurückfällt.
+    q = q.filter(baseline.inferred_day_clause(db, user_id, DayMetric.day))
     if keys:
         q = q.filter(DayMetric.key.in_(tuple(keys)))
     if start is not None:
@@ -152,6 +181,11 @@ def _rows(db: Session, user_id: str, *, confirmed_only: bool,
     zu keinem Tag beides (`services/baseline.py`). `test_f20_baseline.py` nagelt
     genau das fest, weil hier sonst der Tag mit Ereignis UND Tageswert
     unbemerkt zwei Werte bekäme.
+
+    **Und weil das eine Eigenschaft der ABLEITUNG ist, muss `_day_rows` sie
+    abfragen** (Anmerkung 185). Bis dahin verließ sich diese Vereinigung
+    darauf, dass sie beim Schreiben gegolten hat — ein Tag, der seinen Eintrag
+    nachträglich bekam, brachte seinen alten Tageswert mit.
     """
     return (_event_rows(db, user_id, confirmed_only=confirmed_only,
                         keys=keys, start=start, end=end)

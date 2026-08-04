@@ -32,7 +32,7 @@ from __future__ import annotations
 from datetime import date as date_type
 from datetime import datetime, time, timedelta
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import BaselineLocation, Event
@@ -147,6 +147,42 @@ def inferred_days(db: Session, user_id: str, *, start: date_type | None = None,
                 out[day] = row
             day += step
     return out
+
+
+def inferred_day_clause(db: Session, user_id: str, day_col):
+    """Dieselbe Frage wie `inferred_days`, aber als SQL-Bedingung über `day_col`.
+
+    **Anmerkung 185 — warum es diese Regel zweimal gibt.** `inferred_days` holt
+    die Tage in den Arbeitsspeicher; das geht überall dort, wo ohnehin über sie
+    iteriert wird. `weather_day` kann das nicht: seine Auskunft ist eine QUERY,
+    über der die Erfolge in SQL zählen und summieren, und ein Bestand mit 12 000
+    Ereignissen soll dafür nicht durch Python.
+
+    Zwei Fassungen einer Regel laufen still auseinander — das ist in diesem
+    Projekt der teuerste Defekt, den es gibt. Deshalb stehen sie in DERSELBEN
+    Datei nebeneinander, und `test_f20_baseline.py` prüft sie auf demselben
+    Bestand gegeneinander: was die eine liefert, muss die andere liefern.
+
+    Die Regel, ausgeschrieben: der Tag liegt in einem Zeitraum, er liegt nicht
+    in der Zukunft (ein offenes Ende reicht bis HEUTE, nicht bis morgen — siehe
+    `spans`), und an ihm steht kein Eintrag.
+    """
+    today = func.current_date()
+    covered = (db.query(BaselineLocation.id)
+               .filter(BaselineLocation.user_id == user_id,
+                       BaselineLocation.date_start <= day_col,
+                       day_col <= today,
+                       or_(BaselineLocation.date_end.is_(None),
+                           day_col <= BaselineLocation.date_end))
+               .exists())
+    # Der Tag darf keinen Eintrag tragen — die Lückenregel, die diese Datei
+    # überhaupt trägt. Als Anti-Join und nicht als `EXISTS` je Zeile: ein
+    # Bestand mit vierzig Jahren Wohnort trägt sechsstellig viele Tageswerte,
+    # und `date()` über einer Spalte kann kein Index bedienen.
+    taken = (db.query(func.date(Event.date_start))
+             .filter(Event.user_id == user_id, Event.date_start.isnot(None))
+             .distinct().scalar_subquery())
+    return covered & day_col.notin_(taken)
 
 
 def overlaps(periods: list[Span], start: date_type, end: date_type | None,
