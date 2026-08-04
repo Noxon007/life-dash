@@ -13,8 +13,6 @@ node tools/check-shadowing.js       # nothing shadows the translation function t
 node tools/check-weather-summary.js # the weather record counts days, not entries — note 64
 node tools/check-jobs-table.js      # the jobs table renders rows — note 69
 node tools/check-basemaps.js        # background map selection and its guard rails — F13
-```
-
 node tools/check-i18n-containers.js # no translation wipes out a control — note 71
 node tools/check-weather-line.js    # slim and full lists render the same weather — A36
 node tools/check-a37-window.js      # no view loads the whole database — A37, note 81
@@ -26,7 +24,10 @@ node tools/check-a42-city-page.js   # a city opens a page, not an exit — A42, 
 node tools/check-a46-visit-split.js # cutting confirmed visits needs a preview first — A46, note 116
 node tools/check-photo-layer.js     # the photo layer says what it hides, and doubles nothing — A45
 node tools/check-tl-granularity.js  # the condensation level goes to the server — A47
-node tools/check-vector-basemap.js  # a vector map never fails silently — A48
+node tools/check-vector-basemap.js  # a vector map never fails silently — A48, note 171
+node tools/check-foreground.js      # every browser-paced run uses one progress panel — note 172
+node tools/check-wipe-word.js       # both delete buttons ask the same word, and the server accepts it — note 169
+```
 
 Each exits non-zero on failure, so they can be chained in CI later (package R1).
 `npm run check` runs all of them — including the last four, which until 0.35.0

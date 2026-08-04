@@ -117,6 +117,69 @@ setTimeout(() => {
     w.close();
   }
 
+  // --- 3. Fehlende Sprite-Symbole (Anmerkung 149) ------------------------ //
+  // Der gemeldete Fall: ein fremder Stil verlangt `arrow`, sein Sprite hat es
+  // nicht, und MapLibre meldet das je Symbol UND je Kachel — hunderte gleiche
+  // Zeilen, die jede echte Meldung aus der Konsole schieben.
+  //
+  // Der Zustand muss HERGESTELLT werden: eine Ebene bauen, sie „an eine Karte
+  // hängen", das Ereignis auslösen. Nur nachzusehen, ob es
+  // `vectorWatchMissingImages` GIBT, wäre grün, weil die Funktion existiert —
+  // nicht, weil sie etwas bewirkt.
+  {
+    const w = makeDom(true).window, ls = w.localStorage;
+    ls.setItem('lifedash_vectorstyle', STYLE);
+    ls.setItem('lifedash_basemap', 'vector');
+
+    // Ein Doppel, das GENAU die zwei Dinge kann, um die es geht: Ereignisse
+    // annehmen und Bilder entgegennehmen. Ein Auffang-Proxy, der für jede
+    // Eigenschaft sich selbst zurückgibt, wäre hier wertlos — er machte aus
+    // `hasImage()` etwas, das gar kein Boolean ist.
+    const added = [];
+    const handlers = {};
+    const glDouble = {
+      on: (name, fn) => { handlers[name] = fn; },
+      hasImage: id => added.includes(id),
+      addImage: (id, img) => added.push({ id, img }.id),
+    };
+    let addFn = null;
+    const layer = {
+      once: (name, fn) => { if (name === 'add') addFn = fn; },
+      getMaplibreMap: () => glDouble,
+    };
+    const warns = [];
+    const realWarn = w.console.warn;
+    w.console.warn = (...a) => warns.push(a.join(' '));
+
+    w.vectorWatchMissingImages(layer);
+    ok('Die Ebene horcht erst, wenn sie an einer Karte hängt', typeof addFn === 'function',
+       'getMaplibreMap() gibt es vorher gar nicht');
+    addFn();
+    ok('…und meldet sich dann bei styleimagemissing an',
+       typeof handlers.styleimagemissing === 'function');
+
+    handlers.styleimagemissing({ id: 'arrow' });
+    handlers.styleimagemissing({ id: 'arrow' });
+    handlers.styleimagemissing({ id: 'arrow' });
+    w.console.warn = realWarn;
+
+    ok('Ein fehlendes Symbol wird EINMAL gemeldet, nicht je Kachel',
+       warns.filter(m => /arrow/.test(m)).length === 1,
+       `${warns.filter(m => /arrow/.test(m)).length} Meldungen — die Konsole läuft wieder voll`);
+    ok('…und ein Platzhalter behebt es',
+       added.includes('arrow'),
+       'ohne addImage() meldet MapLibre bei jeder weiteren Kachel erneut');
+    ok('…genau einmal', added.filter(x => x === 'arrow').length === 1);
+
+    // Und der Betreiber erfährt es dort, wo er den Stil einträgt — die
+    // Konsole sieht er nie.
+    const note = w.document.getElementById('vec-missing');
+    ok('Der Hinweis steht in den Einstellungen',
+       note && note.style.display !== 'none' && /arrow/.test(note.textContent),
+       note ? `„${note.textContent}"` : 'kein Feld');
+    w.close();
+  }
+
   console.log(fail ? `\nA48-Vektorkarte: ${fail} Prüfung(en) fehlgeschlagen`
                    : '\nA48-Vektorkarte: alles grün');
   process.exit(fail ? 1 : 0);

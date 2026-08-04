@@ -790,26 +790,53 @@
   .login-box .logo { justify-content: center; padding-bottom: 8px; font-size: 24px; }
   .login-box p { color: var(--text-dim); font-size: 13px; line-height: 1.6; margin: 0 0 24px; }
 
-  /* ---------- Lade-Overlay (KI-Analyse etc.) ---------- */
+  /* ---------- Lade-Overlay (jeder Vordergrund-Lauf, F23) ----------
+     Ein Bauteil für alles, was der BROWSER taktet: Titel, was gerade getan
+     wird, Balken, Rest-Schätzung, Abbrechen. Der Hintergrund wird deutlich
+     unscharf — nicht als Effekt, sondern als Aussage: solange das hier steht,
+     ist die Seite darunter nicht bedienbar, und das soll man sehen. */
   .loading-overlay {
     position: fixed; inset: 0; z-index: 2500; display: none;
     align-items: center; justify-content: center; flex-direction: column; gap: 16px;
-    background: rgba(10,12,20,.6); backdrop-filter: blur(2px);
+    background: rgba(10,12,20,.55); backdrop-filter: blur(6px);
   }
   .loading-overlay.show { display: flex; }
+  .loading-card {
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: 16px;
+    padding: 26px 28px; display: flex; flex-direction: column; align-items: center;
+    gap: 12px; box-shadow: 0 18px 48px rgba(0,0,0,.45);
+    max-width: min(420px, 88vw); text-align: center;
+  }
   .loading-overlay .spinner {
     width: 46px; height: 46px; border-radius: 50%;
     border: 4px solid rgba(91,140,255,.25); border-top-color: var(--accent);
     animation: spin .8s linear infinite;
   }
-  .loading-overlay .loading-text { color: var(--text); font-size: 14px; font-weight: 600; }
+  .loading-overlay .loading-text { color: var(--text); font-size: 15px; font-weight: 600; }
+  /* Was gerade getan wird — der Satz, der einen Balken von einer Sanduhr
+     unterscheidet. Feste Höhe, damit die Karte nicht bei jedem Schritt
+     springt. */
+  .loading-note {
+    color: var(--text-dim); font-size: 12.5px; min-height: 17px;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
   @keyframes spin { to { transform: rotate(360deg); } }
   /* Fortschrittsbalken im Lade-Overlay (A2) */
   .loading-bar {
-    width: min(340px, 80vw); height: 8px; border-radius: 6px;
+    width: min(340px, 72vw); height: 8px; border-radius: 6px;
     background: var(--bg-elev); overflow: hidden; display: none;
   }
   .loading-bar-fill { height: 100%; width: 0%; background: var(--accent); border-radius: 6px; transition: width .2s; }
+  /* Zahlen und Rest-Schätzung nebeneinander: links, wie weit — rechts, wie
+     lange noch. Tabellenziffern, damit die Zahl beim Zählen nicht zappelt. */
+  .loading-meta {
+    display: flex; gap: 14px; justify-content: space-between; align-items: baseline;
+    width: min(340px, 72vw); font-size: 12px; color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+  }
+  .loading-meta:empty { display: none; }
+  #loading-cancel { margin-top: 2px; }
+  #loading-cancel[hidden] { display: none; }
   /* A30: schmaler Balken am oberen Rand, solange Anfragen laufen. Bewusst
      unbestimmt (kein Prozentwert) — die Antwortgröße ist vorher unbekannt. */
   #net-bar { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 4000;
@@ -1062,11 +1089,17 @@
   <!-- A30: Netz-Anzeige — signalisiert laufende Anfragen -->
   <div id="net-bar" aria-hidden="true"></div>
 
-  <!-- LADE-OVERLAY (KI-Analyse etc.) -->
-  <div class="loading-overlay" id="loading-overlay">
-    <div class="spinner"></div>
-    <div class="loading-text" id="loading-text" data-i18n="loading.ai">🤖 KI analysiert…</div>
-    <div class="loading-bar" id="loading-bar"><div class="loading-bar-fill" id="loading-bar-fill"></div></div>
+  <!-- LADE-OVERLAY — jeder Vordergrund-Lauf (F23). role=status + aria-live:
+       ein Screenreader soll den Fortschritt hören, nicht nur den Anfang. -->
+  <div class="loading-overlay" id="loading-overlay" role="status" aria-live="polite">
+    <div class="loading-card">
+      <div class="spinner"></div>
+      <div class="loading-text" id="loading-text" data-i18n="loading.ai">🤖 KI analysiert…</div>
+      <div class="loading-note" id="loading-note"></div>
+      <div class="loading-bar" id="loading-bar"><div class="loading-bar-fill" id="loading-bar-fill"></div></div>
+      <div class="loading-meta" id="loading-meta"></div>
+      <button class="btn ghost" id="loading-cancel" hidden data-i18n="loading.cancel">Abbrechen</button>
+    </div>
   </div>
 
   <!-- Toasts (A1) -->
@@ -2070,6 +2103,24 @@
               <b>höchstens einmal</b> gefragt; lange Adressen werden auf die unten gewählten Bausteine gekürzt.
               Details in der README-Anleitung (Schritt 3).</div>
           </div>
+          <!-- Anmerkung 148: Die Orte, an denen der Lauf scheitert, beim Namen
+               nennen. „9 nicht auflösbar" ist richtig und führt nirgendwohin —
+               ein Punkt, den OpenStreetMap nicht kennt, ist morgen auch nicht
+               bekannt. Der nächste Schritt kann nur Handarbeit sein, und dafür
+               muss man erst einmal sehen, um welche Orte es geht. -->
+          <div class="action-row" id="open-places-row" style="display:none">
+            <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
+              <button class="btn secondary" id="btn-open-places" style="text-align:left"
+                      data-i18n="op.show">📋 Offene Orte ansehen</button>
+            </div>
+            <div class="action-desc">
+              <span data-i18n="op.desc"><b>Was der Lauf nicht benennen konnte</b> — mit Koordinaten und
+              Grund. Nicht jeder Punkt der Welt steht in OpenStreetMap: eine Waldhütte, ein Feldweg, ein
+              Grundstück ohne Adresse bleiben offen, so oft man auch fragt. Hier lässt sich der Name
+              <b>von Hand</b> setzen; ein solcher Name wird von keinem Lauf mehr überschrieben.</span>
+              <div id="open-places" style="margin-top:10px"></div>
+            </div>
+          </div>
           <details class="adv">
             <summary data-i18n="adm.format">📐 Anzeige-Format der Adressen</summary>
             <div class="adv-body">
@@ -2359,6 +2410,10 @@
               Die Attribution verlangt fast jede Quelle in ihren Nutzungsbedingungen. Beide Angaben bleiben
               auf diesem Gerät.</span>
               <div id="vector-state" class="hint" style="display:none; margin-top:8px"></div>
+              <!-- Anmerkung 149: Welche Symbole der Stil verlangt, ohne sie
+                   mitzubringen. Steht hier und nicht nur in der Konsole — wer
+                   diese Instanz betreibt, sieht die Konsole nie. -->
+              <div id="vec-missing" class="hint" style="display:none; margin-top:6px"></div>
               <div style="margin-top:8px"><button class="btn small secondary" id="vector-save" data-i18n="adm.basemap.save">Speichern</button></div>
             </div>
           </div>
@@ -2759,23 +2814,157 @@ function clearBanner() {
   const b = document.getElementById('conn-banner');
   if (b) b.remove();
 }
-// Vollbild-Lade-Overlay (z. B. während der KI-Analyse). showLoading(false) blendet aus.
-function showLoading(text) {
-  const ov = document.getElementById('loading-overlay');
-  if (!ov) return;
-  document.getElementById('loading-bar').style.display = 'none'; // Balken nur via showProgress
-  if (text === false) { ov.classList.remove('show'); return; }
-  if (typeof text === 'string') document.getElementById('loading-text').textContent = text;
+// ---------------------------------------------------------------------------
+// F23 — Vordergrund-Läufe: EIN Bauteil, eine Regel
+// ---------------------------------------------------------------------------
+// Die Regel, nach der sich entscheidet, wo etwas erscheint (ARCHITECTURE
+// Kap. 8). Zwei Fragen, die bis 0.39 durcheinandergingen:
+//
+//   1. WER TAKTET den Lauf?
+//        Server  → Job-Runner, läuft weiter, wenn die Seite zugeht → Jobs-Reiter
+//        Browser → Vordergrund-Lauf, endet mit der Seite → dieses Overlay
+//   2. WIRD ER REGISTRIERT? (`startJob`) — eine Sperre je Typ und ein
+//      Protokolleintrag. Unabhängig von Frage 1: der Backup-Import wird vom
+//      BROWSER getaktet und ist trotzdem ein Job, damit kein zweiter Tab
+//      denselben Import noch einmal anfängt. Registrierte Vordergrund-Läufe
+//      stehen deshalb an BEIDEN Stellen — das ist kein Widerspruch, sondern
+//      die Antwort auf zwei verschiedene Fragen.
+//
+// Alles darunter — eine einzelne kurze Anfrage — bekommt den Netzbalken oben
+// (A30) und sonst nichts.
+//
+// Warum das Overlay verzögert erscheint: die meisten Ansichtswechsel sind nach
+// 150 ms fertig. Ein Vollbild-Overlay, das dafür aufblitzt, ist schlimmer als
+// keins — es macht aus einem flüssigen Wechsel ein Flackern. Wer schneller ist
+// als `FG_DELAY`, wird gar nicht erst angezeigt; sichtbar wird nur, was
+// wirklich dauert.
+const FG_DELAY = 300;
+// Der gerade laufende Vordergrund-Lauf, oder null. Verschachtelung ist
+// erlaubt und ändert nichts: `refreshAll()` ruft fünf Lader, und fünf
+// konkurrierende Overlays wären fünfmal dasselbe Flackern. Der innere Lauf
+// benutzt den äußeren weiter und schließt ihn nicht.
+let fgOp = null;
+
+function fgEl(id) { return document.getElementById(id); }
+
+// Rest-Schätzung aus dem bisherigen Tempo. Bewusst erst ab 5 % und erst nach
+// einer Sekunde: eine Hochrechnung aus drei Zeilen sagt „noch 4 Stunden" und
+// ist damit keine Auskunft, sondern eine Falschmeldung.
+function fgEta(op) {
+  if (!op.total || op.done <= 0) return '';
+  const elapsed = Date.now() - op.startedAt;
+  if (elapsed < 1000 || op.done / op.total < 0.05) return '';
+  const left = Math.round(elapsed / op.done * (op.total - op.done) / 1000);
+  if (left < 5) return t('fg.eta.soon', 'gleich fertig');
+  const txt = left < 90 ? `${left} s`
+    : left < 5400 ? `${Math.round(left / 60)} min`
+    : `${Math.round(left / 3600)} h`;
+  return t('fg.eta', 'noch ~{t}').replace('{t}', txt);
+}
+
+function fgRender(op) {
+  const ov = fgEl('loading-overlay');
+  if (!ov || !op.visible) return;
+  fgEl('loading-text').textContent = op.title;
+  fgEl('loading-note').textContent = op.noteText || '';
+  const bar = fgEl('loading-bar');
+  // Ohne bekannte Gesamtmenge KEIN Balken: ein Balken, der bei 0 % steht und
+  // nie wächst, behauptet Stillstand. Dann trägt der Kreisel die Aussage.
+  bar.style.display = op.total ? '' : 'none';
+  if (op.total) {
+    fgEl('loading-bar-fill').style.width =
+      Math.min(100, Math.round(op.done / op.total * 100)) + '%';
+  }
+  const eta = fgEta(op);
+  fgEl('loading-meta').textContent = op.total
+    ? `${op.done.toLocaleString(LOC())} / ${op.total.toLocaleString(LOC())}`
+      + (op.unit ? ` ${op.unit}` : '') + (eta ? ` · ${eta}` : '')
+    : '';
+  const cancel = fgEl('loading-cancel');
+  cancel.hidden = !op.cancellable;
+  cancel.textContent = op.aborted
+    ? t('fg.stopping', '… wird abgebrochen')
+    : t('loading.cancel', 'Abbrechen');
+  cancel.disabled = !!op.aborted;
   ov.classList.add('show');
 }
-// Lade-Overlay mit Fortschrittsbalken (A2) — für Importe mit bekannter Gesamtmenge
-function showProgress(done, total, text) {
-  showLoading(text);
-  const bar = document.getElementById('loading-bar');
-  bar.style.display = '';
-  document.getElementById('loading-bar-fill').style.width =
-    (total ? Math.min(100, Math.round(done / total * 100)) : 0) + '%';
+
+// Ein Abbruch ist kein Fehler. Eigene Klasse, damit ein `catch` ihn von einem
+// echten Fehlschlag unterscheiden KANN — ein `catch`, das beides auf dieselbe
+// Meldung abbildet, trägt den Defekt statt ihn zu melden. Steht bewusst VOR
+// `runForeground`: `class` wird nicht hochgezogen.
+class FgAbort extends Error {
+  constructor() { super('abgebrochen'); this.name = 'FgAbort'; this.aborted = true; }
 }
+// Hat dieser Fehler „der Nutzer wollte nicht mehr" bedeutet? Auch ein vom
+// AbortController abgeschossener `fetch` landet hier (DOMException 'AbortError').
+function isAbort(err) {
+  return !!err && (err.name === 'FgAbort' || err.name === 'AbortError' || err.aborted);
+}
+
+// Der Lauf selbst. `fn(op)` bekommt ein Steuerobjekt:
+//   op.step(done, total, note) — Balken, Zahlen, Rest-Schätzung
+//   op.note(text)              — nur der Satz darunter
+//   op.aborted                 — hat der Nutzer abgebrochen?
+//   op.check()                 — wirft, wenn abgebrochen (für lange Ketten)
+//   op.signal                  — an `api()` weiterreichen; bricht die laufende
+//                                Anfrage wirklich ab, statt nur ihr Ergebnis
+//                                wegzuwerfen
+async function runForeground(title, fn, opts = {}) {
+  // Verschachtelt: den laufenden Vorgang weiterbenutzen. Nur der Titel wird
+  // übernommen, damit man sieht, woran es gerade hängt.
+  if (fgOp) {
+    const prev = fgOp.title;
+    if (title) { fgOp.title = title; fgRender(fgOp); }
+    try { return await fn(fgOp); }
+    finally { fgOp.title = prev; fgRender(fgOp); }
+  }
+  const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+  const op = {
+    title, done: 0, total: opts.total || 0, unit: opts.unit || '',
+    noteText: opts.note || '', startedAt: Date.now(), aborted: false,
+    visible: false, cancellable: opts.cancellable !== false,
+    signal: ctl ? ctl.signal : undefined,
+    step(done, total, note) {
+      op.done = done;
+      if (total != null) op.total = total;
+      if (note != null) op.noteText = note;
+      fgRender(op);
+    },
+    note(text) { op.noteText = text; fgRender(op); },
+    check() { if (op.aborted) throw new FgAbort(); },
+  };
+  const onCancel = () => {
+    op.aborted = true;
+    if (ctl) ctl.abort();
+    fgRender(op);
+  };
+  fgOp = op;
+  const timer = setTimeout(() => { op.visible = true; fgRender(op); }, FG_DELAY);
+  const cancelBtn = fgEl('loading-cancel');
+  if (cancelBtn) cancelBtn.addEventListener('click', onCancel);
+  try {
+    return await fn(op);
+  } finally {
+    clearTimeout(timer);
+    if (cancelBtn) cancelBtn.removeEventListener('click', onCancel);
+    fgOp = null;
+    const ov = fgEl('loading-overlay');
+    if (ov) ov.classList.remove('show');
+    if (cancelBtn) { cancelBtn.hidden = true; cancelBtn.disabled = false; }
+    fgEl('loading-note').textContent = '';
+    fgEl('loading-meta').textContent = '';
+    fgEl('loading-bar').style.display = 'none';
+  }
+}
+
+// `showLoading` / `showProgress` (A2) gibt es NICHT mehr. Sie waren der
+// zweite Weg, dasselbe Overlay zu füllen — ohne Rest-Schätzung, ohne
+// Abbrechen, ohne Aufräumen im `finally`, und jeder Aufrufer musste selbst
+// daran denken, `showLoading(false)` zu rufen. Genau daraus entstand der
+// gemeldete Zustand: manche Knöpfe zeigten etwas, manche nicht, und keiner
+// zeigte dasselbe. `tools/check-foreground.js` sorgt dafür, dass sie nicht
+// zurückkommen.
 
 // ---------- Toasts & Dialoge (A1) — Ersatz für alert()/confirm()/prompt() ----------
 function toast(msg, type = 'ok', ms = 5000) {
@@ -3329,7 +3518,7 @@ const I18N_EN = {
   'adm.wipemine': "Delete my data",
   'act.wipemine': "🗑️ Delete all my data",
   'act.wipemine.desc': "<b>Everything belonging to this account</b> — entries, items, places, routes, weather, uploaded photos and the raw inbox. The account itself stays, other users are unaffected. <b>This cannot be undone.</b> Take a backup first (above, with photos).",
-  'wipemine.ask': "All your entries, items, places, routes, photos and raw records will be permanently deleted. Type LOESCHEN to confirm.",
+  'wipemine.ask': "All your entries, items, places, routes, photos and raw records will be permanently deleted. Type {w} to confirm.",
   'wipemine.done': "✓ {rows} rows and {files} image files deleted.",
   'btn.delete': "Delete",
   'age.at': "at",
@@ -3474,6 +3663,15 @@ const I18N_EN = {
   'login.claim': "Your searchable life database.<br>Please sign in",
   'login.btn': "🔐 Sign in (SSO)",
   'loading.ai': "🤖 AI is analysing…",
+  'loading.ai.note': "Reading the text and splitting it into events …",
+  // F23 — das gemeinsame Fortschritts-Overlay
+  'loading.cancel': "Cancel",
+  'fg.stopping': "… cancelling",
+  'fg.eta': "~{t} left", 'fg.eta.soon': "almost done",
+  'fg.view': "Loading {v} …",
+  'fg.today': "📅 Loading today …",
+  'fg.today.counts': "Counters and time span",
+  'fg.today.otd': "“On this day” look-back",
   'logout': "Sign out",
   'ver.local': "Local build (not from CI)",
   'field.time.tip': "Time (optional)",
@@ -3729,16 +3927,38 @@ const I18N_EN = {
   'exp.places': "places", 'exp.tracks': "routes", 'exp.metrics': "metrics",
   'imp.btn': "Import data", 'imp.running': "… importing", 'imp.title': "Import",
   'imp.unit': "rows", 'imp.done': "Import finished:",
+  'imp.stopped': "Import cancelled — what was done stays:",
+  'imp.table': "Table: {t}",
+  'imp.zip.title': "Restoring backup",
+  'imp.zip.note': "The server is unpacking data and image files …",
   'tlimp.btn': "Import Google Timeline", 'tlimp.title': "Timeline import",
-  'tlimp.loading': "Importing timeline…", 'tlimp.unit': "segments",
+  'tlimp.unit': "segments",
   'tlimp.badfile': "Not a Google Timeline export: the file contains neither \"semanticSegments\" (device export) nor \"timelineObjects\" (Takeout).",
   'tlimp.done': "Timeline import finished:",
+  'tlimp.stopped': "Timeline import cancelled — what was done stays:",
+  'tlimp.note': "{v} visits, {t} routes so far",
   'tlimp.summary': "{v} visits as events, {t} routes.",
   'tlimp.skipped': "{n} duplicates skipped.", 'tlimp.dupes': "duplicates",
   'tlimp.range': "Period:",
   'tlimp.lowprob': "{n} visits below {p} % place certainty skipped.",
   'tlimp.unnamed': "{n} places still have no real name — run „Resolve place names“ below.",
   'tlimp.resolved': "{n} place names resolved directly.",
+  // Anmerkung 148 — die offenen Orte
+  'bm.vector.noimg': "Note: this style asks for icons its sprite does not contain ({n}). The map works; only the icon is missing in those spots.",
+  'op.show': "📋 Show open places", 'op.show.n': "{n} open places",
+  'op.desc': "<b>What the run could not name</b> — with coordinates and reason. Not every point on earth is in OpenStreetMap: a forest hut, a field track, a plot without an address stay open no matter how often you ask. You can set the name <b>by hand</b> here; such a name is never overwritten by a run.",
+  'op.r.nohit': "OpenStreetMap has nothing here",
+  'op.r.fresh': "not asked yet",
+  'op.r.unnamed': "coordinates only",
+  'op.r.labeled': "old label without an address",
+  'op.r.nonlatin': "name in a non-Latin script",
+  'op.r.verbose': "answer does not fit the chosen format",
+  'op.nocoords': "without coordinates", 'op.events': "{n} events",
+  'op.none': "Nothing open.",
+  'op.rename.tip': "Set the name by hand",
+  'op.rename.title': "✏️ Set place name",
+  'op.rename.ask': "What is this place called? The name then counts as your statement — no resolve run will overwrite it.",
+  'op.renamed': "✓ Place renamed — the visits are called that now, too.",
   // Ortsnamen-Format
   'fmt.min': "At least one building block has to stay selected.",
   'fmt.saved': "✓ Place name format saved — applies to all new lookups.",
@@ -3971,9 +4191,63 @@ function makeBaseLayer(cap) {
   const bm = currentBasemap();
   const maxZoom = Math.min(bm.maxZoom, cap);
   if (bm.vector) {
-    return L.maplibreGL({ style: bm.style(), attribution: bm.attribution() });
+    const layer = L.maplibreGL({ style: bm.style(), attribution: bm.attribution(),
+                                 maxZoom });
+    vectorWatchMissingImages(layer);
+    return layer;
   }
   return L.tileLayer(tileUrl(), { attribution: bm.attribution(), maxZoom });
+}
+
+// Anmerkung 149: Ein fremder Stil verlangt Symbole, die sein Sprite nicht
+// mitbringt — typisch `arrow` für Einbahnstraßen. MapLibre meldet das je
+// FEHLENDEM SYMBOL UND JE KACHEL: „Image "arrow" could not be loaded". Beim
+// Herumfahren werden daraus schnell hunderte Zeilen, die alle dasselbe sagen
+// und dabei jede echte Meldung aus der Konsole schieben.
+//
+// Die Antwort darauf ist nicht, den Fehler zu unterdrücken — sondern ihn
+// EINMAL zu sagen und dann zu beheben. Ein durchsichtiges 1×1-Bild an der
+// Stelle des fehlenden Symbols ist genau die Behebung, die MapLibre selbst
+// vorschlägt (`styleimagemissing`): die Ebene zeichnet sich fertig, nur ohne
+// das Pfeilchen. Der Stil ist unvollständig, nicht die Karte kaputt — und
+// welcher Stil welches Symbol vermisst, steht danach in EINER Zeile.
+const VECTOR_MISSING_IMAGES = new Set();
+function vectorWatchMissingImages(layer) {
+  // `getMaplibreMap()` gibt es erst, wenn die Ebene an einer Karte hängt —
+  // deshalb am Leaflet-Ereignis und nicht sofort.
+  layer.once('add', () => {
+    const gl = typeof layer.getMaplibreMap === 'function' ? layer.getMaplibreMap() : null;
+    if (!gl || typeof gl.on !== 'function') return;
+    gl.on('styleimagemissing', ev => {
+      const id = ev && ev.id;
+      if (!id || VECTOR_MISSING_IMAGES.has(id)) return;
+      VECTOR_MISSING_IMAGES.add(id);
+      console.warn(`Vektorkarte: Der Stil verlangt das Symbol „${id}", sein Sprite `
+        + 'enthält es nicht. Die Karte zeichnet an dieser Stelle nichts.');
+      vectorMissingNote();
+      try {
+        // 1×1 durchsichtig. `addImage` braucht rohe RGBA-Bytes — ein Bild zu
+        // laden wäre hier ein Netzabruf für ein Pixel, das niemand sieht.
+        if (!gl.hasImage(id)) {
+          gl.addImage(id, { width: 1, height: 1, data: new Uint8Array(4) });
+        }
+      } catch (err) { console.warn('Vektorkarte: Platzhalter abgelehnt', err); }
+    });
+  });
+}
+// Und dort sagen, wo jemand die Wahl trifft: die Stil-URL steht in den
+// Einstellungen, also gehört der Hinweis daneben. Ein Fehler, der nur in der
+// Entwicklerkonsole steht, ist für den Betreiber dieser Instanz kein Fehler,
+// den er je zu sehen bekommt.
+function vectorMissingNote() {
+  const el = document.getElementById('vec-missing');
+  if (!el) return;
+  const names = [...VECTOR_MISSING_IMAGES];
+  el.style.display = names.length ? '' : 'none';
+  el.textContent = t('bm.vector.noimg',
+    'Hinweis: Dieser Stil verlangt Symbole, die sein Sprite nicht enthält ({n}). '
+    + 'Die Karte funktioniert, an diesen Stellen fehlt nur das Symbol.')
+    .replace('{n}', names.join(', '));
 }
 
 // Registrierte Karten: {map, cap} — `cap` deckelt den Zoom dort, wo die Karte
@@ -4933,23 +5207,32 @@ function renderGreeting() {
 
 async function loadToday() {
   renderGreeting();
-  renderOnThisDay();
-  try {
-    const idx = await fetchIndex();
-    document.getElementById('today-events').textContent = idx.total.toLocaleString(LOC());
-    document.getElementById('today-unconfirmed').textContent =
-      idx.unconfirmed.toLocaleString(LOC());
-    // Anmerkung 110: zweiter Rückstand, eigene Kachel — und nur, wenn es ihn gibt.
-    const fz = idx.fuzzy || 0;
-    document.getElementById('today-fuzzy').textContent = fz.toLocaleString(LOC());
-    document.getElementById('today-fuzzy-card').style.display = fz ? '' : 'none';
-    document.getElementById('today-span').textContent =
-      idx.year_min ? `${idx.year_min} – ${idx.year_max}` : '–';
-    // A35/Anmerkung 73: Startformular nur bei komplett leerer Lebensdatenbank
-    // und solange es nicht übersprungen wurde.
-    const empty = idx.total === 0 && localStorage.getItem('seed-done') !== '1';
-    document.getElementById('seed-form').style.display = empty ? '' : 'none';
-  } catch (_) { /* Kacheln bleiben auf „–" */ }
+  // F23: Bis 0.39 lief `renderOnThisDay()` hier ohne `await` nebenher. Die
+  // Ansicht stand sofort und füllte sich danach still weiter — genau das
+  // „lädt noch ein bisschen", das von außen nicht zu bemessen war. Jetzt
+  // gehören beide Teile zu EINEM Vorgang, der sagt, woran er gerade ist.
+  await runForeground(t('fg.today', '📅 Heute wird geladen …'), async op => {
+    op.step(0, 2, t('fg.today.counts', 'Zählwerk und Zeitraum'));
+    try {
+      const idx = await fetchIndex();
+      document.getElementById('today-events').textContent = idx.total.toLocaleString(LOC());
+      document.getElementById('today-unconfirmed').textContent =
+        idx.unconfirmed.toLocaleString(LOC());
+      // Anmerkung 110: zweiter Rückstand, eigene Kachel — und nur, wenn es ihn gibt.
+      const fz = idx.fuzzy || 0;
+      document.getElementById('today-fuzzy').textContent = fz.toLocaleString(LOC());
+      document.getElementById('today-fuzzy-card').style.display = fz ? '' : 'none';
+      document.getElementById('today-span').textContent =
+        idx.year_min ? `${idx.year_min} – ${idx.year_max}` : '–';
+      // A35/Anmerkung 73: Startformular nur bei komplett leerer Lebensdatenbank
+      // und solange es nicht übersprungen wurde.
+      const empty = idx.total === 0 && localStorage.getItem('seed-done') !== '1';
+      document.getElementById('seed-form').style.display = empty ? '' : 'none';
+    } catch (_) { /* Kacheln bleiben auf „–" */ }
+    op.step(1, 2, t('fg.today.otd', 'Rückblick „an diesem Tag"'));
+    await renderOnThisDay();
+    op.step(2, 2);
+  });
 }
 
 // A35/Anmerkung 73: aus den Startangaben werden bestätigte Ereignisse. Das
@@ -7374,15 +7657,19 @@ async function analyze() {
   // sofort das Richtige.
   if (!navigator.onLine) { queueCapture(text, pos); return; }
   btn.disabled = true; btn.textContent = '🤖 analysiere…';
-  showLoading('🤖 KI analysiert…');
   try {
-    const result = await api("/api/ingest", {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ raw_text: text,
-        capture_lat: capturePos ? capturePos.lat : null,
-        capture_lng: capturePos ? capturePos.lng : null }),
-    });
+    // F23: derselbe Overlay wie jeder andere Vordergrund-Lauf. Abbrechen ist
+    // hier ehrlich: die KI-Anfrage wird wirklich abgeschossen (op.signal),
+    // nicht nur ihr Ergebnis weggeworfen. Was der Server noch schreibt, ist
+    // ein Fragment — Roh-Eingang, Stufe 1, nichts Bestätigtes.
+    const result = await runForeground(t('loading.ai', '🤖 KI analysiert…'),
+      op => api("/api/ingest", {
+        method: 'POST', signal: op.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw_text: text,
+          capture_lat: capturePos ? capturePos.lat : null,
+          capture_lng: capturePos ? capturePos.lng : null }),
+      }), { note: t('loading.ai.note', 'Der Text wird gelesen und in Ereignisse zerlegt …') });
     capturePos = null;
     document.getElementById('geo-btn').classList.remove('active');
     document.getElementById('geo-hint').style.display = 'none';
@@ -7393,11 +7680,13 @@ async function analyze() {
     // abgelaufen, während der Text schon geschrieben war. Beides ist zu
     // retten, nicht zu beklagen. Jede andere Antwort ist ein echter Fehler
     // und gehört gezeigt — puffern würde ihn nur endlos wiederholen.
+    // Ein selbst ausgelöster Abbruch ist keines von beidem: nicht puffern
+    // (der Nutzer wollte es ja nicht) und nicht als Backend-Fehler anzeigen.
+    if (isAbort(err)) return;
     if (!err.status || err.status === 401) { queueCapture(text, pos, err.status === 401 ? 'auth' : 'offline'); return; }
     showBanner(`Backend-Fehler: ${err.message}`);
   } finally {
     btn.disabled = false; btn.textContent = '🤖 KI analysieren';
-    showLoading(false);
   }
 }
 
@@ -9857,14 +10146,39 @@ function gotoView(v) {
   document.getElementById('view-'+v).classList.add('active');
   document.getElementById('view-title').textContent = t(`view.${v}.title`, titles[v][0]);
   document.getElementById('view-sub').textContent = t(`view.${v}.sub`, titles[v][1]);
-  if (v === 'today') loadToday();
-  if (v === 'map') setTimeout(openMapView, 40);
-  if (v === 'stats') loadStats();
-  if (v === 'compendium') { const tab = document.querySelector('#comp-tabs .zoom-btn.active'); if (tab) loadCompendium(tab.dataset.type); }
-  if (v === 'world') loadWorld();
-  if (v === 'achievements') loadAchievements();
-  if (v === 'admin') loadAdminTab(adminTab);
+  // F23: EINE Stelle, an der ein Ansichtswechsel nachlädt — und damit eine
+  // Stelle, die den Fortschritt zeigt. Vorher stand hier siebenmal ein
+  // Aufruf ohne `await`: jede Ansicht baute sich nach dem Wechsel still
+  // weiter auf, und ob sie fertig war, konnte man nur ahnen. Der Overlay
+  // erscheint erst nach `FG_DELAY` — ein Wechsel, der 120 ms dauert, sieht
+  // deshalb genauso aus wie vorher.
+  const load = VIEW_LOADERS[v];
+  if (load) {
+    // EIN Schlüssel mit Platzhalter statt sieben Schlüsseln: fehlte einer,
+    // stünde in der englischen Oberfläche „Today wird geladen …" — ein Satz
+    // aus zwei Sprachen, und zwar genau dort, wo niemand hinsieht.
+    runForeground(t('fg.view', '{v} wird geladen …')
+                    .replace('{v}', t(`view.${v}.title`, titles[v][0])),
+                  op => load(op))
+      .catch(err => { if (!isAbort(err)) console.warn('Ansicht', v, err); });
+  }
 }
+// Was ein Ansichtswechsel nachlädt. Als Tabelle und nicht als Kette von
+// `if`s: eine neue Ansicht ohne Eintrag fällt hier auf, eine ohne `if` nicht.
+const VIEW_LOADERS = {
+  today: () => loadToday(),
+  // Die Karte braucht den Moment, in dem ihr Container sichtbar ist —
+  // Leaflet misst sonst in eine Fläche der Höhe 0.
+  map: () => new Promise(r => setTimeout(() => { openMapView(); r(); }, 40)),
+  stats: () => loadStats(),
+  compendium: () => {
+    const tab = document.querySelector('#comp-tabs .zoom-btn.active');
+    return tab ? loadCompendium(tab.dataset.type) : null;
+  },
+  world: () => loadWorld(),
+  achievements: () => loadAchievements(),
+  admin: () => loadAdminTab(adminTab),
+};
 
 // ---------- VERWALTUNGS-REITER (A14) ----------
 let adminTab = 'moderation';
@@ -10597,7 +10911,17 @@ document.getElementById('import-file').addEventListener('change', async ev => {
     if (/\.zip$/i.test(file.name) || file.type === 'application/zip') {
       const fd = new FormData();
       fd.append('file', file);
-      const r = await api('/api/data/import.zip', { method: 'POST', body: fd });
+      // F23: Eine einzige lange Anfrage — kein Fortschritt in Etappen, aber
+      // sehr wohl eine Aussage darüber, dass gerade etwas läuft und wie lange
+      // schon. Ohne Gesamtmenge zeigt das Bauteil bewusst keinen Balken (ein
+      // Balken bei 0 % behauptet Stillstand), sondern den Kreisel und den
+      // Satz darunter. Abbrechen geht: der Server entpackt weiter, aber der
+      // Browser wartet nicht mehr — und das ist genau das, was der Nutzer
+      // gemeint hat.
+      const r = await runForeground(
+        `📦 ${t('imp.zip.title', 'Backup wird zurückgespielt')}`,
+        op => api('/api/data/import.zip', { method: 'POST', body: fd, signal: op.signal }),
+        { note: t('imp.zip.note', 'Der Server entpackt Daten und Bilddateien …') });
       const bits = [`${r.total} ${t('imp.rows', 'Zeilen neu')}`,
                     `${r.skipped_existing} ${t('imp.known', 'vorhanden')}`];
       if (r.media_restored) bits.push(`${r.media_restored} ${t('imp.photos', 'Fotos wiederhergestellt')}`);
@@ -10624,37 +10948,54 @@ document.getElementById('import-file').addEventListener('change', async ev => {
       toast(err.message, err.status === 409 ? 'warn' : 'error', 9000);
       return;
     }
-    let done = 0, imported = 0, skipped = 0;
+    let done = 0, imported = 0, skipped = 0, stopped = false;
+    // F23: derselbe Overlay wie überall — nur dass dieser Lauf ZUSÄTZLICH
+    // als Job registriert ist. Das ist kein Widerspruch: der Browser taktet
+    // ihn (deshalb der Balken hier), und der Job-Eintrag ist die Sperre, die
+    // einen zweiten Tab am gleichzeitigen Import hindert.
     try {
-      for (const table of TABLES) {
-        const rows = payload[table] || [];
-        for (let i = 0; i < rows.length; i += IMPORT_CHUNK) {
-          if (big) showProgress(done, total, `📥 ${t('imp.title', 'Import')} — ${
-            done.toLocaleString(LOC())} / ${total.toLocaleString(LOC())} ${t('imp.unit', 'Zeilen')}`);
-          const r = await api('/api/data/import', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ format: payload.format, version: payload.version,
-                                   [table]: rows.slice(i, i + IMPORT_CHUNK) }),
-          });
-          if (r.error) { jobFinish(job, 'error', r.error); toast(r.error, 'error'); return; }
-          imported += r.total; skipped += r.skipped_existing;
-          done += Math.min(IMPORT_CHUNK, rows.length - i);
-          jobProgress(job, done, total - done);
+      await runForeground(`📥 ${t('imp.title', 'Import')}`, async op => {
+        op.step(0, total, '');
+        for (const table of TABLES) {
+          const rows = payload[table] || [];
+          for (let i = 0; i < rows.length; i += IMPORT_CHUNK) {
+            // Abgebrochen wird ZWISCHEN den Etappen: eine halb geschriebene
+            // Etappe gäbe es sonst nicht — der Server schreibt sie ganz oder
+            // gar nicht. Das Erreichte bleibt, ein neuer Import setzt fort
+            // (idempotent über die IDs).
+            if (op.aborted) { stopped = true; return; }
+            const r = await api('/api/data/import', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ format: payload.format, version: payload.version,
+                                     [table]: rows.slice(i, i + IMPORT_CHUNK) }),
+            });
+            // Ein abgelehnter Import ist ein Fehler und kein Abbruch — als
+            // Ausnahme geworfen, damit genau EIN `catch` ihn behandelt.
+            if (r.error) throw new Error(r.error);
+            imported += r.total; skipped += r.skipped_existing;
+            done += Math.min(IMPORT_CHUNK, rows.length - i);
+            if (big) op.step(done, total, t('imp.table', 'Tabelle: {t}').replace('{t}', table));
+            jobProgress(job, done, total - done);
+          }
         }
-      }
+      }, { unit: t('imp.unit', 'Zeilen'), total });
     } catch (err) {
       jobFinish(job, 'error', err.message);
       throw err;  // äußerer Catch zeigt den Fehler-Toast
     }
     const summary = `${imported} ${t('imp.rows', 'Zeilen neu')}, ${skipped} ${t('imp.known', 'vorhanden')}`;
-    jobFinish(job, 'done', summary);
-    toast(`✓ ${t('imp.done', 'Import fertig:')} ${summary}`);
+    jobFinish(job, stopped ? 'stopped' : 'done', summary);
+    toast(stopped
+      ? `⏹ ${t('imp.stopped', 'Import abgebrochen — das Erreichte bleibt:')} ${summary}`
+      : `✓ ${t('imp.done', 'Import fertig:')} ${summary}`, stopped ? 'warn' : 'ok', 9000);
     await refreshAll();
   } catch (err) {
-    toast(t('toast.importfail', 'Import fehlgeschlagen: ') + err.message, 'error', 8000);
+    // Ein Abbruch ist kein Fehlschlag — sonst stünde nach dem eigenen Klick
+    // auf „Abbrechen" eine rote Fehlermeldung da (ein `catch`, das zwei
+    // verschiedene Ausgänge auf dieselbe Meldung abbildet).
+    if (!isAbort(err)) toast(t('toast.importfail', 'Import fehlgeschlagen: ') + err.message, 'error', 8000);
   } finally {
     btn.disabled = false; btn.textContent = `📥 ${t('imp.btn', 'Daten importieren')}`;
-    showLoading(false);
     ev.target.value = '';
   }
 });
@@ -10684,7 +11025,6 @@ document.getElementById('timeline-file').addEventListener('change', async ev => 
   if (!file) return;
   const btn = document.getElementById('btn-timeline-import');
   btn.disabled = true; btn.textContent = t('imp.running', '… importiere');
-  showLoading(`🛰️ ${t('tlimp.loading', 'Timeline wird importiert…')}`);
   try {
     const payload = JSON.parse(await file.text());
     const key = payload.semanticSegments ? 'semanticSegments'
@@ -10707,38 +11047,43 @@ document.getElementById('timeline-file').addEventListener('change', async ev => 
     }
     // A12: optionaler Filter — Besuche mit unsicherer Ortszuordnung überspringen
     const minProb = Math.max(0, Math.min(100, +document.getElementById('tl-minprob').value || 0)) / 100;
-    let done = 0;
+    let done = 0, stopped = false;
     try {
-      for (const chunk of chunks) {
-        if (chunks.length > 1) {
-          showProgress(done, segs.length,
-            `🛰️ ${t('tlimp.title', 'Timeline-Import')} — ${done.toLocaleString(LOC())} / ${
-              segs.length.toLocaleString(LOC())} ${t('tlimp.unit', 'Segmente')}`);
+      await runForeground(`🛰️ ${t('tlimp.title', 'Timeline-Import')}`, async op => {
+        op.step(0, segs.length, '');
+        for (const chunk of chunks) {
+          // Zwischen den Etappen abbrechbar; das bereits Importierte bleibt
+          // stehen, ein zweiter Anlauf überspringt es (Segment-Hash).
+          if (op.aborted) { stopped = true; return; }
+          // Bei Etappen kein Auto-Geocoding pro Etappe (Nominatim: 1 Anfrage/s) —
+          // dafür gibt es nach dem Import den Button „Ortsnamen auflösen".
+          const params = new URLSearchParams();
+          if (chunks.length > 1) params.set('auto_resolve', 'false');
+          if (minProb > 0) params.set('min_probability', String(minProb));
+          const qs = params.toString() ? `?${params}` : '';
+          const r = await api(`/api/import/timeline${qs}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ [key]: chunk }),
+          });
+          sum.visits += r.visits_created; sum.tracks += r.tracks_created;
+          sum.dupes += r.skipped_duplicates; sum.resolved += r.names_resolved || 0;
+          sum.lowprob += r.skipped_low_probability || 0;
+          sum.unnamed = r.locations_unnamed || 0; // Gesamtstand, nicht summieren
+          if (r.date_min && (!sum.min || r.date_min < sum.min)) sum.min = r.date_min;
+          if (r.date_max && (!sum.max || r.date_max > sum.max)) sum.max = r.date_max;
+          done += chunk.length;
+          op.step(done, segs.length,
+                  t('tlimp.note', '{v} Besuche, {t} Routen bisher')
+                    .replace('{v}', sum.visits).replace('{t}', sum.tracks));
+          jobProgress(job, done, segs.length - done);
         }
-        // Bei Etappen kein Auto-Geocoding pro Etappe (Nominatim: 1 Anfrage/s) —
-        // dafür gibt es nach dem Import den Button „Ortsnamen auflösen".
-        const params = new URLSearchParams();
-        if (chunks.length > 1) params.set('auto_resolve', 'false');
-        if (minProb > 0) params.set('min_probability', String(minProb));
-        const qs = params.toString() ? `?${params}` : '';
-        const r = await api(`/api/import/timeline${qs}`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ [key]: chunk }),
-        });
-        sum.visits += r.visits_created; sum.tracks += r.tracks_created;
-        sum.dupes += r.skipped_duplicates; sum.resolved += r.names_resolved || 0;
-        sum.lowprob += r.skipped_low_probability || 0;
-        sum.unnamed = r.locations_unnamed || 0; // Gesamtstand, nicht summieren
-        if (r.date_min && (!sum.min || r.date_min < sum.min)) sum.min = r.date_min;
-        if (r.date_max && (!sum.max || r.date_max > sum.max)) sum.max = r.date_max;
-        done += chunk.length;
-        jobProgress(job, done, segs.length - done);
-      }
+      }, { unit: t('tlimp.unit', 'Segmente'), total: segs.length });
     } catch (err) {
       jobFinish(job, 'error', err.message);
       throw err;  // äußerer Catch zeigt den Fehler-Toast
     }
-    jobFinish(job, 'done', `${sum.visits} ${t('tl.visits', 'Besuche')}, ${sum.tracks} ${
+    jobFinish(job, stopped ? 'stopped' : 'done',
+      `${sum.visits} ${t('tl.visits', 'Besuche')}, ${sum.tracks} ${
       t('exp.tracks', 'Routen')}, ${sum.dupes} ${t('tlimp.dupes', 'Dubletten')}`);
     const range = sum.min ? `\n${t('tlimp.range', 'Zeitraum:')} ${sum.min.slice(0,10)} ${
       t('to', 'bis')} ${sum.max.slice(0,10)}` : '';
@@ -10750,18 +11095,18 @@ document.getElementById('timeline-file').addEventListener('change', async ev => 
           .replace('{n}', sum.unnamed)}`
       : (sum.resolved
           ? `\n${t('tlimp.resolved', '{n} Ortsnamen direkt aufgelöst.').replace('{n}', sum.resolved)}` : '');
-    toast(`✓ ${t('tlimp.done', 'Timeline-Import fertig:')}\n`
+    toast(`${stopped ? '⏹ ' + t('tlimp.stopped', 'Timeline-Import abgebrochen — das Erreichte bleibt:')
+                     : '✓ ' + t('tlimp.done', 'Timeline-Import fertig:')}\n`
       + t('tlimp.summary', '{v} Besuche als Ereignisse, {t} Routen.')
           .replace('{v}', sum.visits).replace('{t}', sum.tracks)
       + `\n${t('tlimp.skipped', '{n} Dubletten übersprungen.').replace('{n}', sum.dupes)}`
-      + `${lowprob}${range}${names}`, 'ok', 12000);
+      + `${lowprob}${range}${names}`, stopped ? 'warn' : 'ok', 12000);
     trackCache.clear();
     await refreshAll();
   } catch (err) {
-    toast(t('toast.tlimportfail', 'Timeline-Import fehlgeschlagen: ') + err.message, 'error', 8000);
+    if (!isAbort(err)) toast(t('toast.tlimportfail', 'Timeline-Import fehlgeschlagen: ') + err.message, 'error', 8000);
   } finally {
     btn.disabled = false; btn.textContent = `🛰️ ${t('tlimp.btn', 'Google Timeline importieren')}`;
-    showLoading(false);
     ev.target.value = '';
   }
 });
@@ -11056,7 +11401,99 @@ async function loadPlaceFormat() {
   step('Immich-Jahre', imsDefaultYears);
   loadTileSettings();
   loadVectorSettings();   // A48
+  loadOpenPlaces();       // Anmerkung 148
 }
+
+// --------------------------------------------------------------------------- //
+// Anmerkung 148 — die offenen Orte beim Namen nennen
+// --------------------------------------------------------------------------- //
+// „0 Ortsnamen bearbeitet, 9 nicht auflösbar." Die Zahl stimmt und ist eine
+// Sackgasse: derselbe Lauf noch einmal bringt dieselbe Zahl, weil ein Punkt,
+// den OpenStreetMap nicht kennt, morgen nicht bekannter ist. Was fehlt, ist
+// nicht mehr Automatik, sondern die Liste — und ein Feld zum Hineinschreiben.
+//
+// Warum die Gründe ausgeschrieben werden und nicht als Schlüssel dastehen:
+// `no_hit` sagt einem Menschen nichts, „OpenStreetMap kennt hier nichts" sagt
+// ihm, dass Warten nicht hilft.
+const OPEN_PLACE_REASONS = {
+  no_hit: () => t('op.r.nohit', 'OpenStreetMap kennt hier nichts'),
+  fresh: () => t('op.r.fresh', 'noch nicht gefragt'),
+  unnamed: () => t('op.r.unnamed', 'nur Koordinaten'),
+  labeled: () => t('op.r.labeled', 'altes Label ohne Adresse'),
+  nonlatin: () => t('op.r.nonlatin', 'Name in fremder Schrift'),
+  verbose: () => t('op.r.verbose', 'Antwort passt nicht ins gewählte Format'),
+};
+function openPlaceReason(p) {
+  // Reihenfolge ist die Aussage: „gefragt und nichts bekommen" schlägt jeden
+  // Namensmangel, denn es beantwortet die eigentliche Frage — kann ein
+  // weiterer Lauf hier überhaupt noch etwas ausrichten?
+  const key = p.no_hit ? 'no_hit' : (!p.looked_up ? 'fresh' : (p.defect || 'unnamed'));
+  return (OPEN_PLACE_REASONS[key] || OPEN_PLACE_REASONS.unnamed)();
+}
+let OPEN_PLACES = [];
+async function loadOpenPlaces() {
+  const row = document.getElementById('open-places-row');
+  if (!row) return;
+  try { OPEN_PLACES = await api('/api/places/unresolved?limit=200'); }
+  catch (_) { return; }          // nicht angemeldet o. ä. — der Block bleibt weg
+  // Nichts offen heißt: der Abschnitt steht auch nicht da. Eine leere Liste
+  // mit der Überschrift „offene Orte" behauptet ein Problem, das es nicht gibt.
+  row.style.display = OPEN_PLACES.length ? '' : 'none';
+  document.getElementById('btn-open-places').textContent =
+    `📋 ${t('op.show.n', '{n} offene Orte ansehen').replace('{n}', OPEN_PLACES.length)}`;
+  if (document.getElementById('open-places').dataset.open === '1') renderOpenPlaces();
+}
+function renderOpenPlaces() {
+  const box = document.getElementById('open-places');
+  if (!box) return;
+  box.dataset.open = '1';
+  box.innerHTML = OPEN_PLACES.map(p => {
+    // Die Koordinaten sind der eigentliche Hinweis: wer sie auf der Karte
+    // sieht, weiß meist sofort, was das für ein Ort ist. Deshalb ein echter
+    // Link nach OpenStreetMap statt nur Zahlen zum Abschreiben.
+    const coords = (p.lat != null && p.lng != null)
+      ? `<a href="https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lng}#map=17/${p.lat}/${p.lng}"
+            target="_blank" rel="noopener">${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}</a>`
+      : `<span class="stat-label">${esc(t('op.nocoords', 'ohne Koordinaten'))}</span>`;
+    const evs = p.events
+      ? ` · ${t('op.events', '{n} Ereignisse').replace('{n}', p.events)}` : '';
+    return `<div class="op-row" style="display:flex; gap:10px; align-items:baseline;
+                 padding:6px 0; border-bottom:1px solid var(--border)">
+      <button class="btn small secondary" data-rename="${esc(p.id)}"
+              title="${esc(t('op.rename.tip', 'Namen von Hand setzen'))}">✏️</button>
+      <span style="flex:1; min-width:0">
+        <b>${esc(p.name)}</b><br>
+        <span class="stat-label">${esc(openPlaceReason(p))} · ${coords}${esc(evs)}</span>
+      </span></div>`;
+  }).join('') || `<div class="hint">${esc(t('op.none', 'Nichts offen.'))}</div>`;
+}
+document.getElementById('btn-open-places')?.addEventListener('click', () => {
+  const box = document.getElementById('open-places');
+  if (box.dataset.open === '1') { box.dataset.open = '0'; box.innerHTML = ''; return; }
+  renderOpenPlaces();
+});
+document.getElementById('open-places')?.addEventListener('click', async ev => {
+  const id = ev.target.dataset && ev.target.dataset.rename;
+  if (!id) return;
+  const place = OPEN_PLACES.find(p => p.id === id);
+  if (!place) return;
+  const name = await uiPrompt(
+    t('op.rename.ask', 'Wie heißt dieser Ort? Der Name gilt dann als deine Angabe — '
+      + 'kein Auflöse-Lauf überschreibt ihn wieder.'),
+    { title: t('op.rename.title', '✏️ Ortsnamen setzen'),
+      okLabel: t('save', 'Speichern'), placeholder: place.name });
+  if (name === null || !name.trim()) return;
+  try {
+    await api(`/api/places/${encodeURIComponent(id)}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim() }),
+    });
+    toast(t('op.renamed', '✓ Ort umbenannt — die Besuche heißen jetzt auch so.'));
+    invalidateEvents();
+    await loadOpenPlaces();
+    if (typeof loadTimeline === 'function') loadTimeline();
+  } catch (err) { toast(err.message, 'error', 8000); }
+});
 
 // --------------------------------------------------------------------------- //
 // P2.1 — Immich
@@ -11124,11 +11561,16 @@ document.getElementById('btn-nu-create').addEventListener('click', async () => {
 });
 
 document.getElementById('btn-wipe-mine').addEventListener('click', async () => {
+  // Dasselbe Losungswort wie beim System-Rundumschlag weiter unten — es kam
+  // aus dem Katalog (`wipe.word`), damit eine englische Oberfläche auf einer
+  // englischen Tastatur nicht vor einem Umlaut steht. Bis 0.39 verlangte
+  // diese Stelle „LOESCHEN" und jene „LÖSCHEN": eine Regel, zwei Wörter.
+  const word = t('wipe.word', 'LÖSCHEN');
   const typed = await uiPrompt(
     t('wipemine.ask', 'Alle deine Ereignisse, Objekte, Orte, Routen, Fotos und Roh-Einträge werden endgültig gelöscht. '
-      + 'Zum Bestätigen LOESCHEN eingeben.'),
+      + 'Zum Bestätigen {w} eingeben.').replace('{w}', word),
     { title: t('act.wipemine', '🗑️ Alle meine Daten löschen'), okLabel: t('btn.delete', 'Löschen'),
-      danger: true, placeholder: 'LOESCHEN' });
+      danger: true, placeholder: word });
   if (typed === null) return;
   try {
     const r = await api('/api/data/wipe-mine', {
@@ -11620,6 +12062,7 @@ function vectorState() {
   box.textContent = vectorSupported()
     ? '✓ ' + t('adm.vector.ok', 'Stil hinterlegt — „🧭 Vektorkarte" steht oben rechts auf jeder Karte zur Wahl.')
     : '⚠️ ' + t('bm.vector.nogl', 'Vektorkarten brauchen WebGL — dieser Browser oder dieses Gerät bietet es nicht an.');
+  vectorMissingNote();   // Anmerkung 149
 }
 document.getElementById('vector-save')?.addEventListener('click', () => {
   const url = document.getElementById('vector-url').value.trim();
@@ -11633,6 +12076,10 @@ document.getElementById('vector-save')?.addEventListener('click', () => {
   }
   localStorage.setItem('lifedash_vectorstyle', url);
   localStorage.setItem('lifedash_vectorattr', attr);
+  // Anmerkung 149: Ein anderer Stil hat andere Lücken. Die alte Liste stehen
+  // zu lassen hieße, dem neuen Stil einen Mangel anzuhängen, den er
+  // vielleicht gar nicht hat.
+  VECTOR_MISSING_IMAGES.clear();
   MAP_TILES.forEach(e => {
     const old = e.map.getContainer().querySelector('.basemap-ctl');
     if (old) old.closest('.leaflet-control').remove();
@@ -11683,13 +12130,18 @@ document.getElementById('btn-wipe').addEventListener('click', async e => {
   // Das Losungswort gehört in den Katalog: eine englische Oberfläche, die
   // „LÖSCHEN" mit Umlaut verlangt, ist auf einer englischen Tastatur eine
   // Sackgasse — und der Weg dahin ist bewusst der letzte vor dem Datenverlust.
+  // Dieselbe Zeile steht bei „Alle meine Daten löschen"; der Server prüft das
+  // Wort seit 0.40 ebenfalls (`app/wipe.py`) — vorher war diese Abfrage hier
+  // die EINZIGE Bremse vor einem `POST`, das die Instanz leert.
   const word = t('wipe.word', 'LÖSCHEN');
   const typed = await uiPrompt(
     t('wipe.ask', 'Zur Bestätigung bitte {w} eingeben:').replace('{w}', word),
     { title: t('wipe.last', 'Letzte Sicherheitsabfrage'),
       okLabel: `🗑️ ${t('delete.final', 'Endgültig löschen')}`, danger: true, placeholder: word });
   if (typed !== word) { toast(t('wipe.cancelled', 'Abgebrochen — es wurde nichts gelöscht.'), 'warn'); return; }
-  await runAdmin(e.target, () => api('/api/admin/wipe-data', { method: 'POST' }),
+  await runAdmin(e.target, () => api('/api/admin/wipe-data', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm: typed }) }),
     r => t('wipe.done', 'Alle Daten gelöscht ({n} Zeilen). Die Datenbank ist leer.')
       .replace('{n}', r.total));
 });
