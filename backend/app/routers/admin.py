@@ -293,7 +293,7 @@ def enrich_weather_endpoint(limit: int = Query(25, ge=1, le=200)) -> dict:
     return {"enriched_events": enriched, "remaining": remaining}
 
 
-# Hinweis: Wetter ist FAKTEN-Anreicherung (Schicht 3, KONZEPT Kap. 3.1) —
+# Hinweis: Wetter ist FAKTEN-Anreicherung (Schicht 3, ARCHITECTURE Kap. 3.1) —
 # historisches Wetter ändert sich nicht. Es gibt daher bewusst keinen
 # „Wetter neu berechnen"-Endpoint mehr, nur das Ergänzen fehlender Werte.
 

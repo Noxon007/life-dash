@@ -10,7 +10,7 @@ der Aufruf die ganze Antwort mit (500), obwohl die Volltexttreffer längst
 feststanden — das war das gemeldete „Server-Suche nicht erreichbar". Volltext
 allein ist schnell, ohne Abhängigkeit und deckt den genutzten Fall ab. Kehrt die
 semantische Suche je zurück, gehört sie als Schicht-4-Ableitung mit Vektorindex
-(pgvector) in die DB, nicht in den Prozess (docs/DECISIONS.md, Anm. 136).
+(pgvector) in die DB, nicht in den Prozess (docs/internal/DECISIONS.md, Anm. 136).
 """
 from __future__ import annotations
 

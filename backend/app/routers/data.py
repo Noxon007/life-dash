@@ -1,4 +1,4 @@
-"""Daten-Export & -Import (Datenkontrolle, siehe Konzept Kap. 12).
+"""Daten-Export & -Import (Datenkontrolle, siehe ARCHITECTURE Kap. 10).
 
 Export: alle eigenen Daten (Stufe 1–3) als ein JSON-Dokument.
 Import: dasselbe Format zurückspielen — idempotent (vorhandene IDs werden

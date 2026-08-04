@@ -81,18 +81,23 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # Kein npm-Cache und kein `npm ci`: beide setzen eine eingecheckte
-      # tools/package-lock.json voraus, die hier bewusst gitignored ist (wie
-      # tools/node_modules/). Der einzige Dev-Dependency ist jsdom — Caching
-      # spart nichts, was den Widerspruch wert wäre. `npm install` kommt ohne
-      # Lockdatei aus.
+      # `npm ci` gegen eine EINGECHECKTE tools/package-lock.json. Die Lockdatei
+      # war bis 2026-08-04 ignoriert, mit der Begründung, ein einziger
+      # Dev-Dependency sei den Aufwand nicht wert — das ist der falsche Maßstab.
+      # Der Dependency ist jsdom, und die Wächter prüfen nicht IHREN Code,
+      # sondern das VERHALTEN einer DOM-Nachbildung: `^26.0.0` heißt, die CI
+      # darf eine andere Unterversion ziehen als du lokal. Ein Wächter, der hier
+      # anders urteilt als bei dir, ist genau der Fall aus Anm. 108 — eine
+      # Prüfung, die nicht das prüft, was du geprüft glaubst.
       - uses: actions/setup-node@v6
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: tools/package-lock.json
 
       - name: Abhängigkeiten
         working-directory: tools
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Wächter
         working-directory: tools

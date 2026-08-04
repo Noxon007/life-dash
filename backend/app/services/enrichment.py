@@ -46,7 +46,7 @@ def _needs_weather(event: Event) -> bool:
     weather = [m for m in event.metrics if m.source == Source.weather]
     if not weather:
         return True
-    # Alt-Bestand additiv nachrüsten (KONZEPT F3: „Bestandsdaten per
+    # Alt-Bestand additiv nachrüsten (DECISIONS F3: „Bestandsdaten per
     # Re-Enrichment additiv ergänzbar") — vorhandene Werte bleiben
     # unangetastet, es kommen nur fehlende Schlüssel dazu.
     #
@@ -291,7 +291,7 @@ def enrich_weather(db: Session, limit: int | None = None,
     """Hängt Temperatur + Bedingung an Events ohne Wetter (Batch fürs Admin-UI).
 
     Gibt (angereichert, verbleibend) zurück. Wetter ist Fakten-Anreicherung
-    (KONZEPT Kap. 3.1): einmal geholt = dauerhaft; es wird nur ergänzt,
+    (ARCHITECTURE Kap. 3.1): einmal geholt = dauerhaft; es wird nur ergänzt,
     nie verworfen und neu berechnet.
 
     `user_id` grenzt auf ein Konto ein (siehe `_weather_candidates`).

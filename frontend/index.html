@@ -2614,7 +2614,7 @@ let AUTH = { mode: "dev", user: null };
 // Aufrufstellen. Erst nach einer kurzen Verzögerung sichtbar: sonst blitzt der
 // Balken bei jedem schnellen Aufruf und beim 4-Sekunden-Takt der Job-Liste.
 //
-// WICHTIG: Das macht nichts schneller (KONZEPT Anmerkung 61) — es macht das
+// WICHTIG: Das macht nichts schneller (DECISIONS Anmerkung 61) — es macht das
 // Warten nur sichtbar, statt es wie einen Absturz aussehen zu lassen. Die
 // Ursache haben A36 (schlanke Liste) und A37 (Zeitfenster) beseitigt; der
 // Balken bleibt für alles, was weiterhin dauert (Import, Anreicherung, Jobs).
@@ -2829,7 +2829,7 @@ const uiPrompt = (text, opts = {}) => uiDialog(text, { ...opts, input: true });
 // Steht bewusst VOR dem Theme-Block: applyTheme() läuft schon beim Laden und
 // übersetzt sein Knopf-Label — LANG darf dann nicht mehr in der TDZ stehen.
 // Englischer Katalog — die EINZIGE Stelle für englische UI-Texte.
-// Glossar (KONZEPT): Lebensdatenbank = life database · Vorschlagsraum =
+// Glossar (ARCHITECTURE Kap. 2): Lebensdatenbank = life database · Vorschlagsraum =
 // proposal space · Roh-Eingang = raw inbox · Vorschläge = proposals ·
 // Ereignis = event · Ort = place · Objekt/Entity = item · Kompendium = collection.
 const I18N_EN = {
@@ -7493,7 +7493,7 @@ function edEntities() {
 // F15 — Fotos an Events
 // --------------------------------------------------------------------------- //
 // Die Dateien liegen auf dem eigenen Server und gehören zur Lebensdatenbank
-// (KONZEPT Anmerkung 57). Gelöscht wird nur auf ausdrückliche Ansage.
+// (DECISIONS Anmerkung 57). Gelöscht wird nur auf ausdrückliche Ansage.
 let LB_SET = [], LB_AT = 0;
 function openLightbox(items, index) {
   LB_SET = items; LB_AT = index;

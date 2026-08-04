@@ -74,7 +74,7 @@ def fetch_weather(lat: float, lng: float, day: datetime | date) -> dict | None:
     und -untergang samt Tageslichtdauer, Windböen und UV-Index. Alles aus
     DEMSELBEN Aufruf — die Felder waren immer verfügbar und wurden bisher
     nur nicht abgefragt. Stundenwerte bleiben bewusst außen vor
-    (Entscheidung F3, siehe KONZEPT Anmerkung 49)."""
+    (Entscheidung F3, siehe DECISIONS Anmerkung 49)."""
     if isinstance(day, datetime):
         day = day.date()
     iso = day.isoformat()

@@ -285,7 +285,7 @@ def day_children_for_all(
 #
 # **Das hier schneidet BESTÄTIGTES, und das ist der Grund für jede seiner
 # Einschränkungen.** Die Kernregel lautet „Maschinen ändern Bestätigtes nie"
-# (KONZEPT Kap. 3.1). Erlaubt ist der Lauf trotzdem, aus zwei Gründen, die
+# (ARCHITECTURE Kap. 3.1). Erlaubt ist der Lauf trotzdem, aus zwei Gründen, die
 # beide genannt sein wollen: Ein MENSCH löst ihn aus — er läuft nie im
 # Nachtplan und nie als Nebenwirkung von irgendetwas anderem. Und `date_end`
 # war bei diesen Zeilen nie eine Aussage über die Dauer, sondern ein

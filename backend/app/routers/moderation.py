@@ -150,7 +150,7 @@ def correct_event(
     _confirm_linked_entities(event)
 
     # Der NUTZER hat Zeit/Ort korrigiert -> Wetter folgt den neuen Fakten
-    # (keine Maschinen-Änderung an Bestätigtem; vgl. KONZEPT Kap. 3.1).
+    # (keine Maschinen-Änderung an Bestätigtem; vgl. ARCHITECTURE Kap. 3.1).
     if facts_changed:
         from app.models import Source
         from app.services.enrichment import auto_enrich_events

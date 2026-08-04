@@ -358,7 +358,7 @@ class MediaRef(Base):
     """Bild an einem Event.
 
     ZWEI Naturen, an `provider` zu unterscheiden — der Unterschied ist keine
-    Kosmetik, sondern die Schichtzuordnung aus KONZEPT Kap. 3.1 (Anmerkung 57):
+    Kosmetik, sondern die Schichtzuordnung aus ARCHITECTURE Kap. 3.1 (Anmerkung 57):
 
     * `provider="local"` (F15): eine HOCHGELADENE Datei. Sie existiert
       nirgendwo sonst und gehört damit zur **Lebensdatenbank** — Maschinen
@@ -410,7 +410,7 @@ class MediaRef(Base):
 class Track(Base):
     """Routenverlauf (Stufe 3) — aus Google Timeline (später auch Workouts).
 
-    Punkte werden unvereinfacht gespeichert (Entscheidung: docs/DECISIONS.md);
+    Punkte werden unvereinfacht gespeichert (Entscheidung: docs/internal/DECISIONS.md);
     `external_id` ist der Segment-Hash für idempotenten Re-Import.
     """
 

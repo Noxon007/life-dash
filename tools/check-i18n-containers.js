@@ -6,7 +6,7 @@
 // Element mit id steckt, verschwindet dieses beim Sprachwechsel spurlos.
 // Genau das passierte von 0.20.0 bis 0.26.1: auf Englisch fehlten die
 // Export-Optionen, die Import-Schwelle, die Ortsnamen-Bausteine und die
-// Tracking-Auswahl — die App war einsprachig benutzbar (KONZEPT Anmerkung 71).
+// Tracking-Auswahl — die App war einsprachig benutzbar (DECISIONS Anmerkung 71).
 //
 // Regel: `data-i18n` gehört auf einen <span>, der NUR Text umschließt;
 // Bedienelemente stehen daneben, nicht darin.

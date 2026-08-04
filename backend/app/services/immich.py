@@ -1,6 +1,6 @@
 """P2.1 — Immich-Konnektor: Fotos zu Ereignissen finden.
 
-**Verweise, keine Kopien** (KONZEPT Kap. 9). Die Bilder bleiben in Immich;
+**Verweise, keine Kopien** (ARCHITECTURE Kap. 8). Die Bilder bleiben in Immich;
 Life-Dash merkt sich nur die Asset-ID und reicht Vorschaubilder durch. Damit
 sind Immich-Verknüpfungen eine **Ableitung** (Schicht 4, Anmerkung 57): sie
 dürfen jederzeit verworfen und neu berechnet werden — anders als die

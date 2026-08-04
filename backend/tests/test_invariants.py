@@ -1,4 +1,4 @@
-"""P2.6 — Invarianten-Test „Bestätigtes ist unantastbar" (KONZEPT Kap. 3.1).
+"""P2.6 — Invarianten-Test „Bestätigtes ist unantastbar" (ARCHITECTURE Kap. 3.1).
 
 Die harte Invariante der Lebensdatenbank: Maschinen (Neuberechnung,
 Enrichment, Re-Import) ändern bestätigte Daten NIE — sie ergänzen nur

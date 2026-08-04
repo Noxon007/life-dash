@@ -5,16 +5,24 @@ numbered, with the reasoning that led to the change and the reasoning that was
 rejected. It is the working record: written while building, read while
 building, never rewritten to look tidier afterwards.
 
-**Why it is no longer part of `KONZEPT.md`.** The concept answers “what is
-Life-Dash and why”; it should be readable by someone who has never seen the
-code. This file answers “why is it built exactly like this”, and it is
-long — 490 lines by the time it was split out, growing with every round of
-use. Two audiences, two documents. Nothing was deleted in the split; the
-numbering is continuous and the notes are unchanged.
+**Why it is its own file.** Split out of the concept document on 2026-08-02 at
+490 lines, and it has grown with every round of use since. The description of
+the system should be readable by someone who has never seen the code; this file
+answers “why exactly like this”, and it is long. Two audiences, two documents.
+Nothing was deleted in the split; the numbering is continuous and the notes are
+unchanged.
+
+**Where the rest lives.** What the system *is* →
+[`ARCHITECTURE.md`](ARCHITECTURE.md). What is still open →
+[`ROADMAP.md`](ROADMAP.md). What a user notices between versions →
+[`../../CHANGELOG.md`](../../CHANGELOG.md). Those three carry the present;
+this one carries how it got here. **Appendix A** records what was built and in
+which version; **Appendix B** holds the concept document's closed chapters,
+verbatim.
 
 **There is no ticket system** (note 83). Observations from use become numbered
-notes here, work packages go into `KONZEPT.md` chapter 14. One truth, and the
-one that gets read while working.
+notes here, work packages go into [`ROADMAP.md`](ROADMAP.md). One truth, and
+the one that gets read while working.
 
 **Numbering.** Notes are numbered in the order they were raised, not in the
 order they were built. A note stays in place once written; corrections are
@@ -573,7 +581,7 @@ author has to make, one because it depends on another.*
 
     *Recommended default if the author does not want to decide in detail:* one baseline at a time, gap-filling only, counted separately from evidence (“47 days recorded · 2 190 days inferred”) — that keeps every existing number unchanged and makes the new one impossible to mistake for the old.
 
-    **Author's ruling (2026-08-03) — decided, package [F20](KONZEPT.md#142-open-packages).** The wish was restated more strongly than this note had it: *“eventually I want an entry for every single day, even if it only says ‘visit, Bad Segeberg’ — then weather can be enriched on it. Forty years is 14 600 days and the tool has to cope. What speaks against it?”*
+    **Author's ruling (2026-08-03) — decided, package F20.** The wish was restated more strongly than this note had it: *“eventually I want an entry for every single day, even if it only says ‘visit, Bad Segeberg’ — then weather can be enriched on it. Forty years is 14 600 days and the tool has to cope. What speaks against it?”*
 
     **Not the row count.** That was worth checking rather than assuming: 20 000 events were measured in note 140 at 86 ms and 11 kB for the opening screen, so 14 600 more rows are not the objection and it would have been lazy to make them one.
 
@@ -943,7 +951,7 @@ once it was built:
 ### A.4 Releases 0.21.0 – 0.39.0
 
 The forward-looking half of this table — 0.40.0, 0.41.0 and 1.0.0 —
-stays in [`KONZEPT.md` ch. 14.3](KONZEPT.md#143-release-plan-to-10).
+stays in [`ROADMAP.md` §5](ROADMAP.md#5-release-plan).
 
 | Version | Theme | Contains | Effort |
 |---|---|---|---|
@@ -1027,3 +1035,163 @@ and no change, and one that turned out to be the same defect in two places.
     Alongside: the effect badges under *My data* now all sit at the right-hand end of the heading of whatever they describe. They were in three different places — beside the section heading, in a card header, and under a button — and the badge is the one label you want to read *before* clicking, so three habitual locations means hunting for it each time.
 
     And a display defect with a real cause: a baseline row (`Elternhaus · Mözen, Deutschland · 25.9.1991 – 25.9.2011 · 7.298 Tage`) reused `.bar-label`, whose 105 px and `nowrap` exist so bar charts line up. Everything after the label was cut — that is, everything except the part the user typed themselves. Rows with no bar wrap instead of truncating; `.top-row` had already made the same exception for the same reason.
+---
+
+## Appendix B — the concept document's closed chapters
+
+**Why these are here.** On 2026-08-04 `KONZEPT.md` was split into
+[`ARCHITECTURE.md`](ARCHITECTURE.md) (what the system is) and
+[`ROADMAP.md`](ROADMAP.md) (what is still open). Three of its chapters belonged
+to neither: they describe decisions that were made, met, and are now history —
+the MVP definition the project was measured against, the release plan's
+reasoning about pace and risk, and the questions that stayed open until
+2026-08-03.
+
+They are reproduced **verbatim**, unedited apart from heading levels, for the
+same reason Appendix A is: a note elsewhere that cites “ch. 13” or “the order
+of retreat” must still find its sentence. **Nothing here is current guidance.**
+The MVP shipped forty-eight versions ago; the risk it weighs was accepted long
+since; two of its named goals (semantic search, Alembic) were later reversed on
+purpose. What the system does today is in `ARCHITECTURE.md`.
+
+### B.1 The MVP definition (chapter 13)
+
+#### 13. MVP definition
+
+The goal of the MVP: **the core loop across all three stages works** — enter a fragment (S1) → the AI structures it and the user moderates (S2) → see it on the timeline and map and search it (S3).
+
+##### 13.1 MVP scope (in)
+
+| Area | MVP scope |
+|---|---|
+| **Three-stage foundation** | `Fragment` (S1) immutable → `Event`/`Entity` (S2) with a `confirmed` status → views (S3) recomputable. |
+| **Data capture** | Free-text input plus an AI preview with confirmation/correction. (Voice: phase 2.) |
+| **AI pipeline** | Extraction (date + precision, place, category, simple entities), geocoding, confidence plus review gate. |
+| **Data model** | `Fragment`, `Event`, `Entity`, `EventEntityLink`, `Location` including `confirmed`/`field_overrides`. |
+| **Moderation / admin** | A simple moderation panel: review, confirm and correct `unconfirmed` records; trigger recomputation. |
+| **Timeline** | Zoom year → month → day; events as points/spans; click for detail; `unconfirmed` visibly marked. |
+| **Map** | Located events as markers plus a time-range filter. |
+| **Search** | Full text plus semantic search (embeddings). |
+| **Collection** | The **animals** type as proof of modularity. |
+| **Modules** | A module registry with 2–3 fixed modules (`trip`, `animal`, `country`). |
+| **Auth & multi-user** | OIDC login plus `user_id` in all tables plus JIT provisioning. No user management UI in the MVP — users appear by logging in. |
+| **Responsive base layout** | A mobile-capable layout (bottom navigation, quick capture) from the start; PWA manifest. Offline queue: phase 2. |
+| **Deployment** | Docker Compose (app + Postgres + AI endpoint). |
+
+##### 13.2 Deliberately NOT in the MVP (out)
+
+- Voice input / Whisper, offline capture queue (though the PWA foundation is laid)
+- Immich, Google Timeline, Health Connect, PSN and weather integration (though the data model and stage-3 concept are prepared)
+- Statistics dashboard (only rudimentary counters)
+- A people module (deliberately left out)
+- A complete module set, decade aggregation
+- User management UI, sharing between users (OIDC login and data separation *are* in the MVP)
+
+##### 13.3 Definition of done (MVP)
+
+1. I type “12/07/2026 was in Detmold and saw an eagle” → see an AI preview (stage 2, `unconfirmed`) → confirm it (→ `confirmed`).
+2. The event appears correctly dated on the timeline **and** as a marker in Detmold on the map.
+3. “Summer 2002 holiday in France” is stored as a span (summer 2002, `season`, `unconfirmed`) with the place France.
+4. “Eagle” (animal) appears in the collection together with the sighting.
+5. I can search for “France” and find the event (full text plus semantic).
+6. In the admin panel I can delete the stage-2/3 data and **recompute it from the raw data** — confirmed values are kept.
+7. I sign in via OIDC; a second user signs in and sees **none** of my data.
+8. On a phone I can capture a fragment via the bottom navigation and read the timeline without scrolling horizontally.
+
+
+### B.2 Release plan — pace, risk and the order of retreat (from chapter 14.3)
+
+
+**What 1.0 means here.** Not “feature complete” — it is a *promise*: the data
+model is stable, the upgrade path from any 0.2x database is tested, semantic
+versioning applies from then on, and a stranger can go from zero to a populated,
+working instance in ten minutes. 1.0 is therefore the **publication version**
+(note 54: no promotion before it). Everything that does not serve that promise
+is deliberately pushed to 1.x.
+
+**Ordering principle:** features first, while the data model is still cheap to
+change — then the demo dataset, which freezes what the features look like — then
+hardening, packaging and the project surface. **Since 0.39.0 the cut between
+“features” and “demo” is a decision, not a plan entry:** work accumulates on
+`main` until the author calls the demo, and what has gathered becomes the
+release before it. The demo data comes *after* the
+features on purpose: seeded from an unfinished feature set, it would have to be
+rebuilt with every release.
+
+| Version | Theme | Contains | Effort |
+|---|---|---|---|
+| **0.40.0** | **Whatever daily use turns up** *(open, accumulating on `main` — decided 2026-07-23)* | No planned content. Everything built from here on lands on `main` and is tested from the `:main` image; the release is cut when the author says the demo dataset is next, and whatever has gathered by then becomes 0.40.0. This is note 86's two-track model used the way it was meant to be: a version number exists so that a *user* can tell two states apart, and until publication there is exactly one operator, who is testing continuously and does not need a number for that. It also removes the pressure that produced the note 91 defect twice — a bump set as a starting gun rather than a finish line. **Gathered so far** (feedback round 2026-08-02, notes 139–143): one photo is one event and the `photo_points` table is gone (139) · the map no longer refetches an unchanged corpus (140) · `/api/tracks` stopped truncating silently and the week view stopped freezing (141) · record tiles lead to their day (142) · days lead, entries stand beside them (143). Second pass 2026-08-03 (notes 148–156): the collection leads with days and can be sorted · the clean-up button's 500 · the map stopped building an object per photo · the statistics tab became three views with rankings. Third pass (notes 157–159), and this one came from the **list of things earlier rounds measured and left lying** rather than from a report: the map payload halved and its query stopped building 20 000 ORM objects (157) · the map's weather had been silently gone since note 139 (158) · the paths switch says when it cannot draw (159, the one finding of note 154 that was a rule violation rather than a design choice). Fourth pass (note 160): **the map controls rebuilt** — two labelled groups, four named condensing levels, the 300-point cap decoupled from the merge switch, cluster bubbles sized by count instead of labelled with it, and the photo layer given a colour of its own; note 154 is closed with it, as is A18's cluster threshold. Expected to be **mostly fixes** — it is turning out to be mostly *silence*, which is this project's recurring defect rather than breakage. | ? |
+| **0.41.0** | **Demo mode** (R1a) | A seeded, entirely fictional dataset behind one flag: a plausible life with trips, places across several continents, sightings, concerts, journal entries, weather, achievements and a handful of freely licensed images. **This is the release that unblocks everything public.** | M–L |
+| **1.0.0** | **Publication** *(three stages on `main`, one tag — note 89)* | The promise above, kept. Reached in three named stages that are **worked on the `main` track without a version number of their own**, because none of them is something a user notices on upgrade: **(i) hardening and operations** (R1c/d/f) — `AUTH_MODE=dev` unstartable in a production-shaped environment · no secrets in logs · pinned base images · Dependabot · `SECURITY.md` · versioned ghcr images and a genuine `docker compose up` · **the upgrade path from 0.41 tested end to end** · backup and restore documented, media folder included; **(ii) project surface** (R1b/e/g **and R2**) — README with screenshots and a short GIF · **the documentation site on GitHub Pages (R2, note 121), which is what the README stops having to be** · the “why not X” comparison table from ch. 1.1 · `CONTRIBUTING.md` · issue templates · questions to Discussions · “what this project deliberately does not do” · the donation link (note 63); **(iii) freeze and fresh-install pass** — no new features, walk the stranger's path from an empty machine, fix what it turns up, verify every `.env.example` key is real and every documented command works. Then promotion in the order set out in note 54: selfh.st → r/selfhosted → awesome-selfhosted → Show HN → Fediverse/Lemmy/r/quantifiedself. | L (i) + S–M (ii) + S–M (iii) |
+
+Everything before 0.40.0 — the releases from 0.21.0 on, with what each
+contained and why it sat where it sat — is in
+[Appendix A.4](#a4-releases-0210--0390).
+
+**What waits behind 1.0** is listed in 14.2 above and was narrowed on
+2026-07-22 (note 101) to **new import sources** plus two exceptions: **P5.2**
+(Whisper — not an import, but the only remaining package that adds a heavy
+runtime dependency) and **P6.1** (the shared view — it does not extend recording
+or exploring one's *own* life, it adds a second one). Everything else that was
+parked there has moved ahead of 1.0: P5.1 and the rest of F1 into 0.36.0, the
+second stage of P2.1 into 0.37.0.
+
+This defines 1.0 by exclusion: a complete tool for **capturing and exploring a
+life by hand — with pictures, complete backups and statistics that follow the
+modules** — with the Google Timeline import and Immich as the bulk sources. Every
+further connector widens the intake, not the concept.
+
+**Pace (decided 2026-07-20, note 58).** There is no deadline, and the plan is
+written accordingly: nothing that belongs in a 1.0 is deferred to make a date. Two
+packages that an earlier draft pushed into 1.x — P3.1 and the media-inclusive
+export — were pulled back in, because a tool that loses photos on restore, or whose
+statistics have to be hand-coded per module, is not a 1.0 whatever the label says.
+
+**Risk to watch** *(rewritten 2026-07-22 evening, note 101)*. The runway grew by
+**three** releases at once, and this time not by the old bar. Until now an inserted
+release had to clear *a schema consequence plus an observed complaint* — that is what
+let 0.33.0 and 0.34.0 in, and by that bar A42 still qualifies (a cache table) while
+P5.1, the rest of F1 and P2.1 stage 2 plainly do not. They were pulled forward by a
+**deliberate change of the rule**, recorded in note 101: what is deferred past 1.0 is
+now decided by *kind* — new import connectors, and nothing else — rather than by
+urgency. So the honest statement of the risk is no longer “watch for insertions” but
+this: **the demo mode now sits three releases further away than the plan of 2026-07-20
+put it, and each of those three is a release the author will want to live with for a
+day or two** (note 86). That is the cost, it was accepted knowingly, and the thing to
+watch is whether the runway keeps growing *after* this decision — because the reason it
+could grow this time was a rule change, and a rule can only be changed once before it
+stops being one. Should it need shortening, the order of retreat is unchanged in spirit
+and now explicit in the table: **0.37.0** first (Immich as an event source — a whole
+row, cleanly removable), then the **F1 half of 0.36.0** (the AI daily summary is an
+addition to a feature that already works, unlike P5.1 which closes a hole in capture),
+then **A42's description half** (the detail page and its map are the substance; the
+Wikipedia text is the decoration, and dropping it also drops the schema addition). The
+demo mode itself is not negotiable — it decides whether anyone gets to look before
+installing.
+
+
+### B.3 The questions that were open until 2026-08-03 (chapter 15)
+
+#### Currently open (as of 2026-08-02)
+
+**Nothing is open.** The four questions that stood here on 2026-08-02 were all
+answered on 2026-08-03; two of them became packages, two became rulings.
+
+| # | Question | How it was settled |
+|---|---|---|
+| 144 | **Baseline location for periods with no data** — “from birth to age six I want the system to know I was at my parents’ house”. | **Built as F20** (on `main`, 2026-08-03; the record is in [Appendix A.3](#a3-group-b--new-features-as-far-as-built)). As a *derivation*, not as generated rows: one record per period plus a layer-4 day fill. An inferred day counts fully; it fills gaps only; one baseline at a time. |
+| 145 | **Gap detection** — “eventually have at least one place for every day since birth, and let the system find the gaps”. | **Built as F21** (on `main`, 2026-08-03; the record is in [Appendix A.3](#a3-group-b--new-features-as-far-as-built)). A view, never a stored state — and a baselined day is not a gap. A view, never a stored state. |
+| 146 | **Shared view across accounts** — two independent databases, laid over each other. | **Confirmed for after 1.0 → [P6.1](ROADMAP.md#p61--a-shared-view-across-accounts--ml).** Nothing is to be prepared early: the preparation that matters is already in place and consists of things this project did not do (no cross-account copying, `user_id` filtered at the query). |
+| 147 | **Translation workflow** (Weblate or similar). | **Not now, and the trigger is named:** a third language or an outside contributor. Until then the inline catalogue plus `check-i18n-coverage.js` is the whole apparatus; nothing is extracted “so it is ready”. |
+
+**Closed earlier:** **154** (map controls) — the choice between the three designs
+was made from an interactive mockup and built as note 160: two labelled groups,
+four named condensing levels, the cap decoupled from the merge switch, and a
+colour of its own for the photo layer.
+
+Each of these is written out in `DECISIONS.md` with the alternatives already
+weighed — the table here is the index, not the argument. **When a question is
+answered, this table keeps the answer in one line and the reasoning stays
+there**; a question that vanishes from the index once it is decided takes with
+it the fact that it was ever asked.
+

@@ -1,6 +1,6 @@
 """Tests für 0.24.0: F15 — Fotos von Hand an Events.
 
-Schwerpunkt sind die drei Zusagen aus KONZEPT Anmerkung 57:
+Schwerpunkt sind die drei Zusagen aus DECISIONS Anmerkung 57:
 Hochgeladenes gehört zur Lebensdatenbank, es gibt keine fremden Bilder,
 und Dateien bleiben beim Löschen nicht verwaist liegen.
 """

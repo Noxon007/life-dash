@@ -1,7 +1,7 @@
 """F15 — hochgeladene Bilder: speichern, prüfen, Vorschau, EXIF.
 
 Anders als jede andere Anreicherung liegen hier **Originaldaten**, die es
-nirgendwo sonst gibt (KONZEPT Anmerkung 57): eine hochgeladene Datei gehört
+nirgendwo sonst gibt (DECISIONS Anmerkung 57): eine hochgeladene Datei gehört
 zur Lebensdatenbank und wird von Maschinen nie angefasst.
 
 Sicherheitsleitplanken, weil dies der erste Pfad ist, über den fremde Bytes

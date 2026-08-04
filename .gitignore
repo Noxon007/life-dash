@@ -20,8 +20,10 @@ backend/_pgtest/
 # Python
 __pycache__/
 *.py[cod]
+*.egg-info/
 .venv/
 venv/
+.pytest_cache/
 
 # Logs & lokale Prozess-Artefakte
 backend/_server.log
@@ -32,7 +34,14 @@ backend/_test.err
 # OS / Editor
 .DS_Store
 Thumbs.db
+.vscode/
+.idea/
+
+# Hochgeladene Medien (Lebensdatenbank, Anm. 57 — separat sichern)
 backend/media/
 media/
+
+# Node steckt AUSSCHLIESSLICH in den Wächtern; die App hat keinen Build-Schritt
+# (Anm. 4). package-lock.json ist bewusst NICHT ignoriert: die CI installiert
+# damit dieselben Versionen wie hier, sonst prüft sie etwas anderes als du.
 tools/node_modules/
-tools/package-lock.json

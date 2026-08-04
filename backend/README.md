@@ -62,7 +62,7 @@ service, loaded every embedded event into the app process, and computed cosine
 in pure Python — the only path that did not scale past ~20k events, and it took
 the whole response down (500) when the embed service was unavailable. If it ever
 returns, it belongs in the database as a layer-4 derivation with a vector index
-(pgvector), not in the process (see KONZEPT ch. 15).
+(pgvector), not in the process (see DECISIONS.md).
 
 ## Interface language (F10)
 
@@ -76,16 +76,21 @@ in the backend. The chosen language is also stored on the account and drives
 
 ## Stack
 
-| Layer | Today | Later (concept) |
+| Layer | In use | Considered, not adopted |
 |---|---|---|
-| DB | SQLite (file) or PostgreSQL | PostgreSQL + PostGIS + pgvector |
-| AI | OpenAI-compatible API (any vendor) or mock provider | — |
-| Auth | OIDC (any provider) or dev mode | — |
-| Geo | lat/lng fields + Nominatim-compatible service | PostGIS |
-| Deployment | uvicorn / Docker Compose | Docker Compose |
+| DB | SQLite (file) or PostgreSQL — PostgreSQL is what it runs on | PostGIS, pgvector |
+| Geo | plain `lat`/`lng` columns + a Nominatim-compatible service; tracks are JSON line strings | PostGIS |
+| Migrations | `app/migrate.py` — hand-written `ALTER TABLE` steps | Alembic |
+| Background work | a `Job` table + a minute ticker in the app lifespan, one lock per type | Redis / RQ |
+| AI | any OpenAI-compatible endpoint, or the mock provider | — |
+| Auth | OIDC (any provider), local accounts (scrypt), or dev mode | — |
+| Deployment | uvicorn / Docker Compose | — |
 
-The models are kept Postgres-compatible; `app/migrate.py` adds new columns to
-existing databases (MVP migration, Alembic later).
+The right-hand column is not a plan. Each of those was in the original concept
+and each was left out on purpose: they buy scale this instance does not have,
+at the cost of an operational dependency a self-hoster would have to run. If
+one of them ever arrives it will be because a measurement asked for it — see
+[`../docs/internal/DECISIONS.md`](../docs/internal/DECISIONS.md).
 
 ## Structure
 

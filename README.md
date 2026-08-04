@@ -3,11 +3,14 @@
 Your searchable personal life database — memories, places, trips, concerts and
 more, as a responsive PWA with AI-assisted capture and search.
 
-- **Concept & roadmap:** [docs/KONZEPT.md](docs/KONZEPT.md)
-- **Backend/architecture:** [backend/README.md](backend/README.md)
 - **Deployment:** [docs/DEPLOY.md](docs/DEPLOY.md)
 - **All settings:** [.env.example](.env.example)
 - **Changes per version:** [CHANGELOG.md](CHANGELOG.md)
+- **Backend notes:** [backend/README.md](backend/README.md)
+- **Design documents** (working documents, not user documentation):
+  [architecture](docs/internal/ARCHITECTURE.md) ·
+  [roadmap](docs/internal/ROADMAP.md) ·
+  [decisions log](docs/internal/DECISIONS.md)
 
 ## Quick start
 
@@ -112,7 +115,7 @@ the baseline form, which is the one action that fills a hundred days at once.
 ## How this was built
 
 The entire implementation was written by Anthropic's Claude models — **Fable and
-Opus** — from [docs/KONZEPT.md](docs/KONZEPT.md), with the author directing the
+Opus** — from [the design documents](docs/internal/), with the author directing the
 work, deciding the architecture, reviewing the result and running it daily. This
 is stated up front rather than buried: if you are going to host a database of
 your own life, you should know how the software was made.
