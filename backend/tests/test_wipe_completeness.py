@@ -97,7 +97,7 @@ def _baseline(db, user) -> BaselineLocation:
 
 
 def test_wipe_removes_the_baseline_and_its_day_values(db, user):
-    """Der Fall, der auf PostgreSQL 500 warf: der Grundort zeigt auf einen Ort,
+    """Der Fall, der auf PostgreSQL 500 warf: der Wohnort zeigt auf einen Ort,
     und der Ort sollte gelöscht werden."""
     _baseline(db, user)
 
@@ -183,7 +183,7 @@ def test_the_admin_route_asks_for_it_too(db, user):
 # --------------------------------------------------------------------------- #
 def test_the_export_carries_the_baseline_back_and_forth(db, user):
     """Der Wipe-Dialog sagt „mach vorher ein Backup". Bis 0.39 enthielt dieses
-    Backup die Grundort-Zeiträume nicht — die einzige von Hand gepflegte
+    Backup die Wohnort-Zeiträume nicht — die einzige von Hand gepflegte
     Tabelle, aus nichts wiederherstellbar."""
     _baseline(db, user)
 
@@ -197,7 +197,7 @@ def test_the_export_carries_the_baseline_back_and_forth(db, user):
     back = db.query(BaselineLocation).one()
     assert back.label == "Kindheit"
     # Ein Tag muss ein Tag bleiben und darf nicht als Zeitpunkt zurückkommen —
-    # die Grundort-Rechnung vergleicht `date`, nicht `datetime`.
+    # die Wohnort-Rechnung vergleicht `date`, nicht `datetime`.
     assert back.date_start == date(1995, 3, 1)
     assert back.date_end == date(2007, 8, 31)
     assert db.get(Location, back.location_id) is not None

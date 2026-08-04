@@ -19,7 +19,7 @@
 **Everything built so far is in daily use by its author, and nobody else.** All
 of group A (A1–A48) and group B through F21 are done, along with the Immich
 connector in all three stages, the Google Timeline import, weather enrichment,
-achievements, the baseline location and the gap report. The record of what
+achievements, the residence and the gap report. The record of what
 each release contained is in [Appendix A](DECISIONS.md#appendix-a--what-was-built-and-when).
 
 Work currently accumulates on `main` **without a version number**. The
@@ -130,7 +130,7 @@ data with it.
 ### F22 — the weather run asks one day at a time · S–M
 
 `fetch_weather` sets `start_date` and `end_date` to the **same day**, so the run
-makes one HTTP round trip per (place, day), strictly sequentially. A baseline
+makes one HTTP round trip per (place, day), strictly sequentially. A residence
 period of twenty years is 7,298 requests at a **single** coordinate — near the
 free tier's 10,000/day cap, and half an hour to an hour of waiting.
 
@@ -140,9 +140,9 @@ moves to `customer-api.open-meteo.com`, but a single request does not get
 faster, and the paid plans are aimed at commercial use. The fix is in this
 repository:
 
-- **A date range instead of a day.** One request per baseline period and year
+- **A date range instead of a day.** One request per residence period and year
   instead of 365 — the parameters already exist. This is the whole win for the
-  baseline days, where every day shares one coordinate.
+  residence days, where every day shares one coordinate.
 - **Several coordinates per request** (`latitude=52.52,48.85&longitude=…`,
   documented) for the events, where each day has a different place.
 

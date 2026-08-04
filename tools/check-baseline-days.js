@@ -1,4 +1,4 @@
-// F20 / Anmerkung 144 — der Grundort erreicht den Zeitstrahl.
+// F20 / Anmerkung 144 — der Wohnort erreicht den Zeitstrahl.
 //
 // **Was hier schiefgehen kann, sieht man dem Bildschirm nicht an.** Ein
 // Zeitstrahl ohne abgeleitete Tage sieht aus wie ein Zeitstrahl, in dem es
@@ -67,7 +67,7 @@ function daysOfYear(from, to) {
   const d = new Date(Date.UTC(1990, 0, 1));
   while (d.getUTCFullYear() === 1990) {
     const iso = d.toISOString().slice(0, 10);
-    // der Tag mit einem Eintrag fehlt — der Grundort füllt nur Lücken
+    // der Tag mit einem Eintrag fehlt — der Wohnort füllt nur Lücken
     if (iso !== ENTRY_DAY && iso >= from && iso <= to) out[iso] = 0;
     d.setUTCDate(d.getUTCDate() + 1);
   }
@@ -94,7 +94,7 @@ function makeDom(state) {
         return g;
       };
       // **Das Doppel muss das ZEICHEN behalten, nicht nur seine Zahl.** Seit
-      // der Grundort ein Tropfen mit eigener Farbe ist statt eines grauen
+      // der Wohnort ein Tropfen mit eigener Farbe ist statt eines grauen
       // Rings, ist „wie sieht es aus?" eine prüfbare Aussage — und ein Doppel,
       // das `marker(ll, opt)` die Argumente wegwirft, kann sie nicht zeigen
       // (Anmerkung 116/150: ein Doppel, das ein Feld auslässt, ist eine andere
@@ -110,7 +110,7 @@ function makeDom(state) {
       };
       // `latLngBounds(...).pad(...)` muss die Koordinaten BEHALTEN — sonst
       // steht in `state.fits` der Auffang-Proxy, und „springt der Ausschnitt
-      // auf den Grundort?" ist keine Frage mehr, die eine Antwort hat.
+      // auf den Wohnort?" ist keine Frage mehr, die eine Antwort hat.
       const bounds = (ll) => { const b = { ll, pad: () => b }; return b; };
       const base = new Proxy(function () { return base; }, {
         get: (_t, k) => {
@@ -152,7 +152,7 @@ function makeDom(state) {
                           city: 'Bad Segeberg', country: 'Deutschland' }],
                    days };
         } else if (/days\/weather/.test(p)) {
-          // Das Wetter liegt an einem Tag, den NUR die Grundort-Spanne
+          // Das Wetter liegt an einem Tag, den NUR die Wohnort-Spanne
           // umfasst — die Seite kennt genau einen Tag, und das ist ein anderer.
           const [from, to] = span(p);
           const day = state.wxDay || '1990-03-07';
@@ -301,7 +301,7 @@ setTimeout(async () => {
     w.close();
   }
 
-  // --- 2. Ohne Grundort ändert sich nichts --------------------------------
+  // --- 2. Ohne Wohnort ändert sich nichts --------------------------------
   {
     const state = { calls: [], noBaseline: true };
     const w = makeDom(state).window, d = w.document;
@@ -309,7 +309,7 @@ setTimeout(async () => {
     await w.loadTimeline();
     await wait(150);
     const list = d.getElementById('timeline-list');
-    ok('Ohne Grundort steht keine abgeleitete Zeile da',
+    ok('Ohne Wohnort steht keine abgeleitete Zeile da',
        list.querySelectorAll('.baseline-day').length === 0);
     ok('…und keine Fußzeile behauptet einen Deckel',
        !/300/.test(list.textContent),
@@ -385,7 +385,7 @@ setTimeout(async () => {
     // ihres Aufrufs: nimmt man den Aufruf aus dem leeren Zweig heraus, bleibt
     // die Zusicherung grün (Anmerkung 108, und der `check-a41-cities.js`-Fall
     // in seiner reinsten Form). Geprüft wird deshalb über `renderPeriod` mit
-    // LEERER Karte — und das ist gerade der Normalfall für einen Grundort:
+    // LEERER Karte — und das ist gerade der Normalfall für einen Wohnort:
     // ein Zeitraum, in dem nichts erfasst wurde, hat keine verorteten
     // Ereignisse und trotzdem einen Ort.
     w.eval('mp.located = []; rebuildPeriods(); renderPeriod();');
@@ -410,7 +410,7 @@ setTimeout(async () => {
     ok('…und mit Punkten auf der Karte ebenso',
        w.eval('mp.located.length') > 0
        && w.eval('mapBaseline.getLayers().length') === 1,
-       `Punkte: ${w.eval('mp.located.length')}, Grundort-Zeichen: `
+       `Punkte: ${w.eval('mp.located.length')}, Wohnort-Zeichen: `
        + `${w.eval('mapBaseline.getLayers().length')}`);
 
     w.eval('mp.showBaseline = false;');
@@ -418,11 +418,11 @@ setTimeout(async () => {
     w.close();
   }
 
-  // --- 2d. Ein Zeitraum, in dem NUR der Grundort steht ----------------------
+  // --- 2d. Ein Zeitraum, in dem NUR der Wohnort steht ----------------------
   //
   // **Gemeldet als „auf 1993 kann ich gar nicht gehen".** Die Zeiträume der
   // Karte entstanden aus den EREIGNISSEN — und genau die Jahre, für die der
-  // Grundort gemacht ist, haben keine. Die Ebene war gebaut, gezeichnet und
+  // Wohnort gemacht ist, haben keine. Die Ebene war gebaut, gezeichnet und
   // geprüft, nur nicht erreichbar: dieselbe Falle wie bei den Fototagen (A45),
   // und ebenso unsichtbar, weil eine Ansicht ohne diesen Zeitraum aussieht wie
   // eine Ansicht, in der es ihn nicht gibt.
@@ -441,21 +441,21 @@ setTimeout(async () => {
     await w.openMapView();
     await wait(120);
 
-    // Der einzige verortete Eintrag liegt 1990-06-15; der Grundort läuft von
+    // Der einzige verortete Eintrag liegt 1990-06-15; der Wohnort läuft von
     // 1986-04-02 bis 1992-08-31. 1989 hat also keinen einzigen Eintrag.
     // (1989-03-07 liegt in KW 10 — der 2. Januar 1989 war ein Montag.)
     [['year', '1989'], ['month', '1989-03'], ['week', '1989-W10'],
      ['day', '1989-03-07']].forEach(([mode, key]) => {
       w.eval(`mp.mode = ${JSON.stringify(mode)}; rebuildPeriods();`);
       const has = w.eval(`mp.periods.includes(${JSON.stringify(key)})`);
-      ok(`Nur-Grundort-Zeitraum ist ansteuerbar (${mode})`, has === true,
+      ok(`Nur-Wohnort-Zeitraum ist ansteuerbar (${mode})`, has === true,
          `${key} fehlt in ${w.eval('mp.periods.length')} Zeiträumen — die `
          + 'Ebene ist dann gebaut und gezeichnet, aber nicht erreichbar');
     });
 
     // Und derselbe Weg mit dem Schalter AUS: die Zeiträume dürfen dann nicht
     // stehen bleiben. Ohne diese Gegenrichtung prüfte die Zusicherung oben nur,
-    // dass es die Schlüssel GIBT — nicht, dass sie vom Grundort kommen.
+    // dass es die Schlüssel GIBT — nicht, dass sie vom Wohnort kommen.
     w.eval("mp.mode = 'year'; mp.showBaseline = false; rebuildPeriods();");
     ok('…und mit ausgeschalteter Ebene nicht mehr',
        w.eval("mp.periods.includes('1989')") === false,
@@ -469,7 +469,7 @@ setTimeout(async () => {
     await wait(80);
 
     const marks = w.eval('mapBaseline.getLayers()');
-    ok('Auf 1989 steht das Grundort-Zeichen', marks.length === 1,
+    ok('Auf 1989 steht das Wohnort-Zeichen', marks.length === 1,
        `${marks.length} Zeichen`);
 
     // (2) Der Tropfen — dieselbe Zeichnung wie überall, nur in eigener Farbe.
@@ -487,7 +487,7 @@ setTimeout(async () => {
        String(html).slice(0, 120));
     ok('…und ohne Ziffer darin', !/<b[ >]/.test(html),
        'die Größe eines Tropfens sagt „so viele Einträge" — die Tageszahl '
-       + 'eines Grundorts ist gerade keine Zahl über Einträge');
+       + 'eines Wohnorts ist gerade keine Zahl über Einträge');
 
     // (3) Der Ausschnitt. Ohne Ereignisse gibt es sonst nichts, worauf die
     // Karte springen könnte, und das Bild bleibt beim vorigen Zeitraum stehen.
@@ -564,7 +564,7 @@ setTimeout(async () => {
     w.close();
   }
 
-  console.log(fail ? `\nGrundort-Tage: ${fail} Prüfung(en) fehlgeschlagen`
-                   : '\nGrundort-Tage: alles grün');
+  console.log(fail ? `\nWohnort-Tage: ${fail} Prüfung(en) fehlgeschlagen`
+                   : '\nWohnort-Tage: alles grün');
   process.exit(fail ? 1 : 0);
 }, 60);

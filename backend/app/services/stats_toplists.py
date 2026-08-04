@@ -34,13 +34,13 @@ def _merge_baseline(rows: list[dict], extra: dict[str, int]) -> list[dict]:
     """Abgeleitete Tage in eine fertige Rangliste einrechnen (F20).
 
     **Die Rangfolge entsteht danach neu, und das ist der Punkt.** Wer den
-    Grundort erst nach dem `LIMIT 10` addierte, bekäme eine Liste, in der ein
+    Wohnort erst nach dem `LIMIT 10` addierte, bekäme eine Liste, in der ein
     Ort mit 2 190 abgeleiteten Tagen fehlt, weil er ohne sie nicht unter die
     ersten zehn kam — der Deckel hätte dann die Antwort entschieden, nicht die
     Zahl. Deshalb liefern die Abfragen unten mehr Zeilen, als die Liste zeigt.
 
     Addieren ist erlaubt, weil die beiden Tagesmengen disjunkt sind: der
-    Grundort füllt nur Lücken (`services/baseline.py`). Die EINTRÄGE bleiben
+    Wohnort füllt nur Lücken (`services/baseline.py`). Die EINTRÄGE bleiben
     unberührt — ein abgeleiteter Tag ist kein Eintrag, und ihn als einen zu
     zählen wäre genau die Vermischung, gegen die Anmerkung 143 die zweite Zahl
     überhaupt eingeführt hat.
@@ -59,9 +59,9 @@ def _merge_baseline(rows: list[dict], extra: dict[str, int]) -> list[dict]:
     return out[:TOP_N]
 
 
-# Wie viele Zeilen die Abfragen holen, bevor der Grundort eingerechnet wird.
+# Wie viele Zeilen die Abfragen holen, bevor der Wohnort eingerechnet wird.
 # Großzügig statt exakt: exakt wäre „alle", und für eine Liste von zehn Zeilen
-# den ganzen Ortsbestand zu holen ist der teurere Fehler. Ein Grundort hebt
+# den ganzen Ortsbestand zu holen ist der teurere Fehler. Ein Wohnort hebt
 # einen Ort um höchstens seine Tageszahl — dass der dann nicht unter den ersten
 # fünfzig ohne ihn wäre, hieße, dass es fünfzig Orte mit noch mehr Tagen gibt,
 # und dann ist er auch mit ihm keine Antwort auf „Top 10".
@@ -135,7 +135,7 @@ def _place_ranking(db: Session, user_id: str,
         cur[1] += events
     top = sorted(merged.items(), key=lambda kv: (-kv[1][0], -kv[1][1], kv[0]))
     rows = [{"name": n, "days": d, "events": e} for n, (d, e) in top]
-    # F20: dieselbe Kürzung auch für den Grundort — er läuft hier über
+    # F20: dieselbe Kürzung auch für den Wohnort — er läuft hier über
     # `_short_place`, nicht über den rohen Namen, sonst stünde „Musterweg 1,
     # Bad Segeberg, Deutschland" neben „Musterweg 1" als zweiter Ort.
     extra: dict[str, int] = {}
@@ -156,7 +156,7 @@ def _days(db: Session, user_id: str) -> list[date]:
     darf es: es sind die TAGE, nicht die Einträge. Zwanzig Jahre lückenlos sind
     7 300 Werte; zwanzigtausend Ereignisse wären es nicht.
 
-    **F20: die Grundort-Tage zählen mit.** Sie sind kein Eintrag, aber sie sind
+    **F20: die Wohnort-Tage zählen mit.** Sie sind kein Eintrag, aber sie sind
     Wissen über den Tag — und die Serie fragt „wie lange am Stück weiß ich, wo
     ich war", nicht „wie lange am Stück habe ich getippt". Die Abfrage selbst
     steht seitdem in `services/baseline.py`, weil dort auch die Ableitung
@@ -177,7 +177,7 @@ def _streaks(db: Session, user_id: str) -> dict:
     wie bei den Wetter-Rekorden (Anmerkung 156): zwei Fassungen von „was ist
     eine Lücke" liefen beim ersten Sonderfall auseinander, und die Sonderfälle
     stehen längst da — die Ränder hängen am Geburts-Meilenstein, und ein
-    Grundort-Tag ist keine Lücke mehr (Anmerkung 144/145).
+    Wohnort-Tag ist keine Lücke mehr (Anmerkung 144/145).
 
     Die SERIE bleibt hier: sie liest dieselbe Tagesmenge, beantwortet aber die
     umgekehrte Frage, und für die gibt es keinen zweiten Leser.
@@ -258,7 +258,7 @@ def compute_toplists(db: Session, user_id: str, n: int = TOP_N) -> dict:
         "years": _merge_baseline(
             [{"name": str(int(y)), "days": d, "events": e} for y, d, e in year_rows],
             {str(y): n for y, n in b["years"].items()}),
-        # **Kategorien bekommen den Grundort NICHT**, und das ist keine Lücke:
+        # **Kategorien bekommen den Wohnort NICHT**, und das ist keine Lücke:
         # ein abgeleiteter Tag hat keine Kategorie. Ihm eine zu geben — und sei
         # es „event" — hieße, eine Aussage zu erfinden, die niemand gemacht hat.
         "categories": _ranked(db, user_id, Event.category),

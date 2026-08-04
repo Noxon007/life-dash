@@ -1146,6 +1146,16 @@ and no change, and one that turned out to be the same defect in two places.
 
     One thing followed from it that had been silently wrong before: in year and decade the timeline never pages (the skeleton comes from the index), so `tl.done` never becomes true — and a childhood year reported “0 derived” although the whole year is derived. The full span is fetched there now. It is one request, and its answer is one date per day.
 
+183. ✅ **“Baseline location” became “residence”, and the rule stayed where it was.** Two questions were on the table, and only one of them was about a name.
+
+    The name: *baseline location* described the mechanism (a fallback for days nothing else says anything about), not the thing. What people actually enter is where they lived, and a residence is why the fallback is true in the first place. It also makes the goal legible: enter every residence and the days from birth onwards are covered, with the last period left open-ended so today is filled without anybody maintaining it. **Interface, README and this architecture say “residence”; the table, the model, the endpoints and `services/baseline.py` keep `baseline`.** A full rename is a migration plus a pass through the deletion list for a change no user can see — the cost is real and the benefit is legibility we can get from one sentence in ARCHITECTURE §3.2 instead.
+
+    The rule: the proposal was to let the residence *keep counting* on days that carry a single entry somewhere else (a confirmation in another town — you sleep at home that night), and to fall silent only for **multi-day absences**. It was rejected by the user after being spelled out, in favour of the existing rule: **any entry on a day silences the residence.** Simpler, and consistent with what the day sets already promise. The accepted imprecision is one asymmetry: two entries in two cities on the same day give **both** cities a day, while a single entry elsewhere costs the residence its day — the entry-vs-entry rule is looser than the entry-vs-residence one.
+
+    What that decision avoids is worth recording, because it will be proposed again: recognising a multi-day absence needs a signal, and the obvious one — the entry's own duration — does not carry. *Split multi-day entries* deliberately turns a trip into per-day entries, and the Google import only ever creates single-day visits; the two weeks in Greece that are most obviously an absence arrive as fourteen separate days. Anything better than that would have needed a mark on the entry, an absence period of its own, or a distance heuristic — three new concepts to soften one rounding error.
+
+    The one hole the simple rule leaves is documented rather than closed: an entry occupies only its starting day, so an unsplit multi-day entry lets the residence fill the rest. The *split* run is the answer, it already stands before the residence form in the recommended order, and the form now says so.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

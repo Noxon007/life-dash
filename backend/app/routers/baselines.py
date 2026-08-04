@@ -1,4 +1,4 @@
-"""F20 — Grundorte pflegen, und die Tage, die daraus werden.
+"""F20 — Wohnorte pflegen, und die Tage, die daraus werden.
 
 Eigener Router und nicht in `events.py`, aus demselben Grund, aus dem
 `weather.py` einer ist (Anmerkung 119): der Pfad benennt die Sache. Was hier
@@ -27,7 +27,7 @@ from app.schemas import BaselineCreate, BaselineRead, BaselineUpdate
 from app.services import baseline
 from app.services.ingestion import place_from_point, resolve_place
 
-router = APIRouter(prefix="/api", tags=["Grundort"])
+router = APIRouter(prefix="/api", tags=["Wohnort"])
 
 # Derselbe Riegel wie bei `/api/days/weather`: kein Größenschutz, sondern eine
 # Grenze gegen offensichtlich unsinnige Eingaben — sie muss ein ganzes Leben
@@ -81,9 +81,9 @@ def list_baselines(
 
 def _check_span(db: Session, user: User, start: date_type,
                 end: date_type | None, *, ignore_id: str | None = None) -> None:
-    """Anfang vor Ende, und kein zweiter Grundort im selben Zeitraum.
+    """Anfang vor Ende, und kein zweiter Wohnort im selben Zeitraum.
 
-    **Ein Grundort zur Zeit** (Anmerkung 144). Der Fehler nennt den Zeitraum,
+    **Ein Wohnort zur Zeit** (Anmerkung 144). Der Fehler nennt den Zeitraum,
     mit dem es sich schneidet — „überschneidet sich" allein wäre eine
     Ablehnung ohne Hinweis, was zu ändern ist, und der Nutzer sieht die andere
     Zeile in derselben Liste.
@@ -104,7 +104,7 @@ def create_baseline(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> BaselineRead:
-    """Einen Grundort eintragen — „von … bis … war ich im Wesentlichen hier".
+    """Einen Wohnort eintragen — „von … bis … war ich im Wesentlichen hier".
 
     Der Ort läuft durch dieselbe Auflösung wie bei einem Ereignis: vorhandener
     Ort wird wiederverwendet, ein neuer bekommt Stadt, Land und
@@ -113,7 +113,7 @@ def create_baseline(
 
     **Zwei Wege, und welcher gilt, entscheidet die Angabe.** Getippter Name →
     `resolve_place` (vorwärts geocodiert). Auf der Karte gewählter Punkt →
-    `place_from_point`, und dann liegt der Grundort dort, wo geklickt wurde.
+    `place_from_point`, und dann liegt der Wohnort dort, wo geklickt wurde.
     Gerade hier zählt das: „das Elternhaus" hat oft keine Adresse, die
     Nominatim kennt, und ohne Koordinate bekämen seine 7 000 abgeleiteten Tage
     nie ein Wetter.
@@ -121,7 +121,7 @@ def create_baseline(
     _check_span(db, user, payload.date_start, payload.date_end)
     loc = _place(db, user, payload.place, payload.lat, payload.lng)
     if loc is None:
-        raise HTTPException(400, "Ohne Ort ist ein Grundort keine Aussage.")
+        raise HTTPException(400, "Ohne Ort ist ein Wohnort keine Aussage.")
     row = BaselineLocation(user_id=user.id, location_id=loc.id,
                            label=(payload.label or "").strip() or None,
                            date_start=payload.date_start,
@@ -135,7 +135,7 @@ def create_baseline(
 def _own(db: Session, user: User, baseline_id: str) -> BaselineLocation:
     row = db.get(BaselineLocation, baseline_id)
     if row is None or row.user_id != user.id:
-        raise HTTPException(404, "Grundort nicht gefunden.")
+        raise HTTPException(404, "Wohnort nicht gefunden.")
     return row
 
 
@@ -155,7 +155,7 @@ def update_baseline(
 
     Das Tageswetter bleibt stehen. Es ist eine Tatsache über (Tag, Ort) und
     nicht über den Zeitraum: verschiebt sich der Zeitraum, hängen die alten
-    Werte an Tagen, die der Grundort nicht mehr füllt, und werden von keiner
+    Werte an Tagen, die der Wohnort nicht mehr füllt, und werden von keiner
     Ansicht mehr gelesen — verkehrt wäre erst, sie als neue Antwort auszugeben.
     Wer sie wirklich los sein will, hat den Aufräum-Knopf.
     """

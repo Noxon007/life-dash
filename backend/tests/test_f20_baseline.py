@@ -1,9 +1,9 @@
-"""F20 — der Grundort (Anmerkung 144).
+"""F20 — der Wohnort (Anmerkung 144).
 
 Was hier festgenagelt wird, ist nicht „es gibt eine neue Tabelle", sondern die
 fünf Stellen, an denen dieses Paket still falsch wird:
 
-* **Erfasste und abgeleitete Tage sind disjunkt.** Der Grundort füllt nur
+* **Erfasste und abgeleitete Tage sind disjunkt.** Der Wohnort füllt nur
   Lücken. Auf dieser Eigenschaft beruht, dass jede Statistik die beiden Mengen
   einfach ADDIEREN darf und dass die Wetter-Vereinigung keinen Tag doppelt
   sieht. Fällt sie, zählt alles doppelt — und zwar leise.
@@ -165,7 +165,7 @@ def test_correcting_the_period_leaves_nothing_behind(db, user):
 
 
 def test_two_periods_may_not_overlap(client, db, user):
-    """Ein Grundort zur Zeit (Anmerkung 144, Entscheidung 4)."""
+    """Ein Wohnort zur Zeit (Anmerkung 144, Entscheidung 4)."""
     loc = _loc(db, user, "Bad Segeberg")
     _base(db, user, loc, date(2000, 1, 1), date(2005, 12, 31), label="Elternhaus")
     db.commit()
@@ -221,7 +221,7 @@ def test_an_inferred_day_is_not_an_entry(db, user):
     top = compute_toplists(db, user.id)
     city = top["cities"][0]
     assert city["days"] == 11 and city["events"] == 1
-    # Kategorien bekommen den Grundort NICHT — ein abgeleiteter Tag hat keine.
+    # Kategorien bekommen den Wohnort NICHT — ein abgeleiteter Tag hat keine.
     assert [c["name"] for c in top["categories"]] == ["concert"]
     assert top["categories"][0]["days"] == 1
 
@@ -316,7 +316,7 @@ def test_weather_run_fills_baseline_days_and_marks_them(db, user, fake_weather):
 
 def test_the_day_header_shows_baseline_weather(client, db, user, fake_weather):
     """Der Tageskopf liest EINE Funktion (Anmerkung 119) — sie muss beide
-    Quellen kennen, sonst hätte ein Grundort-Tag zwar Wetter und zeigte keins."""
+    Quellen kennen, sonst hätte ein Wohnort-Tag zwar Wetter und zeigte keins."""
     loc = _loc(db, user, "Kiel")
     _base(db, user, loc, date(2024, 6, 1), date(2024, 6, 2))
     db.commit()
@@ -326,14 +326,14 @@ def test_the_day_header_shows_baseline_weather(client, db, user, fake_weather):
                     params={"from": "2024-06-01", "to": "2024-06-02"}).json()
     assert wx["2024-06-01"]["values"]["temp_max_c"] == 29.0
     assert wx["2024-06-01"]["values"]["weather"] == "Klar"
-    # Ein Tag ohne zweite Region ist eindeutig — der Grundort hat genau einen Ort.
+    # Ein Tag ohne zweite Region ist eindeutig — der Wohnort hat genau einen Ort.
     assert wx["2024-06-01"]["regions"] == 1
 
 
 def test_baseline_weather_reaches_the_badge_thresholds(db, user, fake_weather):
     """Die Erfolge zählen über `day_value_query`. Läse die nur die
-    Ereignis-Metriken, wären Grundort-Tage für sie unsichtbar — und ein Nutzer
-    mit zwanzig Jahren Grundort hätte Wetterdaten, die nirgends ankommen."""
+    Ereignis-Metriken, wären Wohnort-Tage für sie unsichtbar — und ein Nutzer
+    mit zwanzig Jahren Wohnort hätte Wetterdaten, die nirgends ankommen."""
     from app.services.weather_day import day_value_query
 
     loc = _loc(db, user, "Kiel")

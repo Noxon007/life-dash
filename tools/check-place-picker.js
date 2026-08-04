@@ -18,7 +18,7 @@
 //   3. **Die Adresse wird nachgeschlagen und steht im Feld** — sie ist die
 //      Beschriftung, nicht die Angabe.
 //   4. **Der Punkt reist in ALLEN DREI Absendungen mit** (Eingabe,
-//      Bearbeiten-Dialog, Grundort). Drei Formulare, drei Stellen, an denen
+//      Bearbeiten-Dialog, Wohnort). Drei Formulare, drei Stellen, an denen
 //      dasselbe vergessen werden kann.
 //   5. **Wer den Namen danach ändert, meint den Namen** — dann darf die alte
 //      Koordinate NICHT mitfahren. Zwei Angaben über dieselbe Sache laufen
@@ -265,21 +265,21 @@ setTimeout(async () => {
        'der Endpunkt legt den Ort nur an, wenn er weiß, wie er heißen soll');
   }
 
-  // --- 4. Der Punkt reist mit: Grundort -----------------------------------
+  // --- 4. Der Punkt reist mit: Wohnort -----------------------------------
   {
     const state = { calls: [] };
     const w = makeDom(state).window, d = w.document;
     await wait(250);
     d.getElementById('bl-from').value = '1991-09-25';
-    ok('Kartenklick im Grundort-Formular angekommen', await pickOn(w, d, 'bl-place'));
+    ok('Kartenklick im Wohnort-Formular angekommen', await pickOn(w, d, 'bl-place'));
     d.getElementById('bl-add').dispatchEvent(new w.Event('click', { bubbles: true }));
     await wait(150);
 
     const sent = bodyOf(state, /\/api\/baselines$/, 'POST');
-    ok('Der Grundort schickt den gewählten Punkt mit',
+    ok('Der Wohnort schickt den gewählten Punkt mit',
        !!sent && sent.lat === PICK_LAT && sent.lng === PICK_LNG,
        `${JSON.stringify(sent)} — ohne Koordinate bekommen die abgeleiteten `
-       + 'Tage nie ein Wetter, und genau dafür gibt es den Grundort');
+       + 'Tage nie ein Wetter, und genau dafür gibt es den Wohnort');
   }
 
   // --- 5. Wer den Namen ändert, meint den Namen ----------------------------

@@ -15,10 +15,10 @@
 //   2. **Der Deckel wird genannt.** Zwanzig Strecken sehen aus wie die ganze
 //      Wahrheit, wenn niemand sagt, dass es vierhundert sind (A40).
 //   3. **Die Herkunft des Wissens steht dabei** — erfasst gegen abgeleitet.
-//      Eine Abdeckung, die zu 90 % aus einem Grundort stammt, ist eine andere
+//      Eine Abdeckung, die zu 90 % aus einem Wohnort stammt, ist eine andere
 //      Aussage als eine, die aus Einträgen kommt (Anmerkung 143).
 //   4. **Der Klick führt dorthin, wo die Lücke zu schließen ist**, also ins
-//      Grundort-Formular mit übernommenen Daten — nicht in einen Zeitstrahl,
+//      Wohnort-Formular mit übernommenen Daten — nicht in einen Zeitstrahl,
 //      der an dieser Stelle per Definition leer ist.
 //   5. **Ein Fehlschlag gilt nicht als beantwortet**, sonst ist ein einmaliger
 //      Netzfehler eine dauerhaft leere Ansicht (dieselbe Umkehrung der
@@ -119,7 +119,7 @@ setTimeout(async () => {
        `${TOTAL} fehlt in: ${text.slice(0, 220)}`);
 
     // (3) Woher das Wissen kommt — sonst liest sich eine Abdeckung aus einem
-    //     Grundort wie eine aus Einträgen.
+    //     Wohnort wie eine aus Einträgen.
     ok('Erfasst und abgeleitet stehen getrennt da',
        text.includes(String(RECORDED)) && text.includes(String(DERIVED)),
        text.slice(0, 260));
@@ -134,11 +134,11 @@ setTimeout(async () => {
        rows[0] && rows[0].dataset.gapFrom === '1996-01-05',
        rows.map(r => r.dataset.gapFrom).join(', '));
 
-    // (4) Der Klick führt ins Grundort-Formular, nicht in einen leeren
+    // (4) Der Klick führt ins Wohnort-Formular, nicht in einen leeren
     //     Zeitstrahl.
     rows[0].dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
     await wait(60);
-    ok('Der Klick übernimmt den Zeitraum in das Grundort-Formular',
+    ok('Der Klick übernimmt den Zeitraum in das Wohnort-Formular',
        inPage(w, "document.getElementById('bl-from').value") === '1996-01-05'
        && inPage(w, "document.getElementById('bl-to').value") === '1996-08-11',
        `von=${inPage(w, "document.getElementById('bl-from').value")} `

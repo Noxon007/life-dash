@@ -12,9 +12,9 @@
 //      steht auf einem Schalter, den man beim Ansehen der Karte liest. Der
 //      Wächter prüft deshalb nicht „da steht eine Zahl", sondern **dass sie
 //      sich beim Blättern ÄNDERT** und dem Bestand widerspricht.
-//   3. **Der Grundort steht bei den Kategorien**, in beiden Ansichten — nicht
+//   3. **Der Wohnort steht bei den Kategorien**, in beiden Ansichten — nicht
 //      bei den Ebenen, wo er bis 0.39 lag.
-//   4. **Der Grundort ist im Zeitstrahl abschaltbar**, und das Abschalten
+//   4. **Der Wohnort ist im Zeitstrahl abschaltbar**, und das Abschalten
 //      räumt auch die Fußnote weg („300 von 7.300 gezeigt" unter einer Liste
 //      ohne eine einzige davon wäre eine Auskunft über etwas, das nicht da
 //      ist).
@@ -157,14 +157,14 @@ setTimeout(async () => {
      'ein Schalter, dessen Aussehen nicht zu seinem Zustand passt, ist die '
      + 'stillste Sorte Falschaussage');
 
-  // --- 2. Der Grundort steht bei den KATEGORIEN --------------------------- //
+  // --- 2. Der Wohnort steht bei den KATEGORIEN --------------------------- //
   // Über die gemeinsame Gruppe geprüft und nicht über die Reihenfolge im
   // Markup: „steht daneben" wäre auch dann grün, wenn beide in „Ebenen" lägen.
   const sameGroup = (a, b) => {
     const ga = d.getElementById(a), gb = d.getElementById(b);
     return !!ga && !!gb && ga.closest('.filter-group') === gb.closest('.filter-group');
   };
-  ok('Karte: der Grundort steht bei den Kategorien',
+  ok('Karte: der Wohnort steht bei den Kategorien',
      sameGroup('mp-baseline-toggle', 'mp-filters'),
      'er lag in „Ebenen" — beim Benutzen ist er aber eine SORTE Eintrag');
   ok('Zeitstrahl: ebenso', sameGroup('tl-baseline-toggle', 'tl-filters'),
@@ -181,7 +181,7 @@ setTimeout(async () => {
   const label = () => d.getElementById('mp-period-label').textContent;
 
   // Angesteuert wird ausdrücklich, nicht „der letzte": seit Anmerkung 167
-  // bringt der Grundort seine eigenen Zeiträume mit, die Liste endet also im
+  // bringt der Wohnort seine eigenen Zeiträume mit, die Liste endet also im
   // Dezember. Genau das soll sie auch — ein Wächter, der stillschweigend den
   // letzten Eintrag nimmt, prüft die Zeiträume statt die Zahlen.
   w.eval("mp.index = mp.periods.indexOf('2024-08'); renderPeriod();");
@@ -215,7 +215,7 @@ setTimeout(async () => {
 
   // --- 3b. Anmerkung 181: die KATEGORIE-Chips nennen ihre Zahl ebenfalls --- //
   //
-  // Gemeldet: „bei den Kategorien wird nur beim Grundort eine Anzahl
+  // Gemeldet: „bei den Kategorien wird nur beim Wohnort eine Anzahl
   // angegeben, bei den anderen nicht — das ist nicht konsequent." Seit
   // Anmerkung 178 stehen sie in derselben Reihe; eine Reihe, in der ein Chip
   // eine Zahl trägt und sieben nicht, liest sich als Fehler in den sieben.
@@ -253,15 +253,15 @@ setTimeout(async () => {
      'Anmerkung 160: `chip.textContent = …` räumt sie weg — deshalb steht die '
      + 'Beschriftung in einem eigenen Element');
 
-  // --- 4. Der Grundort lässt sich im Zeitstrahl abschalten ---------------- //
+  // --- 4. Der Wohnort lässt sich im Zeitstrahl abschalten ---------------- //
   w.eval("tl.zoom = 'year';");
   await w.loadTimeline();
   await wait(200);
   const list = d.getElementById('timeline-list');
   const blChip = d.getElementById('tl-baseline-toggle');
-  ok('Der Zeitstrahl hat einen Grundort-Schalter', !!blChip);
+  ok('Der Zeitstrahl hat einen Wohnort-Schalter', !!blChip);
   ok('…und er ist benutzbar', !blChip.classList.contains('inert'),
-     'ohne Grundort wäre er außer Kraft — hier gibt es einen');
+     'ohne Wohnort wäre er außer Kraft — hier gibt es einen');
   const withRows = w.eval('tlBaselineRows().length');
   ok('Abgeleitete Tage sind da', withRows === 2, `${withRows} Zeilen`);
   // Anmerkung 181: die Zahl des BESTANDES (366 aus dem Index), nicht die der

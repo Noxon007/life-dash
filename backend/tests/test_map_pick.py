@@ -264,7 +264,7 @@ def test_grundort_aendern_verschiebt_den_punkt(client, geocoding, monkeypatch):
 
 def test_unsinnige_koordinate_wird_abgelehnt(client):
     """Eine Koordinate außerhalb der Erde ist kein Ort, sondern ein Tippfehler
-    — und würde als Grundort klaglos Tausende Tage mit Wetter von nirgendwo
+    — und würde als Wohnort klaglos Tausende Tage mit Wetter von nirgendwo
     füllen."""
     r = client.post("/api/baselines", json={
         "place": "X", "date_start": "2020-01-01", "lat": 91.0, "lng": 10.0,

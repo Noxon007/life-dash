@@ -193,14 +193,14 @@ def auto_enrich_events(db: Session, events: list[Event]) -> int:
 
 
 # --------------------------------------------------------------------------- #
-# F20 — Wetter für Tage, an denen KEIN Ereignis steht (Grundort)
+# F20 — Wetter für Tage, an denen KEIN Ereignis steht (Wohnort)
 # --------------------------------------------------------------------------- #
 def _baseline_users(db: Session, user_id: str | None) -> list[str]:
-    """Wessen Grundorte dieser Lauf anfasst.
+    """Wessen Wohnorte dieser Lauf anfasst.
 
     Mit `user_id` genau dieses Konto (der Weg über „Meine Daten", Anmerkung
     115). Ohne — der alte Rundum-Lauf — alle Konten, die überhaupt einen
-    Grundort haben; über alle Nutzer zu iterieren, um dann fast überall nichts
+    Wohnort haben; über alle Nutzer zu iterieren, um dann fast überall nichts
     zu finden, wäre eine Abfrage je Konto für nichts.
     """
     if user_id is not None:
@@ -211,7 +211,7 @@ def _baseline_users(db: Session, user_id: str | None) -> list[str]:
 
 def _day_weather_candidates(db: Session, user_id: str | None = None
                             ) -> list[tuple[str, object, Location]]:
-    """(Konto, Tag, Ort) für Grundort-Tage, die noch keine Wettermarke tragen.
+    """(Konto, Tag, Ort) für Wohnort-Tage, die noch keine Wettermarke tragen.
 
     **Dieselbe Marker-Regel wie bei den Ereignissen** (`weather_rev`), und aus
     demselben Grund: Open-Meteo liefert nicht für jeden Ort und jedes Datum
@@ -245,7 +245,7 @@ def _day_weather_candidates(db: Session, user_id: str | None = None
 
 
 def _add_day_weather(db: Session, user_id: str, day, loc: Location) -> bool:
-    """Wetter für EINEN Grundort-Tag holen und als `DayMetric` ablegen.
+    """Wetter für EINEN Wohnort-Tag holen und als `DayMetric` ablegen.
 
     Spiegelt `_add_weather` Zeile für Zeile — dieselben Schlüssel, dieselben
     Einheiten, dasselbe „nur Fehlendes anlegen", derselbe Revisionsmarker. Das
@@ -321,9 +321,9 @@ def enrich_weather(db: Session, limit: int | None = None,
         log.info("Wetter: %d von %d ohne Daten (z. B. %s)",
                  len(blank), len(batch), "; ".join(blank[:3]))
 
-    # --- F20: die Grundort-Tage, NACH den Ereignissen -----------------------
+    # --- F20: die Wohnort-Tage, NACH den Ereignissen -----------------------
     # Die Reihenfolge ist eine Aussage: ein Ereignis ist eine erfasste Tatsache,
-    # ein Grundort-Tag ist die Ableitung darüber. Wer den Lauf abbricht, soll
+    # ein Wohnort-Tag ist die Ableitung darüber. Wer den Lauf abbricht, soll
     # das Erfasste vollständig haben und nicht die Hälfte von beidem. Dass die
     # Ableitung überhaupt in DIESEN Lauf gehört und nicht in einen eigenen, ist
     # dieselbe Entscheidung: „Wetter ergänzen" ist eine Aussage über den
@@ -344,6 +344,6 @@ def enrich_weather(db: Session, limit: int | None = None,
 
     # Zwei Reste, getrennt gerechnet und dann addiert. Zusammengezählt VOR dem
     # Abziehen käme Unsinn heraus, sobald beide Quellen im selben Durchgang
-    # etwas beitragen — der angereicherte Grundort-Tag zöge dann die Zahl der
+    # etwas beitragen — der angereicherte Wohnort-Tag zöge dann die Zahl der
     # offenen EREIGNISSE herunter.
     return enriched + day_done, (len(candidates) - enriched) + (day_total - day_done)

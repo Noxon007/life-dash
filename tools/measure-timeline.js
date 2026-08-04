@@ -22,7 +22,7 @@
 // Karten, 172 ms bei 1.800, also mit jeder Seite mehr. Diese Zahlen stehen
 // hier, damit der nächste Umbau daran gemessen wird und nicht an einem Gefühl.
 //
-// **Und was kosten die abgeleiteten Grundort-Tage?** (Anmerkung 182) Der
+// **Und was kosten die abgeleiteten Wohnort-Tage?** (Anmerkung 182) Der
 // zweite Zahlenwert ist ihre Menge in JAHREN; ohne ihn läuft die Messung wie
 // bisher. Gemessen am 2026-08-04, `renderTimeline()` auf vollem Stand:
 //
@@ -40,7 +40,7 @@
 // eine eigene Gruppe.
 //
 // Aufruf aus dem Repo-Wurzelverzeichnis:
-//   node tools/measure-timeline.js [Seiten] [Grundort-Jahre]
+//   node tools/measure-timeline.js [Seiten] [Wohnort-Jahre]
 const fs = require('fs');
 const { JSDOM } = require('jsdom');
 
@@ -50,7 +50,7 @@ const BL_YEARS = Number(process.argv[3] || 0);
 const PAGE = 300;               // TL_PAGE
 const START = new Date('2024-12-31T12:00:00Z').getTime();
 
-// Grundort-Tage in den Jahren VOR den Ereignissen — dort, wo sie in echt auch
+// Wohnort-Tage in den Jahren VOR den Ereignissen — dort, wo sie in echt auch
 // liegen: in der Zeit, aus der nichts erfasst ist.
 const BL_DAYS = {};
 {
@@ -145,7 +145,7 @@ setTimeout(async () => {
     }
     console.log(`  ${PAGES} Seiten zusammen: ${sum.toFixed(0)} ms`);
     if (BL_TOTAL) {
-      console.log(`  Grundort-Zeilen: ${w.eval('TL_BASELINE_SHOWN')}`
+      console.log(`  Wohnort-Zeilen: ${w.eval('TL_BASELINE_SHOWN')}`
                   + ` von ${w.eval('TL_BASELINE.size')} geladenen`
                   + ` (Fenster: ${w.eval("tl.zoom === 'year' || tl.zoom === 'decade'")
                       ? 'keins — Jahr/Jahrzehnt zählen alle' : w.eval('tl.blPages') + ' Schritt(e)'})`);

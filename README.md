@@ -103,7 +103,7 @@ confirmed record — and it makes the imports below much easier to judge.
 5. **Split multi-day entries into days**, if trips and albums have produced
    them. Each day becomes its own entry, so each day can carry its own weather
    and its own photos.
-6. **Enter your baseline locations**, for the years you never recorded
+6. **Enter your residences**, for the years you never recorded
    anything: a period and a place — “from my birth until 2006, my parents'
    house in Bad Segeberg”. Every day in that period with no entry then counts
    as a day at that place, in the timeline and in every statistic. No entries
@@ -111,7 +111,7 @@ confirmed record — and it makes the imports below much easier to judge.
    everything instead of leaving thousands of wrong entries behind. Before the
    weather on purpose — the run below fills those days too.
 7. **Add weather.** Last on purpose: it asks an archive (Open-Meteo) about each
-   located, dated entry — and each baseline day — exactly once and keeps the
+   located, dated entry — and each residence day — exactly once and keeps the
    answer forever, so it pays off most when everything above already exists. It
    only ever adds — nothing you confirmed is overwritten.
 8. **Take a backup** (*Backup & restore*, with photos = a ZIP). Do this once the
@@ -126,10 +126,10 @@ default, because twenty years of library is tens of thousands of markers. And
 the timeline's **Condense by** picker decides how coarsely a day is summarised:
 country, city, district, or every entry on its own.
 
-And once a few baseline periods are in, the statistics tab has a **Gaps** view:
+And once a few residence periods are in, the statistics tab has a **Gaps** view:
 how much of your life is accounted for, a coverage bar per year, and the longest
 stretches with nothing in them at all. Clicking a stretch carries its dates into
-the baseline form, which is the one action that fills a hundred days at once.
+the residence form, which is the one action that fills a hundred days at once.
 
 ## How this was built
 

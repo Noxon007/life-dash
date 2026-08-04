@@ -257,7 +257,7 @@ class EventGeo(BaseModel):
 
 
 class DayCount(BaseModel):
-    """Wie viele TAGE ein Jahr beisteuert — für die abgeleiteten Grundort-Tage."""
+    """Wie viele TAGE ein Jahr beisteuert — für die abgeleiteten Wohnort-Tage."""
     year: int
     count: int
 
@@ -343,7 +343,7 @@ class EventsIndex(BaseModel):
     # F17: der Meilenstein „Geburt" — Grundlage der Alters-Chips, und praktisch
     # immer außerhalb des geladenen Fensters
     birth: dict | None = None
-    # F20: Wie viele Tage der Grundort füllt, und über welche Jahre. Der
+    # F20: Wie viele Tage der Wohnort füllt, und über welche Jahre. Der
     # Zeitstrahl braucht beides, BEVOR er eine Seite geladen hat: die Jahre,
     # damit ein Jahr mit ausschließlich abgeleiteten Tagen überhaupt in der
     # Übersicht steht (sonst wäre die Kindheit unsichtbar, obwohl sie gefüllt
@@ -362,7 +362,7 @@ class EventsIndex(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
-# F20 — Grundort (Anmerkung 144)
+# F20 — Wohnort (Anmerkung 144)
 # --------------------------------------------------------------------------- #
 class BaselineRead(BaseModel):
     """Ein eingetragener Zeitraum samt seinem Ort — und was er wirklich füllt."""

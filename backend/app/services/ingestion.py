@@ -344,7 +344,7 @@ def resolve_place(db: Session, user_id: str | None, place: str,
                   ) -> Location | None:
     """Ortsname → `Location`: vorhandenen nehmen, sonst geocodieren und anlegen.
 
-    **Öffentlich seit F20**, weil der Grundort denselben Ort braucht wie ein
+    **Öffentlich seit F20**, weil der Wohnort denselben Ort braucht wie ein
     Ereignis. Ihn dort ein zweites Mal aufzulösen hieße, drei Regeln ein zweites
     Mal aufzuschreiben — welche Namensbausteine gelten (A25/A28), welche Sprache
     Nominatim antwortet (F10) und dass `city`/`country`/`address` mitkommen

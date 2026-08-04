@@ -110,7 +110,7 @@ def _day_rows(db: Session, user_id: str, *, keys: tuple[str, ...] | None,
     """Wetterwerte, die an einem TAG hängen — F20, dieselben Spalten.
 
     **Hier gibt es kein `confirmed_only`, und das ist kein Versäumnis.** Ein
-    Tages-Wert entsteht aus einem Grundort, und ein Grundort ist eine von Hand
+    Tages-Wert entsteht aus einem Wohnort, und ein Wohnort ist eine von Hand
     eingetragene Tatsache — es gibt keinen Zustand „vorgeschlagen" für ihn. Die
     Frage, die `confirmed_only` beantwortet („zählen Vorschläge mit?"), stellt
     sich an dieser Quelle nicht; sie stumm auf `False` abzubilden hieße, sie mit
@@ -148,7 +148,7 @@ def _rows(db: Session, user_id: str, *, confirmed_only: bool,
     auseinander (Anmerkung 106). So gilt jede genau einmal, für beides.
 
     Dass dabei nichts doppelt gezählt werden kann, ist keine Vorsicht, sondern
-    eine Eigenschaft der Ableitung: ein Grundort füllt nur LÜCKEN, also gibt es
+    eine Eigenschaft der Ableitung: ein Wohnort füllt nur LÜCKEN, also gibt es
     zu keinem Tag beides (`services/baseline.py`). `test_f20_baseline.py` nagelt
     genau das fest, weil hier sonst der Tag mit Ereignis UND Tageswert
     unbemerkt zwei Werte bekäme.

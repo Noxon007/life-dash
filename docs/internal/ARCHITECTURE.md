@@ -96,7 +96,7 @@ documented, the very audience that takes “self-hosted” seriously will bounce
 | **Confirmed status** | Whether a value was moderated by the user (`confirmed`) or is an AI claim (`unconfirmed`). |
 | **Source** | Where a record came from: `manual`, `ai`, `immich`, `google_timeline`, `weather`, `api`. |
 | **Track** | A recorded movement path from a Google Timeline import. Context, not an event. |
-| **Baseline location** | A standing fact with a validity period — “between 1986 and 1992 my baseline was my parents' house”. A fourth kind of statement; see §3.2. |
+| **Residence** | A standing fact with a validity period — “between 1986 and 1992 I lived at my parents' house”. A fourth kind of statement; see §3.2. |
 | **Enrichment** | Automatic augmentation of an event with photos, weather or metrics, based on time and place — retroactively too. |
 
 ---
@@ -124,7 +124,7 @@ flowchart LR
 | **1 · Inbox** | Raw fragments — text, import summaries. | Immutable, permanent. An evidence archive. |
 | **2 · Proposal space** | Unconfirmed AI derivations. *Claims, not truth.* | Disposable — discarded and regenerated on recomputation. |
 | **3 · Life database** | Confirmed events, entities and locations, **plus factual enrichments**: weather, media references, tracks. Facts do not change — once fetched, true forever. | **Fixed.** The actual goal of the system. |
-| **4 · Derived** | Views, statistics, aggregations, baseline day fills. | Disposable, recomputable, never backed up. |
+| **4 · Derived** | Views, statistics, aggregations, residence day fills. | Disposable, recomputable, never backed up. |
 
 Layers 2 and 3 live in the **same tables**; the `confirmed` column is the
 dividing line, and confirming is that column flipping on one row.
@@ -150,10 +150,10 @@ The **inbox is deliberately never deleted automatically**, even when everything
 is confirmed — it costs almost nothing, it is the provenance record, and it is
 the only source for a later re-extraction.
 
-### 3.2 The fourth kind of statement — the baseline location
+### 3.2 The fourth kind of statement — the residence
 
 A fragment says *this was said*, a proposal says *this may have happened*, an
-event says *this happened*. A **baseline location** says something none of them
+event says *this happened*. A **residence** says something none of them
 can: *this was the normal case, as long as nothing else is known.*
 
 It is stored as **one row per period** (`BaselineLocation`), never as generated
@@ -169,13 +169,29 @@ nowhere. Both halves of that are deliberate:
   period change, and a stale derivation is worse than none.
 
 **The property everything else stands on: the two day sets are disjoint.** A
-baseline fills gaps only, so no day has both a recorded event and a baseline.
+residence fills gaps only, so no day has both a recorded event and a residence.
 That is why every statistic may simply *add*, and why the weather union cannot
 double-count. `test_f20_baseline.py` pins exactly that first — everything
 downstream goes quietly wrong the moment it stops holding.
 
 **Consequence for anyone writing a statistic:** a figure over **days** must
-count baseline days; a figure over **entries** must not.
+count residence days; a figure over **entries** must not.
+
+**One caveat that follows from the rule, and bites in practice:** an entry
+occupies only its **starting day** (`recorded_days` reads `date_start`). A
+two-week holiday entered as a *single* entry therefore leaves thirteen days for
+the residence to fill, and the statistics will place you at home for them. The
+remedy is the existing *split multi-day entries* run, which is why it stands
+before the residence form in the recommended order; the residence form says so
+as well.
+
+**The word in the code is `baseline`, the word everywhere else is
+“residence”.** The table, the model, the endpoints (`/api/baselines`,
+`/api/days/baseline`) and the service module keep the older, more general name;
+the interface, this document and the README say what it actually is. Renaming
+the code would be a migration plus a pass through `wipe.py` for a change no
+user can see — deliberately not done (note 183), but worth knowing before
+grepping for one word and finding none.
 
 ---
 
@@ -195,7 +211,7 @@ The central view. Vertical, zoomable from decade to day.
 - **Filters:** category, place, source, confirmed status, granularity
   (country → city → district → point).
 - Photo strips follow the zoom level; a day header carries that day's weather.
-- Baseline days appear as such, marked as derived.
+- Residence days appear as such, marked as derived.
 
 ### 4.2 Map
 
@@ -203,11 +219,11 @@ The central view. Vertical, zoomable from decade to day.
   point · by proximity · per place · per city — and the zoom level decides
   nothing about which one applies.
 - Layers with their own switches: manual entries · imported visits (Google) ·
-  photos (Immich) · paths · baseline locations. A switch that cannot currently
+  photos (Immich) · paths · residences. A switch that cannot currently
   do anything says so (`inert`) instead of lying.
 - Photos and dense point sets are drawn on a **canvas with no object per
   point** — the object load, not the draw load, is what breaks a map.
-- Baseline locations are drawn as **one mark per period, not per day**: six
+- Residences are drawn as **one mark per period, not per day**: six
   years at one coordinate is one point with a weight, and the day count belongs
   in the popup. The timeline does the opposite, for the same reason — it is a
   list of *days*, the map a list of *places*.
@@ -226,7 +242,7 @@ Four panes: **Numbers · Charts · Rankings · Gaps**.
   what it has: *where do I know nothing at all?* Its window is the whole point
   — with a birth milestone it runs birth → today, without one it runs first →
   last known day, and the view states which of the two it is showing. Clicking
-  a gap carries its dates into the baseline form.
+  a gap carries its dates into the residence form.
 
 ### 4.4 Collection
 
@@ -329,7 +345,7 @@ MediaRef                                                    LAYER 3
   external_id · captured_at
 
 Metric            event_id · key · value · unit · source · enriched_at
-DayMetric         the same shape, keyed by DAY — for baseline days, which
+DayMetric         the same shape, keyed by DAY — for residence days, which
                   have no event to hang weather on
 Track             date_start/end · geo (LineString as JSON) · activity_type
                   · distance_m · source · event_id
@@ -449,7 +465,7 @@ compendium_view:
 |---|---|---|
 | **Immich** | photos, geo tags, timestamps | API with a per-user key. Every owned, located, timeline-visible photo becomes an immediately confirmed event; thumbnails are proxied by the backend. References only — no copies. |
 | **Google Timeline** | visited places and routes | Since 2024 the timeline lives on the device only. Import is a file upload of the device export (`semanticSegments`) → stored raw as a fragment → `visit` segments become events, `activity` segments become tracks. |
-| **Weather** | context enrichment | Open-Meteo's historical archive, by time and place, retroactively too. Attached as a `Metric` on events and a `DayMetric` on baseline days. |
+| **Weather** | context enrichment | Open-Meteo's historical archive, by time and place, retroactively too. Attached as a `Metric` on events and a `DayMetric` on residence days. |
 | **Geocoding** | place name ↔ coordinates, both directions | Nominatim or LocationIQ, self-hostable, with backoff. |
 | **Wikipedia / Wikidata** | city descriptions | Cached in `CityInfo`; a failed lookup is recorded so it is not repeated forever. |
 

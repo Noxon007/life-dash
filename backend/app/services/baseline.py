@@ -1,11 +1,11 @@
-"""F20 — aus einem Grundort werden Tage. Schicht 4, nichts gespeichert.
+"""F20 — aus einem Wohnort werden Tage. Schicht 4, nichts gespeichert.
 
-**Die eine Regel dieser Datei.** Ein Tag, der in den Zeitraum eines Grundorts
+**Die eine Regel dieser Datei.** Ein Tag, der in den Zeitraum eines Wohnorts
 fällt und an dem KEIN Eintrag steht, gilt als Tag an diesem Ort. Steht dort ein
-Eintrag — irgendeiner —, gewinnt der Eintrag und der Grundort schweigt.
+Eintrag — irgendeiner —, gewinnt der Eintrag und der Wohnort schweigt.
 
 Daraus folgt die Eigenschaft, an der die halbe Umsetzung hängt: **die
-Ereignistage und die Grundort-Tage sind disjunkt.** Nichts muss zusammengeführt,
+Ereignistage und die Wohnort-Tage sind disjunkt.** Nichts muss zusammengeführt,
 gewichtet oder entschieden werden; eine Zahl über Tage ist immer die Summe
 beider Mengen, und ein Tageswetter kommt entweder aus dem einen oder aus dem
 anderen Speicher, nie aus beiden. Das ist keine Vereinfachung im Nachhinein,
@@ -23,7 +23,7 @@ Preis ist ein Kalenderdurchlauf je Abfrage; bei vierzig Jahren sind das 14 600
 Schleifendurchläufe gegen eine Menge im Arbeitsspeicher, also der billigere Teil
 jeder Statistik, die ihn braucht.
 
-**Der Grundort selbst ist Lebensdatenbank** (`models.BaselineLocation`), die
+**Der Wohnort selbst ist Lebensdatenbank** (`models.BaselineLocation`), die
 Tage daraus sind es nicht. Diese Datei darf deshalb jederzeit anders rechnen;
 die eingetragene Aussage bleibt davon unberührt.
 """
@@ -53,7 +53,7 @@ def _as_date(value) -> date_type | None:
 
 
 def load(db: Session, user_id: str) -> list[BaselineLocation]:
-    """Alle Grundorte eines Kontos, chronologisch, mit ihrem Ort.
+    """Alle Wohnorte eines Kontos, chronologisch, mit ihrem Ort.
 
     `selectinload` und nicht faul: jeder Aufrufer braucht Name, Stadt, Land und
     Koordinate des Orts — ohne das Vorladen wäre eine Liste von zwölf
@@ -67,7 +67,7 @@ def load(db: Session, user_id: str) -> list[BaselineLocation]:
 
 def spans(db: Session, user_id: str, *, today: date_type | None = None,
           rows: list[BaselineLocation] | None = None) -> list[Span]:
-    """Die Zeiträume als (Anfang, Ende, Grundort) — Ende immer gesetzt.
+    """Die Zeiträume als (Anfang, Ende, Wohnort) — Ende immer gesetzt.
 
     Ein offener Zeitraum endet HEUTE und nicht in der Zukunft: „seit 2019 wohne
     ich hier" ist keine Aussage über morgen. Ein Zeitraum, dessen Ende vor
@@ -96,7 +96,7 @@ def recorded_days(db: Session, user_id: str, *, start: date_type | None = None,
     zweites Mal aufzuschreiben).
 
     **Unbestätigte zählen mit.** Ein Vorschlag für den 14. März ist ein Hinweis,
-    dass an dem Tag etwas war; ihn zu übergehen hieße, den Grundort über einen
+    dass an dem Tag etwas war; ihn zu übergehen hieße, den Wohnort über einen
     Tag reden zu lassen, über den die Datenbank bereits etwas Besseres weiß.
     """
     q = (db.query(func.distinct(func.date(Event.date_start)))
@@ -118,7 +118,7 @@ def inferred_days(db: Session, user_id: str, *, start: date_type | None = None,
                   rows: list[BaselineLocation] | None = None,
                   taken: set[date_type] | None = None,
                   ) -> dict[date_type, BaselineLocation]:
-    """{Tag: Grundort} für die Tage, die der Grundort füllt — Lücken only.
+    """{Tag: Wohnort} für die Tage, die der Wohnort füllt — Lücken only.
 
     `taken` erlaubt dem Aufrufer, die Menge der erfassten Tage einmal zu holen
     und mehrfach zu benutzen; ohne das führe die Statistik dieselbe Abfrage
@@ -154,7 +154,7 @@ def overlaps(periods: list[Span], start: date_type, end: date_type | None,
              ) -> BaselineLocation | None:
     """Der erste Zeitraum, der sich mit (start, end) schneidet — oder None.
 
-    **Ein Grundort zur Zeit** (Anmerkung 144, Entscheidung 4). Geprüft wird im
+    **Ein Wohnort zur Zeit** (Anmerkung 144, Entscheidung 4). Geprüft wird im
     Endpunkt, nicht im Schema: „diese Spanne schneidet jene" schreiben SQLite
     und PostgreSQL verschieden, und eine Bedingung, die nur auf einer der beiden
     Datenbanken greift, ist keine.

@@ -2,14 +2,14 @@
 
 **Die Frage, die diese Datei beantwortet, hat F20 erst beantwortbar gemacht.**
 Vorher hätte eine Lückenprüfung jeden Kindheitstag als Lücke gemeldet, und ein
-Bericht mit sechstausend Einträgen ist kein Bericht. Seit ein Grundort-Tag
+Bericht mit sechstausend Einträgen ist kein Bericht. Seit ein Wohnort-Tag
 *zählt* (Anmerkung 144, Entscheidung 2), ist die Antwort auf „wo ist eine
 Lücke?" nicht mehr „wo habe ich nichts ERFASST", sondern **„wo weiß ich gar
 nichts"** — und das ist die Frage, die gestellt wurde.
 
 **Ein Tag gilt als bekannt, wenn irgendetwas über ihn bekannt ist:** ein
 Eintrag (auch ein unbestätigter — ein Vorschlag für den 14. März ist ein
-Hinweis, dass an dem Tag etwas war) oder ein Grundort. Beides kommt aus
+Hinweis, dass an dem Tag etwas war) oder ein Wohnort. Beides kommt aus
 `services/baseline.py`, damit „welche Tage sind belegt" genau einmal
 beantwortet wird.
 
@@ -149,7 +149,7 @@ def longest(db: Session, user_id: str, *, today: date_type | None = None,
     den Wetter-Rekorden): die Rangliste in der Statistik und die Lücken-Ansicht
     lesen dieselbe Funktion. Zwei Fassungen von „was ist eine Lücke" liefen beim
     ersten Sonderfall auseinander, und die Sonderfälle stehen längst da — die
-    Ränder hängen am Geburts-Meilenstein, und ein Grundort-Tag ist keine Lücke.
+    Ränder hängen am Geburts-Meilenstein, und ein Wohnort-Tag ist keine Lücke.
     """
     rows = stretches(db, user_id, today=today, days=days, bounds=bounds)
     if not rows:

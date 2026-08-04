@@ -75,7 +75,7 @@ def _dict_to_kwargs(model, data: dict) -> dict:
         elif val is not None and isinstance(col.type, Date):
             # Ein reiner Tag muss auch als `date` ankommen und nicht als
             # `datetime` mit 00:00 — sonst steht in `baseline_locations`
-            # etwas, das die Grundort-Rechnung anders vergleicht als das,
+            # etwas, das die Wohnort-Rechnung anders vergleicht als das,
             # was sie selbst schreibt.
             val = dateparser.parse(str(val)).date()
         kwargs[col.name] = val
@@ -119,12 +119,12 @@ def export_data(
                        .filter(Entity.user_id == user.id).all())
     events = _loaded("Ereignisse", _kept(db.query(Event), Event))
     tracks = _loaded("Wege", _kept(db.query(Track), Track))
-    # F20: Die Grundort-Zeiträume sind Lebensdatenbank — eine Zeile, von Hand
+    # F20: Die Wohnort-Zeiträume sind Lebensdatenbank — eine Zeile, von Hand
     # eingetragen, aus nichts wiederherstellbar. Bis hierher fehlten sie im
     # Export: eine Sicherung, die vollständig AUSSIEHT und die einzige
     # handgepflegte Tabelle auslässt. `exclude_source` gilt für sie nicht, sie
     # haben keine Quelle — sie sind selbst die Quelle.
-    baselines = _loaded("Grundorte", db.query(BaselineLocation)
+    baselines = _loaded("Wohnorte", db.query(BaselineLocation)
                         .filter(BaselineLocation.user_id == user.id).all())
     event_ids = {e.id for e in events}
     links = [

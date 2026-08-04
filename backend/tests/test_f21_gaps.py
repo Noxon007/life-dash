@@ -3,7 +3,7 @@
 Festgenagelt wird nicht „es gibt einen Endpunkt", sondern die vier Stellen, an
 denen dieser Bericht still eine andere Frage beantwortet als die gestellte:
 
-* **Ein Grundort-Tag ist keine Lücke.** Das ist der ganze Grund, aus dem F21
+* **Ein Wohnort-Tag ist keine Lücke.** Das ist der ganze Grund, aus dem F21
   hinter F20 steht: vorher hätte der Bericht jeden Kindheitstag gemeldet, und
   eine Liste mit sechstausend Zeilen ist kein Bericht. Gefragt ist „wo weiß ich
   gar nichts", nicht „wo habe ich nichts getippt".
@@ -190,7 +190,7 @@ def test_known_plus_unknown_is_the_length_of_the_window(db, user):
     r = gaps.report(db, user.id, today=TODAY)
     assert r["known_days"] + r["unknown_days"] == r["total_days"]
     assert r["total_days"] == (TODAY - date(2024, 1, 1)).days + 1
-    # 29 Grundort-Tage + 2 Einträge (Geburt und der Eintrag im Juni)
+    # 29 Wohnort-Tage + 2 Einträge (Geburt und der Eintrag im Juni)
     assert r["recorded_days"] == 2 and r["baseline_days"] == 29
     assert r["known_days"] == 31
 
@@ -274,7 +274,7 @@ def test_a_mistyped_year_does_not_open_a_thousand_year_window(db, user):
 
 
 def test_the_longest_gap_knows_about_baselines(db, user):
-    """Der Zähler in den Ranglisten liest dieselbe Funktion — ein Grundort
+    """Der Zähler in den Ranglisten liest dieselbe Funktion — ein Wohnort
     verkürzt also auch ihn, statt eine zweite Wahrheit zu behalten."""
     _event(db, user, datetime(2024, 1, 1, 9))
     _event(db, user, datetime(2024, 4, 1, 9))

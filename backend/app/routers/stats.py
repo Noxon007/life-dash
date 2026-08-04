@@ -50,7 +50,7 @@ def gaps_report(db: Session = Depends(get_db),
 
     **Es wird nichts gespeichert.** Eine Lücke ist eine Ansicht, kein Zustand —
     stünde sie als Zeile in der Datenbank, müsste sie bei jedem Import, jeder
-    Löschung und jeder Grundort-Änderung nachgeführt werden, und eine veraltete
+    Löschung und jeder Wohnort-Änderung nachgeführt werden, und eine veraltete
     Lückenliste schickt jemanden auf die Suche nach Daten, die längst da sind.
     """
     return gaps.report(db, user.id)

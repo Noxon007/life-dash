@@ -193,12 +193,12 @@ class Location(Base):
 
 
 class BaselineLocation(Base):
-    """F20 — der Grundort: eine STEHENDE TATSACHE mit Gültigkeitszeitraum.
+    """F20 — der Wohnort: eine STEHENDE TATSACHE mit Gültigkeitszeitraum.
 
-    „Zwischen dem 2. April 1986 und dem 31. August 1992 war mein Grundort das
+    „Zwischen dem 2. April 1986 und dem 31. August 1992 war mein Wohnort das
     Elternhaus in Bad Segeberg." **Das ist eine vierte Sorte Aussage** neben
     Fragment, Vorschlag und Ereignis (Anmerkung 144): ein Ereignis sagt „hier
-    ist etwas passiert", ein Grundort sagt „dies war der Normalfall, solange
+    ist etwas passiert", ein Wohnort sagt „dies war der Normalfall, solange
     nichts anderes bekannt ist".
 
     **Warum das keine erzeugten Ereignisse sind.** Der naheliegende Bau — je Tag
@@ -217,14 +217,14 @@ class BaselineLocation(Base):
     mit jedem Import, jeder Löschung und jeder Zeitraum-Änderung nachgeführt
     werden, und eine veraltete Ableitung ist schlimmer als keine.
 
-    **Der Ort ist ein `Location`** und kein Textfeld. Damit trägt der Grundort
+    **Der Ort ist ein `Location`** und kein Textfeld. Damit trägt der Wohnort
     ohne eine Zeile Zusatzarbeit Koordinaten (fürs Wetter), `city` (A39),
     `country` (F4) und den Namen in genau der Form, die der Nutzer für Orte
     gewählt hat — jede Statistik, die nach Ort, Stadt oder Land gruppiert,
     fragt dieselbe Tabelle wie bisher.
 
     **Zeiträume überlappen sich nicht** (Entscheidung des Users, Anmerkung 144):
-    ein Grundort zur Zeit. Erzwungen wird das im Endpunkt und nicht im Schema —
+    ein Wohnort zur Zeit. Erzwungen wird das im Endpunkt und nicht im Schema —
     „diese Spanne schneidet jene" ist keine Bedingung, die SQLite und
     PostgreSQL gleich ausdrücken.
     """
@@ -543,10 +543,10 @@ class DayMetric(Base):
     """F20 — eine Kennzahl, die an einem TAG hängt statt an einem Ereignis.
 
     **Warum es sie geben muss.** Wetter hängt in diesem Projekt an
-    `Metric.event_id`. Ein Grundort-Tag hat definitionsgemäß kein Ereignis —
+    `Metric.event_id`. Ein Wohnort-Tag hat definitionsgemäß kein Ereignis —
     er ist ja gerade der Tag, an dem nichts erfasst wurde —, also hat er ohne
-    diese Tabelle keinen Platz für das, wofür der Grundort überhaupt gebaut
-    wurde. Das ist der eigentliche Aufwand von F20, nicht die Grundort-Zeile.
+    diese Tabelle keinen Platz für das, wofür der Wohnort überhaupt gebaut
+    wurde. Das ist der eigentliche Aufwand von F20, nicht die Wohnort-Zeile.
 
     **Warum dieselbe FORM wie `Metric` und nicht ein JSON-Feld je Tag.** Ein
     Blob wäre kleiner und wäre die falsche Antwort: `weather_day` fasst
@@ -562,7 +562,7 @@ class DayMetric(Base):
     zu holen wäre — deshalb darf ein Lauf sie neu aufbauen, während er
     `metrics` nie anfassen dürfte (Anmerkung 57 in der allgemeinen Form).
 
-    Der Schlüssel ist (Konto, Tag, Kennzahl): ein Tag hat genau einen Grundort,
+    Der Schlüssel ist (Konto, Tag, Kennzahl): ein Tag hat genau einen Wohnort,
     also genau einen Wert je Kennzahl. Als Unique-Index, damit zwei parallele
     Läufe nicht zwei Wahrheiten anlegen — dieselbe Absicherung wie
     `ux_metrics_weather` (A11).

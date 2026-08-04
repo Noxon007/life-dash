@@ -26,7 +26,7 @@ any `MINOR`.
   switched on: hide the automatically recorded entries and the year says how
   many are left, not how many exist. Paging still works exactly as before in
   *Day*, *Week* and *Month*, where there is no such overview to build.
-- **The baseline location can be switched off in the timeline.** Until now the
+- **The residence can be switched off in the timeline.** Until now the
   derived days were always there — in a year without any entries the timeline
   consisted of nothing else, and there was no handle. The switch sits with the
   categories, in the timeline and on the map, and says how many days it is
@@ -74,14 +74,14 @@ any `MINOR`.
   overwritten by a later run. The visits at that place are renamed with it.
 - **Pick a place on the map instead of typing its name.** A 🗺️ button sits next
   to the place field when you record something, when you edit an entry and when
-  you enter a baseline location: click the map, and *that* point is what gets
+  you enter a residence: click the map, and *that* point is what gets
   stored — the address is looked up afterwards and is only the label. Typing a
   name still works exactly as before, but then the name is the statement and the
   coordinate is looked up from it, which puts the entry at whatever point
   OpenStreetMap has for that name, usually the middle of the town rather than
   the house. It also makes places that have no findable address possible at all:
   the hut in the woods, the parents' house on a road the map does not know. That
-  matters most for a baseline location, where a missing coordinate means
+  matters most for a residence, where a missing coordinate means
   thousands of derived days never get their weather. Edit the name afterwards
   and the picked point is released again — otherwise the field would say one
   thing and the stored point another.
@@ -89,31 +89,31 @@ any `MINOR`.
   fourth tab beside Numbers, Charts and Rankings answers the one question a life
   database cannot answer by looking at what it has. It shows how much of the
   period is accounted for, how much of that is recorded versus derived from a
-  baseline location, a coverage bar per year, and the longest stretches with
-  nothing in them. **Clicking a stretch carries its dates into the baseline
+  residence, a coverage bar per year, and the longest stretches with
+  nothing in them. **Clicking a stretch carries its dates into the residence
   form** — a gap is empty by definition, so jumping into the timeline there
-  would show nothing, while one baseline period can fill a hundred days at once.
+  would show nothing, while one residence period can fill a hundred days at once.
   If you have entered your birth as a milestone the view covers your whole life;
   if not it covers only the period you recorded in, and says so rather than
   quietly reporting a smaller number as if it were the whole story.
   “Longest gap” in the rankings is now the first row of that list — the same
   computation, so the two can no longer disagree at the edges.
-- **Baseline periods show on the map too**, as their own layer with its own
-  switch (🏠 Baseline). **One mark per period, not per day** — six years at your
+- **Residence periods show on the map too**, as their own layer with its own
+  switch (🏠 Residence). **One mark per period, not per day** — six years at your
   parents' house are two thousand derived days at a single coordinate, and
   drawing them individually would be a dot with weight rather than a map; the
   number of days is in the popup. A period appears in every view its span
   overlaps, as the same teardrop the map uses everywhere else but in a colour
   of its own, so what was inferred never looks like something you recorded.
-  **Years in which only the baseline exists can now be reached.** The map's
+  **Years in which only the residence exists can now be reached.** The map's
   period strip used to be built from entries alone, so 1993 — a year with a
-  baseline location and nothing recorded — could not be selected at all, in any
+  residence and nothing recorded — could not be selected at all, in any
   zoom level: the one layer that had something to say about that year was
   unreachable. Day, week, month, year and decade now all offer those periods,
   the map moves to the mark instead of staying where the last period left it,
   and the list beside the map names the place rather than reporting “0 stops”.
-- **A baseline location for the years you never recorded.** Under *My data →
-  Baseline location* you enter a period and a place — “from my birth until 2006
+- **A residence for the years you never recorded.** Under *My data →
+  Residences* you enter a period and a place — “from my birth until 2006
   I was at my parents' house in Bad Segeberg”. Every day in that period that has
   **no** entry then counts as a day at that place: it appears in the timeline,
   counts in the statistics, on the world map and towards the badges, and gets
@@ -179,7 +179,7 @@ any `MINOR`.
 
 ### Fixed
 - **Every category chip now says how many entries it stands for.** Until now
-  only the baseline location did, and it sits in the same row — a row where one
+  only the residence did, and it sits in the same row — a row where one
   switch carries a number and the rest do not reads as if something were broken
   in the rest. On the map the number is the one for the period you are looking
   at; in the timeline it is the one for everything you have recorded, because
@@ -188,7 +188,7 @@ any `MINOR`.
   automatically recorded entries and the chip drops to what is left. Switching a
   category off no longer blanks its number — that is precisely the number you
   reach for when deciding to switch it back on.
-- **All of your baseline days are reachable now, not just 300 of them.** The
+- **All of your residence days are reachable now, not just 300 of them.** The
   timeline used to show 300 derived days picked evenly across the entire period
   — so out of twenty years you saw roughly every twenty-fourth day, with no way
   to get at the rest, and underneath it the footer claimed you had reached the
@@ -221,10 +221,10 @@ any `MINOR`.
   everything before it was rolled back. Deleting a user account failed the same
   way. Three separate lists of what to delete have become one, so the next table
   added to the system cannot go missing from only some of them. Two things that
-  were being left behind now go too: derived baseline weather, and photos that
+  were being left behind now go too: derived residence weather, and photos that
   belong to your account without hanging on any entry — those kept a row after
   their file had already been deleted.
-- **Your baseline periods are part of the backup.** They were missing from both
+- **Your residence periods are part of the backup.** They were missing from both
   the JSON export and the ZIP archive: the one table that exists purely because
   you typed it in, unrecoverable from anything else, absent from the very backup
   the delete dialog tells you to make first.
@@ -291,6 +291,14 @@ any `MINOR`.
   change.
 
 ### Changed
+- **“Baseline location” is now called “residence”.** The old name described the
+  mechanism — a fallback for days nothing else says anything about — rather than
+  the thing you actually enter. It also makes the point of it legible: enter
+  every place you have lived, leave the last period open-ended, and every day
+  from your birth to today is covered without anything to maintain. Only the
+  wording changed; your periods, the days derived from them, and the rule behind
+  them are untouched. A day with any entry on it still belongs to that entry and
+  not to your residence.
 - **A new mark: a bee.** It forages, stores what it brings in cells, and dances
   the location of where it has just been — collecting, keeping each thing as its
   own record, and saying *where*. The honeycomb beside it stands for the
@@ -311,7 +319,7 @@ any `MINOR`.
   canvas for a while now, so the reason had gone and only the habit was left.
   Everything is still one click away, and a choice you make is remembered.
 - **The first-entry form asks for your place of birth, not your home town.** A
-  home town is a period of time, and periods of time belong to the baseline
+  home town is a period of time, and periods of time belong to the residence
   location, which has proper from/to dates and a view of its own — as a dateless
   milestone it landed nowhere in the timeline and counted as a “move” in the
   statistics. Date and place of birth now make **one** entry, because that is
@@ -336,7 +344,7 @@ any `MINOR`.
   will do to your data had to be hunted for each time.
 - **Less text.** The explanation of why photo albums are not used as a source is
   gone, along with the sentences that described how earlier versions behaved.
-- **A baseline period is no longer cut off after its label.** “Elternhaus ·
+- **A residence period is no longer cut off after its label.** “Elternhaus ·
   Mözen, Deutschland · 25.9.1991 – 25.9.2011 · 7,298 days” shared a 105-pixel
   column with the bar charts, so everything after the name disappeared.
 - **The map draws every point now — the 300 limit is gone.** “Every point” used

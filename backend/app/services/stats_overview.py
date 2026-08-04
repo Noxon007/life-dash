@@ -161,7 +161,7 @@ def compute_overview(db: Session, user_id: str, *, today: datetime | None = None
     # Anmerkung 144). Ein Kindheitstag im Elternhaus war ein Tag in Bad
     # Segeberg — eine Statistik, die ihn wegließe, beschriebe die Aufzeichnung
     # und nicht das Leben. Addieren ist hier gefahrlos und zwar nicht aus
-    # Nachlässigkeit: der Grundort füllt nur LÜCKEN, die beiden Tagesmengen
+    # Nachlässigkeit: der Wohnort füllt nur LÜCKEN, die beiden Tagesmengen
     # sind also disjunkt (`services/baseline.py`). Einmal geholt, viermal
     # benutzt — sonst liefe der Kalender für Orte, Städte und Zähler dreimal.
     b_days = baseline.day_counts(db, user_id)

@@ -41,7 +41,7 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
 - **API-Kosten messen** statt raten: `<python> tools/_measure_api.py` legt
   20.000 Ereignisse an und misst die Endpunkte
 - **Zeitstrahl messen**: `node tools/measure-timeline.js [Seiten]
-  [Grundort-Jahre]` — Aufbauzeit und Knotenzahl je nachgeladener Seite, für
+  [Wohnort-Jahre]` — Aufbauzeit und Knotenzahl je nachgeladener Seite, für
   alle drei Zoomstufen; mit dem zweiten Wert zusätzlich die abgeleiteten Tage.
   Der Kopf der Datei trägt die zuletzt gemessenen Zahlen; der nächste Umbau
   wird daran gemessen und nicht an einem Gefühl (Anmerkung 179/182).
@@ -56,13 +56,19 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
 - **Vier Schichten:** Fragment (Roh-Eingang, nie automatisch löschen) →
   unconfirmed (Vorschlag) → confirmed (**Lebensdatenbank — Maschinen ändern
   Bestätigtes nie, Anreicherung wie Wetter nur ADDITIV**) → Ableitungen
-  (Ansichten, Statistik, Grundort-Tage; jederzeit neu berechenbar)
+  (Ansichten, Statistik, Wohnort-Tage; jederzeit neu berechenbar)
 - **Vierte Sorte Aussage:** `BaselineLocation` = stehende Tatsache mit
   Gültigkeitszeitraum (eine Zeile, Lebensdatenbank), die Tage daraus =
   Schicht 4, nirgends gespeichert (`services/baseline.py`). **Die beiden
-  Tagesmengen sind disjunkt** — der Grundort füllt nur Lücken. Wer eine Zahl
+  Tagesmengen sind disjunkt** — der Wohnort füllt nur Lücken. Wer eine Zahl
   über TAGE bildet, muss ihn mitzählen; wer eine über EINTRÄGE bildet, darf es
-  nicht.
+  nicht. **Achtung, ein Eintrag belegt nur seinen ANFANGSTAG** — ein
+  ungeteilter Mehrtäger lässt den Wohnort die übrigen Tage füllen; die Antwort
+  darauf ist der Lauf „Mehrtägiges aufteilen" (Anmerkung 183).
+- **Der Code sagt `baseline`, alles andere sagt „Wohnort"/„residence"**
+  (Anmerkung 183): Tabelle, Modell, Endpunkte und `services/baseline.py`
+  behalten den alten Namen, Oberfläche und Doku nicht. Wer nach EINEM Wort
+  greppt, findet die andere Hälfte nicht.
 - **Löschen hat EINE Liste:** `app/wipe.py` (`WIPE_ORDER` = Reihenfolge und
   Besitz-Bezug, `WIPE_KEEPS` = was mit Begründung stehen bleibt, `DELETE_WORDS`
   = das Losungswort). Drei Aufrufer lesen sie: „meine Daten", „alle Daten",
@@ -223,16 +229,15 @@ die Punkte 1 und 2):
   (Jahr/Jahrzehnt) über den Index gelöst; dieser hier ist bewusst stehen
   geblieben, weil der Umbau (Gruppen einzeln ersetzen statt `innerHTML`) an den
   index-basierten Registern `VISIT_GROUPS`/`TL_STRIP_MEDIA` hängt.
-- **Aus „Grundort" soll „Wohnort" werden** (dritte Rückmeldung, Punkt 3 — vom
-  User zur Diskussion gestellt, NICHT entschieden). Der Kern: heute entscheidet
-  „steht an dem Tag ein Eintrag?", ob der Grundort schweigt. Gewünscht ist,
-  dass eine MEHRTÄGIGE Abwesenheit ihn schweigen lässt und ein einzelnes
-  Ereignis anderswo (Konfirmation) nicht — man ist abends wieder zu Hause. Die
-  Disjunktheit der beiden Tagesmengen bliebe dabei erhalten, es verschiebt sich
-  nur die Grenze; offen ist, WORAN eine mehrtägige Abwesenheit erkannt wird
-  (Dauer des Eintrags / eigene Marke am Eintrag / eigener Abwesenheits-Zeitraum)
-  — und die Dauer allein trägt nicht, weil „Mehrtägiges aufteilen" und der
-  Google-Import beide nur Tages-Einträge hinterlassen.
+- **Aus „Grundort" ist „Wohnort" geworden** (Anmerkung 183) — erledigt, hier
+  nur noch, damit die Frage nicht ein zweites Mal aufgemacht wird: Die REGEL
+  bleibt, wie sie war (jeder Eintrag an einem Tag lässt den Wohnort schweigen).
+  Der Vorschlag, ihn bei EINZELNEN Ereignissen anderswo weiterzählen zu lassen
+  und nur bei MEHRTÄGIGEN Abwesenheiten schweigen zu lassen, wurde ausgeschrieben
+  und vom User verworfen — „konsequenter und einfacher, mit der Ungenauigkeit
+  kann ich leben". Die Ungenauigkeit ist eine Asymmetrie: zwei Einträge in zwei
+  Städten geben BEIDEN einen Tag, ein einzelner Eintrag anderswo kostet den
+  Wohnort seinen.
 - **Das Zeichen ist gewählt** (Anmerkung 180): Biene als Hauptzeichen, Wabe als
   Beizeichen. Erledigt, hier nur noch als Hinweis, dass die Frage keine offene
   mehr ist.

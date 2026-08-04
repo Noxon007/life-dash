@@ -1078,7 +1078,7 @@ def events_index(
     # nicht.
     touched = (db.query(func.max(Event.updated_at))
                .filter(Event.user_id == user.id).scalar())
-    # F20: Der Grundort gehört in die Kennung. Ohne ihn zeigte die Karte nach
+    # F20: Der Wohnort gehört in die Kennung. Ohne ihn zeigte die Karte nach
     # einem neu eingetragenen Zeitraum weiter den alten Stand — und schlimmer:
     # ein Zeitraum, der nur GEÄNDERT wurde, ließe Zahl und Zeitstempel der
     # Ereignisse völlig unberührt. Dieselbe Überlegung wie bei `total` allein
@@ -1090,7 +1090,7 @@ def events_index(
     # Die abgeleiteten Tage, aufgeschlüsselt nach Jahr — der Zeitstrahl braucht
     # sie, BEVOR er eine Seite geladen hat: ein Jahr, in dem ausschließlich
     # abgeleitete Tage liegen, stünde sonst in keiner Übersicht, obwohl es
-    # gefüllt ist. Nur gerechnet, wenn es überhaupt einen Grundort gibt — der
+    # gefüllt ist. Nur gerechnet, wenn es überhaupt einen Wohnort gibt — der
     # Kalenderdurchlauf soll nicht jeden Index kosten, den jemand abruft.
     b_counts = (baseline.day_counts(db, user.id, taken=None) if b_rows
                 else {"total": 0, "years": {}})

@@ -54,7 +54,7 @@
        ihren Untergrund mit dem Theme wechselt (F13) und ein Ton, der auf
        Nachtkarten leuchtet, auf der hellen verschwindet. */
     --photo-dot: #22d3ee;
-    /* F20 — der Grundort bekommt eine eigene Farbe, aus demselben Grund wie
+    /* F20 — der Wohnort bekommt eine eigene Farbe, aus demselben Grund wie
        die Foto-Ebene: er ist keine Kategorie, sondern eine andere SORTE
        Aussage, und ein Ton, der einer Kategoriefarbe nahe liegt, macht aus
        „gefolgert" versehentlich „erfasst".
@@ -257,7 +257,7 @@
   }
   .badge-confirmed { background: rgba(53,196,167,.15); color: var(--confirmed); }
   .badge-unconfirmed { background: rgba(245,166,35,.15); color: var(--unconfirmed); }
-  /* F20: ein abgeleiteter Grundort-Tag. Er sieht bewusst ANDERS aus als eine
+  /* F20: ein abgeleiteter Wohnort-Tag. Er sieht bewusst ANDERS aus als eine
      Ereigniskarte — was hier steht, hat niemand erfasst, es ist gefolgert.
      Gestrichelt und blasser statt bunt: die Zeile soll lesbar sein und nicht
      um Aufmerksamkeit mit den echten Einträgen konkurrieren, zwischen denen
@@ -305,7 +305,7 @@
   .top-row { gap: 10px; }
   .top-row .bar-label { width: auto; flex: 1; min-width: 0; }
   .top-row .bar-val { width: auto; flex-shrink: 0; font-weight: 600; color: var(--text); }
-  /* F20: Die Grundort-Zeile trägt drei Angaben und einen Knopf („Elternhaus ·
+  /* F20: Die Wohnort-Zeile trägt drei Angaben und einen Knopf („Elternhaus ·
      Mözen, Deutschland · 25.9.1991 – 25.9.2011" + „7.298 Tage" + „Entfernen").
      Auf 105 px abgeschnitten bleibt davon der Name übrig — also ausgerechnet
      die Angabe, die man selbst eingetippt hat, während Ort und Zeitraum
@@ -1359,7 +1359,7 @@
              einen zweiten Meilenstein an („Wohnort: Hamburg"). Das war eine
              andere Sorte Aussage als die daneben: ein Geburtsdatum ist ein
              Zeitpunkt, ein Wohnort ist ein ZEITRAUM — und für Zeiträume gibt es
-             seit F20 den Grundort, mit Von-Bis und eigener Ansicht. Als
+             seit F20 den Wohnort, mit Von-Bis und eigener Ansicht. Als
              datumsloser Meilenstein landete er im Zeitstrahl an keiner Stelle
              und in der Statistik als „Umzug".
 
@@ -1457,11 +1457,11 @@
             <label data-i18n="map.cats">Kategorien</label>
             <div class="filter-chips">
               <!-- Anmerkung 178: derselbe Chip wie auf der Karte, an derselben
-                   Stelle. Bis hier waren die abgeleiteten Grundort-Tage im
+                   Stelle. Bis hier waren die abgeleiteten Wohnort-Tage im
                    Zeitstrahl gar nicht abschaltbar — in einem Jahr ohne
                    Einträge bestand er ausschließlich aus ihnen, und wer das
                    nicht wollte, hatte keinen Griff. -->
-              <span class="filter-chip active" id="tl-baseline-toggle" data-i18n-title="map.baseline.tip" title="Deine Grundort-Zeiträume — ein Zeichen je Zeitraum, dort wo du in dieser Zeit normalerweise warst. Abgeleitet, nicht erfasst."><span class="fdot" style="background:var(--baseline-dot)"></span><span data-i18n="map.baseline">🏠 Grundort</span></span>
+              <span class="filter-chip active" id="tl-baseline-toggle" data-i18n-title="map.baseline.tip" title="Deine Wohnort-Zeiträume — ein Zeichen je Zeitraum, dort wo du in dieser Zeit gewohnt hast. Abgeleitet, nicht erfasst."><span class="fdot" style="background:var(--baseline-dot)"></span><span data-i18n="map.baseline">🏠 Wohnort</span></span>
               <span id="tl-filters" style="display:contents"></span>
             </div>
           </div>
@@ -1588,7 +1588,7 @@
           </div>
           <div class="filter-group" style="flex-basis:100%">
             <label data-i18n="map.cats">Kategorien</label>
-            <!-- **Anmerkung 178 — der Grundort steht bei den Kategorien.**
+            <!-- **Anmerkung 178 — der Wohnort steht bei den Kategorien.**
                  Er stand in „Ebenen", und das war eine vertretbare Lesart
                  („woher kommt, was hier liegt?"). Beim Benutzen ist er aber
                  keine Herkunft, sondern eine SORTE Eintrag neben Reise,
@@ -1600,7 +1600,7 @@
                  `buildCatFilter` weiterhin genau EINEN Behälter füllt und die
                  Chips trotzdem in derselben Reihe umbrechen. -->
             <div class="filter-chips">
-              <span class="filter-chip active" id="mp-baseline-toggle" data-i18n-title="map.baseline.tip" title="Deine Grundort-Zeiträume — ein Zeichen je Zeitraum, dort wo du in dieser Zeit normalerweise warst. Abgeleitet, nicht erfasst."><span class="fdot" style="background:var(--baseline-dot)"></span><span data-i18n="map.baseline">🏠 Grundort</span></span>
+              <span class="filter-chip active" id="mp-baseline-toggle" data-i18n-title="map.baseline.tip" title="Deine Wohnort-Zeiträume — ein Zeichen je Zeitraum, dort wo du in dieser Zeit gewohnt hast. Abgeleitet, nicht erfasst."><span class="fdot" style="background:var(--baseline-dot)"></span><span data-i18n="map.baseline">🏠 Wohnort</span></span>
               <span id="mp-filters" style="display:contents"></span>
             </div>
           </div>
@@ -2175,7 +2175,7 @@
           <b>1.</b> Module wählen · <b>2.</b> Google-Timeline importieren ·
           <b>3.</b> Ortsnamen auflösen · <b>4.</b> Immich verbinden, Vorschläge ansehen
           und Fotos verknüpfen · <b>5.</b> mehrtägiges aufteilen ·
-          <b>6.</b> Grundorte eintragen · <b>7.</b> Wetter ergänzen · <b>8.</b> Backup ziehen.
+          <b>6.</b> Wohnorte eintragen · <b>7.</b> Wetter ergänzen · <b>8.</b> Backup ziehen.
           Nichts davon ist Pflicht, jeder Lauf lässt sich wiederholen — nachgetragen wird
           immer nur, was fehlt. <b>Ausführlich</b> in der README-Anleitung
           („Getting started — a sensible order").</div>
@@ -2392,7 +2392,7 @@
              normale Nutzer gar nicht vorhanden. Bewusst nach dem Aufteilen:
              jeder Tages-Eintrag will sein eigenes Wetter, und geholt wird je
              Ereignis genau einmal. -->
-        <!-- F20 (Anmerkung 144): der Grundort. Steht VOR dem Wetter, weil der
+        <!-- F20 (Anmerkung 144): der Wohnort. Steht VOR dem Wetter, weil der
              Wetterlauf die Tage anreichert, die hier entstehen — dieselbe
              Reihenfolgen-Regel wie überall auf dieser Seite (jeder Schritt
              liefert dem nächsten sein Material, Anmerkung 115).
@@ -2400,10 +2400,10 @@
              Der Block ist bewusst ein FORMULAR und kein Lauf: hier wird eine
              Tatsache eingetragen, nicht etwas berechnet. Deshalb trägt er auch
              kein „ergänzt"-Abzeichen, sondern „Lebensdatenbank". -->
-        <div class="section-title eff-head"><span data-i18n="adm.baseline">6 · Grundort</span><span class="eff layer" data-i18n="eff.lifedb">Lebensdatenbank</span></div>
+        <div class="section-title eff-head"><span data-i18n="adm.baseline">6 · Wohnort</span><span class="eff layer" data-i18n="eff.lifedb">Lebensdatenbank</span></div>
         <div class="panel" style="padding:0">
           <div class="action-row">
-            <div class="action-key"><b style="font-size:13px" data-i18n="bl.title">🏠 Wo warst du normalerweise?</b></div>
+            <div class="action-key"><b style="font-size:13px" data-i18n="bl.title">🏠 Wo hast du gewohnt?</b></div>
             <div class="action-desc">
               <span data-i18n="bl.desc"><b>Ein Zeitraum, ein Ort — für alles, was du nie erfasst hast.</b><br>
                 „Von meiner Geburt bis 2006 war ich im Elternhaus in Bad Segeberg." Jeder Tag in
@@ -2412,7 +2412,11 @@
                 bekommt beim nächsten Wetterlauf sein Wetter.<br>
                 Es entstehen dabei <b>keine Einträge</b>, nur diese eine Zeile — korrigierst du sie
                 später, rechnet sich alles neu. Ein Tag mit einem echten Eintrag gewinnt immer,
-                Zeiträume dürfen sich nicht überschneiden.</span>
+                Zeiträume dürfen sich nicht überschneiden.<br>
+                <b>Bei mehrtägigen Einträgen erst Schritt 5 laufen lassen.</b> Ein Eintrag belegt
+                nur seinen Anfangstag — zwei Wochen Urlaub als <i>ein</i> Eintrag lassen den
+                Wohnort die übrigen dreizehn Tage füllen, du wärst also laut Statistik zu Hause.
+                Aufgeteilt stimmt es.</span>
               <div id="bl-list" style="margin-top:10px"></div>
               <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end">
                 <label style="display:flex; flex-direction:column; gap:3px">
@@ -2751,7 +2755,7 @@
 </div>
 
 <!-- Ort auf der Karte wählen — für die Eingabe, den Bearbeiten-Dialog und den
-     Grundort. EIN Dialog für alle drei: welches Feld gefüllt wird, entscheidet
+     Wohnort. EIN Dialog für alle drei: welches Feld gefüllt wird, entscheidet
      der Aufrufer (`openPlacePicker`). Drei eigene Karten wären drei Stellen,
      an denen dieselbe Regel steht, und die laufen auseinander (Anm. 106). -->
 <div class="modal-overlay" id="pick-modal" style="z-index:2500">
@@ -3240,10 +3244,10 @@ const I18N_EN = {
   'tl.year.loading': "Fetching {y} …",
   'tl.end.index': "Every year of your story is listed above — one click fetches its entries.",
   'map.tracks.n': "tracks travelled",
-  'map.baseline.n': "baseline",
-  'map.baseline.none': "No baseline location entered yet — the form is under “My data”.",
-  'tl.baseline.n': "baseline days",
-  'tl.baseline.tip': "Days with no entry but a baseline location that applies — derived, not recorded. The number covers your whole record; how far the list currently reaches is written at its foot.",
+  'map.baseline.n': "residence",
+  'map.baseline.none': "No residence entered yet — the form is under “My data”.",
+  'tl.baseline.n': "residence days",
+  'tl.baseline.tip': "Days with no entry but a residence that applies — derived, not recorded. The number covers your whole record; how far the list currently reaches is written at its foot.",
   'map.manual': "By hand",
   'map.manual.tip': "Entries you recorded yourself — trips, concerts, milestones. On the map the numbered points in their category colour.",
   'map.visits.tip': "Visits taken from the Google Timeline import — the same layer the timeline lists under 🛰️",
@@ -3427,16 +3431,16 @@ const I18N_EN = {
   'adm.placenames': "3 · Place names",
   'adm.tracking': "1 · What do you track?",
   'adm.weather': "7 · Weather",
-  // F20 (Anmerkung 144) — der Grundort
-  'adm.baseline': "6 · Baseline location",
+  // F20 (Anmerkung 144) — der Wohnort
+  'adm.baseline': "6 · Residence",
   'eff.lifedb': "life database",
-  'bl.title': "🏠 Where were you, normally?",
-  'bl.desc': "<b>One period, one place — for everything you never recorded.</b><br>“From my birth until 2006 I was at my parents' house in Bad Segeberg.” Every day in that period with <b>no</b> entry then counts as a day at that place: it shows up in the timeline, counts in the statistics, the world map and the badges, and gets its weather on the next weather run.<br>This creates <b>no entries</b>, just this one row — correct it later and everything recomputes. A day with a real entry always wins, and periods may not overlap.",
+  'bl.title': "🏠 Where have you lived?",
+  'bl.desc': "<b>One period, one place — for everything you never recorded.</b><br>“From my birth until 2006 I was at my parents' house in Bad Segeberg.” Every day in that period with <b>no</b> entry then counts as a day at that place: it shows up in the timeline, counts in the statistics, the world map and the badges, and gets its weather on the next weather run.<br>This creates <b>no entries</b>, just this one row — correct it later and everything recomputes. A day with a real entry always wins, and periods may not overlap.<br><b>For multi-day entries, run step 5 first.</b> An entry only occupies its starting day — a two-week holiday as <i>one</i> entry lets your residence fill the other thirteen days, so the statistics would place you at home. Split up, it is right.",
   'bl.f.label': "Name", 'bl.f.label.ph': "Parents' house",
   'bl.f.place': "Place", 'bl.f.place.ph': "Bad Segeberg",
   'bl.f.from': "From", 'bl.f.to': "To (empty = until today)",
   'bl.add': "Add period",
-  'bl.none': "No baseline period yet.",
+  'bl.none': "No residence period yet.",
   'bl.until': "today",
   'bl.del': "Remove",
   'bl.del.ask': "Remove this period? The place and every real entry stay.",
@@ -3445,15 +3449,15 @@ const I18N_EN = {
   'bl.need': "Place and start date are required.",
   'bl.nocoords': "no coordinates — the days count, but stay without weather.",
   'bl.wx.clear': "Discard day weather",
-  'bl.wx.ask': "Discard the weather of all baseline days? It can be fetched again at any time.",
+  'bl.wx.ask': "Discard the weather of all residence days? It can be fetched again at any time.",
   'bl.wx.done': "{n} values discarded.",
-  'bl.card.tag': "baseline", 'bl.card.here': "here",
-  'bl.card.tip': "Derived from your baseline location — there is no entry on this day.",
-  'tl.bl.window': "{n} of {m} derived baseline days — the most recent first.",
-  'tl.bl.more': "▼ Load more baseline days",
+  'bl.card.tag': "residence", 'bl.card.here': "here",
+  'bl.card.tip': "Derived from your residence — there is no entry on this day.",
+  'tl.bl.window': "{n} of {m} derived residence days — the most recent first.",
+  'tl.bl.more': "▼ Load more residence days",
   'tl.agg.derived': "derived",
-  'map.baseline': "🏠 Baseline", 'map.bl.derived': "derived",
-  'map.baseline.tip': "Your baseline periods — one mark per period, where you normally were during that time. Derived, not recorded.",
+  'map.baseline': "🏠 Residence", 'map.bl.derived': "derived",
+  'map.baseline.tip': "Your residence periods — one mark per period, where you lived at that time. Derived, not recorded.",
   // F21 (Anmerkung 145) — die Lücken-Ansicht
   'stats.tab.gaps': "🕳️ Gaps",
   'gaps.fail': "The gaps could not be computed.",
@@ -3462,14 +3466,14 @@ const I18N_EN = {
   'gaps.head.birth': "Since your birth on {from}, {k} of {total} days are known ({pct} %).",
   'gaps.head.rec': "Between {from} and {to}, {k} of {total} days are known ({pct} %).",
   'gaps.head.nobirth': "Add your birth as a milestone and this view covers your whole life instead of just the recorded period.",
-  'gaps.sum.split': "{rec} days recorded · {base} days derived from a baseline · {gap} days unknown",
+  'gaps.sum.split': "{rec} days recorded · {base} days derived from a residence · {gap} days unknown",
   'gaps.years': "📅 Coverage per year",
   'gaps.top': "📏 Longest gaps",
   'gaps.none': "no gap — every day is accounted for",
   'gaps.capped': "Showing {n} of {m} stretches, longest first.",
-  'gaps.row.tip': "Click to enter as a baseline period",
+  'gaps.row.tip': "Click to enter as a residence period",
   'gaps.jumped': "Period taken over — now add the place.",
-  'adm.firstrun': "<b>First time here?</b> The sections are in the order that makes sense — each one feeds the next its material: <b>1.</b> pick your modules · <b>2.</b> import the Google timeline · <b>3.</b> resolve place names · <b>4.</b> connect Immich, review its proposals and link photos · <b>5.</b> split multi-day entries · <b>6.</b> add baseline locations · <b>7.</b> add weather · <b>8.</b> take a backup. None of it is mandatory, every run can be repeated — it only ever fills in what is missing. <b>In detail</b> in the README guide (“Getting started — a sensible order”).",
+  'adm.firstrun': "<b>First time here?</b> The sections are in the order that makes sense — each one feeds the next its material: <b>1.</b> pick your modules · <b>2.</b> import the Google timeline · <b>3.</b> resolve place names · <b>4.</b> connect Immich, review its proposals and link photos · <b>5.</b> split multi-day entries · <b>6.</b> add your residences · <b>7.</b> add weather · <b>8.</b> take a backup. None of it is mandatory, every run can be repeated — it only ever fills in what is missing. <b>In detail</b> in the README guide (“Getting started — a sensible order”).",
   'adm.users.title': "Users",
   'adm.modqueue': "Moderation queue",
   'act.recompute': "🔄 Recompute AI proposals",
@@ -3818,7 +3822,7 @@ const I18N_EN = {
   'fg.admin.tab': "Loading the tab …",
   'fg.refresh': "Rebuilding the views …",
   'fg.map.points': "Fetching points",
-  'fg.map.baseline': "Baseline periods",
+  'fg.map.baseline': "Residence periods",
   'fg.map.photos': "Photo stock",
   'fg.map.draw': "Drawing the map",
   'fg.stats.numbers': "Numbers and collections",
@@ -4700,9 +4704,9 @@ function buildCatFilter(containerId, activeSet, onChange) {
 }
 // **Anmerkung 181 — jeder Kategorie-Chip nennt seine Zahl.**
 //
-// Gemeldet: „bei den Kategorien wird nur beim Grundort eine Anzahl angegeben,
+// Gemeldet: „bei den Kategorien wird nur beim Wohnort eine Anzahl angegeben,
 // bei den anderen nicht — das ist nicht konsequent." Stimmt. Seit Anmerkung 178
-// steht der Grundort in DERSELBEN Reihe wie Reise, Konzert und Meilenstein, und
+// steht der Wohnort in DERSELBEN Reihe wie Reise, Konzert und Meilenstein, und
 // er war dort der einzige Chip mit einer Zahl.
 //
 // **Die Zahl hängt hier NICHT am eigenen Schalter.** Bei den Ebenen-Schaltern
@@ -4853,7 +4857,7 @@ const tl = { zoom: 'year', query: '', events: [], catFilter: new Set(FILTER_CATS
              // nicht mehr: die Gruppen sind seitdem gewöhnliche verdichtete
              // Ereignisse, und der Server bildet sie (A39/A47) — eine zweite
              // Gruppierung daneben wären zwei Regeln für dieselbe Frage.
-             // Anmerkung 178: Der Grundort ist im Zeitstrahl ein- und
+             // Anmerkung 178: Der Wohnort ist im Zeitstrahl ein- und
              // ausblendbar wie auf der Karte. Voreingestellt AN — die
              // abgeleiteten Tage waren bis hier gar nicht abschaltbar, und
              // ihre Abwesenheit wäre die überraschendere Änderung.
@@ -4998,7 +5002,7 @@ async function loadDayWeather(page) {
 // Bauform wie `loadDayMedia`/`loadDayWeather` daneben, eine Abfrage je Seite.
 //
 // **Die Spanne reicht weiter als die Seite, sobald alles geladen ist.** Ein
-// Grundort füllt gerade die Zeit, in der es KEINE Einträge gibt; wäre das
+// Wohnort füllt gerade die Zeit, in der es KEINE Einträge gibt; wäre das
 // Fenster immer nur die Spanne der geladenen Ereignisse, blieben genau die
 // Jahre unsichtbar, für die es dieses Paket gibt. Der Index kennt das erste
 // abgeleitete Jahr (`baseline_years`), und ab da unten hängen die Tage an.
@@ -5044,7 +5048,7 @@ async function loadBaselineDays(page) {
 
 // **Anmerkung 182 — aus dem Deckel wird ein Fenster.**
 //
-// Gemeldet: „warum können nur 300 Tage vom Grundort angezeigt werden? Es sollen
+// Gemeldet: „warum können nur 300 Tage vom Wohnort angezeigt werden? Es sollen
 // alle angezeigt werden."
 //
 // Bis hierher waren es 300, gleichmäßig über den ganzen Zeitraum GEGRIFFEN.
@@ -5137,10 +5141,10 @@ function baselineDayCard(x) {
     .concat(wx ? [`🌤️ ${esc(wx.line)}`] : []);
   return `
     <div class="event-card baseline-day" title="${esc(t('bl.card.tip',
-      'Abgeleitet aus deinem Grundort — an diesem Tag steht kein Eintrag.'))}">
+      'Abgeleitet aus deinem Wohnort — an diesem Tag steht kein Eintrag.'))}">
       <div class="ev-head">
         <span class="ev-title">${esc(x.label || place || t('bl.card.here', 'hier'))}</span>
-        <span class="chip badge-baseline">${esc(t('bl.card.tag', 'Grundort'))}</span>
+        <span class="chip badge-baseline">${esc(t('bl.card.tag', 'Wohnort'))}</span>
         <span class="ev-date">${esc(fmtDay(x.day))}</span>
       </div>
       ${chips.length ? `<div class="ev-meta">${
@@ -5948,7 +5952,7 @@ function aggRowCard(bucket) {
   }
   const days = new Set(bucket.items.map(e => (e.date_start || '').slice(0, 10))).size;
   const place = tlAggTopPlace(bucket.items);
-  // F20: Ein abgeleiteter Grundort-Tag zählt als TAG, aber nicht als Ereignis.
+  // F20: Ein abgeleiteter Wohnort-Tag zählt als TAG, aber nicht als Ereignis.
   // `bucket.items.length` als „N Ereignisse" auszugeben wäre in einem
   // gefüllten Kindheitsjahr die Aussage „365 Ereignisse" über ein Jahr, in dem
   // niemand etwas erfasst hat — genau die Vermischung, gegen die Anmerkung 143
@@ -6042,7 +6046,7 @@ function tlFooter() {
   // steht darunter ein Knopf und nicht bloß ein Satz.
   const bl = TL_BASELINE_MORE
     ? `<div class="hint" style="text-align:center">${esc(
-        t('tl.bl.window', '{n} von {m} abgeleiteten Grundort-Tagen — die jüngsten zuerst.')
+        t('tl.bl.window', '{n} von {m} abgeleiteten Wohnort-Tagen — die jüngsten zuerst.')
           .replace('{n}', TL_BASELINE_SHOWN.toLocaleString(LOC()))
           .replace('{m}', (TL_BASELINE_TOTAL || TL_BASELINE.size).toLocaleString(LOC())))}</div>`
     : '';
@@ -6053,7 +6057,7 @@ function tlFooter() {
     // ist genau der, den F20 überhaupt eingeführt hat.
     return bl + (TL_BASELINE_MORE
       ? `<div class="hint" id="tl-more-baseline" style="text-align:center; cursor:pointer">${
-          esc(t('tl.bl.more', '▼ Weitere Grundort-Tage laden'))}</div>`
+          esc(t('tl.bl.more', '▼ Weitere Wohnort-Tage laden'))}</div>`
       : `<div class="hint" style="text-align:center">${
           t('tl.end', 'Das ist der Anfang deiner Geschichte.')}</div>`);
   }
@@ -6370,7 +6374,7 @@ document.getElementById('tl-photos-toggle')?.addEventListener('click', function 
   this.classList.toggle('off', !tl.showPhotos);
   loadTimeline();
 });
-// **Anmerkung 178 — der Grundort im Zeitstrahl, endlich mit Schalter.**
+// **Anmerkung 178 — der Wohnort im Zeitstrahl, endlich mit Schalter.**
 //
 // Die abgeleiteten Tage waren hier nie abschaltbar: in einem Jahr ohne
 // Einträge besteht der Zeitstrahl ausschließlich aus ihnen, und wer die
@@ -6382,7 +6386,7 @@ document.getElementById('tl-photos-toggle')?.addEventListener('click', function 
 // sind eine Ableitung im Browser (`tlBaselineRows`), kein Fenster im Server.
 document.getElementById('tl-baseline-toggle')?.addEventListener('click', function () {
   if (this.classList.contains('inert')) {
-    toast(t('map.baseline.none', 'Noch kein Grundort eingetragen — das Formular steht unter „Meine Daten".'), 'warn', 7000);
+    toast(t('map.baseline.none', 'Noch kein Wohnort eingetragen — das Formular steht unter „Meine Daten".'), 'warn', 7000);
     return;
   }
   tl.showBaseline = !tl.showBaseline;
@@ -6404,12 +6408,12 @@ function tlSyncBaselineChip() {
   // Zeilen und nicht 0, wenn er ausgeschaltet ist. Wie weit das Fenster reicht,
   // sagt der Fuß der Liste; das ist dort seine Aufgabe und nicht die des Chips.
   label.textContent = empty
-    ? `🏠 ${t('map.baseline.n', 'Grundort')}`
+    ? `🏠 ${t('map.baseline.n', 'Wohnort')}`
     : `🏠 ${TL_BASELINE_TOTAL.toLocaleString(LOC())} ${
-        t('tl.baseline.n', 'Grundort-Tage')}`;
+        t('tl.baseline.n', 'Wohnort-Tage')}`;
   chip.title = empty
-    ? t('map.baseline.none', 'Noch kein Grundort eingetragen — das Formular steht unter „Meine Daten".')
-    : t('tl.baseline.tip', 'Tage, an denen kein Eintrag steht, aber ein Grundort gilt — abgeleitet, nicht erfasst. Die Zahl ist die des gesamten Bestandes; wie weit die Liste gerade zurückreicht, sagt ihr Fuß.');
+    ? t('map.baseline.none', 'Noch kein Wohnort eingetragen — das Formular steht unter „Meine Daten".')
+    : t('tl.baseline.tip', 'Tage, an denen kein Eintrag steht, aber ein Wohnort gilt — abgeleitet, nicht erfasst. Die Zahl ist die des gesamten Bestandes; wie weit die Liste gerade zurückreicht, sagt ihr Fuß.');
 }
 // A47: Stufe wechseln = neu abfragen. Verdichtet wird auf dem Server, also
 // ist das keine Anzeige-Einstellung (A39: verdichtet wird VOR dem Blättern).
@@ -7611,7 +7615,7 @@ function renderStatsGaps(r) {
       .replace('{k}', n(r.known_days)).replace('{total}', n(r.total_days))
       .replace('{pct}', pct))}</div>
     <div class="stat-label" style="margin-top:6px">${esc(
-      t('gaps.sum.split', '{rec} Tage erfasst · {base} Tage aus dem Grundort abgeleitet · {gap} Tage unbekannt')
+      t('gaps.sum.split', '{rec} Tage erfasst · {base} Tage aus dem Wohnort abgeleitet · {gap} Tage unbekannt')
         .replace('{rec}', n(r.recorded_days)).replace('{base}', n(r.baseline_days))
         .replace('{gap}', n(r.unknown_days)))}</div>
     ${sub}
@@ -7632,7 +7636,7 @@ function renderStatsGaps(r) {
   const rows = (r.stretches || []).map((s, i) =>
     topRow(i, `${fmtDay(s.from)} – ${fmtDay(s.to)}`, dayCount(s.days), '',
            ` data-gap-from="${esc(s.from)}" data-gap-to="${esc(s.to)}" `
-           + `title="${esc(t('gaps.row.tip', 'Klicken: als Grundort-Zeitraum eintragen'))}"`));
+           + `title="${esc(t('gaps.row.tip', 'Klicken: als Wohnort-Zeitraum eintragen'))}"`));
   const capped = r.stretch_count > (r.stretches || []).length
     ? `<div class="stat-label" style="margin-top:8px">${esc(
         t('gaps.capped', '{n} von {m} Strecken gezeigt, die längsten zuerst.')
@@ -7652,14 +7656,14 @@ function renderStatsGaps(r) {
   // **Der Klick führt dorthin, wo die Lücke zu schließen ist.** Ein Sprung in
   // den Zeitstrahl wäre die naheliegende Verdrahtung und die nutzlose: eine
   // Lücke ist per Definition leer, dort stünde nichts. Was 158 Tage auf einmal
-  // füllt, ist ein Grundort-Zeitraum — also führt die Zeile in genau das
+  // füllt, ist ein Wohnort-Zeitraum — also führt die Zeile in genau das
   // Formular, mit den Daten schon eingetragen.
   box.querySelectorAll('[data-gap-from]').forEach(row =>
     row.addEventListener('click', () =>
       openBaselineFor(row.dataset.gapFrom, row.dataset.gapTo)));
 }
 
-// Die Lücke ins Grundort-Formular übernehmen — Verwaltung, „Meine Daten".
+// Die Lücke ins Wohnort-Formular übernehmen — Verwaltung, „Meine Daten".
 function openBaselineFor(from, to) {
   gotoView('admin');
   showAdminTab('daten');
@@ -7919,7 +7923,7 @@ document.getElementById('mf-geo-btn').addEventListener('click', async ev => {
 });
 
 // --------------------------------------------------------------------------- //
-// Ort auf der Karte wählen (Eingabe, Bearbeiten-Dialog, Grundort)
+// Ort auf der Karte wählen (Eingabe, Bearbeiten-Dialog, Wohnort)
 // --------------------------------------------------------------------------- //
 // Ein getippter Ortsname und ein geklickter Punkt sind UMGEKEHRTE Aussagen.
 // Beim Namen ist der Text die Angabe und die Koordinate ihre Ableitung — der
@@ -8856,7 +8860,7 @@ function startVoice() {
 
 // ---------- KARTE ----------
 let mapObj = null, mapMarkers = null, mapCluster = null, mapRoute = null, mapTracks = null;
-// F20: eigene Ebene für den Grundort. Erst beim Aufbau der Karte angelegt
+// F20: eigene Ebene für den Wohnort. Erst beim Aufbau der Karte angelegt
 // wie die anderen — ein `L.layerGroup()` beim Laden des Skripts hinge an
 // keiner Karte und zeichnete nie.
 let mapBaseline = null;
@@ -9035,7 +9039,7 @@ function mpSyncCatChips() {
   }
   syncCatChips('mp-filters', c => n[c] || 0);
 }
-// Der Grundort — seit Anmerkung 178 ein Kategorie-Chip, aber mit derselben
+// Der Wohnort — seit Anmerkung 178 ein Kategorie-Chip, aber mit derselben
 // Pflicht wie jede Ebene: sagen, wie viel er gerade beiträgt, und sagen, wenn
 // er nichts beitragen KANN (A40).
 function mpSyncBaselineChip() {
@@ -9051,11 +9055,11 @@ function mpSyncBaselineChip() {
   // ihre Regel befolgen, sonst ist die Reihe wieder uneinheitlich.
   const n = (!empty && key != null) ? mpBaselinesIn(key).length : 0;
   mpChipCount('mp-baseline-toggle',
-    empty ? `🏠 ${t('map.baseline', '🏠 Grundort').replace('🏠 ', '')}`
-          : `🏠 ${mpNum(n)} ${t('map.baseline.n', 'Grundort')}`,
+    empty ? `🏠 ${t('map.baseline', '🏠 Wohnort').replace('🏠 ', '')}`
+          : `🏠 ${mpNum(n)} ${t('map.baseline.n', 'Wohnort')}`,
     empty
-      ? t('map.baseline.none', 'Noch kein Grundort eingetragen — das Formular steht unter „Meine Daten".')
-      : t('map.baseline.tip', 'Deine Grundort-Zeiträume — ein Zeichen je Zeitraum, dort wo du in dieser Zeit normalerweise warst. Abgeleitet, nicht erfasst.'));
+      ? t('map.baseline.none', 'Noch kein Wohnort eingetragen — das Formular steht unter „Meine Daten".')
+      : t('map.baseline.tip', 'Deine Wohnort-Zeiträume — ein Zeichen je Zeitraum, dort wo du in dieser Zeit gewohnt hast. Abgeleitet, nicht erfasst.'));
 }
 // **Der Kern von Anmerkung 154 (d).** Vier benannte Stufen, und die Zoomstufe
 // entscheidet daran nichts mehr. „Je Stadt" tritt außer Kraft, wenn zu keinem
@@ -9229,10 +9233,10 @@ function rebuildPeriods(keepKey) {
   // Sonderbehandlung fällt damit weg, und mit ihr eine zweite Quelle für
   // dieselbe Frage.
   //
-  // **Anmerkung 167: der Grundort bringt seine Zeiträume ebenfalls selbst mit.**
+  // **Anmerkung 167: der Wohnort bringt seine Zeiträume ebenfalls selbst mit.**
   // Er kann es nicht wie ein Foto tun — er ist kein Ereignis, sondern eine
   // stehende Tatsache über eine Spanne. Ohne diese Zeile ist ein Jahr, in dem
-  // NUR der Grundort steht, nicht ansteuerbar, und die Ebene, die dafür gebaut
+  // NUR der Wohnort steht, nicht ansteuerbar, und die Ebene, die dafür gebaut
   // wurde, bleibt genau dort unerreichbar, wo sie das Einzige ist, was es gibt.
   mpBaselineKeys().forEach(k => keys.add(k));
   const sorted = [...keys].sort();
@@ -9297,7 +9301,7 @@ async function mpEnsureWeather(key, items) {
 
 
 // --------------------------------------------------------------------------- //
-// F20 auf der Karte — der Grundort als eigene Ebene
+// F20 auf der Karte — der Wohnort als eigene Ebene
 // --------------------------------------------------------------------------- //
 // **EIN Zeichen je ZEITRAUM, nicht je Tag.** Sechs Jahre Elternhaus sind 2 190
 // abgeleitete Tage an EINER Koordinate; sie einzeln zu zeichnen ergäbe
@@ -9344,7 +9348,7 @@ function mpPeriodRange(key) {
   return ['0000-01-01', '9999-12-31'];
 }
 
-// Welche Grundort-Zeiträume in einen Zeitraum-Schlüssel fallen. EINE Antwort,
+// Welche Wohnort-Zeiträume in einen Zeitraum-Schlüssel fallen. EINE Antwort,
 // gelesen vom Zeichner, von der Stopp-Liste und vom Zeitraum-Aufbau — drei
 // Stellen, und drei Kopien dieser Bedingung wären drei Regeln (Anmerkung 106).
 function mpBaselinesIn(key) {
@@ -9387,7 +9391,7 @@ function mpDrawBaselines(key) {
       icon: mpDropIconColor(getComputedStyle(document.documentElement)
         .getPropertyValue('--baseline-dot').trim() || '#4cb96b', 0, 13),
       // Über den Ereignis-Punkten, aber unter einem geöffneten Popup: der
-      // Grundort ist die Auskunft für den Zeitraum, in dem sonst nichts steht.
+      // Wohnort ist die Auskunft für den Zeitraum, in dem sonst nichts steht.
       zIndexOffset: -100, title: mpBaselineName(b),
     }).bindPopup(
       `<b>${esc(mpBaselineName(b))}</b><br>${esc(b.place)}<br>`
@@ -9401,16 +9405,16 @@ function mpDrawBaselines(key) {
 }
 
 // --------------------------------------------------------------------------- //
-// **Anmerkung 167 — ein Zeitraum, in dem NUR der Grundort steht, muss
+// **Anmerkung 167 — ein Zeitraum, in dem NUR der Wohnort steht, muss
 // ansteuerbar sein.**
 // --------------------------------------------------------------------------- //
 // Die Zeiträume der Karte entstanden aus den EREIGNISSEN. Genau die Jahre, für
-// die der Grundort gemacht ist, haben keine — 1993 ließ sich damit gar nicht
+// die der Wohnort gemacht ist, haben keine — 1993 ließ sich damit gar nicht
 // ansteuern, und der einzige Ort, der über dieses Jahr etwas zu sagen hat, war
 // nirgends erreichbar. Dieselbe Falle wie bei den Fototagen in A45, und aus
 // demselben Grund unsichtbar: die Ansicht sieht vollständig aus.
 //
-// Der Grundort ist eine STEHENDE Tatsache mit Gültigkeitszeitraum, nicht eine
+// Der Wohnort ist eine STEHENDE Tatsache mit Gültigkeitszeitraum, nicht eine
 // Zeile je Tag — die Schlüssel entstehen deshalb aus der SPANNE, nicht aus den
 // abgeleiteten Tagen. Ein Tag innerhalb der Spanne, an dem etwas erfasst wurde,
 // bringt seinen Schlüssel ohnehin selbst mit; die Vereinigung ist dieselbe
@@ -9540,7 +9544,7 @@ async function mpLoadPoints(force) {
 async function openMapView(op) {
   // Anmerkung 176: Vier Etappen, und der Overlay nennt sie. Ohne die Namen ist
   // ein Kartenaufbau über 20.000 Punkte eine Sanduhr — mit ihnen sieht man,
-  // ob es die Punkte, die Grundorte oder das Zeichnen ist.
+  // ob es die Punkte, die Wohnorte oder das Zeichnen ist.
   const at = (n, note) => op && op.step(n, 4, note);
   at(0, t('fg.map.points', 'Punkte werden geholt'));
   // A37: eigener schlanker Endpunkt statt der Zeitstrahl-Liste — und erst
@@ -9548,8 +9552,8 @@ async function openMapView(op) {
   // Anmerkung 135: wie im Zeitstrahl — unbestätigte Google-/Immich-Vorschläge
   // sind Beleg, kein Ereignis, und tauchen erst nach der Moderation auf.
   await mpLoadPoints();
-  at(1, t('fg.map.baseline', 'Grundort-Zeiträume'));
-  // F20: die Grundort-Zeiträume — eine Handvoll Zeilen, aus derselben Liste
+  at(1, t('fg.map.baseline', 'Wohnort-Zeiträume'));
+  // F20: die Wohnort-Zeiträume — eine Handvoll Zeilen, aus derselben Liste
   // wie das Formular unter „Meine Daten". Sie kommen VOR dem ersten Zeichnen,
   // sonst fehlt die Ebene beim Öffnen und erscheint erst beim nächsten Klick.
   await mpLoadBaselines();
@@ -9784,11 +9788,11 @@ function mpGroupColor(items) { return catColor(mpGroupColorCat(items)); }
 const MP_DROP_PATH = 'M12 32 C12 32 24 20 24 12 A12 12 0 1 0 0 12 C0 20 12 32 12 32 Z';
 function mpDropIcon(cat, n) { return mpDropIconColor(catColor(cat), n); }
 // Derselbe Tropfen mit einer Farbe, die keine Kategoriefarbe ist — der
-// Grundort (F20) braucht ihn. **Eine zweite Zeichnung desselben Zeichens wären
+// Wohnort (F20) braucht ihn. **Eine zweite Zeichnung desselben Zeichens wären
 // zwei Zeichen**, sobald jemand eine davon anfasst; deshalb geht der Weg über
 // die Farbe und nicht über eine eigene Funktion mit eigenem Pfad.
 // `r` übersteuert die Größe: die Größe eines Tropfens sagt sonst „so viele
-// Einträge", und die Tageszahl eines Grundorts ist gerade KEINE Zahl über
+// Einträge", und die Tageszahl eines Wohnorts ist gerade KEINE Zahl über
 // Einträge (dieselbe Verwechslung, gegen die die Sammelzeile im Zeitstrahl
 // zwei getrennte Marken führt).
 function mpDropIconColor(color, n, r) {
@@ -9798,7 +9802,7 @@ function mpDropIconColor(color, n, r) {
   // skalierte sie mit der Tropfengröße mit, und über einer großen Gruppe
   // stünde eine riesige Ziffer. Erst ab einem Kopf, in den sie hineinpasst —
   // die Größe sagt es ohnehin schon.
-  // `n` ohne Zahl (der Grundort zeichnet EIN Zeichen, keine Menge) lässt die
+  // `n` ohne Zahl (der Wohnort zeichnet EIN Zeichen, keine Menge) lässt die
   // Ziffer weg — sonst stünde dort eine 0 oder ein „undefined".
   const num = (r >= 13 && n) ? `<b style="height:${w}px">${n.toLocaleString(LOC())}</b>` : '';
   return L.divIcon({
@@ -9949,7 +9953,7 @@ function renderPeriod() {
   if (!clustered && mp.showRoute && latlngs.length > 1) {
     L.polyline(latlngs, { color: '#5b8cff', weight: 3, opacity: .8, dashArray: '6 6' }).addTo(mapRoute);
   }
-  // **Anmerkung 167: der Ausschnitt kennt auch den Grundort.** Ohne diese
+  // **Anmerkung 167: der Ausschnitt kennt auch den Wohnort.** Ohne diese
   // Zeile wäre ein Zeitraum ohne Ereignisse zwar ansteuerbar und die Ebene
   // gezeichnet — nur läge das Zeichen irgendwo außerhalb des Bildes, das vom
   // vorigen Zeitraum stehen geblieben ist. Sichtbar wäre eine leere Karte, und
@@ -9958,7 +9962,7 @@ function renderPeriod() {
     try { mapObj.fitBounds(L.latLngBounds(latlngs).pad(0.35)); } catch (_) {}
   } else if (MP_BASELINE_LL.length) {
     // Mit Deckel: ein einzelner Punkt hat keine Ausdehnung, und `fitBounds`
-    // zöge dann auf die höchste Stufe — auf einen Häuserblock. Der Grundort
+    // zöge dann auf die höchste Stufe — auf einen Häuserblock. Der Wohnort
     // ist eine Aussage über Jahre, nicht über eine Hausnummer.
     try {
       mapObj.fitBounds(L.latLngBounds(MP_BASELINE_LL).pad(0.35), { maxZoom: 12 });
@@ -10502,7 +10506,7 @@ function renderGroupedPeriod(all, key, stops, level) {
         <div class="stat-label" style="margin-top:3px">${r.range} · ${esc(r.loc.name)}</div>
       </div>`).join('')
     // Anmerkung 167: dieselbe Zeile wie im ungebündelten Zweig. Die Karte
-    // zeichnet den Grundort in JEDER Stufe (der Aufruf steht vor der
+    // zeichnet den Wohnort in JEDER Stufe (der Aufruf steht vor der
     // Verzweigung) — eine Liste, die ihn nur in einer davon nennt, wäre die
     // Hälfte einer Regel, und die läuft still von der anderen weg.
     + mpBaselineStopsHtml(key);
@@ -10532,11 +10536,11 @@ document.getElementById('mp-route-toggle').addEventListener('click', function ()
 // Anmerkung 160 — die beiden Quellen-Schalter der Karte.
 document.getElementById('mp-baseline-toggle')?.addEventListener('click', function () {
   if (this.classList.contains('inert')) {
-    toast(t('map.baseline.none', 'Noch kein Grundort eingetragen — das Formular steht unter „Meine Daten".'), 'warn', 7000);
+    toast(t('map.baseline.none', 'Noch kein Wohnort eingetragen — das Formular steht unter „Meine Daten".'), 'warn', 7000);
     return;
   }
   mp.showBaseline = !mp.showBaseline;
-  // Anmerkung 167: der Schalter ändert seit dem Grundort-Zeitraum nicht nur,
+  // Anmerkung 167: der Schalter ändert seit dem Wohnort-Zeitraum nicht nur,
   // WAS gezeichnet wird, sondern WELCHE Zeiträume es überhaupt gibt — ohne den
   // Neuaufbau bliebe ein Jahr in der Leiste stehen, das nichts mehr zeigt.
   const keep = mp.periods[mp.index];
@@ -10626,7 +10630,7 @@ document.querySelectorAll('[data-mode]').forEach(chip => {
       const key = mp.periods[mp.index];
       const item = mpFiltered().find(e => periodKey(e) === key);
       // Anmerkung 167: hat der Zeitraum gar keine Ereignisse — der Normalfall
-      // für einen Grundort —, liefert der Schlüssel selbst das Datum. Ohne
+      // für einen Wohnort —, liefert der Schlüssel selbst das Datum. Ohne
       // diesen Rückfall springt ein Moduswechsel aus 1993 heraus ans Ende der
       // Zeit, und zwar genau in den Jahren, in denen nichts erfasst wurde.
       anchor = item ? item.date_start.slice(0, 10) : mpPeriodRange(key)[0];
@@ -10929,7 +10933,7 @@ function gotoView(v) {
 // Anmerkung 176: Jeder Lader bekommt das Steuerobjekt durchgereicht. Bis hier
 // nahm es nur `loadToday` — die übrigen sechs zeigten einen Kreisel mit Titel
 // und sonst nichts, obwohl gerade sie die langen sind (die Karte holt Punkte,
-// Grundorte und den Foto-Index, die Statistik vier Endpunkte auf einmal).
+// Wohnorte und den Foto-Index, die Statistik vier Endpunkte auf einmal).
 // Ein Balken, der SAGT, woran er hängt, ist der Unterschied zwischen „es
 // dauert" und „es hängt".
 const VIEW_LOADERS = {
@@ -12049,7 +12053,7 @@ document.getElementById('btn-days-run')?.addEventListener('click', async ev => {
 });
 
 // --------------------------------------------------------------------------- //
-// F20 (Anmerkung 144) — Grundorte pflegen
+// F20 (Anmerkung 144) — Wohnorte pflegen
 // --------------------------------------------------------------------------- //
 // Kein Lauf, sondern ein Formular: hier wird eine TATSACHE eingetragen, keine
 // Ableitung angestoßen. Deshalb gibt es auch keine Vorschau-Pflicht wie bei den
@@ -12067,7 +12071,7 @@ function renderBaselines() {
   const box = document.getElementById('bl-list');
   if (!box) return;
   if (!BASELINES.length) {
-    box.innerHTML = `<div class="stat-label">${esc(t('bl.none', 'Noch kein Grundort eingetragen.'))}</div>`;
+    box.innerHTML = `<div class="stat-label">${esc(t('bl.none', 'Noch kein Wohnort eingetragen.'))}</div>`;
     return;
   }
   const total = BASELINES.reduce((n, b) => n + (b.day_count || 0), 0);
@@ -12089,7 +12093,7 @@ function renderBaselines() {
       <button class="btn" data-bl-del="${esc(b.id)}">${esc(t('bl.del', 'Entfernen'))}</button>
     </div>`;
   }).join('')
-    // Der Aufräum-Knopf steht bei den Grundorten und nicht beim Wetter: er
+    // Der Aufräum-Knopf steht bei den Wohnorten und nicht beim Wetter: er
     // wirft NUR das Tageswetter weg (Schicht 4). Beim Wetterlauf daneben sähe
     // er aus, als lösche er auch das Wetter der Ereignisse — und das ist
     // Anreicherung an bestätigten Daten, die kein Knopf hier anfassen darf.
@@ -12111,14 +12115,14 @@ async function removeBaseline(id) {
 }
 async function clearDayWeather() {
   if (!await uiConfirm(t('bl.wx.ask',
-      'Das Wetter aller Grundort-Tage verwerfen? Es lässt sich jederzeit neu holen.'))) return;
+      'Das Wetter aller Wohnort-Tage verwerfen? Es lässt sich jederzeit neu holen.'))) return;
   try {
     const r = await api('/api/baselines/weather/clear', { method: 'POST' });
     toast(t('bl.wx.done', '{n} Werte verworfen.').replace('{n}', r.removed), 'ok');
     refreshAfterBaseline();
   } catch (err) { toast(err.message, 'error', 8000); }
 }
-// Ein geänderter Grundort ändert Zeitstrahl, Karte und Statistik. Die teuren
+// Ein geänderter Wohnort ändert Zeitstrahl, Karte und Statistik. Die teuren
 // Ansichten entscheiden anhand der Kennung aus dem Index, ob sie überhaupt neu
 // zeichnen (Anmerkung 140) — und `fetchIndex()` merkt sich seine Zusage. Ohne
 // das erzwungene Nachladen bekämen ausgerechnet sie die alte Kennung zurück
@@ -12133,7 +12137,7 @@ function refreshAfterBaseline() {
   // zeigte sie den Stand von vor der Änderung und sähe dabei vollständig aus.
   MP_BASELINES = null;
   statsTopsFor = null;
-  // F21: Ein neuer Grundort SCHLIESST Lücken — die Ansicht, die sie zeigt, ist
+  // F21: Ein neuer Wohnort SCHLIESST Lücken — die Ansicht, die sie zeigt, ist
   // damit die erste, die falsch steht. Ohne dieses Vergessen hätte man gerade
   // einen Zeitraum eingetragen und bekäme ihn weiter als Lücke gemeldet.
   statsGapsFor = null;
