@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     Date,
     DateTime,
     Enum,
@@ -174,6 +175,18 @@ class Location(Base):
     # bekommen, **gefüllt** = Bausteine da.
     address: Mapped[dict | None] = mapped_column(
         JSON(none_as_null=True), nullable=True)
+    # Anmerkung 148: Dieser Name kommt VON HAND. Nominatim kennt nicht jeden
+    # Ort — eine Waldhütte, ein Feldweg, ein Grundstück ohne Adresse bleiben
+    # „Ort (51.9, 8.9)", so oft man auch fragt. Wer dort selbst etwas einträgt,
+    # trifft eine Aussage, und für Aussagen gilt die Kernregel: **Maschinen
+    # ändern Bestätigtes nie.** Ohne diese Marke überschriebe der nächste Lauf
+    # den Namen wieder, sobald der Geocoder irgendetwas zurückgibt — und zwar
+    # ausgerechnet dann, wenn er nach einer Störung wieder erreichbar ist.
+    #
+    # NULL zählt wie False (Bestandszeilen); gesetzt wird sie nur dort, wo
+    # jemand tatsächlich getippt hat.
+    name_manual: Mapped[bool | None] = mapped_column(
+        Boolean, default=False, nullable=True)
     external_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     events: Mapped[list["Event"]] = relationship(back_populates="location")

@@ -474,6 +474,42 @@ class PlaceNameResolveResult(BaseModel):
     remaining: int
 
 
+class UnresolvedPlace(BaseModel):
+    """Anmerkung 148: EIN Ort, den der Auflöse-Lauf nicht benennen konnte.
+
+    „0 Ortsnamen bearbeitet, 9 nicht auflösbar" ist eine Zahl ohne Adresse:
+    sie sagt, dass etwas offen ist, aber nicht, was — und damit gibt es keinen
+    nächsten Schritt außer „nochmal probieren", was dasselbe Ergebnis bringt.
+    Diese Zeile ist der nächste Schritt.
+    """
+    id: str
+    name: str
+    lat: float | None = None
+    lng: float | None = None
+    city: str | None = None
+    country: str | None = None
+    # Welcher Mangel: unnamed | labeled | nonlatin | verbose | None (nur
+    # Feld-Nachtrag offen, der Name selbst ist in Ordnung)
+    defect: str | None = None
+    # Wurde bei diesem Ort überhaupt schon einmal nachgefragt? NULL-Adresse
+    # heißt nein — dieselbe Drei-Zustände-Regel wie überall (Anmerkung 110).
+    looked_up: bool = False
+    # Nachgefragt und NICHTS bekommen — das ist der eigentliche Grund, warum
+    # ein Ort „nicht auflösbar" heißt. Nominatim kennt schlicht nicht jeden
+    # Punkt der Welt.
+    no_hit: bool = False
+    # Von Hand benannt: dieser Ort ist erledigt und wird nie wieder angefasst.
+    manual: bool = False
+    # Wie viele Ereignisse an diesem Ort hängen — die Antwort auf „lohnt sich
+    # die Handarbeit hier?"
+    events: int = 0
+
+
+class PlaceRename(BaseModel):
+    """Ein von Hand gesetzter Ortsname."""
+    name: str
+
+
 class MediaRead(BaseModel):
     """F15: ein Bild an einem Event. `url`/`thumb_url` zeigen auf die
     geschützten Endpunkte — Dateien werden nie direkt statisch ausgeliefert."""

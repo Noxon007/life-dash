@@ -20,10 +20,11 @@ import math
 import re
 import time
 from datetime import datetime, timezone
+from typing import Annotated
 
 from dateutil import parser as dateparser
-from fastapi import APIRouter, Body, Depends
-from sqlalchemy import or_
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
@@ -42,7 +43,8 @@ from app.models import (
     Track,
     User,
 )
-from app.schemas import PlaceNameResolveResult, TimelineImportResult, TrackRead
+from app.schemas import (PlaceNameResolveResult, PlaceRename,
+                         TimelineImportResult, TrackRead, UnresolvedPlace)
 from app.services import geocode as geocode_svc
 from app.services import visitsplit
 from app.sqlutil import even_spread
@@ -386,7 +388,13 @@ def _apply_resolved_name(db: Session, loc: Location, user_id: str,
     # Zuhause seine einzige verbliebene Kennzeichnung.
     if hit.get("type") and loc.type not in ("home", "work"):
         loc.type = hit["type"]
-    _set_name(db, loc, user_id, short)
+    # Anmerkung 148: Ein von Hand gesetzter Name ist eine AUSSAGE, und
+    # Maschinen ändern Bestätigtes nie. Die Felder darunter (Stadt, Land,
+    # Bausteine) sind dagegen Anreicherung und dürfen kommen — sie ergänzen,
+    # sie widersprechen nicht. Der Ort bleibt deshalb Kandidat für die
+    # Feld-Nachträge und wird trotzdem nie umbenannt.
+    if not loc.name_manual:
+        _set_name(db, loc, user_id, short)
     # A39: Stadt aus denselben addressdetails — trägt Städte-Statistik und
     # Zeitstrahl-Verdichtung. Nur setzen, wenn etwas da ist: ein bereits
     # bekannter Wert soll nicht von einem Treffer ohne Stadtfeld gelöscht
@@ -519,8 +527,13 @@ def _resolve_candidates(db: Session, user_id: str, parts: list[str]) -> list[Loc
     # „labeled" kostet keinen Abruf — deshalb ganz nach vorn: der Lauf hat
     # sofort etwas vorzuweisen, statt eine Minute lang zu schweigen.
     order = {"labeled": 0, "unnamed": 1, "nonlatin": 2, "verbose": 3}
+    # Anmerkung 148: Ein von Hand gesetzter Name hat definitionsgemäß keinen
+    # Mangel — „zu lang" oder „fremdschriftlich" sind Urteile über das, was ein
+    # Geocoder geliefert hat, nicht über das, was ein Mensch geschrieben hat.
+    # Die Feld-Nachträge weiter unten nehmen ihn trotzdem mit.
     scored = [(order[d], l) for l in rows
-              if (d := _name_defect(l.name, parts, l.address)) is not None]
+              if not l.name_manual
+              and (d := _name_defect(l.name, parts, l.address)) is not None]
     # A39: Orte, deren Name in Ordnung ist, denen aber die Stadt fehlt. Sie
     # kommen zuletzt — ihr Name stimmt ja, es geht nur um ein Feld, das es vor
     # 0.34 nicht gab. `city IS NULL` heißt „nie nachgesehen"; der Lauf schreibt
@@ -897,6 +910,115 @@ def resolve_names_batch(
              "(%d in diesem Lauf), %d offen",
              scope or "alle", resolved, failed, len(skip), remaining)
     return PlaceNameResolveResult(resolved=resolved, failed=failed, remaining=remaining)
+
+
+# --------------------------------------------------------------------------- #
+# Anmerkung 148 — die Orte, an denen der Lauf scheitert, beim Namen nennen
+# --------------------------------------------------------------------------- #
+@router.get("/places/unresolved", response_model=list[UnresolvedPlace])
+def unresolved_places(
+    # `= Query(...)` als Default käme beim Direktaufruf (Tests, Job-Runner)
+    # als Query-OBJEKT an, nicht als Zahl — `Annotated` ist hier Pflicht.
+    limit: Annotated[int, Query(ge=1, le=1000)] = 200,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[UnresolvedPlace]:
+    """Die offenen Orte — mit dem GRUND, warum sie offen sind.
+
+    „9 nicht auflösbar" war bis 0.39 alles, was ein Nutzer erfuhr. Die Zahl ist
+    richtig und führt nirgendwohin: nochmal laufen lassen gibt dieselbe Zahl,
+    denn ein Ort, den Nominatim nicht kennt, wird morgen auch nicht bekannt
+    sein. Diese Liste macht daraus einen nächsten Schritt — Koordinaten, Anzahl
+    der Ereignisse, und ob überhaupt schon einmal gefragt wurde.
+
+    Bewusst NICHTS gespeichert (Anmerkung 96): dass ein Abruf scheiterte, ist
+    kein Merkmal des Ortes, sondern das Ergebnis eines Versuchs. Die Liste
+    entsteht bei jeder Abfrage neu aus denselben Bedingungen, die auch der Lauf
+    benutzt — dieselbe Funktion, nicht dieselbe Regel zweimal geschrieben.
+    """
+    parts = geocode_svc.parts_for(user)
+    # Aus derselben Kandidatenliste, die auch der Lauf abarbeitet — aber nur
+    # die mit einem NAMENSMANGEL. Die Liste enthält auch Orte, deren Name in
+    # Ordnung ist und bei denen nur ein Feld nachgetragen wird (Stadt seit
+    # A39, Bausteine seit A47). Die gehören nicht hierher: sie stehen dem
+    # Nutzer nicht im Weg, sie sind nur noch nicht dran — und sie wären
+    # zahlreich genug, um die neun, um die es geht, unauffindbar zu machen.
+    defects = {}
+    candidates = []
+    for l in _resolve_candidates(db, user.id, parts):
+        if l.name_manual:
+            continue
+        d = _name_defect(l.name, parts, l.address)
+        if d is None:
+            continue
+        defects[l.id] = d
+        candidates.append(l)
+        if len(candidates) >= limit:
+            break
+    if not candidates:
+        return []
+    # Eine Abfrage für alle Zählungen statt einer je Ort — bei 200 Orten wäre
+    # das sonst der Unterschied zwischen einer und zweihundert Anfragen.
+    counts = dict(db.query(Event.location_id, func.count(Event.id))
+                  .filter(Event.user_id == user.id,
+                          Event.location_id.in_([l.id for l in candidates]))
+                  .group_by(Event.location_id).all())
+    return [
+        UnresolvedPlace(
+            id=l.id, name=l.name, lat=l.lat, lng=l.lng,
+            city=l.city or None, country=l.country,
+            defect=defects[l.id],
+            # Drei Zustände, wie überall: NULL = nie nachgesehen,
+            # {} = nachgesehen und nichts bekommen, gefüllt = Bausteine da.
+            looked_up=l.address is not None,
+            no_hit=l.address == {},
+            manual=bool(l.name_manual),
+            events=counts.get(l.id, 0),
+        )
+        for l in candidates
+    ]
+
+
+@router.patch("/places/{place_id}", response_model=UnresolvedPlace)
+def rename_place(
+    place_id: str,
+    body: PlaceRename,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> UnresolvedPlace:
+    """Ortsnamen von Hand setzen — und damit endgültig.
+
+    `name_manual` ist keine Kosmetik: ohne die Marke überschriebe der nächste
+    Auflöse-Lauf den Namen wieder, sobald der Geocoder irgendetwas zurückgibt.
+    Ausgerechnet nach einer Störung, wenn er wieder erreichbar ist, wäre die
+    Handarbeit weg. Ein von Hand gesetzter Name ist eine Aussage des Nutzers,
+    und **Maschinen ändern Bestätigtes nie** (ARCHITECTURE Kap. 3.1).
+
+    Die Besuchs-Titel („Besuch: …") ziehen mit — dieselbe Funktion, die auch
+    der Geocoder benutzt.
+    """
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(400, "Der Ortsname darf nicht leer sein")
+    loc = db.get(Location, place_id)
+    if not loc or loc.user_id != user.id:
+        raise HTTPException(404, "Ort nicht gefunden")
+    _set_name(db, loc, user.id, name)
+    loc.name_manual = True
+    db.commit()
+    log.info("Ortsname von Hand gesetzt: %r (user=%s)", loc.name,
+             user.email or user.id)
+    parts = geocode_svc.parts_for(user)
+    return UnresolvedPlace(
+        id=loc.id, name=loc.name, lat=loc.lat, lng=loc.lng,
+        city=loc.city or None, country=loc.country,
+        defect=_name_defect(loc.name, parts, loc.address),
+        looked_up=loc.address is not None, no_hit=loc.address == {},
+        manual=True,
+        events=(db.query(Event)
+                .filter(Event.user_id == user.id,
+                        Event.location_id == loc.id).count()),
+    )
 
 
 # --------------------------------------------------------------------------- #

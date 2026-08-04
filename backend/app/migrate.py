@@ -21,8 +21,13 @@ _MISSING_COLUMNS: dict[str, dict[str, str]] = {
     # anderes Namensformat nur über einen neuen Nominatim-Lauf zu haben,
     # gedrosselt auf eine Abfrage je 1,2 Sekunden. Mit den Bausteinen ist es
     # eine reine Rechenoperation.
+    # Anmerkung 148: `name_manual` schützt einen von Hand gesetzten Ortsnamen
+    # vor dem nächsten Auflöse-Lauf. Bestandszeilen bekommen NULL, und NULL
+    # zählt wie „nicht von Hand" — richtig, denn bis dahin konnte niemand
+    # einen Ortsnamen von Hand setzen.
     "locations": {"user_id": "VARCHAR(36)", "country": "VARCHAR(64)",
-                  "city": "VARCHAR(128)", "address": "JSON"},
+                  "city": "VARCHAR(128)", "address": "JSON",
+                  "name_manual": "BOOLEAN"},
     "events": {"user_id": "VARCHAR(36)", "embedding": "JSON", "note": "TEXT",
                "external_id": "VARCHAR(64)",
                "confirmed_at": "TIMESTAMP", "confirmed_by": "VARCHAR(16)",
