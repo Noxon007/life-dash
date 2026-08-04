@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import date as date_type
 from datetime import datetime
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -334,11 +335,22 @@ class BaselineRead(BaseModel):
     day_count: int = 0
 
 
+# Ein auf der Karte gewählter Punkt. Beide Werte oder keiner — eine halbe
+# Koordinate ist keine, und sie stillschweigend zu ignorieren wäre genau die
+# Sorte Auslassung, die dieses Projekt jagt. `place` bleibt daneben stehen: er
+# ist die VORSCHAU aus dem Formular und dient nur noch als Rückfall, wenn zum
+# Punkt keine Adresse zu holen ist (siehe `ingestion.place_from_point`).
+LatField = Annotated[float, Field(ge=-90, le=90)]
+LngField = Annotated[float, Field(ge=-180, le=180)]
+
+
 class BaselineCreate(BaseModel):
     place: str
     date_start: date_type
     date_end: date_type | None = None
     label: str | None = None
+    lat: LatField | None = None
+    lng: LngField | None = None
 
 
 class BaselineUpdate(BaseModel):
@@ -354,6 +366,8 @@ class BaselineUpdate(BaseModel):
     date_end: date_type | None = None
     clear_end: bool = False
     label: str | None = None
+    lat: LatField | None = None
+    lng: LngField | None = None
 
 
 class FragmentRead(BaseModel):
@@ -410,6 +424,10 @@ class EventManualCreate(BaseModel):
     # F1: persönliche Notiz/Tagebuchtext (Markdown) — nie von der KI angefasst
     note: str | None = None
     location_name: str | None = None
+    # Auf der Karte gewählter Punkt. Ist er da, ist ER die Aussage und
+    # `location_name` nur noch die Beschriftung (siehe `place_from_point`).
+    location_lat: LatField | None = None
+    location_lng: LngField | None = None
     entities: list[ManualEntity] = []
 
 
@@ -512,6 +530,9 @@ class EventUpdate(BaseModel):
     # Neuer Ortsname/Adresse -> wird geocodiert (bis Straße/Hausnummer).
     # Leerer String = Ort entfernen.
     location_name: str | None = None
+    # Auf der Karte gewählter Punkt — dann zählt er statt des Namens.
+    location_lat: LatField | None = None
+    location_lng: LngField | None = None
     # Ersetzt die verknüpften Objekte vollständig (z. B. "Seeadler" -> "Adler").
     # Leere Liste = alle Verknüpfungen entfernen. None = unverändert.
     entities: list[ManualEntity] | None = None

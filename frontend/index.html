@@ -283,6 +283,16 @@
   .top-row { gap: 10px; }
   .top-row .bar-label { width: auto; flex: 1; min-width: 0; }
   .top-row .bar-val { width: auto; flex-shrink: 0; font-weight: 600; color: var(--text); }
+  /* F20: Die Grundort-Zeile trägt drei Angaben und einen Knopf („Elternhaus ·
+     Mözen, Deutschland · 25.9.1991 – 25.9.2011" + „7.298 Tage" + „Entfernen").
+     Auf 105 px abgeschnitten bleibt davon der Name übrig — also ausgerechnet
+     die Angabe, die man selbst eingetippt hat, während Ort und Zeitraum
+     wegfallen. Sie darf deshalb UMBRECHEN statt zu kürzen: das sind eine
+     Handvoll Zeilen, kein Diagramm, in dem Balken untereinander stehen müssen. */
+  .bl-row { align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+  .bl-row .bar-label { width: auto; flex: 1 1 240px; min-width: 0; line-height: 1.5;
+                       white-space: normal; overflow: visible; }
+  .bl-row .bar-val { width: auto; flex-shrink: 0; font-weight: 600; color: var(--text); }
   .top-rank { width: 22px; flex-shrink: 0; text-align: right; font-size: 12px;
               font-weight: 700; color: var(--accent); }
   .top-row[data-top-day] { cursor: pointer; border-radius: 6px; padding: 2px 4px; margin: 0 -4px 8px; }
@@ -355,9 +365,21 @@
               background: var(--bg-elev); border: 1px solid var(--border); }
   .job-live:last-child { margin-bottom: 0; }
   .job-live .job-name { font-size: 13px; color: var(--text); font-weight: 600; }
+  /* Das Effekt-Badge sitzt IMMER am rechten Rand der Kopfzeile des Blocks, für
+     den es gilt — Abschnittsüberschrift, Immich-Karte oder einzelne Zeile.
+     Vorher hing dieselbe Angabe an drei verschiedenen Stellen: neben der
+     Überschrift, rechts in der Kartenkopfzeile und UNTER dem Knopf. Wer sie
+     dreimal woanders findet, sucht sie jedes Mal neu — und das Badge ist genau
+     die Angabe, die man VOR dem Klicken sehen will. */
+  .eff-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .eff-head > .eff { margin-left: auto; }
+  .action-row > .eff { margin-left: auto; align-self: flex-start; }
   @media (max-width: 860px) {
     .action-row { flex-direction: column; gap: 8px; }
     .action-row .btn { min-width: 0; width: 100%; }
+    /* In der Spalte gibt es keinen rechten Rand, an den etwas gehört —
+       untereinander steht alles links. */
+    .action-row > .eff { margin-left: 0; }
   }
   .bar-track { flex: 1; height: 22px; background: var(--bg-elev); border-radius: 6px; overflow: hidden; }
   .bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 6px; }
@@ -695,6 +717,11 @@
   }
   .modal-box h3 { margin: 0 0 6px; }
   .btn.danger { background: var(--danger); color: #fff; }
+  /* Ortswahl auf der Karte. Höhe in dvh, nicht vh (A38): vh rechnet ohne
+     Adressleiste, und dann steht „Übernehmen" auf dem Handy unter dem Rand. */
+  .pick-map { height: min(46dvh, 380px); min-height: 240px; border-radius: 10px;
+              border: 1px solid var(--border); overflow: hidden; }
+  .pick-map .leaflet-container { cursor: crosshair; }
 
   /* ---------- Sheet (A38) ----------
      Ein Muster für alles, was auf dem Handy von unten kommt: „Mehr“ und der
@@ -1089,7 +1116,10 @@
           <option value="journal" data-i18n="cat.journal">Tagebuch</option>
         </select></div></div>
       <div class="field-row"><div class="field-key" data-i18n="field.place">Ort / Adresse</div>
-        <div class="field-val"><input id="ed-location" data-i18n-ph="edit.place.ph" placeholder="z. B. Reeperbahn 1, Hamburg — wird geocodiert" style="max-width:none"></div></div>
+        <div class="field-val" style="display:flex; gap:8px; max-width:none">
+          <input id="ed-location" data-i18n-ph="edit.place.ph" placeholder="z. B. Reeperbahn 1, Hamburg — wird geocodiert" style="max-width:none; flex:1">
+          <button class="btn small secondary" data-pick-for="ed-location" data-i18n-title="pick.tip" title="Ort auf der Karte wählen — der geklickte Punkt wird gespeichert, nicht der Ortsmittelpunkt der Adresse">🗺️</button>
+        </div></div>
       <div class="field-row"><div class="field-key" data-i18n="field.items">🏷️ Objekte</div>
         <div class="field-val" style="max-width:none">
           <div id="ed-entities" style="display:flex; flex-direction:column; gap:6px"></div>
@@ -1768,6 +1798,7 @@
               <div class="field-val" style="display:flex; gap:8px">
                 <input id="mf-location" data-i18n-ph="in.loc.ph" placeholder="z. B. Bern, Schweiz — wird automatisch geocodiert" style="max-width:none; flex:1">
                 <button class="btn small secondary" id="mf-geo-btn" data-i18n-title="in.geo2.tip" title="Gerätestandort als Adresse übernehmen (überschreibbar)">📍</button>
+                <button class="btn small secondary" data-pick-for="mf-location" data-i18n-title="pick.tip" title="Ort auf der Karte wählen — der geklickte Punkt wird gespeichert, nicht der Ortsmittelpunkt der Adresse">🗺️</button>
               </div></div>
             <div class="field-row"><div class="field-key" data-i18n="field.objects">Objekte</div>
               <div class="field-val">
@@ -1976,11 +2007,10 @@
           <b>3.</b> Ortsnamen auflösen · <b>4.</b> Immich verbinden, Vorschläge ansehen
           und Fotos verknüpfen · <b>5.</b> mehrtägiges aufteilen ·
           <b>6.</b> Grundorte eintragen · <b>7.</b> Wetter ergänzen · <b>8.</b> Backup ziehen.
-          Nichts davon ist Pflicht, und jeder Lauf lässt sich beliebig oft wiederholen —
-          nachgetragen wird immer nur, was fehlt.
-          <br><b>Ausführliche Erklärung zu jedem Schritt</b> steht in der README-Anleitung
+          Nichts davon ist Pflicht, jeder Lauf lässt sich wiederholen — nachgetragen wird
+          immer nur, was fehlt. <b>Ausführlich</b> in der README-Anleitung
           („Getting started — a sensible order").</div>
-        <div class="section-title" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap"><span data-i18n="adm.tracking">1 · Was trackst du?</span><span class="eff layer" data-i18n="eff.setting">Einstellung</span></div>
+        <div class="section-title eff-head"><span data-i18n="adm.tracking">1 · Was trackst du?</span><span class="eff layer" data-i18n="eff.setting">Einstellung</span></div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key"><b style="font-size:13px" data-i18n="adm.track.mods">🧩 Module</b></div>
@@ -1992,7 +2022,7 @@
             </div>
           </div>
         </div>
-        <div class="section-title" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap"><span data-i18n="adm.imports">2 · Importe</span><span class="eff mod" data-i18n="eff.propose">legt Vorschläge an</span></div>
+        <div class="section-title eff-head"><span data-i18n="adm.imports">2 · Importe</span><span class="eff mod" data-i18n="eff.propose">legt Vorschläge an</span></div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key">
@@ -2014,43 +2044,18 @@
                 </div>
               </details></div>
           </div>
-          <!-- A46: Reparatur für den Bestand. Steht direkt unter dem Import,
-               weil sie genau dessen Hinterlassenschaft aufräumt — neue
-               Importe schneiden schon selbst. Erst sehen, dann schreiben
-               (P2.5-Muster): die Aktion fasst Bestätigtes an. A3: einmaliger
-               Reparaturlauf, deshalb zusammengeklappt. -->
-          <details class="adv">
-            <summary data-i18n="adm.adv.repair">Erweitert: alten Bestand in Tage schneiden</summary>
-            <div class="adv-body">
-              <div class="action-row has-result" style="padding:0; border-bottom:none">
-                <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
-                  <button class="btn secondary" id="btn-md-preview" style="text-align:left" data-i18n="md.preview">🔍 Vorschau ansehen</button>
-                  <button class="btn secondary" id="btn-md-run" style="text-align:left" disabled data-i18n="md.run">✂️ In Tage schneiden</button>
-                </div>
-                <div class="action-desc">
-                  <span data-i18n="md.desc"><b>Mehrtägige Besuche aus alten Importen in Tage schneiden.</b><br>
-                  Neue Importe schneiden schon selbst; dieser Knopf holt den Bestand nach — <b>nur
-                  importierte Besuche</b>, von Hand Erfasstes bleibt mehrtägig. „Nachsehen" zeigt vorher,
-                  was passiert. Hintergrund in der README-Anleitung (Schritt 2).</span>
-                </div>
-                <div id="md-result" class="hint action-result" style="display:none"></div>
-              </div>
-            </div>
-          </details>
         </div>
 
-        <div class="section-title" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap"><span data-i18n="adm.placenames">3 · Ortsnamen</span><span class="eff add" data-i18n="eff.enrich">ergänzt</span></div>
+        <div class="section-title eff-head"><span data-i18n="adm.placenames">3 · Ortsnamen</span><span class="eff add" data-i18n="eff.enrich">ergänzt</span></div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
               <button class="btn" id="btn-resolve-run" style="text-align:left" data-i18n="act.namerun">📍 Ortsnamen auflösen</button>
             </div>
-            <div class="action-desc" data-i18n="act.namerun.desc"><b>Ein Lauf für alle Ortsnamen</b> (Reverse-Geocoding
-              via OpenStreetMap, gedrosselt; läuft als Hintergrund-Job in Etappen, jederzeit fortsetzbar;
-              manuell umbenannte Einträge bleiben unangetastet). Holt echte Adressen für „Ort (53.49, 10.00)",
-              kürzt lange Adressen auf die unten gewählten Bausteine und geocodiert jeden Ort <b>höchstens
-              einmal</b>. Sonderfälle (Labels wie „Zuhause", Fremdschrift, fehlende Bausteine) erklärt die
-              README-Anleitung (Schritt 3).</div>
+            <div class="action-desc" data-i18n="act.namerun.desc"><b>Holt echte Adressen für „Ort (53.49, 10.00)"</b>
+              — über OpenStreetMap, gedrosselt, im Hintergrund und jederzeit fortsetzbar. Jeder Ort wird
+              <b>höchstens einmal</b> gefragt; lange Adressen werden auf die unten gewählten Bausteine gekürzt.
+              Details in der README-Anleitung (Schritt 3).</div>
           </div>
           <details class="adv">
             <summary data-i18n="adm.format">📐 Anzeige-Format der Adressen</summary>
@@ -2158,60 +2163,21 @@
               </div>
               <div class="action-desc">
                 <span data-i18n="ims.desc"><b>Jedes Foto mit Koordinaten wird ein Ereignis — direkt bestätigt, wie ein
-                importierter Google-Besuch.</b> Auf der <b>Karte</b> ein Punkt mit Vorschaubild, dort, wo das Bild
-                entstanden ist. Im <b>Zeitstrahl</b> eine Zeile <i>ohne</i> Bild („Foto in Detmold"), gleiche Tage am
-                gleichen Ort zu einer Zeile zusammengefasst — die Bilder eines Tages stehen ohnehin in der Fotoleiste
-                darüber. Angelegt werden nur <b>eigene</b> Fotos <b>mit Koordinaten</b>, die in deinem
-                Immich-Zeitstrahl stehen; Archiviertes und Gesperrtes bleibt außen vor.</span>
+                importierter Google-Besuch.</b> Auf der <b>Karte</b> ein Punkt mit Vorschaubild, im <b>Zeitstrahl</b>
+                eine Zeile ohne Bild („Foto in Detmold"). Angelegt werden nur <b>eigene</b> Fotos <b>mit
+                Koordinaten</b> aus deinem Immich-Zeitstrahl; Archiviertes und Gesperrtes bleibt außen vor.</span>
                 <span class="hint" style="display:block; margin-top:8px" data-i18n="ims.hint">Erst die Vorschau, dann das
-                Anlegen — der Knopf bleibt bis dahin gesperrt. Ein Jahr kann zehntausend Ereignisse ergeben, und die
-                will man vorher gesehen haben, gerade weil sie direkt bestätigt werden.</span>
-                <span class="hint" style="display:block; margin-top:8px" data-i18n="ims.albums.why"><b>Alben werden
-                nicht als Quelle benutzt.</b> Ein Album würde <i>ein</i> mehrtägiger Eintrag mit einem Kartenpunkt —
-                der Zwilling deiner selbst erfassten Reise. Besser herum: <b>Reisen legst du an, die Fotos hängen sich
-                daran</b> („Fotos verknüpfen" oben).</span>
+                Anlegen — der Knopf bleibt bis dahin gesperrt. Ein Jahr kann zehntausend Ereignisse ergeben.</span>
               </div>
               <div id="ims-result" class="hint action-result" style="display:none"></div>
             </div>
           </div>
 
-          <!-- Aufräumen: die Tagescluster aus Anmerkung 138 („34 Fotos in
-               Detmold" als EIN Ereignis). Sie sind durch Schritt B abgelöst;
-               nebeneinander stehen gelassen behaupten sie denselben Tag
-               zweimal. Der Knopf erscheint NUR, wenn es welche gibt — eine
-               Karte, die dauerhaft von einer Übergangsform erzählt, ist ein
-               Änderungsprotokoll, keine Anleitung (Anmerkung 115). -->
-          <div class="im-card" id="im-cleanup" style="display:none">
-            <div class="im-head">
-              <div><span class="im-step" data-i18n="im.step.x">Aufräumen</span> <h4 data-i18n="im.x.title">Alte Fototag-Sammeleinträge entfernen</h4></div>
-              <span class="eff write" data-i18n="eff.write">ändert Bestätigtes</span>
-            </div>
-            <div class="action-row has-result">
-              <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
-                <button class="btn secondary" id="dc-preview" style="text-align:left" data-i18n="dc.preview">🔍 Nachsehen, was betroffen ist</button>
-                <button class="btn" id="dc-run" style="text-align:left" disabled data-i18n="dc.run">🗑️ Sammeleinträge entfernen</button>
-              </div>
-              <div class="action-desc">
-                <span data-i18n="dc.desc">Eine frühere Fassung legte je Tag und Ort <b>einen</b> Sammeleintrag an
-                („34 Fotos in Detmold"). Seit Schritt B jedes Foto einzeln anlegt, behaupten beide zusammen denselben
-                Tag zweimal. Dieser Knopf entfernt ausschließlich die alten Sammeleinträge — deine Foto-Ereignisse und
-                alles von Hand Erfasste bleiben unangetastet.</span>
-                <span class="hint" style="display:block; margin-top:8px" data-i18n="dc.hint">Erst nachsehen, dann
-                entfernen: der Knopf bleibt bis dahin gesperrt, und die Vorschau <b>nennt</b> die betroffenen Einträge,
-                statt sie nur zu zählen.</span>
-              </div>
-              <div id="dc-result" class="hint action-result" style="display:none"></div>
-            </div>
-          </div>
-
         </div>
 
-        <!-- A28: EIN Ortsnamen-Lauf für alles — keine Scope-Auswahl mehr -->
-        <!-- Anmerkung 113: Seit Immich Alben vorschlägt, entstehen mehrtägige
-             Einträge in Serie — und jeder einzelne wollte von Hand aufgeteilt
-             werden. Erst sehen, dann anlegen (P2.5): die Aktion schreibt
-             vervielfacht in die Lebensdatenbank. -->
-        <div class="section-title" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap"><span data-i18n="adm.daysplit">5 · Tages-Einträge</span><span class="eff write" data-i18n="eff.write">ändert Bestätigtes</span></div>
+        <!-- Erst sehen, dann anlegen (P2.5): die Aktion schreibt vervielfacht
+             in die Lebensdatenbank. -->
+        <div class="section-title eff-head"><span data-i18n="adm.daysplit">5 · Tages-Einträge</span><span class="eff write" data-i18n="eff.write">ändert Bestätigtes</span></div>
         <div class="panel" style="padding:0">
           <div class="action-row has-result">
             <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
@@ -2247,7 +2213,7 @@
              Der Block ist bewusst ein FORMULAR und kein Lauf: hier wird eine
              Tatsache eingetragen, nicht etwas berechnet. Deshalb trägt er auch
              kein „ergänzt"-Abzeichen, sondern „Lebensdatenbank". -->
-        <div class="section-title" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap"><span data-i18n="adm.baseline">6 · Grundort</span><span class="eff layer" data-i18n="eff.lifedb">Lebensdatenbank</span></div>
+        <div class="section-title eff-head"><span data-i18n="adm.baseline">6 · Grundort</span><span class="eff layer" data-i18n="eff.lifedb">Lebensdatenbank</span></div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key"><b style="font-size:13px" data-i18n="bl.title">🏠 Wo warst du normalerweise?</b></div>
@@ -2257,9 +2223,8 @@
                 diesem Zeitraum, an dem <b>kein</b> Eintrag steht, gilt dann als Tag an diesem Ort:
                 er taucht im Zeitstrahl auf, zählt in Statistik, Weltkarte und Abzeichen mit und
                 bekommt beim nächsten Wetterlauf sein Wetter.<br>
-                <b>Es entstehen dabei keine Einträge.</b> Der Zeitraum bleibt eine einzige Zeile —
-                korrigierst du ihn später, rechnet sich alles neu, statt tausend falsche Einträge
-                zurückzulassen. Ein Tag mit einem echten Eintrag gewinnt immer.
+                Es entstehen dabei <b>keine Einträge</b>, nur diese eine Zeile — korrigierst du sie
+                später, rechnet sich alles neu. Ein Tag mit einem echten Eintrag gewinnt immer,
                 Zeiträume dürfen sich nicht überschneiden.</span>
               <div id="bl-list" style="margin-top:10px"></div>
               <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end">
@@ -2269,7 +2234,10 @@
                 </label>
                 <label style="display:flex; flex-direction:column; gap:3px">
                   <span class="stat-label" data-i18n="bl.f.place">Ort</span>
-                  <input id="bl-place" type="text" data-i18n-ph="bl.f.place.ph" placeholder="Bad Segeberg">
+                  <span style="display:flex; gap:6px">
+                    <input id="bl-place" type="text" data-i18n-ph="bl.f.place.ph" placeholder="Bad Segeberg">
+                    <button class="btn small secondary" data-pick-for="bl-place" data-i18n-title="pick.tip" title="Ort auf der Karte wählen — der geklickte Punkt wird gespeichert, nicht der Ortsmittelpunkt der Adresse">🗺️</button>
+                  </span>
                 </label>
                 <label style="display:flex; flex-direction:column; gap:3px">
                   <span class="stat-label" data-i18n="bl.f.from">Von</span>
@@ -2286,7 +2254,7 @@
           </div>
         </div>
 
-        <div class="section-title" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap"><span data-i18n="adm.weather">7 · Wetter</span><span class="eff add" data-i18n="eff.enrich">ergänzt</span></div>
+        <div class="section-title eff-head"><span data-i18n="adm.weather">7 · Wetter</span><span class="eff add" data-i18n="eff.enrich">ergänzt</span></div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key">
@@ -2294,18 +2262,16 @@
             </div>
             <div class="action-desc" data-i18n="act.weather.desc"><b>Fehlendes Wetter nachtragen</b> (via Open-Meteo,
               <b>additiv</b> — Vorhandenes wird nie überschrieben).<br>
-              Steht bewusst hinten: jedes Ereignis wird genau einmal gefragt, also lohnt der Lauf am meisten,
-              wenn Importe und Vorschläge durch sind. Läuft im Hintergrund (Fortschritt/Stopp im Reiter
-              <b>„Jobs"</b>, auch als Nachtplan). Details in der README-Anleitung (Schritt 6).</div>
+              Steht hinten, weil jedes Ereignis genau einmal gefragt wird — der Lauf lohnt am meisten, wenn
+              Importe und Vorschläge durch sind. Läuft im Hintergrund, auch als Nachtplan.</div>
           </div>
         </div>
 
         <div class="section-title" data-i18n="adm.backup">8 · Sichern &amp; Zurückspielen</div>
         <div class="panel" style="padding:0">
           <div class="action-row">
-            <div class="action-key" style="display:flex; flex-direction:column; gap:8px; align-items:flex-start">
+            <div class="action-key">
               <button class="btn" id="btn-export" data-i18n="act.export">📦 Daten exportieren</button>
-              <span class="eff read" data-i18n="eff.read">nur Lesen</span>
             </div>
             <div class="action-desc"><span data-i18n="act.export.desc"><b>Backup als JSON-Datei.</b><br>
               Lädt alle deine Daten (Roh-Eingang, Ereignisse, Objekte, Orte, Wetter) als eine
@@ -2325,21 +2291,22 @@
               <span class="hint" style="display:block; margin-top:6px" data-i18n="exp.media.hint">Ohne dieses Häkchen
               bekommst du reines JSON: klein, lesbar, diffbar — aber <b>ohne deine Bilddateien</b>. Die stecken nur
               im ZIP. Immich-Bilder sind in keinem von beiden: die liegen in Immich und werden dort gesichert.</span></div>
+            <span class="eff read" data-i18n="eff.read">nur Lesen</span>
           </div>
           <div class="action-row">
-            <div class="action-key" style="display:flex; flex-direction:column; gap:8px; align-items:flex-start">
+            <div class="action-key">
               <button class="btn secondary" id="btn-import" style="width:100%; text-align:left" data-i18n="act.import">📥 Daten importieren</button>
               <input type="file" id="import-file" accept=".json,.zip,application/json,application/zip" style="display:none">
-              <span class="eff write" data-i18n="eff.restore">schreibt</span>
             </div>
             <div class="action-desc" data-i18n="act.import.desc"><b>Export-Datei zurückspielen.</b><br>
               Importiert eine Life-Dash-Export-Datei. Bereits vorhandene Einträge (gleiche ID) werden
               übersprungen — mehrfaches Importieren erzeugt keine Duplikate. Alles landet in deinem Konto.</div>
+            <span class="eff write" data-i18n="eff.restore">schreibt</span>
           </div>
         </div>
 
         <!-- F13: eigene Hintergrundkarte (+ A40-Schwelle, Anm. 115) -->
-        <div class="section-title" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap"><span data-i18n="adm.basemap">Karte</span><span class="eff layer" data-i18n="eff.setting">Einstellung</span></div>
+        <div class="section-title eff-head"><span data-i18n="adm.basemap">Karte</span><span class="eff layer" data-i18n="eff.setting">Einstellung</span></div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key"><b style="font-size:13px" data-i18n="adm.basemap.own">🔧 Eigene Karte</b></div>
@@ -2414,7 +2381,7 @@
         </div>
 
         <!-- A33: eigene Daten löschen — das Gegenstück zum Export -->
-        <div class="section-title" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap"><span data-i18n="adm.wipemine">Meine Daten löschen</span><span class="eff write" data-i18n="eff.delete">löscht endgültig</span></div>
+        <div class="section-title eff-head"><span data-i18n="adm.wipemine">Meine Daten löschen</span><span class="eff write" data-i18n="eff.delete">löscht endgültig</span></div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key">
@@ -2588,6 +2555,28 @@
     <div class="btn-row" style="margin-top:14px">
       <button class="btn" id="pr-go" data-i18n="pr.go">🖨️ Drucken</button>
       <button class="btn ghost" id="pr-cancel" data-i18n="btn.cancel">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ort auf der Karte wählen — für die Eingabe, den Bearbeiten-Dialog und den
+     Grundort. EIN Dialog für alle drei: welches Feld gefüllt wird, entscheidet
+     der Aufrufer (`openPlacePicker`). Drei eigene Karten wären drei Stellen,
+     an denen dieselbe Regel steht, und die laufen auseinander (Anm. 106). -->
+<div class="modal-overlay" id="pick-modal" style="z-index:2500">
+  <div class="modal-box" style="width:min(720px,100%)">
+    <h3 data-i18n="pick.title">📍 Ort auf der Karte wählen</h3>
+    <div class="stat-label" style="margin:6px 0 12px; line-height:1.5" data-i18n="pick.hint">
+      Klick auf die Karte setzt den Punkt — <b>genau dorthin</b>, nicht auf den
+      Ortsmittelpunkt. Die Adresse dazu wird nachgeschlagen und ist nur die
+      Beschriftung; änderst du sie danach im Feld, gilt wieder der Name.
+    </div>
+    <div id="pick-map" class="pick-map"></div>
+    <div id="pick-state" class="hint" style="margin-top:10px" data-i18n="pick.none">Noch kein Punkt gewählt.</div>
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn" id="pick-ok" disabled data-i18n="pick.ok">✓ Übernehmen</button>
+      <button class="btn secondary" id="pick-here" data-i18n="pick.here">📍 Mein Standort</button>
+      <button class="btn ghost" id="pick-cancel" data-i18n="btn.cancel">Abbrechen</button>
     </div>
   </div>
 </div>
@@ -3050,6 +3039,16 @@ const I18N_EN = {
   'field.location': "Place",
   'in.loc.ph': "e.g. Bern, Switzerland — geocoded automatically",
   'in.geo2.tip': "Use your device location as the address (you can overwrite it)",
+  // Ort auf der Karte wählen
+  'pick.title': "📍 Pick a place on the map",
+  'pick.hint': "Clicking the map sets the point — <b>exactly there</b>, not at the centre of the town. The address is looked up afterwards and is only the label; edit it in the field and the name counts again.",
+  'pick.none': "No point picked yet.",
+  'pick.ok': "✓ Use this point",
+  'pick.here': "📍 My location",
+  'pick.tip': "Pick a place on the map — the point you click is what gets stored, not the centre of the address",
+  'pick.busy': "… looking up the address",
+  'pick.locating': "… getting your location",
+  'pick.done': "📍 Point taken: {n}",
   'field.objects': "Items",
   'in.ent.ph': "name, e.g. shark",
   'btn.add': "+ add",
@@ -3089,7 +3088,7 @@ const I18N_EN = {
   'adm.baseline': "6 · Baseline location",
   'eff.lifedb': "life database",
   'bl.title': "🏠 Where were you, normally?",
-  'bl.desc': "<b>One period, one place — for everything you never recorded.</b><br>“From my birth until 2006 I was at my parents' house in Bad Segeberg.” Every day in that period with <b>no</b> entry then counts as a day at that place: it shows up in the timeline, counts in the statistics, the world map and the badges, and gets its weather on the next weather run.<br><b>No entries are created.</b> The period stays a single row — correct it later and everything recomputes, instead of leaving a thousand wrong entries behind. A day with a real entry always wins. Periods may not overlap.",
+  'bl.desc': "<b>One period, one place — for everything you never recorded.</b><br>“From my birth until 2006 I was at my parents' house in Bad Segeberg.” Every day in that period with <b>no</b> entry then counts as a day at that place: it shows up in the timeline, counts in the statistics, the world map and the badges, and gets its weather on the next weather run.<br>This creates <b>no entries</b>, just this one row — correct it later and everything recomputes. A day with a real entry always wins, and periods may not overlap.",
   'bl.f.label': "Name", 'bl.f.label.ph': "Parents' house",
   'bl.f.place': "Place", 'bl.f.place.ph': "Bad Segeberg",
   'bl.f.from': "From", 'bl.f.to': "To (empty = until today)",
@@ -3126,7 +3125,7 @@ const I18N_EN = {
   'gaps.capped': "Showing {n} of {m} stretches, longest first.",
   'gaps.row.tip': "Click to enter as a baseline period",
   'gaps.jumped': "Period taken over — now add the place.",
-  'adm.firstrun': "<b>First time here?</b> The sections are in the order that makes sense — each one feeds the next its material: <b>1.</b> pick your modules · <b>2.</b> import the Google timeline · <b>3.</b> resolve place names · <b>4.</b> connect Immich, review its proposals and link photos · <b>5.</b> split multi-day entries · <b>6.</b> add weather · <b>7.</b> take a backup. None of it is mandatory, and every run can be repeated as often as you like — it only ever fills in what is missing.<br><b>A detailed explanation of every step</b> is in the README guide (“Getting started — a sensible order”).",
+  'adm.firstrun': "<b>First time here?</b> The sections are in the order that makes sense — each one feeds the next its material: <b>1.</b> pick your modules · <b>2.</b> import the Google timeline · <b>3.</b> resolve place names · <b>4.</b> connect Immich, review its proposals and link photos · <b>5.</b> split multi-day entries · <b>6.</b> add baseline locations · <b>7.</b> add weather · <b>8.</b> take a backup. None of it is mandatory, every run can be repeated — it only ever fills in what is missing. <b>In detail</b> in the README guide (“Getting started — a sensible order”).",
   'adm.users.title': "Users",
   'adm.modqueue': "Moderation queue",
   'act.recompute': "🔄 Recompute AI proposals",
@@ -3148,8 +3147,7 @@ const I18N_EN = {
   'imp.thumbs': "previews rebuilt",
   'adm.immich': "4 · Immich (photos)",
   // P2.1 stage 2 (0.37.0) — Immich as an event source
-  'ims.desc': "<b>Every photo with coordinates becomes an event — confirmed straight away, like an imported Google visit.</b> On the <b>map</b> a dot with a thumbnail, where the picture was taken. In the <b>timeline</b> a line <i>without</i> a picture (“Photo in Detmold”), same day and same place folded into one row — the pictures of a day are in the photo strip above anyway. Only <b>your own</b> photos <b>with coordinates</b> that sit in your Immich timeline are used; archived and locked ones stay out.",
-  'ims.albums.why': "<b>Albums are not used as a source.</b> An album would become <i>one</i> multi-day entry with a single point on the map — the twin of the trip you enter yourself. The better way round: <b>you create the trips, the photos attach themselves</b> (“Link photos” above).",
+  'ims.desc': "<b>Every photo with coordinates becomes an event — confirmed straight away, like an imported Google visit.</b> On the <b>map</b> a dot with a thumbnail, in the <b>timeline</b> a line without a picture (“Photo in Detmold”). Only <b>your own</b> photos <b>with coordinates</b> from your Immich timeline are used; archived and locked ones stay out.",
   // A45 — locating photos
   'pp.reset': "🗑️ Discard photo events",
   'pp.have': "{n} photo events created",
@@ -3181,17 +3179,6 @@ const I18N_EN = {
   'pp.reset.none': "There are no photo events to discard.",
   'pp.reset.ask': "{n} photo events will be deleted. A new run can create them again. Continue?",
   // Anmerkung 139 — Aufraeumen der alten Fototag-Sammeleintraege
-  'im.step.x': "Clean-up",
-  'im.x.title': "Remove old photo-day summary entries",
-  'dc.preview': "🔍 See what is affected",
-  'dc.run': "🗑️ Remove summary entries",
-  'dc.desc': "An earlier version created <b>one</b> summary entry per day and place (“34 photos in Detmold”). Now that step B creates every photo individually, the two together claim the same day twice. This button removes only the old summary entries — your photo events and everything entered by hand stay untouched.",
-  'dc.hint': "Look first, then remove: the button stays locked until then, and the preview <b>names</b> the affected entries instead of merely counting them.",
-  'dc.clean': "✓ There are no old summary entries left.",
-  'dc.found': "{n} summary entries will be removed",
-  'dc.more': "… and {n} more",
-  'dc.done': "✓ {n} summary entries removed.",
-  'dc.needpreview': "Look at what is affected first.",
   // Anmerkung 143 — Tage führen, Einträge stehen daneben
   'n.day': "day",
   'n.days': "days",
@@ -3218,7 +3205,7 @@ const I18N_EN = {
   'ims.run': "✚ Create events",
   'ims.busy': "🔍 looking …",
   'ims.year.tip': "One year per run — a whole library at once would mean hundreds of events",
-  'ims.hint': "Preview first, then create — the button stays locked until then. One year can yield ten thousand events, and you want to have seen them beforehand, precisely because they are confirmed straight away.",
+  'ims.hint': "Preview first, then create — the button stays locked until then. One year can yield ten thousand events.",
   'ims.head': "{y}: {n} photo events on {d} days",
   'ims.none': "nothing new to create.",
   'ims.none.why': "Either there are no own photos with coordinates in that year, or everything has been created already — or deleted, and deleted ones do not come back.",
@@ -3253,16 +3240,6 @@ const I18N_EN = {
   'ds.needpreview': "Take a look first — then split.",
   'ds.done': "✓ {d} day entries created for {n} events. The per-day weather is added by the weather run.",
   // A46 — cut multi-day imported visits into days
-  'md.preview': "🔍 Show preview",
-  'md.run': "✂️ Cut into days",
-  'md.desc': "<b>Cut multi-day visits from older imports into days.</b><br>New imports already cut by themselves; this button catches up with what is already there — <b>imported visits only</b>, anything entered by hand stays multi-day. “Check first” shows what will happen. Background in the README guide (step 2).",
-  'md.none': "Nothing to cut.",
-  'md.none.why': "No imported visit reaches across a day boundary.",
-  'md.head': "{n} visits → {r} rows afterwards",
-  'md.toolong': "{n} skipped for being longer than {s} days — that is not a night, it is something else.",
-  'md.kids': "{n} skipped because they have day entries of their own — those would hang off a span that no longer exists.",
-  'md.needpreview': "Take a look first — then cut.",
-  'md.done': "✓ {n} visits cut, {c} new rows.",
   'im.rights.missing': "Immich is running (version {v}), but the key is missing permissions:",
   'im.rights.toast': "The key is missing permissions: {r}",
   'im.rights.ok': "✓ Version {v} — all required permissions present.",
@@ -3402,7 +3379,6 @@ const I18N_EN = {
   'act.namerun': "📍 Resolve place names",
   'adm.format': "📐 Address display format",
   'adm.adv.import': "Advanced import option",
-  'adm.adv.repair': "Advanced: cut older data into days",
   'opt.allcats': "All categories",
   'opt.allsources': "All sources",
   'opt.src.ai': "AI extraction",
@@ -3495,7 +3471,7 @@ const I18N_EN = {
   // --- Verwaltung: Erklaertexte ---
   'adm.runs.hint': "These runs happen <b>in the background on the server</b> — you can close the page. Progress, the stop button and the nightly schedule live in the <b>“Jobs”</b> tab; progress is kept when you stop, and a restart resumes where it left off.",
   'act.recompute.desc': "<b>Repeat the AI extraction.</b><br>Discards all <i>unconfirmed</i> events and rebuilds them from the raw inbox — with the current AI model and prompt. Confirmed events and manually corrected fields are left untouched. Useful after model or prompt changes. Stops cleanly when the AI quota runs out (whatever was computed is kept).",
-  'act.weather.desc': "<b>Fill in missing weather</b> (via Open-Meteo, <b>additive</b> — existing values are never overwritten).<br>Deliberately last: each entry is asked exactly once, so the run pays off most when imports and proposals are done. It runs in the background (progress and stop in the <b>“Jobs”</b> tab, and can be put on the nightly schedule). Details in the README guide (step 6).",
+  'act.weather.desc': "<b>Fill in missing weather</b> (via Open-Meteo, <b>additive</b> — existing values are never overwritten).<br>It comes last because each entry is asked exactly once — the run pays off most when imports and proposals are done. Runs in the background, and on the nightly schedule too.",
   'adm.links': "🔧 Diagnostics & links",
   'adm.links.hint': "Useful when self-hosting: the API UI lists every endpoint to try out (with your login), the health page says in one line whether the backend and database are up — the right target URL for an uptime monitor.",
   'adm.links.api': "📖 API documentation (/docs)",
@@ -3510,7 +3486,7 @@ const I18N_EN = {
   'act.export.desc': "<b>Backup as a JSON file.</b><br>Downloads all your data (raw inbox, events, items, places, weather) as a single JSON file. Embeddings are included. Do this regularly — this is your backup.",
   'act.import.desc': "<b>Restore an export file.</b><br>Imports a Life-Dash export file. Entries that already exist (same ID) are skipped — importing repeatedly creates no duplicates. Everything lands in your account.",
   'act.tlimport.desc': "<b>Location history &amp; routes from Google Maps.</b><br>Visits become events, movements become routes; importing repeatedly creates no duplicates. How to export from your phone is in the README guide (step 2).",
-  'act.namerun.desc': "<b>One run for every place name</b> (reverse geocoding via OpenStreetMap, rate limited; runs as a background job in stages, resumable at any time; manually renamed entries are left alone). Fetches real addresses for “Place (53.49, 10.00)”, shortens long addresses to the building blocks chosen below, and geocodes each place <b>at most once</b>. Special cases (labels like “Home”, foreign scripts, missing building blocks) are explained in the README guide (step 3).",
+  'act.namerun.desc': "<b>Fetches real addresses for “Place (53.49, 10.00)”</b> — via OpenStreetMap, rate limited, in the background and resumable at any time. Each place is asked <b>at most once</b>; long addresses are shortened to the building blocks chosen below. Details in the README guide (step 3).",
   'adm.format.desc': "<b>Building blocks for resolved addresses</b> — instead of the long address chain with administrative regions and postcode:",
   'adm.track.desc': "<b>Choose modules for collection, statistics &amp; AI.</b><br>Deselected modules disappear from tabs, filters, forms and the AI prompt — existing data is kept and reappears immediately once you select them again.",
   'adm.fuzzy.hint': "Events with a vague date (month, season, year, decade or no date at all). Clicking one opens the quick editor — the more precise the dates, the better the timeline and map.",
@@ -7072,6 +7048,109 @@ document.getElementById('mf-geo-btn').addEventListener('click', async ev => {
     btn.disabled = false;
   }
 });
+
+// --------------------------------------------------------------------------- //
+// Ort auf der Karte wählen (Eingabe, Bearbeiten-Dialog, Grundort)
+// --------------------------------------------------------------------------- //
+// Ein getippter Ortsname und ein geklickter Punkt sind UMGEKEHRTE Aussagen.
+// Beim Namen ist der Text die Angabe und die Koordinate ihre Ableitung — der
+// Server geocodiert vorwärts und bekommt von Nominatim dessen eigenen Punkt,
+// meist den Ortsmittelpunkt. Beim Klick ist der Punkt die Angabe und der Name
+// nur die Beschriftung. Deshalb reist die Koordinate mit; ohne sie wäre der
+// Klick eine Anregung gewesen und nicht das, was gespeichert wird.
+//
+// **Die Marke löst sich beim Tippen von selbst.** Steht im Feld etwas anderes,
+// als der Punkt ergeben hat, sind es zwei Angaben über dieselbe Sache, und die
+// laufen auseinander (Anmerkung 106): der Name sagt „Berlin", die Koordinate
+// zeigt aufs Elternhaus. Wer den Namen ändert, meint den Namen — geprüft wird
+// das beim Absenden, nicht über einen Listener, damit es auch für Werte gilt,
+// die von anderswo ins Feld geschrieben wurden.
+const PICKED = new Map();          // Feld-ID -> {lat, lng, name}
+function pickedFor(id) {
+  const p = PICKED.get(id), el = document.getElementById(id);
+  if (!p || !el) return null;
+  return el.value.trim() === p.name ? p : null;
+}
+let pickMap = null, pickMarker = null, pickTarget = null, pickPt = null;
+
+function pickState(html, ok) {
+  document.getElementById('pick-state').innerHTML = html;
+  document.getElementById('pick-ok').disabled = !ok;
+}
+function pickSet(lat, lng) {
+  pickPt = { lat: +lat.toFixed(5), lng: +lng.toFixed(5) };
+  if (pickMarker) pickMarker.setLatLng([pickPt.lat, pickPt.lng]);
+  else pickMarker = L.marker([pickPt.lat, pickPt.lng]).addTo(pickMap);
+  pickState(`📍 ${pickPt.lat}, ${pickPt.lng}`, true);
+}
+function openPlacePicker(inputId) {
+  pickTarget = inputId;
+  pickPt = null;
+  if (pickMarker && pickMap) { pickMap.removeLayer(pickMarker); pickMarker = null; }
+  document.getElementById('pick-modal').classList.add('show');
+  if (!pickMap) {
+    pickMap = L.map('pick-map');
+    addTiles(pickMap, 19);
+    pickMap.on('click', ev => pickSet(ev.latlng.lat, ev.latlng.lng));
+  }
+  // Startausschnitt, absteigend nach dem, was am ehesten gemeint ist: der Punkt
+  // dieses Feldes, der Ort des gerade bearbeiteten Ereignisses, der zuletzt
+  // gewählte Punkt (man erfasst meist in derselben Gegend), sonst die Welt.
+  // Eine feste Startkoordinate steht hier bewusst nicht — das wäre eine
+  // Annahme über den Betreiber (A27).
+  const prev = PICKED.get(inputId);
+  const evLoc = (inputId === 'ed-location' && editingEvent && editingEvent.location
+                 && editingEvent.location.lat != null) ? editingEvent.location : null;
+  let last = null;
+  try { last = JSON.parse(localStorage.getItem('lifedash_lastpick') || 'null'); } catch (_) {}
+  const at = prev || evLoc || last;
+  if (at) pickMap.setView([at.lat, at.lng], 16);
+  else pickMap.setView([20, 0], 2);
+  if (prev) pickSet(prev.lat, prev.lng);
+  else pickState(t('pick.none', 'Noch kein Punkt gewählt.'), false);
+  // Die Karte entsteht in einem gerade erst eingeblendeten Dialog und kennt
+  // ihre Größe noch nicht — ohne das hier bleibt sie ein grauer Streifen.
+  setTimeout(() => pickMap.invalidateSize(), 60);
+}
+function closePlacePicker() {
+  document.getElementById('pick-modal').classList.remove('show');
+  pickTarget = null;
+}
+document.querySelectorAll('[data-pick-for]').forEach(btn =>
+  btn.addEventListener('click', () => openPlacePicker(btn.dataset.pickFor)));
+document.getElementById('pick-cancel').addEventListener('click', closePlacePicker);
+document.getElementById('pick-modal').addEventListener('click', ev => {
+  if (ev.target === document.getElementById('pick-modal')) closePlacePicker();
+});
+document.getElementById('pick-here').addEventListener('click', async ev => {
+  const restore = btnBusy(ev.target, t('pick.locating', '… hole Standort'));
+  try {
+    const pos = await getPosition();
+    pickMap.setView([pos.lat, pos.lng], 16);
+    pickSet(pos.lat, pos.lng);
+  } catch (err) { toast(err.message, 'warn'); }
+  finally { restore(); }
+});
+document.getElementById('pick-ok').addEventListener('click', async ev => {
+  if (!pickPt || !pickTarget) return;
+  const el = document.getElementById(pickTarget), pt = pickPt, id = pickTarget;
+  const restore = btnBusy(ev.target, t('pick.busy', '… schlage Adresse nach'));
+  let name = '';
+  try {
+    name = (await api(`/api/ingest/reverse-location?lat=${pt.lat}&lng=${pt.lng}`)).name || '';
+  } catch (_) {
+    // Ohne Adresse ist der Punkt trotzdem gültig — er ist ja die Aussage. Das
+    // Feld bekommt die Schreibweise, an der der Ortsnamen-Lauf ihn später
+    // wiederfindet, statt leer zu bleiben und einen Fehlschlag zu verschweigen.
+    name = `Ort (${pt.lat}, ${pt.lng})`;
+  } finally { restore(); }
+  el.value = name;
+  PICKED.set(id, { lat: pt.lat, lng: pt.lng, name });
+  try { localStorage.setItem('lifedash_lastpick', JSON.stringify(pt)); } catch (_) {}
+  closePlacePicker();
+  toast(t('pick.done', '📍 Punkt übernommen: {n}').replace('{n}', name), 'ok', 5000);
+});
+
 // ---------- P5.1: Offline erfassen ----------
 // Stufe 1 des Konzepts lautet „capture first — nie etwas verlieren", und ohne
 // Netz galt sie bis 0.36 nicht: der Knopf lief in einen Fehler, der Text stand
@@ -7739,7 +7818,17 @@ document.getElementById('ed-save').addEventListener('click', async () => {
   if ((ts || te) && prec === 'day') prec = 'exact';
   if (prec !== e.date_precision) changes.date_precision = prec;
   if (val('ed-category') !== e.category) changes.category = val('ed-category');
-  if (val('ed-location').trim() !== (e.location ? e.location.name : '')) changes.location_name = val('ed-location').trim();
+  // Ein gewählter Punkt geht IMMER mit, auch wenn der Name zufällig derselbe
+  // blieb: die Änderung ist dann der Punkt, und ohne ihn wäre der Klick
+  // wirkungslos gewesen, ohne dass irgendetwas es sagt.
+  const edPick = pickedFor('ed-location');
+  if (edPick) {
+    changes.location_name = val('ed-location').trim();
+    changes.location_lat = edPick.lat;
+    changes.location_lng = edPick.lng;
+  } else if (val('ed-location').trim() !== (e.location ? e.location.name : '')) {
+    changes.location_name = val('ed-location').trim();
+  }
   if (val('ed-note').trim() !== (e.note || '')) changes.note = val('ed-note').trim();
   const entsNow = edEntities();
   const entsOrig = (e.entities || []).map(en => ({ type: en.type, name: en.name }));
@@ -7847,6 +7936,9 @@ document.getElementById('mf-save').addEventListener('click', async () => {
         date_precision: document.getElementById('mf-precision').value,
         category: document.getElementById('mf-category').value,
         location_name: document.getElementById('mf-location').value.trim() || null,
+        // Auf der Karte gewählt? Dann zählt der Punkt und nicht der Name.
+        location_lat: pickedFor('mf-location')?.lat ?? null,
+        location_lng: pickedFor('mf-location')?.lng ?? null,
         entities: manualEntities,
       }),
     });
@@ -10654,7 +10746,7 @@ function renderBaselines() {
     const nocoords = (b.lat == null || b.lng == null)
       ? ` <span class="stat-label">· ${esc(t('bl.nocoords',
           'ohne Koordinaten — die Tage zählen, bleiben aber ohne Wetter.'))}</span>` : '';
-    return `<div class="bar-row">
+    return `<div class="bar-row bl-row">
       <div class="bar-label"><b>${esc(name)}</b>
         <span class="stat-label"> · ${esc(b.place)} · ${esc(fmtDay(b.date_start))} – ${esc(to)}</span>${nocoords}</div>
       <div class="bar-val">${esc(dayCount(b.day_count || 0))}</div>
@@ -10730,6 +10822,11 @@ document.getElementById('bl-add')?.addEventListener('click', async ev => {
         date_start: from,
         date_end: document.getElementById('bl-to').value || null,
         label: document.getElementById('bl-label').value.trim() || null,
+        // Gerade hier zählt der gewählte Punkt am meisten: „das Elternhaus" hat
+        // oft keine Adresse, die Nominatim findet — und ohne Koordinate
+        // bekämen seine Tausende abgeleiteter Tage nie ein Wetter.
+        lat: pickedFor('bl-place')?.lat ?? null,
+        lng: pickedFor('bl-place')?.lng ?? null,
       }),
     });
     toast(t('bl.added', 'Zeitraum eingetragen — {n} Tage gefüllt.')
@@ -10740,78 +10837,6 @@ document.getElementById('bl-add')?.addEventListener('click', async ev => {
     refreshAfterBaseline();
   } catch (err) { toast(err.message, 'error', 9000); }
   finally { btn.disabled = false; }
-});
-
-// --------------------------------------------------------------------------- //
-// A46 — mehrtägige importierte Besuche nachträglich in Tage schneiden
-// --------------------------------------------------------------------------- //
-// Dasselbe Muster wie darüber, und zwar bewusst: erst nachsehen, dann
-// schreiben. Der Unterschied ist, WAS auf dem Spiel steht — dieser Lauf legt
-// nichts an, er ÄNDERT Bestätigtes. Deshalb muss die Vorschau nicht die Zahl
-// der Ereignisse in den Vordergrund stellen, sondern die Zahl der Zeilen
-// danach: aus 2.000 werden 4.000, und das ist die Zahl, die überrascht.
-let mdSeen = false;
-function mdLock() {
-  const run = document.getElementById('btn-md-run');
-  if (run) run.disabled = !mdSeen;
-}
-document.getElementById('btn-md-preview')?.addEventListener('click', async ev => {
-  const btn = ev.target, box = document.getElementById('md-result');
-  const restore = btnBusy(btn, t('prev.busy', 'sehe nach …'));
-  try {
-    const r = await api('/api/events/visits/multiday');
-    mdSeen = r.events > 0;
-    box.style.display = '';
-    if (!r.events) {
-      box.innerHTML = `<b>${esc(t('md.none', 'Nichts zu schneiden.'))}</b><br>`
-        + esc(t('md.none.why', 'Kein importierter Besuch reicht über eine Tagesgrenze.'));
-    } else {
-      box.innerHTML = `<b>${esc(t('md.head', '{n} Besuche → {r} Zeilen danach')
-          .replace('{n}', r.events).replace('{r}', r.rows_after))}</b>
-        <div style="margin-top:6px">${r.list.map(e => `
-          <div style="padding:3px 0">✂️ <b>${esc(e.title)}</b>
-            <span class="stat-label">· ${esc(e.start.slice(0, 16).replace('T', ' '))} – ${
-              esc(e.end.slice(0, 16).replace('T', ' '))} · ${e.days} ${esc(t('ds.days', 'Tage'))}</span>
-          </div>`).join('')}</div>
-        ${r.more ? `<div class="stat-label">… ${r.more} ${esc(t('ims.more', 'weitere'))}</div>` : ''}`;
-    }
-    // Was der Lauf auslässt, steht dort, wo hingeschaut wird (Anmerkung 110).
-    if (r.too_long_count) {
-      box.innerHTML += `<div class="stat-label" style="margin-top:8px">⏭️ ${
-        esc(t('md.toolong', '{n} übersprungen, weil länger als {s} Tage — das ist keine Nacht, sondern etwas anderes.')
-          .replace('{n}', r.too_long_count).replace('{s}', r.max_days))}</div>`;
-    }
-    if (r.with_children) {
-      box.innerHTML += `<div class="stat-label" style="margin-top:8px">⏭️ ${
-        esc(t('md.kids', '{n} übersprungen, weil sie eigene Tages-Einträge haben — die hingen sonst an einer Spanne, die es nicht mehr gibt.')
-          .replace('{n}', r.with_children))}</div>`;
-    }
-    mdLock();
-    toast(r.events
-      ? `🔍 ${t('md.head', '{n} Besuche → {r} Zeilen danach')
-            .replace('{n}', r.events).replace('{r}', r.rows_after)} — ${
-            t('prev.below', 'die Liste steht unter dem Knopf.')}`
-      : `🔍 ${t('md.none', 'Nichts zu schneiden.')}`, 'ok', 7000);
-  } catch (err) {
-    box.style.display = ''; box.textContent = err.message;
-    mdSeen = false; mdLock();
-    toast(err.message, 'error', 8000);
-  } finally { restore(); }
-});
-document.getElementById('btn-md-run')?.addEventListener('click', async ev => {
-  const btn = ev.target;
-  if (!mdSeen) { toast(t('md.needpreview', 'Erst nachsehen — dann schneiden.'), 'warn'); return; }
-  btn.disabled = true;
-  try {
-    const r = await api('/api/events/visits/split', { method: 'POST' });
-    toast(t('md.done', '✓ {n} Besuche geschnitten, {c} Zeilen neu.')
-      .replace('{n}', r.events).replace('{c}', r.created), 'ok', 8000);
-    // Vorschau verbraucht, Zeitstrahl veraltet — beides wie beim F7-Lauf.
-    mdSeen = false;
-    document.getElementById('md-result').style.display = 'none';
-    if (typeof loadTimeline === 'function') loadTimeline();
-  } catch (err) { toast(err.message, 'error', 8000); }
-  finally { mdLock(); }
 });
 
 // Ortsnamen-Format: Bausteine (Straße/Ortsteil/Stadt/Land) pro Nutzer gespeichert
@@ -10887,7 +10912,6 @@ function renderImmichState(s) {
   // Stufe 2: Jahresauswahl füllen, sobald klar ist, dass es Immich gibt.
   loadImmichYears();
   ppLoadIndex();       // Stand der Foto-Ereignisse (ebenfalls eigene Daten)
-  dcCheck(true);       // Anm. 139: gibt es noch alte Sammeleinträge?
 }
 async function saveImmich() {
   const url = document.getElementById('im-url').value.trim();
@@ -11164,74 +11188,6 @@ document.getElementById('pp-reset')?.addEventListener('click', async ev => {
   finally { btn.disabled = false; }
 });
 
-// --------------------------------------------------------------------------- //
-// Aufräumen: die Tagescluster aus Anmerkung 138
-// --------------------------------------------------------------------------- //
-// Dieselbe Bauform wie der A46-Besuchsschnitt und die F7-Serie, und aus
-// demselben Grund: die Aktion fasst BESTÄTIGTES an. Erst nachsehen, dann
-// löschen; der Knopf bleibt bis dahin gesperrt, und die Vorschau NENNT die
-// Zeilen, statt sie nur zu zählen.
-let dcSeen = false;
-async function dcCheck(silent) {
-  const card = document.getElementById('im-cleanup');
-  if (!card) return 0;
-  try {
-    const r = await api('/api/immich/day-clusters');
-    // **Die Karte gibt es nur, solange es etwas aufzuräumen gibt.** Eine
-    // Karte, die dauerhaft von einer Übergangsform erzählt, ist ein
-    // Änderungsprotokoll und keine Anleitung (Anmerkung 115).
-    card.style.display = r.total ? '' : 'none';
-    if (!silent) dcShow(r);
-    return r.total;
-  } catch (_) { return 0; }
-}
-function dcShow(r) {
-  const box = document.getElementById('dc-result');
-  const run = document.getElementById('dc-run');
-  if (!box) return;
-  box.style.display = '';
-  dcSeen = r.total > 0;
-  if (run) run.disabled = !dcSeen;
-  if (!r.total) {
-    box.innerHTML = esc(t('dc.clean', '✓ Es gibt keine alten Sammeleinträge mehr.'));
-    return;
-  }
-  const rows = (r.sample || []).map(x =>
-    `<div>· ${esc((x.date || '').slice(0, 10))} — ${esc(x.title)}</div>`).join('');
-  box.innerHTML = `<b>${esc(t('dc.found', '{n} Sammeleinträge werden entfernt')
-      .replace('{n}', r.total.toLocaleString(LOC())))}</b>`
-    + `<div class="stat-label" style="margin-top:6px">${rows}</div>`
-    + (r.total > (r.sample || []).length
-        ? `<div class="stat-label">${esc(t('dc.more', '… und {n} weitere')
-            .replace('{n}', (r.total - (r.sample || []).length).toLocaleString(LOC())))}</div>`
-        : '');
-}
-document.getElementById('dc-preview')?.addEventListener('click', async ev => {
-  const btn = ev.target;
-  btn.disabled = true;
-  try { dcShow(await api('/api/immich/day-clusters')); }
-  catch (err) { toast(err.message, 'error', 8000); }
-  finally { btn.disabled = false; }
-});
-document.getElementById('dc-run')?.addEventListener('click', async ev => {
-  // Der Riegel sitzt hier UND am Knopf: `disabled` allein wäre eine Sperre,
-  // die ein Klick aus dem Skript heraus nicht kennt (dieselbe Zusage wie bei
-  // der Immich-Vorschau, geprüft von check-p21-preview.js).
-  if (!dcSeen) {
-    toast(t('dc.needpreview', 'Erst nachsehen, was betroffen ist.'), 'warn');
-    return;
-  }
-  const btn = ev.target;
-  btn.disabled = true;
-  try {
-    const r = await api('/api/immich/day-clusters/remove', { method: 'POST' });
-    toast(t('dc.done', '✓ {n} Sammeleinträge entfernt.').replace('{n}', r.removed), 'ok', 6000);
-    dcSeen = false;
-    await dcCheck(false);
-    if (mapObj) { await mpLoadPoints(true); rebuildPeriods(); renderPeriod(); }
-  } catch (err) { toast(err.message, 'error', 8000); }
-  finally { btn.disabled = !dcSeen; }
-});
 function imsNote(text) {
   const box = document.getElementById('ims-result');
   if (!box || !text) { if (box && box.dataset.note) { box.style.display = 'none'; delete box.dataset.note; } return; }

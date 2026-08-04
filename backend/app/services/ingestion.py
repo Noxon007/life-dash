@@ -173,8 +173,12 @@ def create_manual_event(db: Session, user_id: str, payload) -> Event:
     db.add(fragment)
     db.flush()
 
-    pseudo = ExtractedEvent(title=payload.title, location_name=payload.location_name)
-    location = _resolve_location(db, pseudo, user_id)
+    if payload.location_lat is not None and payload.location_lng is not None:
+        location = place_from_point(db, user_id, payload.location_lat,
+                                    payload.location_lng, payload.location_name or "")
+    else:
+        pseudo = ExtractedEvent(title=payload.title, location_name=payload.location_name)
+        location = _resolve_location(db, pseudo, user_id)
 
     provider = get_provider()
     event = Event(
@@ -273,6 +277,66 @@ def tracked_modules(db: Session, user_id: str | None) -> list[str] | None:
     user = db.get(User, user_id) if user_id else None
     tracked = ((user.settings or {}).get("tracked_modules")) if user else None
     return tracked if isinstance(tracked, list) else None
+
+
+def place_from_point(db: Session, user_id: str | None,
+                     lat: float, lng: float, fallback_name: str = ""
+                     ) -> Location:
+    """Ein auf der Karte GEWÄHLTER Punkt → `Location`.
+
+    Die Umkehrung von `resolve_place`, und der Unterschied ist, **welche der
+    beiden Angaben die Aussage ist**. Bei einem getippten Ortsnamen ist der Name
+    die Aussage und die Koordinate ihre Ableitung — deshalb wird dort vorwärts
+    geocodiert und das mitgelieferte `lat`/`lng` überschrieben. Bei einem Klick
+    auf die Karte ist es genau andersherum: der Punkt liegt, wo geklickt wurde,
+    und alles andere (Name, Stadt, Land, Bausteine) wird daraus abgeleitet.
+
+    Ihn durch den Vorwärts-Weg zu schicken wäre deshalb kein Umweg, sondern eine
+    andere Antwort: Nominatim gäbe zum Namen seinen eigenen Punkt zurück (den
+    Ortsmittelpunkt statt des Hauses), und was gespeichert würde, wäre nicht
+    mehr das, worauf gezeigt wurde. Und Orte ohne Adresse — die Hütte im Wald,
+    das Elternhaus an einer Straße, die OSM nicht kennt — wären über den
+    Namensweg gar nicht erfassbar.
+
+    Der Reverse-Abruf passiert hier und nicht beim Aufrufer: `city`, `country`
+    und `address` sind dieselben Felder, die A39/F4/Anmerkung 110 überall sonst
+    füllen, und ein vom Browser mitgeschickter Wert wäre eine zweite Quelle für
+    dieselbe Tatsache. Die Vorschau im Formular ist eine Anzeige, keine Angabe.
+    """
+    user = db.get(User, user_id) if user_id else None
+    hit = reverse_geocode(lat, lng, lang_for(user)) if settings.geocoding_enabled else None
+    name = (short_name(hit, parts_for(user)) or (fallback_name or "").strip()
+            or f"Ort ({lat:.5f}, {lng:.5f})")
+
+    # Identität bleibt der NAME, wie überall sonst in diesem Modul. Zwei Klicks
+    # auf dasselbe Haus dürfen nicht zwei Orte ergeben, sonst zählt „Top-Orte"
+    # denselben Ort zweimal. Der vorhandene Ort wird dabei weder umbenannt noch
+    # VERSCHOBEN — an ihm hängt die Historie; nur eine fehlende Koordinate wird
+    # nachgetragen, und das ist rein additiv.
+    existing = (
+        db.query(Location)
+        .filter(Location.user_id == user_id, Location.name.ilike(name))
+        .first()
+    )
+    if existing:
+        if existing.lat is None or existing.lng is None:
+            existing.lat, existing.lng = lat, lng
+        return existing
+
+    # Endlos-Abruf-Falle: `address IS NULL` heißt „nie nachgesehen" und holt den
+    # Ort in den A47-Rückfüll-Lauf. Nachgesehen HABEN wir gerade — auch wenn
+    # nichts kam. Ohne die leere Marke fragte der Lauf diesen Punkt für immer
+    # neu (F12 `weather_rev`, A39-Leerstring, A42 „kein Artikel", …).
+    address = raw_address(hit)
+    if address is None and settings.geocoding_enabled:
+        address = {}
+    location = Location(user_id=user_id, name=name[:255], lat=lat, lng=lng,
+                        type=(hit.get("type") if hit else None),
+                        country=((hit.get("address") or {}).get("country") if hit else None),
+                        city=city_of(hit), address=address)
+    db.add(location)
+    db.flush()
+    return location
 
 
 def resolve_place(db: Session, user_id: str | None, place: str,

@@ -93,18 +93,27 @@ def correct_event(
 
     data = payload.model_dump(exclude_unset=True)
     # Ändern sich die Fakten Zeit/Ort, stimmt angehängtes Wetter nicht mehr
-    facts_changed = bool({"location_name", "date_start", "date_end"} & data.keys())
+    facts_changed = bool({"location_name", "location_lat", "location_lng",
+                          "date_start", "date_end"} & data.keys())
 
-    # Ort separat behandeln: Name/Adresse -> Geocoding -> Location-Zeile
-    if "location_name" in data:
+    # Ort separat behandeln: Name/Adresse -> Geocoding -> Location-Zeile.
+    # Die beiden Koordinaten gehen IMMER aus `data` heraus, auch wenn kein Name
+    # dabei ist — sie sind Angaben ÜBER den Ort, keine Spalten am Ereignis, und
+    # die Schleife unten würde sie sonst als `event.location_lat` ansetzen.
+    lat, lng = data.pop("location_lat", None), data.pop("location_lng", None)
+    if "location_name" in data or (lat is not None and lng is not None):
         from app.ai.base import ExtractedEvent
-        from app.services.ingestion import _resolve_location
+        from app.services.ingestion import _resolve_location, place_from_point
 
-        name = (data.pop("location_name") or "").strip()
-        event.location = (
-            _resolve_location(db, ExtractedEvent(title=event.title, location_name=name), user.id)
-            if name else None
-        )
+        name = (data.pop("location_name", "") or "").strip()
+        if lat is not None and lng is not None:
+            # Auf der Karte gewählt: der Punkt ist die Aussage (place_from_point)
+            event.location = place_from_point(db, user.id, lat, lng, name)
+        elif name:
+            event.location = _resolve_location(
+                db, ExtractedEvent(title=event.title, location_name=name), user.id)
+        else:
+            event.location = None
         overrides["location"] = True
 
     # Objekte separat behandeln: Verknüpfungen vollständig ersetzen

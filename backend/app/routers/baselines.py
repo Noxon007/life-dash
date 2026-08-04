@@ -25,7 +25,7 @@ from app.database import get_db
 from app.models import BaselineLocation, DayMetric, User
 from app.schemas import BaselineCreate, BaselineRead, BaselineUpdate
 from app.services import baseline
-from app.services.ingestion import resolve_place
+from app.services.ingestion import place_from_point, resolve_place
 
 router = APIRouter(prefix="/api", tags=["Grundort"])
 
@@ -33,6 +33,19 @@ router = APIRouter(prefix="/api", tags=["Grundort"])
 # Grenze gegen offensichtlich unsinnige Eingaben — sie muss ein ganzes Leben
 # umfassen können, sonst wird sie zur stillen Auslassung (Anmerkung 120).
 MAX_DAYS = 40000
+
+
+def _place(db: Session, user: User, place: str | None,
+           lat: float | None, lng: float | None):
+    """Ort aus dem Formular: gewählter Punkt schlägt getippten Namen.
+
+    Eine Stelle für beide Aufrufer (anlegen und ändern) — die Regel „der Punkt
+    ist die Aussage" zweimal aufzuschreiben hieße, sie beim ersten Sonderfall
+    auseinanderlaufen zu lassen (Anmerkung 106).
+    """
+    if lat is not None and lng is not None:
+        return place_from_point(db, user.id, lat, lng, (place or "").strip())
+    return resolve_place(db, user.id, (place or "").strip())
 
 
 def _to_read(row: BaselineLocation, days: int) -> BaselineRead:
@@ -93,14 +106,20 @@ def create_baseline(
 ) -> BaselineRead:
     """Einen Grundort eintragen — „von … bis … war ich im Wesentlichen hier".
 
-    Der Ort läuft durch `resolve_place`, also durch dieselbe Auflösung wie bei
-    einem Ereignis: vorhandener Ort wird wiederverwendet, ein neuer wird
-    geocodiert und bekommt Stadt, Land und Adress-Bausteine. Ohne Koordinate
-    bleibt der Eintrag gültig — er trägt dann nur kein Wetter, und das sagt die
-    Oberfläche, statt es zu verschweigen.
+    Der Ort läuft durch dieselbe Auflösung wie bei einem Ereignis: vorhandener
+    Ort wird wiederverwendet, ein neuer bekommt Stadt, Land und
+    Adress-Bausteine. Ohne Koordinate bleibt der Eintrag gültig — er trägt dann
+    nur kein Wetter, und das sagt die Oberfläche, statt es zu verschweigen.
+
+    **Zwei Wege, und welcher gilt, entscheidet die Angabe.** Getippter Name →
+    `resolve_place` (vorwärts geocodiert). Auf der Karte gewählter Punkt →
+    `place_from_point`, und dann liegt der Grundort dort, wo geklickt wurde.
+    Gerade hier zählt das: „das Elternhaus" hat oft keine Adresse, die
+    Nominatim kennt, und ohne Koordinate bekämen seine 7 000 abgeleiteten Tage
+    nie ein Wetter.
     """
     _check_span(db, user, payload.date_start, payload.date_end)
-    loc = resolve_place(db, user.id, payload.place.strip())
+    loc = _place(db, user, payload.place, payload.lat, payload.lng)
     if loc is None:
         raise HTTPException(400, "Ohne Ort ist ein Grundort keine Aussage.")
     row = BaselineLocation(user_id=user.id, location_id=loc.id,
@@ -149,8 +168,8 @@ def update_baseline(
     row.date_start, row.date_end = start, end
     if payload.label is not None:
         row.label = payload.label.strip() or None
-    if payload.place:
-        loc = resolve_place(db, user.id, payload.place.strip())
+    if payload.place or (payload.lat is not None and payload.lng is not None):
+        loc = _place(db, user, payload.place, payload.lat, payload.lng)
         if loc is None:
             raise HTTPException(400, "Ort nicht auflösbar.")
         row.location_id = loc.id

@@ -1,10 +1,3 @@
-- **Merged points are a teardrop now, sized by how much is in them.** A place
-  you went to fifty times draws a bigger mark than one you went to twice, in the
-  colour of whatever you mostly did there — and the tip sits exactly on the
-  place, so a big mark still says *here* rather than *roughly here*. A single
-  entry stays a round dot, so the shape tells you whether there is one thing or
-  several before you read a number. The same mark is used whether you merge by
-  proximity or per place.
 # Changelog
 
 All notable changes to Life-Dash. The format follows
@@ -23,6 +16,19 @@ any `MINOR`.
 ## [Unreleased]
 
 ### Added
+- **Pick a place on the map instead of typing its name.** A 🗺️ button sits next
+  to the place field when you record something, when you edit an entry and when
+  you enter a baseline location: click the map, and *that* point is what gets
+  stored — the address is looked up afterwards and is only the label. Typing a
+  name still works exactly as before, but then the name is the statement and the
+  coordinate is looked up from it, which puts the entry at whatever point
+  OpenStreetMap has for that name, usually the middle of the town rather than
+  the house. It also makes places that have no findable address possible at all:
+  the hut in the woods, the parents' house on a road the map does not know. That
+  matters most for a baseline location, where a missing coordinate means
+  thousands of derived days never get their weather. Edit the name afterwards
+  and the picked point is released again — otherwise the field would say one
+  thing and the stored point another.
 - **A “Gaps” view in the statistics: where do you know nothing at all?** The
   fourth tab beside Numbers, Charts and Rankings answers the one question a life
   database cannot answer by looking at what it has. It shows how much of the
@@ -165,6 +171,16 @@ any `MINOR`.
   change.
 
 ### Changed
+- **The effect badges under *My data* all sit in the same spot now** — at the
+  right-hand end of the heading of whatever they describe. They used to be in
+  three different places (beside the section heading, at the end of a card
+  header, and underneath a button), so the one label that tells you what a run
+  will do to your data had to be hunted for each time.
+- **Less text.** The explanation of why photo albums are not used as a source is
+  gone, along with the sentences that described how earlier versions behaved.
+- **A baseline period is no longer cut off after its label.** “Elternhaus ·
+  Mözen, Deutschland · 25.9.1991 – 25.9.2011 · 7,298 days” shared a 105-pixel
+  column with the bar charts, so everything after the name disappeared.
 - **The map draws every point now — the 300 limit is gone.** “Every point” used
   to stop at 300 and tell you how many it was hiding. That was never a limit
   about your data: each entry was drawn as a marker *plus* a numbered circle on
@@ -446,6 +462,11 @@ any `MINOR`.
   failed first one.
 
 ### Removed
+- **The two clean-up runs for data from earlier versions:** “Advanced: cut older
+  data into days” under Imports, and the Immich card “Remove old photo-day
+  summary entries”. New imports have cut visits into days by themselves for a
+  while, and step B replaced the photo-day summaries — the buttons were a
+  changelog on screen. Their endpoints are still there if a run is ever needed.
 - **The “Strongest sun” (UV) statistics tile.** It could never fill: the weather
   archive used for past dates carries no UV values at all, so the tile stayed
   empty no matter how much weather you added. “Sunniest day” (sunshine hours,

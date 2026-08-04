@@ -83,6 +83,53 @@ ein Nutzer merkt.
   etc. aus Config); `.env.example` ist die Setup-Referenz
 
 ## Stand
+**Feedback-Runde 2026-08-04 (Anmerkungen 164–166), auf `main`, ohne
+Versionssprung.** Fünf Punkte; einer war eine Frage nach der Reihenfolge, die
+eine Antwort brauchte und keine Änderung.
+
+**Anm. 164 — Ort auf der Karte wählen, und warum das eine ANDERE Sorte Aussage
+ist.** Der bequeme Weg wäre gewesen, den Klick wie eine schönere Tastatur zu
+behandeln: reverse-geocodieren, Adresse ins Feld, fertig, kein Backend. Genau
+diese Fassung speichert etwas anderes, als sie zeigt. **Getippter Name und
+geklickter Punkt sind umgekehrte Aussagen:** beim Namen ist der Text die Angabe
+und die Koordinate ihre Ableitung (der Server geocodiert VORWÄRTS und bekommt
+Nominatims Punkt — für „Mözen" die Dorfmitte), beim Klick ist es andersherum.
+Also `location_lat`/`location_lng` durch `POST /api/events`,
+`PATCH /api/moderation/{id}` und `POST|PATCH /api/baselines`, und
+`ingestion.place_from_point` als die zweite, umgekehrte Hälfte von
+`resolve_place`. **Der Reverse-Abruf sitzt im Backend, nicht im Browser** — die
+Formularvorschau ist eine Anzeige, keine Angabe, und `city`/`country`/`address`
+haben überall sonst genau eine Quelle. **Identität bleibt der NAME** (zwei
+Klicks auf dasselbe Haus sind ein Ort), ein vorhandener Ort wird weder
+umbenannt noch VERSCHOBEN — nur eine fehlende Koordinate wird nachgetragen.
+**Die Marke löst sich beim Tippen**, geprüft beim Absenden statt über einen
+Listener (Anm. 106: sonst sagt das Feld „Berlin" und der Punkt zeigt aufs
+Elternhaus). Endlos-Abruf-Falle beidseitig: Fehlversuch → `address = {}`, aber
+bei ABGESCHALTETEM Geocoding bleibt `NULL`, sonst wären die Orte für immer
+gesperrt. Wächter `check-place-picker.js`, gegen sieben injizierte Defekte
+gefahren — einen überlebte er zuerst, weil die Zusicherung das `disabled`-
+ATTRIBUT im Markup las, während der Code die EIGENSCHAFT setzt.
+
+**Anm. 165 — „Ortsnamen auflösen" bleibt Schritt 3.** Gefragt war, ob es hinter
+Immich und Grundort gehört. Nein: keiner von beiden hinterlässt einen
+unaufgelösten Ortsnamen. Immichs Fotoorte tragen eine GESETZTE `address` (die
+Marke, an der `resolve_names` sie stehen lässt, Anm. 139), der Grundort löst
+seinen Ort beim Eintragen auf. Material für den Namenslauf liefert nur der
+Google-Import.
+
+**Anm. 166 — drei Textblöcke weg.** Der Album-Hinweis (er argumentiert gegen
+ein Feature, das es nicht gibt), und die beiden Reparaturläufe für Bestände
+früherer Fassungen („alten Bestand in Tage schneiden", „Alte
+Fototag-Sammeleinträge entfernen"). Anm. 115 hatte die Regel für den zweiten
+schon aufgeschrieben und ihn dann hinter `display:none` stehen lassen. **Die
+Endpunkte bleiben; die Anleitung ist der Bildschirm, nicht die API.** Dazu:
+Effekt-Badges sitzen jetzt ALLE am rechten Rand der Kopfzeile ihres Blocks (sie
+standen an drei Stellen), und die Grundort-Zeile bricht um statt zu kürzen —
+sie benutzte `.bar-label` mit 105 px und `nowrap`, also fiel alles außer dem
+selbst getippten Namen weg. **Nebenbefund: `CHANGELOG.md` hatte einen
+verirrten Absatz VOR der Überschrift** (Dublette des Tropfen-Eintrags aus
+Anm. 163) — entfernt.
+
 **Doku aufgeteilt (2026-08-02, Anm. 147):** `docs/KONZEPT.md` = was und warum
 (Vision, Architektur, Roadmap 14.2/14.3); **`docs/DECISIONS.md` = die
 nummerierten Anmerkungen** mit ihrer Begründung. Erst dort nachlesen, nicht
