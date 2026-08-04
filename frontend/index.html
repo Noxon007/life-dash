@@ -5091,7 +5091,13 @@ async function loadTimeline(more = false) {
       // schätzen. Ein `renderTimeline()` hinterher, weil dieser Abruf
       // absichtlich NICHT abgewartet wird (er hängt sonst an der Seite).
       TL_INDEX_YEARS = idx.years || [];
-      if (tl.zoom === 'year' || tl.zoom === 'decade') renderTimeline();
+      // `!tl.loading` ist der Punkt: kommt der Index, WÄHREND die erste Seite
+      // noch unterwegs ist, zeichnete dieser Aufruf eine leere Liste samt
+      // „dazu ist nichts geladen" — und der richtige Aufbau überschriebe sie
+      // Sekundenbruchteile später. Ein Aufblitzen der falschen Auskunft ist
+      // dieselbe Sorte Falschaussage wie eine dauerhafte, nur kürzer.
+      // Ist der Lauf noch dran, nimmt sein eigener Abschluss das Gerüst mit.
+      if (!tl.loading && (tl.zoom === 'year' || tl.zoom === 'decade')) renderTimeline();
       TL_VISIT_COUNT = idx.visits || 0;
       TL_PENDING_COUNT = idx.machine_proposals || 0;
       // A47: Die Stufe „Ortsteil" liest `Location.address`, und die gibt es
