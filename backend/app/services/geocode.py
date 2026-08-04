@@ -27,6 +27,7 @@ import urllib.parse
 import urllib.request
 
 from app.config import settings
+from app.services.translit import romanize
 
 log = logging.getLogger("lifedash.geocode")
 
@@ -101,6 +102,28 @@ NON_LATIN_RE = re.compile(
     "\\u0900-\\u097f\\u0e00-\\u0e7f\\u3040-\\u30ff\\u4e00-\\u9fff\\uac00-\\ud7af]"
 )
 
+
+def latinize(value: str | None) -> str | None:
+    """Einen Namensbaustein in lateinischer Schrift — oder `None`.
+
+    Drei Ausgänge, und sie müssen unterscheidbar bleiben:
+    **schon lateinisch** (unverändert zurück) · **umgeschrieben**
+    („Βίγλα" → „Vigla") · **keine Umschrift möglich** (`None`, etwa bei
+    japanischen oder arabischen Namen). Der dritte Fall darf nicht wie der
+    erste aussehen — sonst stünde ein unlesbarer Name da, den ein Lauf für
+    erledigt hält.
+
+    Erst die Quelle, dann wir: `name:de`/`name:en` aus OSM haben Vorrang und
+    werden in `_prefer_latin` bzw. `_poi_name` schon vorher gezogen. Hier
+    landet nur, wofür OSM keinen lateinischen Namen kennt.
+    """
+    if not value:
+        return None
+    if not NON_LATIN_RE.search(value):
+        return value
+    out = romanize(value)
+    return out if out and not NON_LATIN_RE.search(out) else None
+
 # --------------------------------------------------------------------------- #
 # Kompakter Anzeige-Name (statt des langen display_name)
 #
@@ -146,7 +169,14 @@ def city_of(hit: dict | None) -> str | None:
     """
     addr = (hit or {}).get("address") or {}
     val = next((addr[k] for k in _PART_KEYS["city"] if addr.get(k)), None)
-    return str(val)[:128] if val else None
+    if not val:
+        return None
+    # Dieselbe Umschrift wie im Anzeigenamen. Zwei Schreibweisen derselben
+    # Stadt wären zwei Städte im Kompendium — „Κέρκυρα" in der Statistik und
+    # „Kerkyra" auf der Karte, und die Zahl darüber stimmte für keine von
+    # beiden. Lässt sie sich nicht umschreiben, bleibt der Originalname: ein
+    # unlesbarer Stadtname ist immer noch eine Auskunft, gar keiner nicht.
+    return (latinize(str(val)) or str(val))[:128]
 
 
 def _poi_name(namedetails: dict | None, lang: str | None = None) -> str | None:
@@ -168,23 +198,48 @@ def short_name(hit: dict | None, parts: list[str] | None = None) -> str:
     Aussichtspunkt), steht dessen Eigenname immer vorn — er ist in den
     Adress-Bausteinen nicht enthalten. Trägt das Objekt selbst einen
     Baustein-Namen (Straße, Stadt …), wird nichts doppelt ausgegeben.
-    Fällt ohne Adressfelder auf die ersten zwei display_name-Segmente zurück."""
+    Fällt ohne Adressfelder auf die ersten zwei display_name-Segmente zurück.
+
+    **Fremdschrift wird hier umgeschrieben** (`translit`), nicht erst in der
+    Anzeige: der Name ist das, was gespeichert wird, und was gespeichert ist,
+    liest jede Ansicht gleich. Die Stelle ist mit Absicht diese — sie wird
+    sowohl vom frischen Abruf als auch von `_rename_from_stored` benutzt,
+    also repariert derselbe Griff den Bestand rückwirkend, ohne eine einzige
+    Netzanfrage."""
     addr = (hit or {}).get("address") or {}
-    out: list[str] = []
     poi = (hit or {}).get("poi")
     # Baustein-Werte (roh): dient dem Dubletten-Check — ist der Eigenname
     # z. B. der Straßen- oder Stadtname selbst, ist er kein POI-Zusatz
     part_vals = {str(addr[k]) for keys in _PART_KEYS.values() for k in keys if addr.get(k)}
+    # (Text, ist es das Land?, ließ es sich lateinisch schreiben?)
+    segs: list[tuple[str, bool, bool]] = []
+
+    def add(val: str, is_country: bool) -> None:
+        lat = latinize(val)
+        text = lat or val
+        # Entdoppelt wird nach der Umschrift: zwei Bausteine, die dasselbe
+        # ergeben, sind derselbe Baustein — sonst stünde „Kerkyra, Kerkyra".
+        if any(text == seen for seen, _, _ in segs):
+            return
+        segs.append((text, is_country, lat is not None))
+
     if poi and poi not in part_vals:
-        out.append(str(poi))
+        add(str(poi), False)
     for part in sanitize_parts(parts):
         val = next((addr[k] for k in _PART_KEYS[part] if addr.get(k)), None)
         if part == "road" and val and addr.get("house_number"):
             val = f"{val} {addr['house_number']}"
-        if val and val not in out:
-            out.append(str(val))
-    if out:
-        return ", ".join(out)
+        if val:
+            add(str(val), part == "country")
+    # Was sich nicht umschreiben ließ (japanisch, arabisch …), fällt weg —
+    # ABER nur, solange danach noch etwas übrig bleibt, das den Ort BENENNT.
+    # Bliebe nur das Land stehen, wäre aus „Αγία Κυριακή, Griechenland" ein
+    # bloßes „Griechenland" geworden: eine Ansicht, die den Ort nicht mehr
+    # unterscheidet, ist schlechter als eine, die ihn unlesbar zeigt.
+    if any(not ok for _, _, ok in segs) and any(ok and not c for _, c, ok in segs):
+        segs = [s for s in segs if s[2]]
+    if segs:
+        return ", ".join(text for text, _, _ in segs)
     name = (hit or {}).get("name") or ""
     return ", ".join(s.strip() for s in name.split(",")[:2])
 
@@ -218,17 +273,25 @@ def raw_address(hit: dict | None) -> dict | None:
 def _prefer_latin(display_name: str, namedetails: dict | None,
                   lang: str | None = None) -> str:
     """Ersetzt einen fremdschriftlichen Hauptnamen (erstes Adress-Segment)
-    durch den Namen in der UI-Sprache aus den namedetails, falls vorhanden."""
-    if not namedetails or not display_name:
+    durch den Namen in der UI-Sprache aus den namedetails, falls vorhanden.
+
+    Kennt OSM keinen, wird umgeschrieben (`translit`) — erst die Auskunft der
+    Quelle, dann unsere. Die Reihenfolge ist keine Feinheit: „München" ist der
+    Name der Stadt, „Minchen" wäre nur, wie man ihn buchstabiert."""
+    if not display_name:
         return display_name
     first, sep, rest = display_name.partition(",")
     if not NON_LATIN_RE.search(first):
         return display_name
     best = next((namedetails[k] for k in _name_keys(lang)[:2]
-                 if namedetails.get(k)), None)
-    if not best or NON_LATIN_RE.search(best):
-        return display_name
-    return f"{best}{sep}{rest}"
+                 if (namedetails or {}).get(k)), None)
+    if best and not NON_LATIN_RE.search(best):
+        return f"{best}{sep}{rest}"
+    # Rückfall: die ganze Kette umschreiben. Die hinteren Segmente können
+    # ebenso fremdschriftlich sein wie das erste, und ein halb umgeschriebener
+    # Name ist keine Verbesserung, sondern eine zweite Schreibweise.
+    rom = romanize(display_name)
+    return rom if rom and not NON_LATIN_RE.search(rom) else display_name
 
 
 def geocode(query: str, lang: str | None = None) -> dict | None:

@@ -186,11 +186,15 @@ CORFU_HIT = {
 
 
 def test_short_name_default_parts():
-    assert short_name(CORFU_HIT) == "Ελευθερίου Βενιζέλου, Mantouki, Korfu, Griechenland"
+    # Seit Anmerkung 173 wird die Fremdschrift beim Zusammensetzen umgeschrieben
+    # (ELOT 743): OSM kennt für diese Straße keinen `name:de`/`name:en`, also
+    # bliebe der Name sonst dauerhaft griechisch — und der Ortsnamen-Lauf
+    # meldete ihn bei jedem Durchgang erneut als Mangel.
+    assert short_name(CORFU_HIT) == "Eleftheriou Venizelou, Mantouki, Korfu, Griechenland"
 
 
 def test_short_name_selected_parts():
-    assert short_name(CORFU_HIT, ["road", "city"]) == "Ελευθερίου Βενιζέλου, Korfu"
+    assert short_name(CORFU_HIT, ["road", "city"]) == "Eleftheriou Venizelou, Korfu"
     assert short_name(CORFU_HIT, ["city", "country"]) == "Korfu, Griechenland"
 
 

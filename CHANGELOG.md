@@ -16,6 +16,23 @@ any `MINOR`.
 ## [Unreleased]
 
 ### Added
+- **Place names in Greek or Cyrillic script are now written out in Latin
+  letters.** OpenStreetMap only has a German or English name for the well-known
+  places; a lane on Antipaxos or a chapel near Gaios has just its local name,
+  and until now that name stayed as it came — unreadable in the timeline, and
+  reported again by every single run of *Resolve place names*, because asking
+  once more could never change it. They are now transliterated (ELOT 743, the
+  same spelling Greek street signs and passports use): “Ελευθερίου Βενιζέλου”
+  becomes “Eleftheriou Venizelou”, “Αγία Κυριακή” becomes “Agia Kyriaki”. **A
+  name OpenStreetMap does have keeps precedence** — “München” stays “München”
+  and does not become “Minchen”. Scripts without a table (Japanese, Arabic,
+  Hebrew, Thai) are left out of the name instead, but only while something
+  remains that still names the place: if only the country would be left, the
+  original name stays, because a place you cannot read is still better than a
+  place called “Japan”. Cities are spelled the same way everywhere, so the
+  collection no longer counts one town twice. Existing places are fixed by the
+  usual *Resolve place names* run and without a single lookup — the address
+  parts are already stored, so it is arithmetic rather than a request.
 - **Everything that takes a moment now says so, the same way everywhere.** One
   progress panel over a blurred page: what is running, what it is doing right
   now, how far along it is, roughly how much longer, and a cancel button. It
