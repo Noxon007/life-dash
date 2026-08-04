@@ -22,14 +22,48 @@
 // Karten, 172 ms bei 1.800, also mit jeder Seite mehr. Diese Zahlen stehen
 // hier, damit der nächste Umbau daran gemessen wird und nicht an einem Gefühl.
 //
-// Aufruf aus dem Repo-Wurzelverzeichnis: node tools/measure-timeline.js [Seiten]
+// **Und was kosten die abgeleiteten Grundort-Tage?** (Anmerkung 182) Der
+// zweite Zahlenwert ist ihre Menge in JAHREN; ohne ihn läuft die Messung wie
+// bisher. Gemessen am 2026-08-04, `renderTimeline()` auf vollem Stand:
+//
+//     Jahre  Zoom    mit Fenster   ohne jedes Fenster
+//        20  Jahr         50 ms       49 ms  (dort GIBT es keins)
+//        20  Monat        52 ms      923 ms
+//        20  Tag         206 ms   10.196 ms
+//        40  Jahr        103 ms      101 ms
+//        40  Monat        51 ms    1.925 ms
+//        40  Tag         210 ms   43.402 ms
+//
+// Das ist der ganze Grund, warum Jahr und Jahrzehnt alle Tage nehmen und Tag,
+// Woche und Monat ein wachsendes Fenster: in den Sammel-Zoomstufen begrenzt
+// `TL_GROUP_CAP` die Zeilen je Gruppe ohnehin, im Tages-Zoom ist jeder Tag
+// eine eigene Gruppe.
+//
+// Aufruf aus dem Repo-Wurzelverzeichnis:
+//   node tools/measure-timeline.js [Seiten] [Grundort-Jahre]
 const fs = require('fs');
 const { JSDOM } = require('jsdom');
 
 const html = fs.readFileSync('frontend/index.html', 'utf8');
 const PAGES = Number(process.argv[2] || 6);
+const BL_YEARS = Number(process.argv[3] || 0);
 const PAGE = 300;               // TL_PAGE
 const START = new Date('2024-12-31T12:00:00Z').getTime();
+
+// Grundort-Tage in den Jahren VOR den Ereignissen — dort, wo sie in echt auch
+// liegen: in der Zeit, aus der nichts erfasst ist.
+const BL_DAYS = {};
+{
+  const first = new Date('2022-12-31T00:00:00Z');
+  for (let i = 0; i < BL_YEARS * 365; i++) {
+    BL_DAYS[new Date(first.getTime() - i * 86400e3).toISOString().slice(0, 10)] = 0;
+  }
+}
+const BL_TOTAL = Object.keys(BL_DAYS).length;
+const BL_INDEX_YEARS = BL_TOTAL
+  ? [...new Set(Object.keys(BL_DAYS).map(d => +d.slice(0, 4)))]
+      .sort().map(year => ({ year, count: 365 }))
+  : [];
 
 // Ereignisse absteigend nach Datum, wie der Server sie liefert: einer je
 // Stunde, damit ein Jahrgang mehrere Monate umspannt und die Gruppierung
@@ -67,8 +101,14 @@ const dom = new JSDOM(html, {
       } else if (/events\/index/.test(p)) {
         body = { total: PAGE * PAGES, dated: PAGE * PAGES, undated: 0, unconfirmed: 0,
                  fuzzy: 0, visits: 0, photo_events: 0, machine_proposals: 0,
-                 years: [{ year: 2024, count: PAGE * PAGES }] };
-      } else if (/days\/media|days\/weather|days\/baseline/.test(p)) body = {};
+                 years: [{ year: 2024, count: PAGE * PAGES }],
+                 baseline_days: BL_TOTAL, baseline_years: BL_INDEX_YEARS };
+      } else if (/days\/baseline/.test(p)) {
+        body = BL_TOTAL
+          ? { periods: [{ id: 'b1', label: 'Elternhaus', place: 'Musterweg 1',
+                          city: 'Musterstadt', country: 'DE' }], days: BL_DAYS }
+          : {};
+      } else if (/days\/media|days\/weather/.test(p)) body = {};
       else if (/auth\/config/.test(p)) body = { mode: 'dev' };
       else if (/auth\/me\/settings/.test(p)) body = { immich: null, place_name_parts: ['city'] };
       else if (/auth\/me$/.test(p)) body = { id: 'u1', display_name: 'T', role: 'admin' };
@@ -104,6 +144,12 @@ setTimeout(async () => {
                   + `${dt.toFixed(0).padStart(5)} ms   ${String(nodes).padStart(6)}`);
     }
     console.log(`  ${PAGES} Seiten zusammen: ${sum.toFixed(0)} ms`);
+    if (BL_TOTAL) {
+      console.log(`  Grundort-Zeilen: ${w.eval('TL_BASELINE_SHOWN')}`
+                  + ` von ${w.eval('TL_BASELINE.size')} geladenen`
+                  + ` (Fenster: ${w.eval("tl.zoom === 'year' || tl.zoom === 'decade'")
+                      ? 'keins — Jahr/Jahrzehnt zählen alle' : w.eval('tl.blPages') + ' Schritt(e)'})`);
+    }
     // Und die reine Zeichenzeit ohne Abruf, auf dem vollen Stand.
     const t1 = w.performance.now();
     w.renderTimeline();

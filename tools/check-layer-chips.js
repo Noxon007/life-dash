@@ -44,6 +44,16 @@ const EVENTS = [
   ...[1, 2, 3, 4, 5, 6, 7].map(i => ev('h' + i, 'google_timeline', 'event', AUG, 'Köln')),
 ];
 const VISIT_TOTAL = 9631;   // Bestand — absichtlich weit weg von 2 und 7
+// Anmerkung 181: der BESTAND je Kategorie, wie ihn der Index liefert. Die
+// Zahlen sind mit Absicht keine, die in der geladenen Seite vorkommen — und
+// `event` ist zusätzlich in „von Hand" und „automatisch erfasst" geteilt,
+// damit sich prüfen lässt, dass der Chip mitgeht, wenn eine Ebene ausgeht.
+const CAT_INDEX = [
+  { category: 'concert', count: 4711, manual: 4711, visits: 0, photos: 0 },
+  { category: 'trip', count: 1234, manual: 1234, visits: 0, photos: 0 },
+  { category: 'meal', count: 88, manual: 88, visits: 0, photos: 0 },
+  { category: 'event', count: 5100, manual: 100, visits: 5000, photos: 0 },
+];
 const BASELINE = [{
   id: 'b1', place: 'Detmold', label: 'Zuhause', lat: 51.93, lng: 8.87,
   date_start: '2024-01-01', date_end: '2024-12-31', day_count: 366,
@@ -87,7 +97,12 @@ function makeDom() {
           body = { total: EVENTS.length, dated: EVENTS.length, undated: 0,
                    unconfirmed: 0, fuzzy: 0, visits: VISIT_TOTAL, photo_events: 0,
                    machine_proposals: 0, years: [{ year: 2024, count: EVENTS.length }],
-                   baseline_days: 366, baseline_years: [{ year: 2024, days: 366 }] };
+                   baseline_days: 366, baseline_years: [{ year: 2024, days: 366 }],
+                   // Anmerkung 181: die Kategoriezahlen des Zeitstrahls kommen
+                   // von hier. Unverwechselbar weit weg von den geladenen
+                   // Mengen (2 Konzerte, 9 Sonstige) — steht auf dem Chip eine
+                   // davon, zählt er die Seite statt den Bestand (A37).
+                   categories: CAT_INDEX };
         } else if (/\/api\/baselines/.test(p)) body = BASELINE;
         else if (/days\/baseline/.test(p)) {
           // Zwei abgeleitete Tage — beide an Tagen OHNE Ereignis, sonst wären
@@ -198,6 +213,46 @@ setTimeout(async () => {
   ok('Ausgeschaltet steht dort 0', num(vis.textContent) === '0', vis.textContent);
   w.eval('mp.showVisits = true; mpSyncSourceChips();');
 
+  // --- 3b. Anmerkung 181: die KATEGORIE-Chips nennen ihre Zahl ebenfalls --- //
+  //
+  // Gemeldet: „bei den Kategorien wird nur beim Grundort eine Anzahl
+  // angegeben, bei den anderen nicht — das ist nicht konsequent." Seit
+  // Anmerkung 178 stehen sie in derselben Reihe; eine Reihe, in der ein Chip
+  // eine Zahl trägt und sieben nicht, liest sich als Fehler in den sieben.
+  const catChip = (box, c) => d.querySelector(`#${box} [data-cat="${c}"]`);
+  ok('Karte: jeder Kategorie-Chip trägt eine Zahl',
+     w.eval('FILTER_CATS').every(c => /\d/.test((catChip('mp-filters', c) || {}).textContent || '')),
+     w.eval('FILTER_CATS').map(c => (catChip('mp-filters', c) || {}).textContent).join(' | '));
+  // Wir stehen im Juli: 3 von Hand (Konzert, Reise, Essen) und 2 automatisch
+  // erfasste, die als „Sonstiges" laufen.
+  ok('Juli: 1 Konzert', num(catChip('mp-filters', 'concert').textContent) === '1',
+     catChip('mp-filters', 'concert').textContent);
+  ok('Juli: 2 Sonstiges', num(catChip('mp-filters', 'event').textContent) === '2',
+     catChip('mp-filters', 'event').textContent);
+  ok('…und wo nichts liegt, steht 0',
+     num(catChip('mp-filters', 'sport').textContent) === '0',
+     catChip('mp-filters', 'sport').textContent);
+
+  // **Der Kern der Regel: die Zahl hängt NICHT am eigenen Schalter.** Bei den
+  // Ebenen daneben tut sie das (dort heißt sie „was zeichne ich gerade"). Auf
+  // einem Kategorie-Chip wäre „0 Konzerte" die Wiederholung der Ausgrauung —
+  // und sie nähme genau die Zahl weg, wegen der man ihn anklickt.
+  catChip('mp-filters', 'concert')
+    .dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await wait(120);
+  ok('…und ein ausgeschalteter Chip behält sie',
+     num(catChip('mp-filters', 'concert').textContent) === '1'
+     && catChip('mp-filters', 'concert').classList.contains('off'),
+     `${catChip('mp-filters', 'concert').textContent} — ausgeschaltet ist er `
+     + 'schon an der Ausgrauung zu erkennen');
+  catChip('mp-filters', 'concert')
+    .dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await wait(120);
+  ok('…und die Farbmarke überlebt das Schreiben',
+     !!catChip('mp-filters', 'concert').querySelector('.fdot'),
+     'Anmerkung 160: `chip.textContent = …` räumt sie weg — deshalb steht die '
+     + 'Beschriftung in einem eigenen Element');
+
   // --- 4. Der Grundort lässt sich im Zeitstrahl abschalten ---------------- //
   w.eval("tl.zoom = 'year';");
   await w.loadTimeline();
@@ -209,8 +264,38 @@ setTimeout(async () => {
      'ohne Grundort wäre er außer Kraft — hier gibt es einen');
   const withRows = w.eval('tlBaselineRows().length');
   ok('Abgeleitete Tage sind da', withRows === 2, `${withRows} Zeilen`);
-  ok('…und der Schalter nennt ihre Zahl', num(blChip.textContent) === '2',
-     blChip.textContent);
+  // Anmerkung 181: die Zahl des BESTANDES (366 aus dem Index), nicht die der
+  // gerade gezeichneten zwei Zeilen — wie „🛰️ 9.631 automatisch erfasst"
+  // darüber und wie die Kategorie-Chips daneben. Wie weit die Liste
+  // zurückreicht, ist die Frage des Fußes, nicht die des Chips.
+  ok('…und der Schalter nennt die Zahl des Bestandes',
+     num(blChip.textContent) === '366', blChip.textContent);
+
+  // Und die Kategorie-Chips des Zeitstrahls: hier ist die richtige Zahl die
+  // des BESTANDES, weil der Zeitstrahl nur ein Fenster kennt — aus der
+  // geladenen Seite wäre sie eine beliebige Teilmenge (A37).
+  ok('Zeitstrahl: der Kategorie-Chip nennt den Bestand',
+     num(catChip('tl-filters', 'concert').textContent) === '4711',
+     `${catChip('tl-filters', 'concert').textContent} — in der geladenen Seite `
+     + 'stehen 2 Konzerte; steht die 2 auf dem Chip, zählt er das Fenster');
+  // **Und er geht mit, wenn eine Ebene ausgeht.** 5.100 „Sonstiges" bestehen
+  // aus 100 von Hand und 5.000 automatisch erfassten; wer die ausblendet,
+  // bekäme sonst ein Versprechen über 5.100 Einträge und beim Anklicken 100
+  // (Anmerkung 92 / A40, eine Ebene höher).
+  // Voreingestellt sind die automatisch erfassten im Zeitstrahl AUS — also
+  // stehen dort die 100 von Hand erfassten und nicht die 5.100 des Bestandes.
+  ok('…ohne die ausgeblendete Herkunft',
+     num(catChip('tl-filters', 'event').textContent) === '100',
+     `${catChip('tl-filters', 'event').textContent} — steht hier 5.100, `
+     + 'verspricht der Chip Einträge, die beim Anklicken nicht da sind');
+  w.eval('tl.showVisits = true; renderTimeline();');
+  await wait(60);
+  ok('…und mit ihr sind es 5.100',
+     num(catChip('tl-filters', 'event').textContent) === '5100',
+     `${catChip('tl-filters', 'event').textContent} — bleibt die Zahl stehen, `
+     + 'geht der Chip beim Umlegen einer Ebene nicht mit');
+  w.eval('tl.showVisits = false; renderTimeline();');
+  await wait(60);
 
   blChip.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   await wait(140);

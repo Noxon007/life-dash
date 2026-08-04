@@ -262,6 +262,27 @@ class DayCount(BaseModel):
     count: int
 
 
+class CategoryCount(BaseModel):
+    """Wie viele Einträge eine Kategorie beisteuert — über den GANZEN Bestand.
+
+    Dieselbe Aufteilung wie `YearCount` und aus demselben Grund (Anmerkung
+    179): der Zeitstrahl blendet automatisch Erfasstes aus, und eine Zahl, die
+    das Ausgeblendete mitzählt, verspricht auf dem Chip „412 Reisen" und zeigt
+    beim Anklicken drei. Gerechnet wird sie im Browser aus `manual` plus dem,
+    was gerade eingeblendet ist — mit derselben Funktion wie die Jahreszahl.
+
+    **Warum sie überhaupt vom Server kommt** (Anmerkung 181): die
+    Kategorie-Chips standen als einzige Schalter der Oberfläche ohne Zahl da.
+    Aus der geladenen Seite wäre sie eine beliebige Teilmenge gewesen — wer
+    eine Zahl über den gesamten Bestand braucht, holt sie hier.
+    """
+    category: str
+    count: int
+    visits: int = 0
+    photos: int = 0
+    manual: int = 0
+
+
 class YearCount(BaseModel):
     year: int
     count: int
@@ -315,6 +336,10 @@ class EventsIndex(BaseModel):
     year_min: int | None = None
     year_max: int | None = None
     years: list[YearCount] = []
+    # Anmerkung 181: dieselbe Auskunft je Kategorie. Sie trägt die Zahlen auf
+    # den Kategorie-Chips des Zeitstrahls — bis hierher die einzigen Schalter
+    # der Oberfläche, die keine nannten.
+    categories: list[CategoryCount] = []
     # F17: der Meilenstein „Geburt" — Grundlage der Alters-Chips, und praktisch
     # immer außerhalb des geladenen Fensters
     birth: dict | None = None

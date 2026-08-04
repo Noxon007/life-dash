@@ -3243,7 +3243,7 @@ const I18N_EN = {
   'map.baseline.n': "baseline",
   'map.baseline.none': "No baseline location entered yet — the form is under “My data”.",
   'tl.baseline.n': "baseline days",
-  'tl.baseline.tip': "Days with no entry but a baseline location that applies — derived, not recorded. The number is how many rows are shown; the footer says how many there are in total.",
+  'tl.baseline.tip': "Days with no entry but a baseline location that applies — derived, not recorded. The number covers your whole record; how far the list currently reaches is written at its foot.",
   'map.manual': "By hand",
   'map.manual.tip': "Entries you recorded yourself — trips, concerts, milestones. On the map the numbered points in their category colour.",
   'map.visits.tip': "Visits taken from the Google Timeline import — the same layer the timeline lists under 🛰️",
@@ -3449,7 +3449,8 @@ const I18N_EN = {
   'bl.wx.done': "{n} values discarded.",
   'bl.card.tag': "baseline", 'bl.card.here': "here",
   'bl.card.tip': "Derived from your baseline location — there is no entry on this day.",
-  'tl.bl.capped': "Showing {n} of {m} derived baseline days, spread evenly across the period.",
+  'tl.bl.window': "{n} of {m} derived baseline days — the most recent first.",
+  'tl.bl.more': "▼ Load more baseline days",
   'tl.agg.derived': "derived",
   'map.baseline': "🏠 Baseline", 'map.bl.derived': "derived",
   'map.baseline.tip': "Your baseline periods — one mark per period, where you normally were during that time. Derived, not recorded.",
@@ -4677,11 +4678,17 @@ async function saveTracked(keys) {
 }
 
 // Wiederverwendbare Kategorie-Filter-Chips. onChange(activeSet) wird bei jedem Klick gerufen.
+//
+// **Anmerkung 181 — die Beschriftung steht in einem eigenen Element.** Sie war
+// ein blanker Textknoten hinter der Farbmarke; wer eine Zahl hineinschreiben
+// wollte, hätte `textContent` gesetzt und damit die Marke weggeräumt — genau
+// der Fehler aus Anmerkung 160, weshalb es auf der Karte `mpChipCount` gibt.
+// Ein benanntes Element ist die billigere Hälfte derselben Lösung.
 function buildCatFilter(containerId, activeSet, onChange) {
   const el = document.getElementById(containerId);
   el.innerHTML = FILTER_CATS.map(c => `
     <span class="filter-chip ${activeSet.has(c) ? 'active' : 'off'}" data-cat="${c}">
-      <span class="fdot" style="background:${catColor(c)}"></span>${catLabel(c)}
+      <span class="fdot" style="background:${catColor(c)}"></span><span class="fcat">${catLabel(c)}</span>
     </span>`).join('');
   el.querySelectorAll('.filter-chip').forEach(chip => chip.addEventListener('click', () => {
     const c = chip.dataset.cat;
@@ -4691,7 +4698,42 @@ function buildCatFilter(containerId, activeSet, onChange) {
     onChange(activeSet);
   }));
 }
+// **Anmerkung 181 — jeder Kategorie-Chip nennt seine Zahl.**
+//
+// Gemeldet: „bei den Kategorien wird nur beim Grundort eine Anzahl angegeben,
+// bei den anderen nicht — das ist nicht konsequent." Stimmt. Seit Anmerkung 178
+// steht der Grundort in DERSELBEN Reihe wie Reise, Konzert und Meilenstein, und
+// er war dort der einzige Chip mit einer Zahl.
+//
+// **Die Zahl hängt hier NICHT am eigenen Schalter.** Bei den Ebenen-Schaltern
+// daneben tut sie das, und das ist dort richtig — sie heißt „was zeichne ich
+// gerade". Auf einem Kategorie-Chip wäre „0 Reisen" die Wiederholung dessen,
+// was die Ausgrauung schon sagt, und sie nähme genau die Zahl weg, wegen der
+// man ihn anklickt.
+//
+// Karte und Zeitstrahl zählen verschieden, und beide zu Recht: die Karte kennt
+// den Zeitraum, den sie zeichnet, der Zeitstrahl nur ein Fenster in die
+// Vergangenheit. Also nennt die Karte den ZEITRAUM und der Zeitstrahl den
+// BESTAND (aus dem Index — aus der geladenen Liste wäre es eine beliebige
+// Teilmenge, A37). Jede der beiden Reihen ist damit in sich stimmig, und genau
+// das war die Beschwerde.
+function syncCatChips(containerId, countOf) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.querySelectorAll('[data-cat]').forEach(chip => {
+    const lbl = chip.querySelector('.fcat');
+    if (!lbl) return;
+    const n = countOf(chip.dataset.cat);
+    lbl.textContent = n == null ? catLabel(chip.dataset.cat)
+      : `${n.toLocaleString(LOC())} ${catLabel(chip.dataset.cat)}`;
+  });
+}
 const passesFilter = (e, set) => set.has(FILTER_CATS.includes(e.category) ? e.category : 'event');
+// Welche Kategorie ein Eintrag für die Chips hat — dieselbe Regel wie in
+// `passesFilter`: was in keinem Chip steht, zählt bei „Sonstiges" mit. Zwei
+// Fassungen davon liefen sonst auseinander, und der Chip zeigte eine Zahl, die
+// zu seiner eigenen Auswahl nicht passt (Anmerkung 106).
+const chipCat = e => (FILTER_CATS.includes(e.category) ? e.category : 'event');
 function catClass(c) { return KNOWN_CATS.includes(c) ? `cat-${c}` : 'cat-media'; }
 function catColor(c) { return catColors[c] || '#f5a623'; }
 
@@ -4815,6 +4857,10 @@ const tl = { zoom: 'year', query: '', events: [], catFilter: new Set(FILTER_CATS
              // ausblendbar wie auf der Karte. Voreingestellt AN — die
              // abgeleiteten Tage waren bis hier gar nicht abschaltbar, und
              // ihre Abwesenheit wäre die überraschendere Änderung.
+             // Anmerkung 182: wie viele Schritte weit das Fenster der
+             // abgeleiteten Tage gerade reicht — mitgezählt wie `offset` bei
+             // den Ereignissen, damit „weiter zurück" für beide dasselbe heißt.
+             blPages: 1,
              showPhotos: false, showBaseline: true, level: 'city' };
 
 function isoWeek(d) {
@@ -4966,7 +5012,13 @@ async function loadBaselineDays(page) {
     if (!yrs.length) return;
     // Solange noch Seiten kommen, bleibt es bei der geladenen Spanne — sonst
     // lüde der erste Seitenaufruf gleich vierzig Jahre Tage nach.
-    if (tl.done || !from) {
+    //
+    // Anmerkung 182: außer in Jahr und Jahrzehnt. Dort wird gar nicht
+    // geblättert (das Gerüst kommt aus dem Index, Anmerkung 179), `tl.done`
+    // wird also nie wahr — und die Sammelzeile eines Kindheitsjahres meldete
+    // „0 abgeleitet", obwohl das ganze Jahr abgeleitet ist. Es ist EINE
+    // Anfrage, und ihre Antwort ist ein Datum je Tag.
+    if (tl.done || tlSkeletonMode() || !from) {
       const last = `${yrs[yrs.length - 1].year}-12-31`;
       from = `${yrs[0].year}-01-01`;
       if (!to || last > to) to = last;
@@ -4977,6 +5029,7 @@ async function loadBaselineDays(page) {
     const r = await api(`/api/days/baseline?from=${from}&to=${to}`);
     const periods = r.periods || [];
     Object.entries(r.days || {}).forEach(([d, i]) => TL_BASELINE.set(d, periods[i]));
+    TL_BASELINE_KEYS = null;   // die Reihenfolge muss neu gebildet werden
     // Und ihr Wetter. `loadDayWeather` fragt die Spanne der geladenen SEITE ab
     // — die abgeleiteten Tage liegen aber gerade dort, wo keine Ereignisse
     // sind, also außerhalb davon. Ohne diesen zweiten Abruf hätten sie Wetter
@@ -4989,18 +5042,54 @@ async function loadBaselineDays(page) {
   } catch { /* Beiwerk — ohne die Tage bleibt der Zeitstrahl gültig */ }
 }
 
-// Wie viele abgeleitete Tage höchstens als eigene Zeile gezeichnet werden.
+// **Anmerkung 182 — aus dem Deckel wird ein Fenster.**
 //
-// Ein Grundort über zwanzig Jahre sind 7 300 Zeilen, und eine Ansicht, die
-// siebentausend Zeilen baut, ist keine Ansicht mehr (dieselbe Rechnung wie bei
-// den Kartenpunkten, Anmerkung 153). Gegriffen wird GLEICHMÄSSIG über den
-// Zeitraum statt vorne abzuschneiden — `all.slice(0, 300)` war der Defekt aus
-// Anmerkung 110 und noch einmal aus Anmerkung 160 — und die Zahl steht in der
-// Fußzeile, statt verschwiegen zu werden (A40).
-const TL_BASELINE_CAP = 300;
+// Gemeldet: „warum können nur 300 Tage vom Grundort angezeigt werden? Es sollen
+// alle angezeigt werden."
+//
+// Bis hierher waren es 300, gleichmäßig über den ganzen Zeitraum GEGRIFFEN.
+// Beides war falsch, und zwar aus zwei verschiedenen Gründen:
+//
+// 1. **Die Stichprobe.** Gleichmäßig verteilen ist die richtige Antwort auf
+//    einen ENDGÜLTIGEN Deckel (Anmerkung 110, 160) — dort ist die Alternative,
+//    dass die zweite Jahreshälfte fehlt. Hier war es die falsche: aus 7.300
+//    Tagen jeden 24. zu zeigen ergibt eine Liste, aus der sich nichts ablesen
+//    lässt, und der einzige Weg zu den übrigen war: keiner.
+// 2. **Es ist gar kein Deckel-Problem.** Der Zeitstrahl IST ein Fenster in die
+//    Vergangenheit; die Ereignisse kommen seitenweise und wachsen beim
+//    Scrollen. Die abgeleiteten Tage taten das als einziges nicht.
+//
+// Jetzt: die jüngsten `TL_BASELINE_STEP` Tage, ZUSAMMENHÄNGEND, und jedes
+// „Ältere Einträge laden" nimmt einen Schritt mehr. Damit sind am Ende alle
+// erreichbar — und keine Zeile springt beim Nachladen weg, was eine wachsende
+// Stichprobe getan hätte.
+//
+// **Jahr und Jahrzehnt haben gar kein Fenster mehr.** Dort steht je Gruppe eine
+// Sammelzeile mit „N abgeleitet", und die zählte bis hier die STICHPROBE: ein
+// Jahr mit 365 abgeleiteten Tagen meldete 15. Der Deckel war dort also nicht
+// eine Auslassung, sondern eine falsche Zahl. Gemessen kostet es nichts, ihn
+// wegzulassen — 49 ms bei 7.300 Tagen, 101 ms bei 14.600, weil `TL_GROUP_CAP`
+// die Zeilen je Gruppe ohnehin begrenzt (`tools/measure-timeline.js`). Im
+// Tages-Zoom wäre dasselbe 10 s bzw. 43 s, und genau deshalb bleibt dort ein
+// Fenster, statt es „einfach alle" zu nennen.
+const TL_BASELINE_STEP = 300;
 const TL_BASELINE = new Map();
 let TL_BASELINE_TOTAL = 0;
 let TL_BASELINE_SHOWN = 0;
+// Reicht das Fenster im Tages-/Wochen-/Monats-Zoom weiter zurück, als gerade
+// gezeigt wird? Trägt den Knopf im Fuß — der Zeitstrahl ist sonst „zu Ende",
+// obwohl siebentausend Tage darunter liegen.
+let TL_BASELINE_MORE = false;
+// Die Tage absteigend sortiert, EINMAL je Stand. Ungültig, sobald sich die
+// Menge ändert; die Länge zu vergleichen genügt, weil nur hinzugefügt wird.
+//
+// **Gemessen bringt das nichts** (206 ms gegen 210 ms im Tages-Zoom bei 14.600
+// Tagen) — es steht hier trotzdem, weil es die Menge ist, die seit Anmerkung
+// 182 in Jahr und Jahrzehnt vollständig geladen wird, und weil vier Zeilen
+// billiger sind als die Frage beim nächsten Mal. Die 200 ms liegen woanders:
+// jede nachgeladene Seite baut die GANZE Liste neu (offener Punkt aus
+// Anmerkung 179, `tools/measure-timeline.js`).
+let TL_BASELINE_KEYS = null;
 
 // Die abgeleiteten Tage als Zeilen — in genau der Form, die `tlGroup` von
 // einem Ereignis erwartet, damit sie in JEDER Zoomstufe von selbst richtig
@@ -5010,18 +5099,31 @@ function tlBaselineRows() {
   // Anmerkung 178: ausgeschaltet heißt keine Zeilen UND keine Fußnote —
   // „300 von 7.300 gezeigt" unter einer Liste ohne eine einzige davon wäre
   // eine Auskunft über etwas, das gerade nicht da ist.
+  TL_BASELINE_MORE = false;
   if (!tl.showBaseline || !TL_BASELINE.size) { TL_BASELINE_SHOWN = 0; return []; }
-  const all = [...TL_BASELINE.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1));
-  const pick = all.length > TL_BASELINE_CAP ? spreadPick(all, TL_BASELINE_CAP) : all;
+  if (!TL_BASELINE_KEYS || TL_BASELINE_KEYS.length !== TL_BASELINE.size) {
+    TL_BASELINE_KEYS = [...TL_BASELINE.keys()].sort((a, b) => (a < b ? 1 : -1));
+  }
+  const all = TL_BASELINE_KEYS;
+  // Anmerkung 182: Jahr und Jahrzehnt sammeln — dort ist jede ausgelassene
+  // Zeile eine zu kleine Zahl in der Sammelzeile, und alle zu nehmen kostet
+  // gemessen 49 ms. Tag, Woche und Monat bekommen das wachsende Fenster.
+  const windowed = tl.zoom !== 'year' && tl.zoom !== 'decade';
+  const room = TL_BASELINE_STEP * Math.max(1, tl.blPages || 1);
+  const pick = (windowed && all.length > room) ? all.slice(0, room) : all;
+  TL_BASELINE_MORE = pick.length < all.length;
   TL_BASELINE_SHOWN = pick.length;
-  return pick.map(([day, pd]) => ({
-    baselineDay: true, day,
-    date_start: `${day}T00:00:00`,
-    label: (pd && pd.label) || null,
-    // `location` in der Form, die `tlAggTopPlace` liest — sonst wüsste die
-    // Jahres-Sammelzeile nicht, wo dieser Tag war.
-    location: pd ? { name: pd.place, city: pd.city } : null,
-  }));
+  return pick.map(day => {
+    const pd = TL_BASELINE.get(day);
+    return {
+      baselineDay: true, day,
+      date_start: `${day}T00:00:00`,
+      label: (pd && pd.label) || null,
+      // `location` in der Form, die `tlAggTopPlace` liest — sonst wüsste die
+      // Jahres-Sammelzeile nicht, wo dieser Tag war.
+      location: pd ? { name: pd.place, city: pd.city } : null,
+    };
+  });
 }
 
 // Eine Zeile für einen abgeleiteten Tag. Bewusst KEINE Ereigniskarte: sie ist
@@ -5081,7 +5183,11 @@ async function loadTimeline(more = false) {
   if (tl.loading) return;
   tl.loading = true;
   try {
-    if (!more) { tl.events = []; tl.offset = 0; tl.done = false; }
+    // Anmerkung 182: das Fenster der abgeleiteten Tage wächst mit den Seiten
+    // mit. Ein frischer Aufbau setzt es zurück — sonst zeigte ein Zoomwechsel
+    // plötzlich zwanzig Jahre Tage, weil vorher weit geblättert wurde.
+    if (!more) { tl.events = []; tl.offset = 0; tl.done = false; tl.blPages = 1; }
+    else tl.blPages++;
     // F17: Das Geburtsdatum steckt in einem Meilenstein, der fast immer
     // außerhalb der geladenen Seiten liegt — es kommt aus dem Index.
     fetchIndex().then(idx => {
@@ -5091,6 +5197,9 @@ async function loadTimeline(more = false) {
       // schätzen. Ein `renderTimeline()` hinterher, weil dieser Abruf
       // absichtlich NICHT abgewartet wird (er hängt sonst an der Seite).
       TL_INDEX_YEARS = idx.years || [];
+      // Anmerkung 181: die Kategoriezahlen kommen aus derselben Antwort.
+      TL_INDEX_CATS = idx.categories || [];
+      tlSyncCatChips();
       // `!tl.loading` ist der Punkt: kommt der Index, WÄHREND die erste Seite
       // noch unterwegs ist, zeichnete dieser Aufruf eine leere Liste samt
       // „dazu ist nichts geladen" — und der richtige Aufbau überschriebe sie
@@ -5523,6 +5632,10 @@ function renderTimelineList() {
   renderCityChip();
   renderDayChip();         // Anmerkung 142
   ensurePhotoIndex();      // A45: entscheidet, ob der Foto-Schalter etwas kann
+  // Anmerkung 181: hier und nicht nur beim Index-Abruf — die Zahl einer
+  // Kategorie ändert sich, sobald „automatisch erfasst" oder „Fotos" umgelegt
+  // wird (`tlSrcCount`), und das ist genau ein Neuzeichnen ohne neuen Index.
+  tlSyncCatChips();
   const toggle = document.getElementById('tl-visits-toggle');
   toggle.style.display = TL_VISIT_COUNT ? '' : 'none';
   toggle.textContent = `🛰️ ${TL_VISIT_COUNT.toLocaleString(LOC())} ${t('tl.visits.n', 'automatisch erfasst')}`;
@@ -5681,14 +5794,36 @@ const TL_AGG_GROUPS = [];   // Index -> { items, unit, label }
 // echten Zahl. Geladen wird beim Aufklappen, und zwar genau die Spanne, die
 // aufgeklappt wurde — statt sich Seite um Seite dorthin zu blättern.
 let TL_INDEX_YEARS = [];
-// Wie viele Einträge ein Jahr beisteuert — je nachdem, was gerade eingeblendet
-// ist. Ohne diese Rechnung stünde am Jahr 2016 „4.812", und wer die automatisch
-// erfassten ausgeblendet hat, klappt es auf und findet drei: die stille
-// Falschaussage aus Anmerkung 92, nur eine Ebene höher.
-function tlYearCount(y) {
-  return (y.manual || 0)
-    + (tlShowsSource('google_timeline') ? (y.visits || 0) : 0)
-    + (tlShowsSource('immich') ? (y.photos || 0) : 0);
+// Anmerkung 181: dieselbe Auskunft je Kategorie, ebenfalls aus dem Index.
+let TL_INDEX_CATS = [];
+// Wie viele Einträge ein Eimer des Index beisteuert — je nachdem, was gerade
+// eingeblendet ist. Ohne diese Rechnung stünde am Jahr 2016 „4.812", und wer
+// die automatisch erfassten ausgeblendet hat, klappt es auf und findet drei:
+// die stille Falschaussage aus Anmerkung 92, nur eine Ebene höher.
+//
+// Anmerkung 181: die Rechnung heißt jetzt nach ihrer AUFGABE und nicht mehr
+// nach ihrem ersten Anwendungsfall („Jahr"), weil sie seitdem zwei hat —
+// Jahres-Überschriften und Kategorie-Chips. Eine Regel, die nach ihrem ersten
+// Fall heißt, wird beim zweiten nicht gesucht, sondern neu geschrieben.
+function tlSrcCount(x) {
+  return (x.manual || 0)
+    + (tlShowsSource('google_timeline') ? (x.visits || 0) : 0)
+    + (tlShowsSource('immich') ? (x.photos || 0) : 0);
+}
+// Die Zahlen auf den Kategorie-Chips des Zeitstrahls: über den GANZEN Bestand,
+// so wie „🛰️ N automatisch erfasst" daneben (A37 — aus der geladenen Seite
+// wäre es eine beliebige Teilmenge). Der Fuß sagt, wie weit das Fenster reicht.
+function tlSyncCatChips() {
+  const own = {};
+  // Was in keinem Chip steht, zählt bei „Sonstiges" mit — dieselbe Regel wie
+  // `passesFilter`, sonst nennt der Chip eine andere Menge, als er einblendet.
+  let other = 0;
+  TL_INDEX_CATS.forEach(c => {
+    const n = tlSrcCount(c);
+    if (FILTER_CATS.includes(c.category)) own[c.category] = (own[c.category] || 0) + n;
+    else other += n;
+  });
+  syncCatChips('tl-filters', cat => (own[cat] || 0) + (cat === 'event' ? other : 0));
 }
 // Das Gerüst: für jedes Jahr des Index eine Gruppe, auch wenn davon nichts
 // geladen ist. Bei einer Suche oder einem gesetzten Tag-/Stadtfilter NICHT —
@@ -5698,7 +5833,7 @@ function tlIndexSkeleton(groups) {
   if (tl.query || tl.day || tl.city) return;
   if (tl.zoom !== 'year' && tl.zoom !== 'decade') return;
   TL_INDEX_YEARS.forEach(y => {
-    const n = tlYearCount(y);
+    const n = tlSrcCount(y);
     if (!n) return;
     const key = tl.zoom === 'year' ? String(y.year)
                                    : String(Math.floor(y.year / 10) * 10);
@@ -5729,7 +5864,7 @@ function tlMergeIndexRows(g, buckets) {
     const key = String(y.year);
     if (tl.zoom === 'year' ? rows.length : loaded.has(key)) return;
     rows.push({ key, unit: 'year', label: key, sort: y.year, items: [],
-                pending: { year: y.year, count: tlYearCount(y) } });
+                pending: { year: y.year, count: tlSrcCount(y) } });
   });
   return rows.sort((a, b) => b.sort - a.sort);
 }
@@ -5887,6 +6022,11 @@ function tlGroupWeather(g) {
 function tlBindFooter(el) {
   const more = el.querySelector('#tl-load-more');
   if (more) more.addEventListener('click', () => loadTimeline(true));
+  // Anmerkung 182: Sind die Ereignisse zu Ende und die abgeleiteten Tage
+  // nicht, gibt es nichts zu HOLEN — die Tage liegen längst im Browser. Ein
+  // `loadTimeline` an dieser Stelle wäre eine Anfrage, die nichts mitbringt.
+  const blMore = el.querySelector('#tl-more-baseline');
+  if (blMore) blMore.addEventListener('click', () => { tl.blPages++; renderTimeline(); });
 }
 
 // A37: Fuß des Zeitstrahls — zeigt, dass die Geschichte weitergeht. Das
@@ -5897,15 +6037,25 @@ function tlFooter() {
   if (tl.query) return '';
   // F20/A40: Was die Ansicht nicht alles zeigen kann, sagt sie — und zwar
   // hier, wo hingeschaut wird, nicht in einer Einstellung (Anmerkung 110).
-  const bl = (TL_BASELINE_TOTAL > TL_BASELINE_SHOWN && TL_BASELINE_SHOWN)
+  // Anmerkung 182: Die Zahl ist die eines FENSTERS geworden, nicht die einer
+  // Stichprobe — es fehlt also nichts, es ist nur noch nicht geladen. Deshalb
+  // steht darunter ein Knopf und nicht bloß ein Satz.
+  const bl = TL_BASELINE_MORE
     ? `<div class="hint" style="text-align:center">${esc(
-        t('tl.bl.capped', '{n} von {m} abgeleiteten Grundort-Tagen gezeigt, gleichmäßig über den Zeitraum verteilt.')
+        t('tl.bl.window', '{n} von {m} abgeleiteten Grundort-Tagen — die jüngsten zuerst.')
           .replace('{n}', TL_BASELINE_SHOWN.toLocaleString(LOC()))
-          .replace('{m}', TL_BASELINE_TOTAL.toLocaleString(LOC())))}</div>`
+          .replace('{m}', (TL_BASELINE_TOTAL || TL_BASELINE.size).toLocaleString(LOC())))}</div>`
     : '';
   if (tl.done) {
-    return bl + `<div class="hint" style="text-align:center">${
-      t('tl.end', 'Das ist der Anfang deiner Geschichte.')}</div>`;
+    // Anmerkung 182: „Das ist der Anfang deiner Geschichte" ist eine
+    // Falschaussage, solange siebentausend abgeleitete Tage darunter liegen.
+    // Die EREIGNISSE sind zu Ende, die Geschichte nicht — und der Unterschied
+    // ist genau der, den F20 überhaupt eingeführt hat.
+    return bl + (TL_BASELINE_MORE
+      ? `<div class="hint" id="tl-more-baseline" style="text-align:center; cursor:pointer">${
+          esc(t('tl.bl.more', '▼ Weitere Grundort-Tage laden'))}</div>`
+      : `<div class="hint" style="text-align:center">${
+          t('tl.end', 'Das ist der Anfang deiner Geschichte.')}</div>`);
   }
   // Anmerkung 179: In Jahr und Jahrzehnt steht oben schon alles. Ein Knopf
   // „Ältere Einträge laden" darunter wäre ein Angebot, das nichts Neues bringt
@@ -6249,13 +6399,17 @@ function tlSyncBaselineChip() {
   chip.classList.toggle('active', !empty && tl.showBaseline);
   chip.classList.toggle('off', !empty && !tl.showBaseline);
   const label = chip.querySelector('[data-i18n]') || chip;
+  // Anmerkung 181: die Zahl des BESTANDES, wie bei den Kategorie-Chips daneben
+  // und bei „🛰️ automatisch erfasst" darüber — nicht die der gerade gezeichneten
+  // Zeilen und nicht 0, wenn er ausgeschaltet ist. Wie weit das Fenster reicht,
+  // sagt der Fuß der Liste; das ist dort seine Aufgabe und nicht die des Chips.
   label.textContent = empty
     ? `🏠 ${t('map.baseline.n', 'Grundort')}`
-    : `🏠 ${(tl.showBaseline ? TL_BASELINE_SHOWN : 0).toLocaleString(LOC())} ${
+    : `🏠 ${TL_BASELINE_TOTAL.toLocaleString(LOC())} ${
         t('tl.baseline.n', 'Grundort-Tage')}`;
   chip.title = empty
     ? t('map.baseline.none', 'Noch kein Grundort eingetragen — das Formular steht unter „Meine Daten".')
-    : t('tl.baseline.tip', 'Tage, an denen kein Eintrag steht, aber ein Grundort gilt — abgeleitet, nicht erfasst. Die Zahl ist die der gezeigten Zeilen; wie viele es insgesamt sind, steht in der Fußzeile.');
+    : t('tl.baseline.tip', 'Tage, an denen kein Eintrag steht, aber ein Grundort gilt — abgeleitet, nicht erfasst. Die Zahl ist die des gesamten Bestandes; wie weit die Liste gerade zurückreicht, sagt ihr Fuß.');
 }
 // A47: Stufe wechseln = neu abfragen. Verdichtet wird auf dem Server, also
 // ist das keine Anzeige-Einstellung (A39: verdichtet wird VOR dem Blättern).
@@ -8790,6 +8944,7 @@ function mpSyncChips(condensed) {
   mpSyncPhotoChip();
   mpSyncSourceChips();
   mpSyncBaselineChip();
+  mpSyncCatChips();        // Anmerkung 181
   mpSyncDensity();
 }
 
@@ -8859,6 +9014,27 @@ function mpSyncSourceChips() {
       : `${t('map.visits.tip', 'Aus dem Google-Timeline-Import übernommene Besuche — dieselbe Ebene, die der Zeitstrahl unter 🛰️ führt')}\n`
         + t('map.n.total', 'Insgesamt im Bestand: {n}').replace('{n}', mpNum(mp.visitTotal)));
 }
+// Anmerkung 181: die Kategorie-Chips der Karte nennen, was in DIESEM Zeitraum
+// liegt. Gezählt wird VOR dem Kategorie-Filter (`mp.located` statt
+// `mpFiltered()`) — sonst stünde auf jedem ausgeschalteten Chip eine Null, und
+// die Zahl, wegen der man ihn anklickt, wäre genau dann weg, wenn man sie
+// braucht.
+function mpSyncCatChips() {
+  const key = mp.periods[mp.index];
+  const n = {};
+  if (key != null) {
+    // Die Ebenen-Schalter sind hier schon berücksichtigt: was sie ausblenden,
+    // holt der Server erst gar nicht (`mpLoadPoints` setzt visits/photos/
+    // manual). Ein zweiter Filter an dieser Stelle wäre dieselbe Regel ein
+    // zweites Mal — und die läuft still auseinander (Anmerkung 106).
+    mp.located.forEach(e => {
+      if (periodKey(e) !== key) return;
+      const c = chipCat(e);
+      n[c] = (n[c] || 0) + 1;
+    });
+  }
+  syncCatChips('mp-filters', c => n[c] || 0);
+}
 // Der Grundort — seit Anmerkung 178 ein Kategorie-Chip, aber mit derselben
 // Pflicht wie jede Ebene: sagen, wie viel er gerade beiträgt, und sagen, wenn
 // er nichts beitragen KANN (A40).
@@ -8870,7 +9046,10 @@ function mpSyncBaselineChip() {
   chip.classList.toggle('active', !empty && mp.showBaseline);
   chip.classList.toggle('off', !empty && !mp.showBaseline);
   const key = mp.periods[mp.index];
-  const n = (!empty && mp.showBaseline && key != null) ? mpBaselinesIn(key).length : 0;
+  // Anmerkung 181: unabhängig vom eigenen Schalter, wie die Kategorie-Chips
+  // daneben — er steht seit Anmerkung 178 in ihrer Reihe und muss dann auch
+  // ihre Regel befolgen, sonst ist die Reihe wieder uneinheitlich.
+  const n = (!empty && key != null) ? mpBaselinesIn(key).length : 0;
   mpChipCount('mp-baseline-toggle',
     empty ? `🏠 ${t('map.baseline', '🏠 Grundort').replace('🏠 ', '')}`
           : `🏠 ${mpNum(n)} ${t('map.baseline.n', 'Grundort')}`,
@@ -11946,6 +12125,10 @@ async function clearDayWeather() {
 // und täten nichts, während die Seite vollständig aussieht.
 function refreshAfterBaseline() {
   TL_BASELINE.clear();
+  // **Die Länge allein reicht hier nicht.** Wird ein Zeitraum um einen Tag
+  // verschoben, kommen GENAUSO VIELE Tage zurück wie vorher — der
+  // Zwischenspeicher sähe unverändert aus und trüge die alten Daten.
+  TL_BASELINE_KEYS = null;
   // Die Karte hält die Zeiträume in einer eigenen Liste — ohne das Vergessen
   // zeigte sie den Stand von vor der Änderung und sähe dabei vollständig aus.
   MP_BASELINES = null;

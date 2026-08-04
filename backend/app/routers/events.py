@@ -17,8 +17,9 @@ from app.database import get_db
 from app.models import (ConfirmState, DatePrecision, Event, EventEntityLink,
                         Location, Metric, Source, User)
 from app.routers._serialize import EAGER, EAGER_SLIM, event_to_read
-from app.schemas import (DayCount, EventGeo, EventManualCreate, EventRead,
-                         EventsIndex, LocationGeo, OnThisDayGroup, YearCount)
+from app.schemas import (CategoryCount, DayCount, EventGeo, EventManualCreate,
+                         EventRead, EventsIndex, LocationGeo, OnThisDayGroup,
+                         YearCount)
 from app.services import baseline, visitsplit
 from app.services.immich_link import MACHINE_SOURCES
 from app.services.photo_points import asset_of as photo_asset_of
@@ -1001,6 +1002,16 @@ def events_index(
                        manual=n - int(v or 0) - int(p or 0))
              for y, n, v, p in rows]
     dated = sum(y.count for y in years)
+    # Anmerkung 181: dieselbe Rechnung, eine Spalte weiter — was jede Kategorie
+    # beisteuert. Ohne Datumsfilter: ein undatierter Eintrag steht im
+    # Zeitstrahl unter „Unbekannt" und ist damit einer, den der Chip einblendet.
+    cat_rows = (db.query(Event.category, func.count(Event.id), *machine)
+                .filter(Event.user_id == user.id)
+                .group_by(Event.category).all())
+    categories = [CategoryCount(category=c or "event", count=n,
+                                visits=int(v or 0), photos=int(p or 0),
+                                manual=n - int(v or 0) - int(p or 0))
+                  for c, n, v, p in cat_rows]
     total = (db.query(func.count(Event.id))
              .filter(Event.user_id == user.id).scalar() or 0)
     unconfirmed = (db.query(func.count(Event.id))
@@ -1092,6 +1103,7 @@ def events_index(
         year_min=years[0].year if years else None,
         year_max=years[-1].year if years else None,
         years=years,
+        categories=categories,
         baseline_days=b_counts["total"],
         baseline_years=[DayCount(year=int(y), count=n)
                         for y, n in sorted(b_counts["years"].items())],

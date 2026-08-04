@@ -178,6 +178,26 @@ any `MINOR`.
   and your longest recorded trip.
 
 ### Fixed
+- **Every category chip now says how many entries it stands for.** Until now
+  only the baseline location did, and it sits in the same row — a row where one
+  switch carries a number and the rest do not reads as if something were broken
+  in the rest. On the map the number is the one for the period you are looking
+  at; in the timeline it is the one for everything you have recorded, because
+  the timeline only ever holds a window and a number out of that window would
+  be an arbitrary subset. It also follows what you have switched on: hide the
+  automatically recorded entries and the chip drops to what is left. Switching a
+  category off no longer blanks its number — that is precisely the number you
+  reach for when deciding to switch it back on.
+- **All of your baseline days are reachable now, not just 300 of them.** The
+  timeline used to show 300 derived days picked evenly across the entire period
+  — so out of twenty years you saw roughly every twenty-fourth day, with no way
+  to get at the rest, and underneath it the footer claimed you had reached the
+  beginning of your story. The derived days now behave like everything else in
+  the timeline: the most recent ones first, and “load older entries” keeps going
+  back until the first day of the period is on screen. In the *Year* and
+  *Decade* views there is no limit at all any more — and that also repairs a
+  wrong number, because the “N derived” on each summary row was counting the
+  sample rather than the days: a December with 31 derived days reported 26.
 - **“Today” opens right away.** The greeting, the tiles and the first-entry form
   are there immediately; the “On this day” look-back fills itself in underneath
   and says so while it works, instead of holding the whole first view of the app

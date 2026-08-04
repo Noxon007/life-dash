@@ -17,9 +17,12 @@
 //      Kennung, führt in keinen Bearbeiten-Dialog und ist als abgeleitet
 //      markiert. Sähe sie aus wie ein Eintrag, wäre die Unterscheidung genau
 //      dort verloren, wo sie zählt.
-//   3. **Der Deckel schneidet nicht ab, er verteilt** — und SAGT, dass er
-//      deckelt. `all.slice(0, 300)` war der Defekt aus Anmerkung 110 und noch
-//      einmal aus Anmerkung 160; hier wäre er zum dritten Mal möglich.
+//   3. **Es gibt einen Weg zu ALLEN abgeleiteten Tagen** (Anmerkung 182). Das
+//      Fenster fasst einen Schritt, zeigt die jüngsten Tage zusammenhängend,
+//      sagt beide Zahlen und trägt einen Knopf, der es erweitert — bis der
+//      erste Tag des Zeitraums dasteht. Vorher waren es 300 gleichmäßig über
+//      den Zeitraum gegriffene Tage OHNE jeden Weg zu den übrigen, und der Fuß
+//      meldete darunter „das ist der Anfang deiner Geschichte".
 //   4. **Ein Tag mit Eintrag bekommt keine abgeleitete Zeile daneben.** Das
 //      ist die Eigenschaft, auf der im Backend jede Addition beruht — sie muss
 //      auch in der Anzeige gelten, sonst steht der Tag zweimal da.
@@ -235,22 +238,50 @@ setTimeout(async () => {
        'auf der Disjunktheit beruht im Server jede Addition — steht der Tag '
        + 'hier zweimal, zählt er dort auch zweimal');
 
-    // (3) Der Deckel verteilt und sagt es.
+    // (3) Anmerkung 182: Das Fenster zeigt die JÜNGSTEN Tage zusammenhängend —
+    //     und lässt sich erweitern, bis alle da sind.
     const shown = inPage(w, 'TL_BASELINE_SHOWN');
     const total = inPage(w, 'TL_BASELINE_TOTAL');
-    ok('Der Deckel greift', shown === inPage(w, 'TL_BASELINE_CAP') && total > shown,
+    ok('Das Fenster fasst einen Schritt',
+       shown === inPage(w, 'TL_BASELINE_STEP') && total > shown,
        `${shown} von ${total}`);
-    const picked = inPage(w,
-      "tlBaselineRows().map(r => r.day).sort()");
-    ok('…und schneidet nicht vorne ab', Array.isArray(picked)
-       && picked[0] < '1990-02-01' && picked[picked.length - 1] > '1990-11-30',
+    const picked = inPage(w, "tlBaselineRows().map(r => r.day).sort()");
+    ok('…und es ist ein Fenster, keine Stichprobe', Array.isArray(picked)
+       && picked[picked.length - 1] === '1990-12-31' && picked[0] > '1990-02-28',
        `${Array.isArray(picked) ? picked[0] + ' … ' + picked[picked.length - 1] : picked}`
-       + ' — `slice(0, N)` nähme die ersten N chronologisch, und der Rest des '
-       + 'Jahres fehlte, während die Ansicht vollständig aussieht');
-    ok('…und die Fußzeile sagt, dass gedeckelt wird',
+       + ' — gegriffen wird zusammenhängend ab dem jüngsten Tag; eine über das '
+       + 'Jahr verteilte Auswahl ließe sich nicht erweitern, ohne dass beim '
+       + 'nächsten Schritt jede Zeile an eine andere Stelle springt');
+    ok('…und die Fußzeile nennt beide Zahlen',
        /364/.test(list.textContent) && /300/.test(list.textContent),
        'A40: was eine Ansicht nicht alles zeigen kann, muss sie dort sagen, '
        + 'wo hingeschaut wird');
+    // **Der Kern von Anmerkung 182.** Bis hierher gab es keinen Weg zu den
+    // übrigen 64 Tagen — die Ereignisse waren zu Ende, also sagte der Fuß „das
+    // ist der Anfang deiner Geschichte" über eine Liste, der zwei Monate
+    // fehlten. Ein Fenster ohne Griff ist ein Deckel mit besserem Namen.
+    const moreBtn = list.querySelector('#tl-more-baseline');
+    ok('…und der Fuß bietet den Weg weiter zurück', !!moreBtn,
+       'ohne Knopf wäre das Fenster ein Deckel — und der Fuß behauptete '
+       + 'gleichzeitig, die Geschichte sei zu Ende');
+    ok('…statt „Das ist der Anfang deiner Geschichte"',
+       !/Anfang|beginning/i.test(list.textContent),
+       list.textContent.slice(-200));
+    if (moreBtn) moreBtn.dispatchEvent(new w.Event('click', { bubbles: true }));
+    await wait(50);
+    const after = inPage(w, 'TL_BASELINE_SHOWN');
+    ok('…ein Klick holt die nächsten', after === total,
+       `${shown} → ${after} von ${total} — ein Schritt sind ${
+         inPage(w, 'TL_BASELINE_STEP')} Tage, und mehr als alle gibt es nicht`);
+    const all = inPage(w, "tlBaselineRows().map(r => r.day).sort()");
+    ok('…und dann steht der erste Tag des Zeitraums da',
+       Array.isArray(all) && all[0] === '1990-01-01',
+       Array.isArray(all) ? all[0] : all);
+    const foot = d.getElementById('timeline-list').textContent;
+    ok('…und erst jetzt ist die Geschichte zu Ende',
+       /Anfang|beginning/i.test(foot)
+       && !d.getElementById('timeline-list').querySelector('#tl-more-baseline'),
+       foot.slice(-200));
 
     // (5) Das Wetter der abgeleiteten Tage wird geholt und gezeigt.
     //
@@ -515,6 +546,17 @@ setTimeout(async () => {
     ok('…und weist sie als abgeleitet aus',
        agg && agg.querySelector('.badge-baseline'),
        'eine Zahl, die mitzählt, muss sagen, woher sie kommt (A40)');
+    // **Anmerkung 182 — hier war der Deckel nicht eine Auslassung, sondern
+    // eine FALSCHE ZAHL.** Der Dezember 1990 hat 31 abgeleitete Tage; die
+    // Stichprobe von 300 aus 364 machte daraus 26, und das stand als
+    // gerundete Tatsache in einer Sammelzeile, der man die Auswahl nicht
+    // ansieht. Deshalb hat Jahr/Jahrzehnt gar kein Fenster mehr — gemessen
+    // kostet das nichts (`tools/measure-timeline.js`), weil `TL_GROUP_CAP`
+    // die Zeilen je Gruppe ohnehin begrenzt.
+    ok('…und zählt sie VOLLSTÄNDIG', /^31\b/.test(dvChip),
+       `${JSON.stringify(dvChip)} — der Dezember 1990 hat 31 abgeleitete Tage; `
+       + 'jede kleinere Zahl ist die Größe einer Stichprobe, die als Aussage '
+       + 'über den Monat auftritt');
     // Und die Tage stehen trotzdem da — sie sind die führende Zahl.
     ok('…während die Tage weiter zählen',
        /^[1-9]/.test(chips.find(c => /days|Tage/.test(c)) || ''),

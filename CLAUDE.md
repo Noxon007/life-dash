@@ -40,10 +40,11 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
   können (Blättern, Zeitzonen, echte DTOs). Immer aus dem Wurzelverzeichnis.
 - **API-Kosten messen** statt raten: `<python> tools/_measure_api.py` legt
   20.000 Ereignisse an und misst die Endpunkte
-- **Zeitstrahl messen**: `node tools/measure-timeline.js` — Aufbauzeit und
-  Knotenzahl je nachgeladener Seite, für alle drei Zoomstufen. Der Kopf der
-  Datei trägt die zuletzt gemessenen Zahlen; der nächste Umbau wird daran
-  gemessen und nicht an einem Gefühl (Anmerkung 179).
+- **Zeitstrahl messen**: `node tools/measure-timeline.js [Seiten]
+  [Grundort-Jahre]` — Aufbauzeit und Knotenzahl je nachgeladener Seite, für
+  alle drei Zoomstufen; mit dem zweiten Wert zusätzlich die abgeleiteten Tage.
+  Der Kopf der Datei trägt die zuletzt gemessenen Zahlen; der nächste Umbau
+  wird daran gemessen und nicht an einem Gefühl (Anmerkung 179/182).
 - **CI** (`.github/workflows/tests.yml`): bei jedem Push/PR pytest auf SQLite
   *und* PostgreSQL plus die Wächter. Bewusst ohne Pfadfilter und ohne
   `cancel-in-progress`: ein übersprungener Test sieht aus wie ein bestandener.
@@ -207,8 +208,9 @@ Stufen), P3.1, P5.1 und F1. Offen bis 1.0 sind nur noch **R1** (Demo-Modus,
 Härtung, Projektoberfläche) und **R2** (Doku-Seite) — Einzelheiten in
 `ROADMAP.md`.
 
-**Offen aus den Rückmeldungen vom 2026-08-04** (Anmerkungen 168–180 sind
-erledigt, die zweite Rückmeldung mit elf Punkten vollständig):
+**Offen aus den Rückmeldungen vom 2026-08-04** (Anmerkungen 168–182 sind
+erledigt, die zweite Rückmeldung mit elf Punkten vollständig, aus der dritten
+die Punkte 1 und 2):
 
 - Der **LCP-Wert der Vektorkarte** (>4,9 s beim Wechsel auf Woche/Monat) ist
   NICHT behoben — nur der `styleimagemissing`-Fehler daneben. Der Moduswechsel
@@ -221,6 +223,16 @@ erledigt, die zweite Rückmeldung mit elf Punkten vollständig):
   (Jahr/Jahrzehnt) über den Index gelöst; dieser hier ist bewusst stehen
   geblieben, weil der Umbau (Gruppen einzeln ersetzen statt `innerHTML`) an den
   index-basierten Registern `VISIT_GROUPS`/`TL_STRIP_MEDIA` hängt.
+- **Aus „Grundort" soll „Wohnort" werden** (dritte Rückmeldung, Punkt 3 — vom
+  User zur Diskussion gestellt, NICHT entschieden). Der Kern: heute entscheidet
+  „steht an dem Tag ein Eintrag?", ob der Grundort schweigt. Gewünscht ist,
+  dass eine MEHRTÄGIGE Abwesenheit ihn schweigen lässt und ein einzelnes
+  Ereignis anderswo (Konfirmation) nicht — man ist abends wieder zu Hause. Die
+  Disjunktheit der beiden Tagesmengen bliebe dabei erhalten, es verschiebt sich
+  nur die Grenze; offen ist, WORAN eine mehrtägige Abwesenheit erkannt wird
+  (Dauer des Eintrags / eigene Marke am Eintrag / eigener Abwesenheits-Zeitraum)
+  — und die Dauer allein trägt nicht, weil „Mehrtägiges aufteilen" und der
+  Google-Import beide nur Tages-Einträge hinterlassen.
 - **Das Zeichen ist gewählt** (Anmerkung 180): Biene als Hauptzeichen, Wabe als
   Beizeichen. Erledigt, hier nur noch als Hinweis, dass die Frage keine offene
   mehr ist.

@@ -354,6 +354,42 @@ def test_index_carries_the_birth_for_the_age_chips(db, user):
     assert idx.birth["date_start"] == datetime(1990, 4, 12)
 
 
+def test_index_counts_categories_split_by_source(db, user):
+    """Anmerkung 181: die Kategorie-Chips holen ihre Zahl von hier.
+
+    Und zwar **aufgeteilt nach Herkunft**, aus demselben Grund wie die
+    Jahreszahlen (Anmerkung 179): der Zeitstrahl blendet automatisch Erfasstes
+    aus, und ein Chip, der es mitzählt, verspricht 400 Reisen und zeigt beim
+    Anklicken drei. Ohne die Aufteilung wäre die Zahl im Browser gar nicht
+    korrigierbar — sie käme als eine einzige Summe an.
+    """
+    for i in range(3):
+        _event(db, user, f"Konzert {i}", category="concert",
+               when=datetime(2024, 3, i + 1))
+    _event(db, user, "Reise", category="trip", when=datetime(2024, 4, 1))
+    for i in range(7):
+        _event(db, user, f"Besuch {i}", category="event",
+               when=datetime(2024, 5, i + 1), source=Source.google_timeline)
+    # Undatiert — steht im Zeitstrahl unter „Unbekannt" und ist damit einer,
+    # den der Chip einblendet. Ein Datumsfilter hier machte die Zahl kleiner
+    # als die Liste, die sie beschreibt.
+    _event(db, user, "irgendwann", category="trip", when=None)
+
+    idx = events_index(db=db, user=user)
+    by = {c.category: c for c in idx.categories}
+
+    assert by["concert"].count == 3
+    assert by["concert"].manual == 3
+    assert by["concert"].visits == 0
+    assert by["trip"].count == 2, "der undatierte Eintrag zählt mit"
+    assert by["event"].count == 7
+    assert by["event"].visits == 7
+    assert by["event"].manual == 0, (
+        "ohne die Aufteilung stünde auf dem Chip 7, und wer die automatisch "
+        "erfassten ausblendet, klickt ihn an und findet nichts")
+    assert sum(c.count for c in idx.categories) == idx.total
+
+
 def test_static_routes_win_over_the_single_event_route():
     """`/api/events/{event_id}` steht am Ende der Datei — mit Absicht.
 

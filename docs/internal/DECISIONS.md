@@ -1128,6 +1128,24 @@ and no change, and one that turned out to be the same defect in two places.
 
     Defined **once** inline as a `<symbol>`: two copies of the same SVG carry two gradient ids, and the second one wins silently. The service worker's shell cache moves to v3 — without that, everyone who has opened the app keeps the old symbol for as long as the cache name stays the same.
 
+181. ✅ **A row of switches where one carries a number and seven do not.** Reported: “in the categories, only the baseline location gives a count, the others don't — that isn't consistent.” Correct, and it is a consequence of note 178: the baseline location moved *into* the category row there, bringing its number with it. Read as a row, seven chips without a number look like a fault in the seven.
+
+    Every category chip now names its count, in both views — and the two views count **different things, both rightly**. The map knows the period it is drawing, so it names that period. The timeline only knows a window into the past, so it names the **whole record**, from the index (A37: a number over the entire holding comes from the server; out of the loaded page it would be an arbitrary subset). Each row is now internally consistent, which was the complaint.
+
+    **The count does not depend on the chip's own switch.** On the layer switches beside it, it does — there it means “what am I drawing right now”. On a category chip “0 concerts” would repeat what the greying-out already says, and it would remove precisely the number one clicks the chip for. The baseline chip follows the category rule now, not the layer rule, because it stands in that row.
+
+    The index delivers the per-category number **split by source** (`CategoryCount`), for the same reason as the per-year one in note 179: the timeline hides auto-recorded entries, and a chip that counts them promises 5,100 entries and shows 100 when clicked. `tlYearCount` became `tlSrcCount` in the process — a rule named after its first use is not found at the second, it is written a second time.
+
+182. ✅ **A cap with no way past it is not a limit, it is an omission.** Reported: “why can only 300 baseline days be shown? all of them should be.” They were 300, picked *evenly across the whole period* — and both halves of that were wrong, for two different reasons.
+
+    Spreading evenly is the right answer to a **final** cap (notes 110, 160), where the alternative is that the second half of the year is missing. Here it was the wrong one: showing every 24th day out of 7,300 yields a list nothing can be read from, and the only route to the rest was: none. Worse, the footer said “this is the beginning of your story” underneath it, because the *events* had run out.
+
+    And it was never a cap problem. The timeline **is** a window into the past; events arrive in pages and grow as you scroll. The derived days were the only thing that didn't. They now do: the most recent `TL_BASELINE_STEP` days, **contiguous**, and every “load older entries” takes one more step — including a button of its own once the events are exhausted but the days are not. A growing sample would have made every row jump elsewhere at each step; a window does not.
+
+    **Year and decade have no window at all any more.** There the cap wasn't an omission but a **wrong number**: each aggregate row says “N derived”, and it counted the sample — December 1990 has 31 derived days and reported 26. Measured, dropping the cap there costs nothing (49 ms at 7,300 days, 101 ms at 14,600) because `TL_GROUP_CAP` limits the rows per group anyway. In the day zoom the same thing is 10 s and 43 s — which is why a window stays there instead of calling it “simply all”. Same measuring script as note 179, and the numbers are the reason the two zooms are treated differently rather than a feeling about it.
+
+    One thing followed from it that had been silently wrong before: in year and decade the timeline never pages (the skeleton comes from the index), so `tl.done` never becomes true — and a childhood year reported “0 derived” although the whole year is derived. The full span is fetched there now. It is one request, and its answer is one date per day.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into
