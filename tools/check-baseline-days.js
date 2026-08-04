@@ -83,7 +83,16 @@ function makeDom(state) {
       w.fetch = (u, opt) => {
         const p = String(u);
         state.calls.push([(opt && opt.method) || 'GET', p]);
+        if (opt && opt.method === 'POST') (state.posts || []).push({ url: p, opt });
         let body = [];
+        if (/\/api\/baselines$/.test(p) && opt && opt.method === 'POST') {
+          return Promise.resolve({ ok: true, status: 201,
+                                   json: () => Promise.resolve({ id: 'b9', day_count: 2192 }) });
+        }
+        if (/\/api\/baselines$/.test(p)) {
+          return Promise.resolve({ ok: true, status: 200,
+                                   json: () => Promise.resolve([]) });
+        }
         if (/days\/baseline/.test(p)) {
           const [from, to] = span(p);
           const days = state.noBaseline ? {} : daysOfYear(from, to);
@@ -219,6 +228,44 @@ setTimeout(async () => {
     ok('…und keine Fußzeile behauptet einen Deckel',
        !/300/.test(list.textContent),
        list.textContent.slice(0, 200));
+    w.close();
+  }
+
+  // --- 2b. Das Formular schickt einen JSON-Body, der auch als solcher ankommt
+  //
+  // **Gemeldet als „422 beim Zeitraum eintragen".** `api()` setzt den
+  // Content-Type NICHT — jeder JSON-Aufruf in dieser Datei setzt ihn selbst,
+  // und dieser eine tat es nicht. Ohne ihn schickt der Browser `text/plain`,
+  // FastAPI sieht keinen Body und antwortet 422: eine Meldung, die auf das
+  // Formular zeigt, obwohl am Formular nichts falsch ist.
+  //
+  // Kein Test konnte das sehen, weil keiner das Formular je ABGESCHICKT hat —
+  // die Backend-Tests rufen den Endpunkt direkt, und der bekommt seinen Body
+  // vom TestClient korrekt gesetzt. Der Defekt saß genau in der Naht dazwischen.
+  {
+    const state = { calls: [], posts: [] };
+    const w = makeDom(state).window, d = w.document;
+    await wait(200);
+    d.getElementById('bl-place').value = 'Bad Segeberg';
+    d.getElementById('bl-from').value = '1986-04-02';
+    d.getElementById('bl-to').value = '1992-08-31';
+    d.getElementById('bl-add').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    await wait(150);
+
+    const post = state.posts.find(p => /\/api\/baselines$/.test(p.url));
+    ok('Das Formular schickt den Zeitraum ab', !!post,
+       `Aufrufe: ${JSON.stringify(state.posts.map(p => p.url))}`);
+    const ct = post && post.opt && post.opt.headers
+      && (post.opt.headers['Content-Type'] || post.opt.headers['content-type']);
+    ok('…als JSON, mit dem Content-Type dazu', ct === 'application/json',
+       `Content-Type: ${ct} — ohne ihn antwortet FastAPI mit 422, und der `
+       + 'Fehler zeigt auf das Formular statt auf den Aufruf');
+    let body = null;
+    try { body = JSON.parse(post.opt.body); } catch (_) {}
+    ok('…und der Rumpf trägt Ort und Anfang',
+       body && body.place === 'Bad Segeberg' && body.date_start === '1986-04-02'
+       && body.date_end === '1992-08-31',
+       JSON.stringify(body));
     w.close();
   }
 

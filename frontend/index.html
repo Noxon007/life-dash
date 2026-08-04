@@ -10606,6 +10606,11 @@ document.getElementById('bl-add')?.addEventListener('click', async ev => {
   try {
     const row = await api('/api/baselines', {
       method: 'POST',
+      // `api()` setzt den Content-Type NICHT — jeder JSON-Aufruf hier setzt ihn
+      // selbst. Ohne ihn schickt der Browser `text/plain`, FastAPI sieht keinen
+      // JSON-Body und antwortet 422: eine Fehlermeldung, die auf das Formular
+      // zeigt, obwohl am Formular nichts falsch ist.
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         place,
         date_start: from,
