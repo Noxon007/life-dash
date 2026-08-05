@@ -28,7 +28,7 @@ from fastapi.testclient import TestClient
 from app.database import get_db
 from app.main import app
 from app.models import (BaselineLocation, ConfirmState, DatePrecision, DayMetric,
-                        Event, Location, Source, User, UserRole)
+                        Event, Location, Metric, Source, User, UserRole)
 from app.services import baseline, weather_day
 from app.services.enrichment import enrich_weather
 from app.services.stats_overview import compute_overview
@@ -349,6 +349,97 @@ def test_baseline_weather_reaches_the_badge_thresholds(db, user, fake_weather):
 
     rows = day_value_query(db, user.id, "sunshine_h", min_value=10).all()
     assert len(rows) == 3
+
+
+# --------------------------------------------------------------------------- #
+# Anmerkung 194 — dieselbe Regel in der Statistik
+# --------------------------------------------------------------------------- #
+def _day_wx(db, user, day, **vals):
+    for key, value in vals.items():
+        db.add(DayMetric(user_id=user.id, day=day, key=key, value=value,
+                         source=Source.weather))
+
+
+def test_the_weather_balance_counts_baseline_days(db, user):
+    """Gemeldet: „warum gibt es keine Regentage zwischen 1991 und 2009?"
+
+    Weil die Bilanz ihre Tagesliste aus den EREIGNISSEN baute und die
+    Tageswerte nur für Tage nachschlug, an denen ohnehin schon ein Eintrag
+    stand. Ein Jahr, in dem nur der Wohnort steht, kam damit nicht einmal als
+    Balken vor — obwohl sein Wetter in der Datenbank liegt und die Abzeichen es
+    die ganze Zeit gezählt haben (Test darüber).
+
+    Geprüft wird über ein Jahr OHNE jeden Eintrag: die alte Rechnung konnte
+    darüber gar nichts liefern, egal wie viele Tageswerte darin stehen.
+    """
+    loc = _loc(db, user, "Bad Segeberg, Kreis Segeberg", city="Bad Segeberg")
+    _base(db, user, loc, date(2000, 1, 1), date(2000, 1, 31), label="Zuhause")
+    for day in (5, 6, 7):
+        _day_wx(db, user, date(2000, 1, day), rain_mm=9.0)
+    _day_wx(db, user, date(2000, 1, 5), sunshine_h=11.0, temp_max_c=40.0)
+    # Ein Ereignis in einem anderen Jahr — die Ereignis-Hälfte muss bleiben.
+    ev = _event(db, user, datetime(2024, 5, 5, 12), loc=loc)
+    for key, value in (("rain_mm", 9.0), ("sunshine_h", 1.0), ("temp_max_c", 20.0)):
+        db.add(Metric(event_id=ev.id, key=key, value=value, source=Source.weather))
+    db.commit()
+
+    wx = compute_overview(db, user.id)["weather"]
+    assert [2000, 3] in wx["rain_days_per_year"], wx["rain_days_per_year"]
+    assert [2024, 1] in wx["rain_days_per_year"]
+    assert wx["rain_days"] == 4
+    # 11 h am Wohnort-Tag + 1 h am Ereignis-Tag. Fehlt die erste Hälfte, steht
+    # hier 1 — und genau so sah der gemeldete Bestand aus.
+    assert wx["sun_hours"] == 12
+    # Die Bezugsgröße der Prozentzahl ist DIESELBE Menge, über die gezählt wird
+    assert wx["days"] == 4 and wx["rain_share"] == 100
+
+
+def test_a_baseline_day_can_hold_a_record(db, user):
+    """Anmerkung 161 hat die Rekorde zu Aussagen über TAGE gemacht — dann muss
+    ein Tag, an dem nichts erfasst wurde, einen halten können.
+
+    Und er muss sich als solcher zu erkennen geben: `derived` statt eines
+    erfundenen Titels. Ein Rekordtag ohne Eintrag, der aussieht wie einer mit,
+    verwischt genau den Unterschied, den dieses Paket überhaupt eingeführt hat.
+    """
+    loc = _loc(db, user, "Bad Segeberg, Kreis Segeberg", city="Bad Segeberg")
+    _base(db, user, loc, date(2000, 1, 1), date(2000, 1, 31))
+    _day_wx(db, user, date(2000, 1, 5), temp_max_c=40.0)
+    ev = _event(db, user, datetime(2024, 5, 5, 12), loc=loc, title="Sommertag")
+    db.add(Metric(event_id=ev.id, key="temp_max_c", value=20.0,
+                  source=Source.weather))
+    db.commit()
+
+    hot = compute_overview(db, user.id)["extremes"]["hot"]
+    assert hot["value"] == 40.0
+    assert hot["derived"] is True and hot["id"] is None
+    # Der Ort steht da, gekürzt wie bei jedem Eintrag — der Titel bleibt LEER,
+    # weil ihn niemand geschrieben hat (die Anzeige setzt den Satz, F10).
+    assert hot["place"] == "Bad Segeberg" and hot["title"] is None
+    assert str(hot["date_start"])[:10] == "2000-01-05"
+
+    # Und die Rangliste darunter ist dieselbe Rechnung (Anmerkung 156): Platz 1
+    # muss die Kachel sein, sonst sind es wieder zwei Rangfolgen.
+    tops = compute_toplists(db, user.id)["weather"]["hot"]
+    assert [r["value"] for r in tops[:2]] == [40.0, 20.0]
+    assert tops[0]["derived"] is True and tops[1]["derived"] is False
+    assert tops[1]["title"] == "Sommertag"
+
+
+def test_the_warmest_trip_stays_a_question_about_entries(db, user):
+    """Die Gegenrichtung derselben Regel — und der Grund, warum sie eine Regel
+    und keine Umstellung ist: **als TAG zählt der Wohnort voll, als EINTRAG
+    nie.** „Wärmste Reise" fragt nach einer Reise; ein Wohnort-Tag ist keine.
+    """
+    loc = _loc(db, user, "Bad Segeberg")
+    _base(db, user, loc, date(2000, 1, 1), date(2000, 1, 31))
+    _day_wx(db, user, date(2000, 1, 5), temperature_c=40.0)
+    db.commit()
+
+    ov = compute_overview(db, user.id)
+    assert ov["weather"]["warmest_trip"] is None
+    # …die Tage selbst sind trotzdem angekommen
+    assert ov["weather"]["days"] == 1
 
 
 def test_day_weather_survives_a_moved_period_and_can_be_cleared(client, db, user,

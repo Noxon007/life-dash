@@ -210,6 +210,16 @@ any `MINOR`.
   life moves; plus how many countries and cities each year of your life touched.
 
 ### Fixed
+- **The years in which only your residence is recorded now appear in the
+  weather statistics.** Rainy days, hours of sunshine and every weather record
+  were computed over days that carry an *entry* — so a year with nothing but a
+  residence produced no bar at all, even though its weather has been in the
+  database all along and the badges have been counting it since day one. A day
+  filled by your residence can now hold a record too; it says that it is
+  derived instead of borrowing the look of something you wrote down. *Warmest
+  trip* is unchanged and still asks about trips, because a residence day is not
+  one. Statistics take roughly a fifth longer to compute as a result — that is
+  the price of the first twenty years of a life appearing in them.
 - **The loading window's counter now moves while it waits.** Opening
   *Statistics* showed “0 / 2” for the whole wait and then went straight to
   done: one step covered four requests made at once, so the number had nothing

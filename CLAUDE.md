@@ -62,7 +62,10 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
   Schicht 4, nirgends gespeichert (`services/baseline.py`). **Die beiden
   Tagesmengen sind disjunkt** — der Wohnort füllt nur Lücken. Wer eine Zahl
   über TAGE bildet, muss ihn mitzählen; wer eine über EINTRÄGE bildet, darf es
-  nicht. **Achtung, ein Eintrag belegt nur seinen ANFANGSTAG** — ein
+  nicht. **Der Verräter ist die Überschrift** (Anmerkung 194): „Regentage",
+  „Sonnenstunden", „kältester Tag" sind Zahlen über Tage — wer die Tagesliste
+  aus der EREIGNIS-Tabelle aufzählt, liegt schon falsch, und zwar lautlos: es
+  fehlen nur Jahre. **Achtung, ein Eintrag belegt nur seinen ANFANGSTAG** — ein
   ungeteilter Mehrtäger lässt den Wohnort die übrigen Tage füllen; die Antwort
   darauf ist der Lauf „Mehrtägiges aufteilen" (Anmerkung 183).
 - **Der Code sagt `baseline`, alles andere sagt „Wohnort"/„residence"**

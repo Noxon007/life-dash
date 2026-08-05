@@ -177,6 +177,15 @@ downstream goes quietly wrong the moment it stops holding.
 **Consequence for anyone writing a statistic:** a figure over **days** must
 count residence days; a figure over **entries** must not.
 
+> This is the rule most easily broken without noticing, because breaking it
+> raises nothing — it only leaves years out. It happened to the whole weather
+> balance and to every weather record (note 194): they built their list of days
+> from the *events*, so a decade in which only a residence is recorded produced
+> no figure at all, while the badges next door had been counting those same days
+> from the start. **The tell is always the heading:** “rainy days”, “hours of
+> sunshine”, “coldest day” are figures over days. If a computation reaches for
+> the event table to enumerate them, it is already wrong.
+
 **One caveat that follows from the rule, and bites in practice:** an entry
 occupies only its **starting day** (`recorded_days` reads `date_start`). A
 two-week holiday entered as a *single* entry therefore leaves thirteen days for

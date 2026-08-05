@@ -18,14 +18,16 @@ Schicht 4: nichts gespeichert, alles bei jeder Abfrage neu gerechnet.
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import date as date_type
+from datetime import datetime, time
+from typing import NamedTuple
 
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.sqlutil import day_number
-from app.models import (ConfirmState, Entity, Event, EventEntityLink, Location,
-                        Metric, Source)
+from app.models import (ConfirmState, DatePrecision, DayMetric, Entity, Event,
+                        EventEntityLink, Location, Metric, Source)
 from app.services import baseline, weather_day
 
 # Dieselben Muster wie im Frontend (dort als RegExp über „Titel + Beschreibung")
@@ -95,6 +97,23 @@ def _short_place(name: str | None) -> str | None:
     if not name:
         return None
     return name.split(",")[0].strip() or None
+
+
+def _as_day(value) -> date_type | None:
+    """Was aus einer `Date`-Spalte kommt, als `date`.
+
+    Beide Dialekte liefern hier ein `date`; die Zeichenketten-Rückfallebene
+    steht trotzdem da, weil dieselbe Spalte über `union_all` und Subqueries
+    läuft und SQLite dort schon einmal Text zurückgegeben hat (`recorded_days`
+    trägt denselben Satz)."""
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date_type):
+        return value
+    try:
+        return datetime.fromisoformat(str(value)[:10]).date()
+    except (TypeError, ValueError):
+        return None
 
 
 def _age_years(birth: datetime, when: datetime) -> int:
@@ -249,8 +268,24 @@ def compute_overview(db: Session, user_id: str, *, today: datetime | None = None
     }
 
 
-def _extreme_tops(events: dict, values: dict, val, card,
-                  n: int) -> dict[str, list[dict]]:
+class WeatherSource(NamedTuple):
+    """Alles, was eine Wetter-Auskunft braucht — als EIN Ding.
+
+    Anmerkung 194: Vorher waren es vier lose Rückgabewerte, und als die
+    Wohnort-Tage dazukamen, wären es sechs geworden. Eine benannte Struktur ist
+    hier nicht Geschmack, sondern die Absicherung gegen genau den Defekt, der
+    diese Anmerkung ausgelöst hat: **eine zweite Auswertung, die eine der
+    Quellen einfach nicht mitgibt.** Wer `WeatherSource` bekommt, bekommt beide.
+    """
+    events: dict            # {id: Ereignis-Tupel}
+    values: dict            # {id: {Schlüssel: Wert}} — Wetter je Ereignis
+    val: object             # (id, *keys) -> Wert, mit Schlüssel-Kette
+    card: object            # (id, Wert) -> Rekord-Zeile
+    days: dict              # {Tag: {Schlüssel: Wert}} — Wohnort-Tage (F20)
+    day_card: object        # (Tag, Wert) -> Rekord-Zeile
+
+
+def _extreme_tops(src: WeatherSource, n: int) -> dict[str, list[dict]]:
     """Die besten `n` **Tage** je Extremwert — die Rangfolge an EINER Stelle.
 
     Die Kachel im Statistik-Reiter nimmt davon den Kopf, die Top-Liste
@@ -277,34 +312,60 @@ def _extreme_tops(events: dict, values: dict, val, card,
     Rekord, wie extrem es an diesem Tag überhaupt wurde. Den vorsichtigen Wert
     hier zu nehmen hieße, den heißesten Tag am kühlsten seiner Orte zu messen.
     `direction` steht schon in `_EXTREMES`, es kommt also keine Angabe dazu.
+
+    **Anmerkung 194: die Wohnort-Tage stehen mit in der Rangfolge**, und
+    deshalb nimmt diese Funktion die ganze `WeatherSource` statt einer Auswahl
+    daraus. Als Einzelparameter mit Vorbelegung wäre der Defekt genau so
+    wiedergekommen, wie er entstanden ist: die zweite Auswertung (die
+    Top-Listen) hätte eine Quelle einfach nicht mitgegeben, und niemandem wäre
+    eine fehlende Zeile aufgefallen.
     """
+    events, values, val, card, days, day_card = (
+        src.events, src.values, src.val, src.card, src.days, src.day_card)
     out: dict[str, list[dict]] = {}
     for name, keys, direction, positive_only in _EXTREMES:
-        best: dict[object, tuple[str, float]] = {}
-        for eid in values:
-            v = val(eid, *keys)
+        # Je Tag der Anwärter, der ihn vertritt: (Stichentscheid, Wert, Kennung
+        # oder None). `None` heißt „abgeleiteter Tag" — die Karte baut dann
+        # `day_card`. Ein Tag kann nie beides sein (F20: der Wohnort füllt nur
+        # Lücken), die beiden Mengen treten sich also nicht in die Quere.
+        best: dict[object, tuple[str, float, object]] = {}
+
+        def offer(day, v, eid=None):
             if v is None or (positive_only and v <= 0):
-                continue
-            when = getattr(events.get(eid), "date_start", None)
-            if when is None:
-                continue
-            day = when.date()
-            cur = best.get(day)
+                return
             # Bei Gleichstand innerhalb eines Tages gewinnt die kleinere
             # Kennung — aus demselben Grund wie bei der Sortierung unten: ohne
             # eine zweite Stufe entschiede die Reihenfolge der Dict-Iteration,
             # welcher Ort neben dem Datum steht.
+            tie = eid or ""
+            cur = best.get(day)
             if cur is None or (v > cur[1] if direction == "max" else v < cur[1]) \
-                    or (v == cur[1] and eid < cur[0]):
-                best[day] = (eid, v)
-        rows = list(best.values())
-        # `eid` als zweites Sortierkriterium: bei gleichen Werten — nach dem
-        # Runden auf eine Nachkommastelle keine Seltenheit — wäre die
+                    or (v == cur[1] and tie < cur[0]):
+                best[day] = (tie, v, eid)
+
+        for eid in values:
+            when = getattr(events.get(eid), "date_start", None)
+            if when is not None:
+                offer(when.date(), val(eid, *keys), eid)
+        for day, vals in days.items():
+            # Dieselbe Schlüssel-Kette wie `val` bei den Ereignissen —
+            # `temp_max_c`, sonst `temperature_c`. Zwei Fassungen davon liefen
+            # still auseinander, und die zweite stünde hier.
+            v = next((vals[k] for k in keys if vals.get(k) is not None), None)
+            offer(day, v)
+
+        # Der Stichentscheid als zweites Sortierkriterium: bei gleichen Werten —
+        # nach dem Runden auf eine Nachkommastelle keine Seltenheit — wäre die
         # Reihenfolge sonst die der Dict-Iteration und damit zwischen zwei
         # Aufrufen verschieden. Eine Rangliste, die bei jedem Laden anders
-        # aussieht, ist keine.
-        rows.sort(key=lambda r: (-r[1] if direction == "max" else r[1], r[0]))
-        out[name] = [card(eid, v) for eid, v in rows[:n]]
+        # aussieht, ist keine. Ein abgeleiteter Tag trägt dabei den leeren
+        # Stichentscheid und steht bei Gleichstand deshalb vorn — willkürlich,
+        # aber fest, und das ist die Eigenschaft, um die es geht.
+        rows = sorted(best.items(),
+                      key=lambda kv: (-kv[1][1] if direction == "max"
+                                      else kv[1][1], kv[1][0]))
+        out[name] = [(card(eid, v) if eid is not None else day_card(day, v))
+                     for day, (_tie, v, eid) in rows[:n]]
     return out
 
 
@@ -354,20 +415,139 @@ def weather_values(db: Session, user_id: str):
         return {"value": round(value, 1), "id": eid, "title": e.title,
                 "date_start": e.date_start,
                 "date_precision": e.date_precision.value,
-                "place": _short_place(e.name)}
+                "place": _short_place(e.name), "derived": False}
 
-    return events, values, val, card
+    days, day_card = _baseline_weather_days(db, user_id)
+    return WeatherSource(events, values, val, card, days, day_card)
+
+
+# --------------------------------------------------------------------------- #
+# **Anmerkung 194 — die zweite Hälfte der Tage.**
+# --------------------------------------------------------------------------- #
+# Gemeldet: „warum gibt es keine Regentage zwischen 1991 und 2009 — weil da nur
+# ein Wohnort hinterlegt ist?" Ja, und das war ein Defekt und keine Eigenschaft.
+#
+# Die Wetterwerte dieser Jahre LIEGEN in der Datenbank (`DayMetric`, vom selben
+# Lauf geholt wie die der Ereignisse), und `weather_day.day_values` vereinigt
+# beide Quellen längst korrekt. Die Statistik hat die Vereinigung nur nicht
+# benutzt: sie baute ihre Tagesliste aus den EREIGNISSEN und schlug die
+# Tageswerte danach lediglich für Tage nach, an denen ohnehin schon ein Eintrag
+# stand. Ein Jahr ohne Einträge kam damit nicht einmal als Balken vor.
+#
+# **Es ist genau die Regel aus F20, nur an einer Stelle, die sie nicht gelesen
+# hat**: wer eine Zahl über TAGE bildet, muss den Wohnort mitzählen; wer eine
+# über EINTRÄGE bildet, darf es nicht. „Regentage", „Sonnenstunden" und
+# „kältester Tag" sind Zahlen über Tage — die Überschrift sagt es, seit
+# Anmerkung 161 führt auch der Klick zum TAG. Die Abzeichen (F19) haben die
+# Wohnort-Tage die ganze Zeit mitgezählt, weil sie über `weather_day` gehen: ein
+# Sonnentag von 1998 konnte ein Abzeichen einbringen und stand trotzdem in
+# keiner Sonnenstunde.
+#
+# **Nur die Tage werden geholt, die wirklich Wetter tragen** — nicht alle
+# abgeleiteten. `baseline.inferred_days` würde bei vierzig Jahren Wohnort
+# siebentausend Tage in den Speicher legen, um für die meisten nichts zu finden;
+# die Bedingung als SQL (`inferred_day_clause`, dieselbe Regel) lässt die
+# Datenbank aussortieren. Der Ort kommt danach aus den Zeiträumen, deren es eine
+# Handvoll gibt.
+def _baseline_weather_days(db: Session, user_id: str):
+    """({Tag: {Schlüssel: Wert}}, Kartenbauer) für die Wohnort-Tage mit Wetter.
+
+    Dieselbe Gestalt wie `values`/`card` bei den Ereignissen, damit
+    `_extreme_tops` beide Mengen ohne Fallunterscheidung durchläuft.
+
+    **Dass sich die beiden Mengen nicht überschneiden, ist keine Vorsicht,
+    sondern die tragende Eigenschaft aus F20** (der Wohnort füllt nur Lücken).
+    Deshalb darf hier schlicht dazugelegt werden, statt je Tag eine Vorrangregel
+    zu erfinden — dieselbe Begründung, mit der `weather_day._rows` die beiden
+    Quellen vereinigt.
+
+    **Die Lückenregel steht hier in ihrer PYTHON-Fassung** (`recorded_days` +
+    die Zeiträume), nicht als SQL-Bedingung. Das ist keine dritte Fassung: es
+    sind die beiden, die `baseline.py` nebeneinander führt und gegeneinander
+    prüft — `inferred_days` rechnet genauso.
+
+    **Welche der drei möglichen Bauarten die billigste ist, war zweimal anders
+    als vermutet.** Gemessen mit `tools/_measure_api.py` (20.000 Ereignisse,
+    5.843 Wohnort-Tage mit Wetter), Ausgangswerte 405 ms für
+    `/api/stats/overview` und 357 ms für `/api/stats/toplists`:
+
+    * `inferred_day_clause` als Anti-Join in der Abfrage → 500 / 501 ms.
+      `date()` über einer Spalte kann kein Index bedienen.
+    * Aus `weather_day.day_values` abgeleitet (die Vereinigung, die die Bilanz
+      ohnehin holt) → 442 / 628 ms. Für die Bilanz die beste Wahl, für die
+      Ranglisten die schlechteste: die brauchen die Vereinigung sonst gar nicht.
+    * Diese hier — Zeilen roh holen, in Python aussortieren → 509 / 554 ms.
+
+    Die letzte ist die einzige, die BEIDE Auskünfte gleich behandelt, und sie
+    ist damit die einzige, die ohne eine zweite Fassung derselben Frage
+    auskommt. Von den ~120 ms Aufschlag entfallen rund 60 auf diese Funktion,
+    der Rest auf die 5.843 zusätzlichen Anwärter je Rekord in `_extreme_tops`.
+    Beide Endpunkte sind Klick-Endpunkte, und der Aufschlag kauft die ersten
+    zwanzig Jahre eines Lebens — vorher standen sie in keiner dieser Zahlen.
+    """
+    rows = (db.query(DayMetric.day, DayMetric.key, DayMetric.value)
+            .filter(DayMetric.user_id == user_id,
+                    DayMetric.source == Source.weather,
+                    DayMetric.key.in_(_WX_KEYS),
+                    DayMetric.value.isnot(None))
+            .all())
+    # Welcher Wohnort einen Tag vertritt: der ERSTE Zeitraum, der ihn deckt —
+    # dieselbe Wahl wie in `baseline.inferred_days` (dort gewinnt der erste,
+    # weil `if day not in out` die späteren abweist). Zwei Antworten darauf
+    # liefen still auseinander, und diese hier stünde in der Statistik.
+    # `spans` deckelt zugleich bei HEUTE, beantwortet also auch die zweite
+    # Hälfte der Regel („nicht in der Zukunft") — deshalb ist „kein Zeitraum
+    # gefunden" hier dasselbe wie „zählt nicht mit".
+    periods = baseline.spans(db, user_id) if rows else []
+
+    def where(day: date_type):
+        for start, end, row in periods:
+            if start <= day <= end:
+                return row
+        return None
+
+    recorded = baseline.recorded_days(db, user_id) if rows else set()
+    days: dict[date_type, dict[str, float]] = {}
+    for day, key, value in rows:
+        d = _as_day(day)
+        # Die dritte Hälfte der Regel: an dem Tag darf kein Eintrag stehen. Ein
+        # Tageswert, dessen Tag nachträglich einen bekommen hat, bleibt liegen
+        # und gilt von selbst wieder, sobald der Tag zurückfällt (Anm. 185).
+        if d is None or d in recorded or where(d) is None:
+            continue
+        days.setdefault(d, {})[key] = value
+
+    def day_card(day: date_type, value: float) -> dict:
+        row = where(day)
+        loc = getattr(row, "location", None)
+        # **`title` bleibt leer, und das ist der Punkt.** Ein abgeleiteter Tag
+        # hat keinen Titel, den jemand geschrieben hätte — „Wohnort" hier
+        # einzusetzen hieße, deutschen Text aus dem Server in eine Oberfläche zu
+        # schreiben, die auch englisch sein kann (F10). Die Marke ist `derived`,
+        # den Satz dazu formuliert die Anzeige.
+        return {"value": round(value, 1), "id": None, "title": None,
+                "date_start": datetime.combine(day, time.min),
+                "date_precision": DatePrecision.day.value,
+                "place": _short_place(getattr(loc, "name", None)),
+                "derived": True}
+
+    return days, day_card
 
 
 def _weather_stats(db: Session, user_id: str) -> dict:
-    """Wetter-Extreme (je Ereignis) und Wetter-Bilanz (je KALENDERTAG, A31).
+    """Wetter-Rekorde und Wetter-Bilanz — beides je KALENDERTAG (A31).
 
-    Beides braucht die Werte je Ereignis, deshalb ein gemeinsamer Durchgang."""
-    events, values, val, card = weather_values(db, user_id)
-    if not values:
+    Beides braucht dieselben Werte, deshalb ein gemeinsamer Durchgang.
+
+    Anmerkung 194: „je Ereignis" stand hier in der ersten Zeile und stimmte
+    schon seit Anmerkung 161 nicht mehr für die Rekorde. Jetzt sind es zwei
+    Quellen (Ereignisse und Wohnort-Tage) und eine Einheit."""
+    src = weather_values(db, user_id)
+    events, values = src.events, src.values
+    if not values and not src.days:
         return _empty_weather()
 
-    # --- Extreme: je Ereignis, nicht je Tag (die heißeste Stunde zählt) ---
+    # --- Rekorde: je Tag, aus beiden Quellen (Anmerkung 161/194) ---
     # Anmerkung 114: Eine Schleife über eine Tabelle statt zwölf Blöcke. Die
     # ersten sechs Kacheln standen als zwei getrennte Fassungen desselben
     # Gedankens da; mit sechs weiteren wäre daraus dieselbe stille Doppelregel
@@ -380,7 +560,7 @@ def _weather_stats(db: Session, user_id: str) -> dict:
     # Ebene höher, und sie liefen genau dann auseinander, wenn jemand eine
     # Schwelle ändert (etwa „0 zählt nicht").
     extremes = {name: (rows[0] if rows else None)
-                for name, rows in _extreme_tops(events, values, val, card, 1).items()}
+                for name, rows in _extreme_tops(src, 1).items()}
 
     # --- Bilanz: EIN Datensatz je Kalendertag (A31/Anmerkung 64) ---
     # Ein importierter Tag trägt dutzende Besuche mit demselben Wetter; über
@@ -393,30 +573,38 @@ def _weather_stats(db: Session, user_id: str) -> dict:
     # begründet. Jetzt gilt überall die Regel aus `weather_day`: je Schlüssel
     # der kleinste Wert des Tages, also der vorsichtige.
     day_wx = weather_day.day_values(db, user_id, keys=_WX_KEYS)
-    # Das Ereignis bleibt trotzdem gebraucht — aber nur noch als IDENTITÄT
-    # (zu welcher Reise gehört der Tag, wie heißt sie). Der WERT kommt aus
-    # `day_wx`. Zwei Fragen, zwei Quellen: genau die Trennung, deren Fehlen
-    # den Vertreter zur Auskunft gemacht hat.
-    by_day: dict[str, str] = {}
-    for eid in sorted(values, key=lambda i: (events[i].date_start, i)):
-        day = events[eid].date_start.date().isoformat()
-        by_day.setdefault(day, eid)
-    day_ids = list(by_day.values())
     dval = lambda day, key: (day_wx.get(day) or {}).get(key)  # noqa: E731
-    day_of = lambda i: events[i].date_start.date().isoformat()  # noqa: E731
 
-    rain_days = sum(1 for i in day_ids if (dval(day_of(i), "rain_mm") or 0) >= 1)
-    sun_hours = round(sum(dval(day_of(i), "sunshine_h") or 0 for i in day_ids))
+    # **Anmerkung 194: gezählt wird über `day_wx`, nicht über eine aus den
+    # Ereignissen gebaute Tagesliste.** Hier stand genau das — und damit fielen
+    # die Wohnort-Tage heraus, die `day_values` längst mitliefert. Ein Jahr, in
+    # dem nur der Wohnort steht, kam nicht einmal als Balken vor.
+    #
+    # Ein Nebeneffekt der Umstellung ist ihre eigene Begründung: die Zahl „Tage
+    # mit Wetter" ist jetzt die Länge derselben Menge, über die gezählt wird.
+    # Vorher waren es zwei Mengen, die auseinanderlaufen konnten, ohne dass es
+    # jemandem auffällt — die Bezugsgröße von „x % deiner Tage" stammte aus der
+    # einen, der Zähler aus der anderen.
+    rain_days = sum(1 for v in day_wx.values() if (v.get("rain_mm") or 0) >= 1)
+    sun_hours = round(sum(v.get("sunshine_h") or 0 for v in day_wx.values()))
     rain_per_year: dict[int, int] = {}
-    for i in day_ids:
-        y = events[i].date_start.year
+    for day, v in day_wx.items():
+        y = int(day[:4])
         rain_per_year.setdefault(y, 0)
-        if (dval(day_of(i), "rain_mm") or 0) >= 1:
+        if (v.get("rain_mm") or 0) >= 1:
             rain_per_year[y] += 1
 
-    # Wärmste Reise: Mittel über die TAGE einer Reise, nicht über ihre Einträge
+    # **Die wärmste Reise bleibt eine Frage über EINTRÄGE** (welche Reise?), und
+    # deshalb bleibt hier die Tagesliste aus den Ereignissen stehen. Ein
+    # Wohnort-Tag gehört zu keiner Reise; ihn mitzuzählen hieße, dieselbe Regel
+    # in die andere Richtung zu verletzen (F20: als TAG voll, als EINTRAG nie).
+    by_day: dict[str, str] = {}
+    for eid in sorted(values, key=lambda i: (events[i].date_start, i)):
+        by_day.setdefault(events[eid].date_start.date().isoformat(), eid)
+    day_of = lambda i: events[i].date_start.date().isoformat()  # noqa: E731
+
     trips: dict[str, list] = {}
-    for i in day_ids:
+    for i in by_day.values():
         e = events[i]
         temp = dval(day_of(i), "temperature_c")
         if e.category != "trip" or temp is None:
@@ -434,10 +622,10 @@ def _weather_stats(db: Session, user_id: str) -> dict:
     return {
         "extremes": extremes,
         "weather": {
-            "days": len(day_ids),
+            "days": len(day_wx),
             "sun_hours": sun_hours,
             "rain_days": rain_days,
-            "rain_share": round(rain_days / len(day_ids) * 100) if day_ids else 0,
+            "rain_share": round(rain_days / len(day_wx) * 100) if day_wx else 0,
             "warmest_trip": warmest,
             "rain_days_per_year": [[y, n] for y, n in sorted(rain_per_year.items())],
         },

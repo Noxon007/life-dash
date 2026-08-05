@@ -1277,6 +1277,22 @@ and no change, and one that turned out to be the same defect in two places.
 
     Guard: `check-foreground.js` samples `op.done` **during** the wait and requires at least three distinct readings — the point is not that a number is displayed but that it moves, and a `step()` line does not show which. Red against both broken states (the old two-step loader, and an `op.all` that ticks only at the end).
 
+194. ✅ **“Why are there no rainy days between 1991 and 2009 — because only a residence is stored there?”** Asked from the rain-days-per-year chart, which jumped from a single day in 1991 to a single day in 2009 and only became dense from 2018 on.
+
+    Yes — and the reason was sharper than the question assumed, so it was measured before it was answered. **The weather for those years is in the database.** The enrichment fetches it for residence days (`_add_day_weather`) and `weather_day.day_values` unions both sources correctly. The statistics simply never looked: `_weather_stats` built its list of days from the **events** and then looked the daily values up only for days that already carried an entry. A year without entries did not appear as a bar at all.
+
+    Reproduced on a built case — three residence days with 9 mm each in 2000, one event day in 2024: `day_values` returned all four, `rain_days_per_year` returned `[[2024, 1]]`. Sun hours read 1 where 12 was right; the hottest day was a 20 °C event while a 40 °C residence day stood in the same corpus.
+
+    **It is the F20 rule at a place that had not read it:** a figure over *days* must count the residence, a figure over *entries* must not. “Rainy days”, “hours of sunshine” and “coldest day” are figures over days — the headings say so, and since note 161 the click leads to the **day**. The tell was an inconsistency nobody had connected: the **badges** have counted residence days all along (they read `weather_day`), so a sunny day in 1998 could earn a badge and still appear in no sun-hour total.
+
+    **Both halves were fixed, records included** (the user's call): the balance now counts over `day_values` — the union that already exists — and `_extreme_tops` takes the residence days as further candidates. A derived day carries `derived: true` and **no title**; inventing one (“Residence”) would write German from the server into an interface that can be English (F10), so the display forms the sentence (`wxWho`). The counter-direction is kept and tested: *warmest trip* stays a question about entries, because a residence day is not a trip.
+
+    **The signature is the safeguard.** `_extreme_tops` takes the whole `WeatherSource` rather than a selection from it, and there is no default for the residence half — the defect arose precisely because a second evaluation (the top-lists) could quietly leave a source out, and nobody misses a row that was never there.
+
+    Cost, measured rather than assumed, and twice against expectation (`tools/_measure_api.py`, 20,000 events and 5,843 residence days with weather; baseline 405 ms / 357 ms): the SQL anti-join costs 500/501 ms, deriving it from `day_values` 442/628 ms (best for the balance, worst for the rankings), fetching the rows and filtering in Python 509/554 ms. The last is the only one that treats both callers alike, so it is the only one that needs no second version of the same question. Roughly 120 ms of the surcharge buys the first twenty years of a life, which appeared in none of these numbers before.
+
+    Guards: three cases in `test_f20_baseline.py` (balance, a record held by a residence day, and the counter-rule for the warmest trip) plus the display half in `check-weather-summary.js` — the tile and the ranking row must show neither “null” nor a derived day dressed as a recorded one. All run against the pre-fix state as note 108 requires.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

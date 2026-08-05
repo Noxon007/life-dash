@@ -19,7 +19,7 @@ const dom = new JSDOM(html, {
     w.L = new Proxy(function () { return w.L; }, { get: (_t, k) => (k === 'getZoom' ? () => 6 : w.L), apply: () => w.L });
   }
 });
-setTimeout(() => {
+setTimeout(async () => {
   const w = dom.window, d = dom.window.document; let fail = 0;
   const ok = (n, c) => { console.log((c ? '  ok   ' : '  FAIL ') + n); if (!c) fail++; };
   const tiles = () => d.getElementById('weather-tiles').textContent.replace(/\s+/g, ' ');
@@ -58,6 +58,66 @@ setTimeout(() => {
   // nimmt genau EIN Argument (die Server-Antwort).
   ok('renderWeatherSummary nimmt die Server-Antwort, keine Ereignisliste',
      w.renderWeatherSummary.length === 1);
+
+  // ---- Anmerkung 194: ein Rekord-Tag ohne Eintrag ------------------------
+  //
+  // Seit die Rekorde beide Tagesarten kennen, schickt der Server für einen
+  // Wohnort-Tag `derived: true` und KEINEN Titel. Zwei Dinge können daran
+  // schiefgehen, und beide sind still:
+  //
+  //   1. Die Anzeige schreibt `x.title` hin — dann steht in der Kachel „null".
+  //   2. Sie lässt den leeren Titel einfach weg — dann sieht ein gefolgerter
+  //      Tag aus wie ein erfasster, und der Unterschied, um den es in F20
+  //      überhaupt geht, ist genau an der Stelle weg, an der er zählt.
+  //
+  // Geprüft wird deshalb beides: kein „null", UND die Herkunft steht da.
+  const derived = { value: 40.0, id: null, title: null, derived: true,
+                    date_start: '2000-01-05T00:00:00', date_precision: 'day',
+                    place: 'Bad Segeberg' };
+  const own = { value: 20.0, id: 'e1', title: 'Sommertag', derived: false,
+                date_start: '2024-05-05T12:00:00', date_precision: 'day',
+                place: 'Köln' };
+  ok('Ein abgeleiteter Tag wird benannt',
+     /\S/.test(w.wxWho(derived)) && !/null|undefined/.test(w.wxWho(derived)));
+  ok('…und als abgeleitet erkennbar', w.wxWho(derived) !== w.wxWho(own));
+  ok('Ein erfasster Tag behält seinen Titel', w.wxWho(own) === 'Sommertag');
+
+  // Dieselbe Zeile in der Rangliste darunter (Anmerkung 156: eine Rechnung,
+  // zwei Anzeigen — dann muss auch die zweite es sagen).
+  w.renderStatsTops({ weather: { hot: [derived, own] }, places: [], cities: [] });
+  const tops = d.getElementById('stats-tops').textContent.replace(/\s+/g, ' ');
+  ok('Die Rangliste nennt den Wohnort-Tag als abgeleitet',
+     tops.includes('Bad Segeberg') && !/null|undefined/.test(tops)
+     && tops.includes(w.wxWho(derived).replace(/^🏠 /, '').split(' — ').pop()));
+
+  // Und der Weg, auf dem es gemeldet wurde: die Kachel. Sie entsteht in
+  // `loadStats`, also wird `loadStats` gefahren — ein Wächter, der nur die
+  // Hilfsfunktion prüft, wäre grün, weil es sie GIBT, nicht weil die Kachel
+  // sie benutzt.
+  w.fetch = (u) => {
+    const p = String(u);
+    let body = [];
+    if (/stats\/overview/.test(p)) {
+      body = { counts: { events: 1, places: 1, cities: 1, concerts: 0,
+                         unconfirmed: 0, milestones: 0, moves: 0, meals: 0 },
+               age: null, birth: null, extremes: { hot: derived },
+               per_year: [], per_category: [], top_places: [], top_cities: [],
+               top_animals: [],
+               weather: { days: 4, sun_hours: 12, rain_days: 4, rain_share: 100,
+                          warmest_trip: null, rain_days_per_year: [[2000, 3]] } };
+    }
+    return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body) });
+  };
+  await w.loadStats();
+  const sub = d.getElementById('stat-hot-sub').textContent;
+  ok('Die Rekord-Kachel zeigt keinen „null"-Titel', !/null|undefined/.test(sub));
+  // Gegen den WORTLAUT aus `wxWho` geprüft und nicht gegen eine zweite Fassung
+  // davon: unter jsdom läuft die Oberfläche englisch (Anmerkung 114), ein hier
+  // eingetippter deutscher Satz stünde also nie im Ergebnis und die Prüfung
+  // wäre immer rot — oder, schlimmer, immer grün, wenn man sie danach
+  // aufweicht.
+  ok('…und sagt, dass der Tag abgeleitet ist',
+     sub.includes('Bad Segeberg') && sub.includes(w.wxWho(derived)), sub);
 
   console.log(fail ? `\n${fail} FEHLER` : '\nA31/A37: alle Prüfungen bestanden');
   process.exit(fail ? 1 : 0);

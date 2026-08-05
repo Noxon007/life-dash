@@ -455,7 +455,11 @@ def _weather_tops(db: Session, user_id: str, n: int) -> dict[str, list[dict]]:
     Ereignis als die Kachel — genau die Trennung, gegen die Anmerkung 156
     diese Funktion zusammengelegt hat.
     """
-    events, values, val, card = ov.weather_values(db, user_id)
-    if not values:
+    src = ov.weather_values(db, user_id)
+    # Anmerkung 194: auch „keine Ereignisse mit Wetter" ist kein leeres
+    # Ergebnis mehr — ein Bestand kann ausschließlich aus Wohnort-Tagen
+    # bestehen, und für die ersten zwanzig Jahre eines Lebens ist genau das der
+    # Normalfall.
+    if not src.values and not src.days:
         return {name: [] for name, *_ in ov._EXTREMES}
-    return ov._extreme_tops(events, values, val, card, n)
+    return ov._extreme_tops(src, n)

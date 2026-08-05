@@ -3779,12 +3779,16 @@ const I18N_EN = {
   'wx.sun': "☀️ Hours of sunshine",
   'wx.sun.sub': "across all days together",
   'wx.rain': "🌧️ Rainy days",
-  'wx.rain.sub': "of your recorded days",
+  // Anmerkung 194: „deiner erfassten Tage" stimmte nicht mehr, sobald die
+  // Wohnort-Tage mitzählen — die sind gerade NICHT erfasst, sondern gefolgert.
+  'wx.rain.sub': "of your days with weather",
   'wx.trip': "🏖️ Warmest trip",
   'wx.trip.sub': "no trip with weather yet",
   'wx.feels': "feels like",
   'wx.none': "no weather data — Admin → My data → “Add weather”",
   'wx.noplace': "no place",
+  // Anmerkung 194: ein Rekord-Tag ohne Eintrag — der Wohnort trägt ihn
+  'wx.derived': "🏠 Residence — derived",
   'wx.newdata': "comes with new weather enrichment (from v0.14)",
   'chart.raindays': "Rainy days per year",
   // A37 — Zeitfenster: Nachladen, Ende der Geschichte, Einzelabruf
@@ -7465,7 +7469,7 @@ function renderWeatherSummary(ov) {
     tile(wx.sun_hours ? `${wx.sun_hours} h` : '–', t('wx.sun', '☀️ Sonnenstunden'),
          t('wx.sun.sub', 'über alle Tage zusammen')),
     tile(wx.rain_days, t('wx.rain', '🌧️ Regentage'),
-         `${wx.rain_share}% ${t('wx.rain.sub', 'deiner erfassten Tage')}`),
+         `${wx.rain_share}% ${t('wx.rain.sub', 'deiner Tage mit Wetter')}`),
     tile(warm ? `${warm.avg.toFixed(1)} °C` : '–', t('wx.trip', '🏖️ Wärmste Reise'),
          warm ? esc(warm.title) : t('wx.trip.sub', 'noch keine Reise mit Wetter')),
   ].join('');
@@ -7586,8 +7590,10 @@ async function loadStats(op) {
   const tempCard = (id, x, unit = ' °C',
                     empty = t('wx.none', 'keine Wetterdaten — Verwaltung → Meine Daten → „Wetter ergänzen"')) => {
     num(id, x ? `${x.value}${unit}` : '–');
+    // Anmerkung 194: `wxWho` statt `x.title` — an einem Wohnort-Tag steht dort
+    // sonst „null", und zwar sichtbar in der Kachel.
     num(id + '-sub', x
-      ? `${fmtDate(x)} · ${x.place || t('wx.noplace', 'ohne Ort')} — ${x.title}`
+      ? `${fmtDate(x)} · ${x.place || t('wx.noplace', 'ohne Ort')} — ${wxWho(x)}`
       : empty);
     const card = document.getElementById(id).closest('.stat-card');
     if (card) card.dataset.day = (x && x.date_start) ? x.date_start.slice(0, 10) : '';
@@ -7737,6 +7743,24 @@ function applyWeatherSource() {
     const own = el.dataset.wxSource;
     el.title = note ? (own ? `${own}\n${note}` : note) : own || '';
   });
+}
+// **Anmerkung 194 — wer den Rekord-Tag vertritt.**
+//
+// Seit die Rekorde beide Tagesarten kennen (Ereignisse UND Wohnort-Tage), kann
+// eine Zeile zu einem Tag gehören, an dem gar nichts erfasst wurde. Der Server
+// schickt dafür `derived: true` und KEINEN Titel — einen zu erfinden hieße,
+// deutschen Text aus dem Server in eine Oberfläche zu schreiben, die auch
+// englisch sein kann (F10).
+//
+// **Gesagt werden muss es trotzdem**, und zwar mit demselben Wort wie überall
+// sonst: ein Wohnort-Tag ist gefolgert, nicht erfasst. Eine Zeile, die nur den
+// Ort nennt, sähe aus wie ein Eintrag ohne Titel — und der Unterschied zwischen
+// „an dem Tag war ich dort" und „an dem Tag hat niemand etwas aufgeschrieben,
+// aber ich wohnte dort" ist genau der, den dieses Programm nicht verwischen
+// will. EINE Funktion, weil zwei Stellen sie lesen (Kachel und Rangliste).
+function wxWho(r) {
+  if (!r) return '';
+  return r.derived ? t('wx.derived', '🏠 Wohnort — abgeleitet') : (r.title || '');
 }
 // Die elf Rekord-Listen in derselben Reihenfolge und mit denselben Einheiten
 // wie die Kacheln darüber. Die Tabelle steht hier EINMAL — die Kacheln lesen
@@ -7899,7 +7923,7 @@ function renderStatsTops(top) {
           // Rangliste soll man von rechts lesen können.
           topRow(i, fmtDay((r.date_start || '').slice(0, 10)),
                  `${r.value}${unit}`,
-                 [r.place, r.title].filter(Boolean).join(' — '),
+                 [r.place, wxWho(r)].filter(Boolean).join(' — '),
                  ` data-top-day="${esc((r.date_start || '').slice(0, 10))}"`)),
         noWx)).join('')
     + `</div>`
