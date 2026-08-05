@@ -270,3 +270,53 @@ def test_unsinnige_koordinate_wird_abgelehnt(client):
         "place": "X", "date_start": "2020-01-01", "lat": 91.0, "lng": 10.0,
     })
     assert r.status_code == 422
+
+
+def test_ein_umgesetzter_tag_holt_sein_wetter_am_NEUEN_punkt(client, db, user,
+                                                             geocoding,
+                                                             fake_weather):
+    """Anmerkung 187 — der gemeldete Ablauf: 14-Tage-Reise, aufgeteilt, und
+    danach einzelne Tage genauer verorten.
+
+    Zwei Zusagen, und beide gingen leise kaputt:
+
+    * **Ein Tag steht für sich.** Die Tages-Kinder erben den Ort des Elternteils
+      als VERWEIS, nicht als Kopie eines Feldes — wer einen davon versetzt, darf
+      die anderen dreizehn nicht mitnehmen.
+    * **Das Wetter folgt dem Ort.** Der Korrektur-Endpunkt wirft es weg und holt
+      es neu; geprüft wird die KOORDINATE des Abrufs, nicht bloß, dass wieder
+      Wetter dasteht. Das wäre auch dann grün, wenn der alte Wert stehen bliebe
+      — und ein Regentag in Danzig mit dem Wetter von Warschau ist genau die
+      Sorte plausibler Falschangabe, die dieses Projekt teuer bezahlt.
+    """
+    warschau = Location(user_id=user.id, name="Warschau", city="Warschau",
+                        country="Polen", lat=52.23, lng=21.01)
+    db.add(warschau)
+    db.flush()
+    start = datetime(2024, 6, 1)
+    trip = Event(user_id=user.id, title="Polen", category="trip",
+                 date_start=start, date_end=datetime(2024, 6, 14, 23, 59, 59),
+                 date_precision=DatePrecision.day, location=warschau,
+                 source=Source.manual, confirmed=ConfirmState.confirmed)
+    db.add(trip)
+    db.commit()
+
+    kids = client.post(f"/api/events/{trip.id}/days").json()
+    assert len(kids) == 14
+    assert {k["location"]["name"] for k in kids} == {"Warschau"}
+
+    fake_weather.clear()
+    r = client.patch(f"/api/moderation/{kids[3]['id']}",
+                     json={"location_name": "Danzig",
+                           "location_lat": 54.35, "location_lng": 18.65})
+    assert r.status_code == 200, r.text
+
+    moved = db.get(Event, kids[3]["id"])
+    db.refresh(moved)
+    assert (moved.location.lat, moved.location.lng) == (54.35, 18.65)
+    # Der Nachbartag bleibt, wo er war — sonst hätte die Korrektur eines Tages
+    # die ganze Reise verschoben.
+    assert db.get(Event, kids[4]["id"]).location.name == "Warschau"
+    # Und der Abruf ging an den NEUEN Punkt.
+    assert [(lat, lng) for lat, lng, _ in fake_weather] == [(54.35, 18.65)], (
+        "das Wetter muss am neuen Ort geholt werden, nicht am alten")
