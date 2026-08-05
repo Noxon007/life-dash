@@ -17,12 +17,12 @@ sie stimmt: die längste ERFASSTE Reise, nicht die längste, die stattfand.
 """
 from __future__ import annotations
 
-import math
 from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.data import countries as ref
 from app.models import Event, Location, MediaRef, Metric, Source
 from app.services import baseline, gaps
 from app.services import stats_overview as ov
@@ -69,16 +69,60 @@ def _merge_baseline(rows: list[dict], extra: dict[str, int]) -> list[dict]:
 _PRE_N = 50
 
 
+def _relabel(rows: list[dict], label) -> list[dict]:
+    """Zeilen unter einem gemeinsamen Anzeigenamen zusammenfassen (Anm. 198).
+
+    **Die Einträge werden addiert, die Tage auch — und das Zweite ist eine
+    Näherung.** Ein Tag, an dem sowohl ein „Deutschland"- als auch ein
+    „Germany"-Ort einen Eintrag trug, zählt hier zweimal. Genau zu rechnen
+    hieße, die Tagesmenge je Anzeigenamen zu bilden, also alle Tage in den
+    Prozess zu holen — für eine Liste von zehn Zeilen. `_place_ranking` rechnet
+    seit Anmerkung 156 aus demselben Grund genauso; eine zweite, genauere Zahl
+    an derselben Stelle wäre der teurere Fehler.
+    """
+    merged: dict[str, dict] = {}
+    for row in rows:
+        name = label(row["name"]) or row["name"]
+        cur = merged.get(name)
+        if cur is None:
+            merged[name] = {**row, "name": name}
+        else:
+            cur["days"] += row["days"]
+            cur["events"] += row["events"]
+    return sorted(merged.values(),
+                  key=lambda r: (-r["days"], -r["events"], r["name"]))
+
+
+def _relabel_counts(counts: dict[str, int], label) -> dict[str, int]:
+    """Dasselbe für die Wohnort-Tage — sie tragen dieselben Rohnamen.
+
+    Ohne das bliebe genau die Hälfte getrennt: die Wohnort-Tage kommen mit
+    `loc.country` herein und würden neben dem umbenannten Ereignis-Land als
+    zweite Zeile stehen — also derselbe Defekt, nur eine Ebene tiefer.
+    """
+    out: dict[str, int] = {}
+    for name, n in counts.items():
+        key = label(name) or name
+        out[key] = out.get(key, 0) + n
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # Ranglisten über Orte, Städte, Länder, Jahre, Kategorien
 # --------------------------------------------------------------------------- #
 def _ranked(db: Session, user_id: str, column, *extra_filters,
-            baseline_days: dict[str, int] | None = None) -> list[dict]:
+            baseline_days: dict[str, int] | None = None,
+            label=None) -> list[dict]:
     """Tage UND Einträge je Wert einer Spalte, absteigend nach Tagen.
 
     Beide Zahlen in einer Abfrage: zwei Abfragen wären zwei Zeitpunkte und
     damit zwei Bestände — bei einem laufenden Import genügt das für eine Liste,
     in der die Einträge nicht zu den Tagen passen.
+
+    `label` schreibt den Wert für die ANZEIGE um (Anmerkung 198, Länder). Wird
+    einer übergeben, holt die Abfrage `_PRE_N` Zeilen statt `TOP_N` — aus
+    demselben Grund wie beim Wohnort: würde erst nach dem `LIMIT 10`
+    zusammengefasst, entschiede der Deckel über die Antwort und nicht die Zahl.
     """
     day_key = day_number(Event.date_start)
     rows = (db.query(column.label("k"),
@@ -95,14 +139,19 @@ def _ranked(db: Session, user_id: str, column, *extra_filters,
             # gemeinte Antwort, nicht die alphabetisch erste.
             .order_by(func.count(func.distinct(day_key)).desc(),
                       func.count(Event.id).desc(), column.asc())
-            .limit(_PRE_N if baseline_days else TOP_N).all())
+            .limit(_PRE_N if (baseline_days or label) else TOP_N).all())
     out = [{"name": str(k), "days": days, "events": events}
            for k, days, events in rows]
-    return _merge_baseline(out, baseline_days or {})
+    extra = baseline_days or {}
+    if label is not None:
+        out = _relabel(out, label)
+        extra = _relabel_counts(extra, label)
+    return _merge_baseline(out, extra)
 
 
 def _place_ranking(db: Session, user_id: str,
-                   baseline_days: dict[str, int] | None = None) -> list[dict]:
+                   baseline_days: dict[str, int] | None = None,
+                   at_home=None) -> list[dict]:
     """Orte — mit derselben Kürzung wie die Balken daneben (`_short_place`).
 
     Die Kürzung ist der Grund, warum das hier nicht `_ranked` sein kann: eine
@@ -111,18 +160,24 @@ def _place_ranking(db: Session, user_id: str,
     Zusammenfassung passiert in Python. **Zwei Ortslisten mit zwei
     Kürzungsregeln wären zwei Antworten auf dieselbe Frage** — die Balken und
     diese Liste stehen untereinander und widersprächen sich.
+
+    Dasselbe gilt seit Anmerkung 197 für `at_home`: ein Ort im Umkreis eines
+    Wohnorts trägt dessen Namen (`baseline.home_naming`). Deshalb kommen jetzt
+    auch Koordinaten aus der Abfrage — gruppiert wird nach Name UND Koordinate,
+    denn ohne sie ließe sich „dieser Ort ist zu Hause" gar nicht fragen.
     """
+    at_home = at_home or (lambda name, lat, lng: name)
     day_key = day_number(Event.date_start)
-    rows = (db.query(Location.name,
+    rows = (db.query(Location.name, Location.lat, Location.lng,
                      func.count(func.distinct(day_key)),
                      func.count(Event.id))
             .join(Event, Event.location_id == Location.id)
             .filter(Event.user_id == user_id, Event.date_start.isnot(None),
                     Location.name.isnot(None))
-            .group_by(Location.name).all())
+            .group_by(Location.name, Location.lat, Location.lng).all())
     merged: dict[str, list[int]] = {}
-    for name, days, events in rows:
-        short = ov._short_place(name)
+    for name, lat, lng, days, events in rows:
+        short = ov._short_place(at_home(name, lat, lng))
         if not short:
             continue
         # **Die Tage werden addiert, und das ist eine Näherung.** Zwei Adressen
@@ -228,12 +283,19 @@ def _streaks(db: Session, user_id: str) -> dict:
 
 
 # --------------------------------------------------------------------------- #
-def compute_toplists(db: Session, user_id: str, n: int = TOP_N) -> dict:
-    """Alle Ranglisten der dritten Statistik-Ansicht in einer Antwort."""
+def compute_toplists(db: Session, user_id: str, n: int = TOP_N,
+                     lang: str | None = None) -> dict:
+    """Alle Ranglisten der dritten Statistik-Ansicht in einer Antwort.
+
+    `lang` ist die Sprache der Oberfläche (F10) und entscheidet, wie ein Land
+    heißt — nicht, welche Länder gezählt werden.
+    """
     # F20: EINMAL rechnen, viermal verwenden. Der Kalenderdurchlauf ist billig,
     # aber vier Durchläufe wären vier Stellen, an denen „was ist ein
     # abgeleiteter Tag" beantwortet wird (Anmerkung 106).
     b = baseline.day_counts(db, user_id)
+    at_home = baseline.home_naming(db, user_id)
+    land = lambda name: ref.display(name, lang)  # noqa: E731 — eine Zeile, ein Zweck
     day_key = day_number(Event.date_start)
     year_rows = (db.query(func.extract("year", Event.date_start).label("y"),
                           func.count(func.distinct(day_key)),
@@ -246,16 +308,19 @@ def compute_toplists(db: Session, user_id: str, n: int = TOP_N) -> dict:
 
     return {
         "weather": _weather_tops(db, user_id, n),
-        "places": _place_ranking(db, user_id, b["places"]),
+        "places": _place_ranking(db, user_id, b["places"], at_home=at_home),
         # Der Leerstring heißt „nachgesehen, gibt es hier nicht" (A39) und ist
         # keine Stadt — er fällt hier genauso weg wie NULL.
         "cities": _ranked(db, user_id, Location.city,
                           Event.location_id == Location.id, Location.city != "",
                           baseline_days=b["cities"]),
+        # Anmerkung 198: EIN Land, EIN Name — „Deutschland" (Nominatim) und
+        # „Germany" (Immichs EXIF-Geokodierung) sind dasselbe und standen
+        # bisher als zwei Zeilen untereinander.
         "countries": _ranked(db, user_id, Location.country,
                              Event.location_id == Location.id,
                              Location.country != "",
-                             baseline_days=b["countries"]),
+                             baseline_days=b["countries"], label=land),
         "years": _merge_baseline(
             [{"name": str(int(y)), "days": d, "events": e} for y, d, e in year_rows],
             {str(y): n for y, n in b["years"].items()}),
@@ -266,7 +331,7 @@ def compute_toplists(db: Session, user_id: str, n: int = TOP_N) -> dict:
         "streaks": _streaks(db, user_id),
         "photos": _photo_stats(db, user_id, n),
         "farthest": _farthest_from_home(db, user_id),
-        "reach": _reach_per_year(db, user_id),
+        "reach": _reach_per_year(db, user_id, label=land),
         "baseline_days": b["total"],
     }
 
@@ -307,7 +372,7 @@ def _farthest_from_home(db: Session, user_id: str) -> dict | None:
                 .group_by(Location.id, Location.name, Location.city,
                           Location.country, Location.lat, Location.lng).all())
         for name, city, country, lat, lng, first in rows:
-            km = _haversine_km(home.lat, home.lng, lat, lng)
+            km = baseline.haversine_km(home.lat, home.lng, lat, lng)
             if best is None or km > best["km"]:
                 best = {"km": round(km, 1),
                         "place": ov._short_place(name) or name,
@@ -318,24 +383,13 @@ def _farthest_from_home(db: Session, user_id: str) -> dict | None:
     return best
 
 
-def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
-    """Luftlinie in Kilometern.
-
-    In Python und nicht in SQL: `sin`/`cos` sind in SQLite nur vorhanden, wenn
-    es mit `SQLITE_ENABLE_MATH_FUNCTIONS` gebaut wurde — eine Abfrage, die auf
-    der einen Datenbank rechnet und auf der anderen abstürzt, ist genau die
-    Dialektfalle, für die es `tools/pg-test.ps1` gibt. Gerechnet wird ohnehin
-    über Orte, nicht über Ereignisse (siehe oben).
-    """
-    r = 6371.0088
-    p1, p2 = math.radians(lat1), math.radians(lat2)
-    dp, dl = math.radians(lat2 - lat1), math.radians(lng2 - lng1)
-    a = (math.sin(dp / 2) ** 2
-         + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2)
-    return 2 * r * math.asin(min(1.0, math.sqrt(a)))
+# Die Luftlinie steht seit Anmerkung 197 in `services/baseline.py` — dort
+# braucht sie der Wohnort-Umkreis, und hier die Frage „wie weit war ich weg".
+# Zwei Fassungen derselben Formel wären zwei Erdradien in Wartung.
+_haversine_km = baseline.haversine_km
 
 
-def _reach_per_year(db: Session, user_id: str) -> list[dict]:
+def _reach_per_year(db: Session, user_id: str, label=None) -> list[dict]:
     """Wie viele verschiedene Länder und Städte je Jahr — Reichweite statt Menge.
 
     **Der Wohnort zählt mit**, und das ist keine Kleinigkeit: ein Jahr, das
@@ -343,7 +397,15 @@ def _reach_per_year(db: Session, user_id: str) -> list[dict]:
     er in einem war. Dieselbe Regel wie überall seit F20 — wer eine Zahl über
     TAGE oder über ORTE bildet, muss ihn mitzählen (nur Zahlen über EINTRÄGE
     dürfen es nicht).
+
+    **Anmerkung 198: hier war die doppelte Schreibweise keine Schönheitsfrage,
+    sondern eine falsche Zahl.** Diese Funktion zählt VERSCHIEDENE Länder —
+    „Deutschland" und „Germany" nebeneinander im selben Jahr machten daraus
+    zwei, und „2025 · 10 Länder" war um eins zu hoch. Die Rangliste zeigte den
+    Fehler doppelt an, die Reichweite verrechnete ihn still; deshalb läuft die
+    Umschrift hier durch dieselbe Funktion wie dort.
     """
+    label = label or (lambda name: name)
     rows = (db.query(func.extract("year", Event.date_start).label("y"),
                      Location.country, Location.city)
             .join(Location, Event.location_id == Location.id)
@@ -353,7 +415,7 @@ def _reach_per_year(db: Session, user_id: str) -> list[dict]:
     for year, country, city in rows:
         lands, towns = by_year.setdefault(int(year), (set(), set()))
         if country:
-            lands.add(country)
+            lands.add(label(country) or country)
         if city:
             towns.add(city)
     for start, end, row in baseline.spans(db, user_id):
@@ -363,7 +425,7 @@ def _reach_per_year(db: Session, user_id: str) -> list[dict]:
         for year in range(start.year, end.year + 1):
             lands, towns = by_year.setdefault(year, (set(), set()))
             if loc.country:
-                lands.add(loc.country)
+                lands.add(label(loc.country) or loc.country)
             if loc.city:
                 towns.add(loc.city)
     return [{"year": y, "countries": len(lands), "cities": len(towns)}

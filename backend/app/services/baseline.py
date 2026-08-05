@@ -29,6 +29,7 @@ die eingetragene Aussage bleibt davon unberührt.
 """
 from __future__ import annotations
 
+import math
 from datetime import date as date_type
 from datetime import datetime, time, timedelta
 
@@ -40,6 +41,13 @@ from app.models import BaselineLocation, Event
 # Ein Zeitraum ohne Enddatum reicht bis heute (siehe Modell-Kommentar). Wer
 # „heute" übergibt, kann das in Tests festhalten, ohne die Uhr zu stellen.
 Span = tuple[date_type, date_type, BaselineLocation]
+
+# **Anmerkung 197 — wie nah „zu Hause" ist.** 150 m ist die Größenordnung
+# eines Häuserblocks: die Nebenstraße, auf die ein Geräte-Export den
+# Wohnungsschlüssel legt, liegt darin; das Café zwei Querstraßen weiter nicht.
+# Bewusst eine Konstante und keine Einstellung — eine Zahl, die jeder Nutzer
+# anders setzt, macht aus einer Rangliste eine Aussage über die Einstellung.
+HOME_RADIUS_KM = 0.15
 
 
 def _as_date(value) -> date_type | None:
@@ -202,6 +210,67 @@ def overlaps(periods: list[Span], start: date_type, end: date_type | None,
         if s <= end and start <= e:
             return row
     return None
+
+
+# --------------------------------------------------------------------------- #
+# Anmerkung 197 — ein Ort im Umkreis des Wohnorts heißt wie der Wohnort
+# --------------------------------------------------------------------------- #
+def haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Luftlinie in Kilometern.
+
+    In Python und nicht in SQL: `sin`/`cos` sind in SQLite nur vorhanden, wenn
+    es mit `SQLITE_ENABLE_MATH_FUNCTIONS` gebaut wurde — eine Abfrage, die auf
+    der einen Datenbank rechnet und auf der anderen abstürzt, ist genau die
+    Dialektfalle, für die es `tools/pg-test.ps1` gibt. Gerechnet wird ohnehin
+    über ORTE, nicht über Ereignisse: es sind Hunderte, nicht Zehntausende.
+    """
+    r = 6371.0088
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp, dl = math.radians(lat2 - lat1), math.radians(lng2 - lng1)
+    a = (math.sin(dp / 2) ** 2
+         + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2)
+    return 2 * r * math.asin(min(1.0, math.sqrt(a)))
+
+
+def home_naming(db: Session, user_id: str, *,
+                rows: list[BaselineLocation] | None = None):
+    """Gibt eine Funktion `(name, lat, lng) -> name` zurück.
+
+    **Der gemeldete Fall.** In den Top-Orten standen „Barmbeker Straße 13 ·
+    0 Einträge · 1.142 Tage" (der eingetragene Wohnort) und „Knickweg ·
+    1.161 Einträge · 665 Tage" (was der Geräte-Export für dieselbe Wohnung
+    hielt) als zwei Orte untereinander. Es ist einer.
+
+    **Die Regel: der Name, den ein MENSCH gegeben hat, gewinnt.** Ein Wohnort
+    ist eine eingetragene Aussage, ein rückwärts geokodierter Straßenname eine
+    Vermutung der Maschine — und Maschinen bekommen in diesem Programm nicht
+    das letzte Wort über Bestätigtes. Umgeschrieben wird deshalb nicht der
+    gespeicherte Ort, sondern nur, wie er in einer Rangliste HEISST (Schicht 4);
+    Karte, Filter und Bestand bleiben unberührt.
+
+    **Ohne Koordinate keine Zusammenlegung.** Nach Namensähnlichkeit zu raten
+    („Knickweg" klingt nicht nach „Barmbeker Straße") ginge nicht, und nach
+    Stadt zusammenzulegen wäre zu grob — der halbe Bezirk hieße dann Zuhause.
+
+    Zurück kommt eine FUNKTION und keine fertige Liste, weil zwei Ansichten sie
+    lesen: die Balken im Überblick und die Rangliste darunter. Zwei
+    Umbenennungsregeln wären zwei Antworten auf dieselbe Frage — genau das, was
+    `_place_ranking` schon bei der Kürzung vermeidet.
+    """
+    homes = [(row.location.lat, row.location.lng, row.location.name)
+             for row in (rows if rows is not None else load(db, user_id))
+             if row.location is not None and row.location.lat is not None
+             and row.location.lng is not None and row.location.name]
+
+    def named(name: str | None, lat: float | None, lng: float | None) -> str | None:
+        if not homes or lat is None or lng is None:
+            return name
+        for h_lat, h_lng, h_name in homes:
+            if haversine_km(lat, lng, h_lat, h_lng) <= HOME_RADIUS_KM:
+                return h_name
+        return name
+
+    return named
 
 
 # --------------------------------------------------------------------------- #

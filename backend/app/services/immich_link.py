@@ -107,14 +107,7 @@ def day_candidates(db: Session, user_id: str) -> list[date]:
                     Event.source.in_(MACHINE_SOURCES),
                     Event.date_start.isnot(None))
             .group_by(y, m, d).all())
-    ym, mm, dm = day_parts(MediaRef.captured_at)
-    done = (db.query(ym, mm, dm)
-            .filter(MediaRef.user_id == user_id,
-                    MediaRef.provider == PROVIDER,
-                    MediaRef.event_id.is_(None),
-                    MediaRef.captured_at.isnot(None))
-            .group_by(ym, mm, dm).all())
-    have = {(int(a), int(b), int(c)) for a, b, c in done}
+    have = days_with_media(db, user_id)
     return sorted(date(int(a), int(b), int(c)) for a, b, c in days
                   if (int(a), int(b), int(c)) not in have)
 
@@ -139,20 +132,38 @@ def _spread_over_day(assets: list[dict], seen: set[str]) -> list[dict]:
     return [usable[int(i * step)] for i in range(MAX_PER_EVENT)]
 
 
-def link_day(db: Session, user, day: date, url: str, key: str,
-             seen: set[str]) -> int:
-    """Sucht Fotos für EINEN Tag und hängt sie an das Datum. Ohne Commit.
+def days_with_media(db: Session, user_id: str) -> set[tuple[int, int, int]]:
+    """Tage, an denen schon eine Fotoleiste hängt — als (Jahr, Monat, Tag).
 
-    Kein Orts-Abgleich, anders als beim Ereignis: der Tag ist ein Behälter der
-    ZEITachse (Anmerkung 87), und ein Ortsfilter auf einen Behälter, der
-    ausdrücklich nicht vom Ort handelt, wäre in sich widersprüchlich. Wer
-    vormittags Besuche in Düsseldorf hat und abends in München fotografiert,
-    hat ein Foto von diesem Tag — und sonst hätte es gar keinen Platz.
+    Die Marke gegen die Endlos-Abruf-Falle und gegen Dubletten in EINEM Satz.
+    Steht hier, weil sie zwei Leser hat: `day_candidates` (welche Tage sind
+    noch offen?) und der Foto-Ereignis-Lauf (welche Tage darf ich noch füllen?).
+    Zwei Fassungen von „dieser Tag ist versorgt" wären zwei Antworten, und die
+    zweite hängte die Bilder ein zweites Mal an.
     """
-    start = datetime(day.year, day.month, day.day)
-    end = start.replace(hour=23, minute=59, second=59, microsecond=999999)
+    ym, mm, dm = day_parts(MediaRef.captured_at)
+    rows = (db.query(ym, mm, dm)
+            .filter(MediaRef.user_id == user_id,
+                    MediaRef.provider == PROVIDER,
+                    MediaRef.event_id.is_(None),
+                    MediaRef.captured_at.isnot(None))
+            .group_by(ym, mm, dm).all())
+    return {(int(a), int(b), int(c)) for a, b, c in rows}
+
+
+def add_day_media(db: Session, user, assets: list[dict], seen: set[str]) -> int:
+    """Aus einer Menge Assets die Fotoleiste EINES Tages bauen. Ohne Commit.
+
+    Die Assets kommen von außen und werden hier nicht geholt — genau deshalb
+    gibt es diese Funktion (Anmerkung 196). Zwei Läufe brauchen dieselbe Regel
+    aus zwei Richtungen: `link_day` sucht den Tag im Netz, der Foto-Ereignis-Lauf
+    hat die Assets des ganzen Jahres längst in der Hand und soll dafür nicht
+    dreitausend Tage einzeln nachfragen. Was beide teilen — höchstens zwölf,
+    gleichmäßig über den Tag gestreut, jedes Foto nur einmal — steht damit an
+    einer Stelle statt an zweien.
+    """
     added = 0
-    for asset in _spread_over_day(api.search_assets(url, key, start, end), seen):
+    for asset in _spread_over_day(assets, seen):
         if added >= MAX_PER_EVENT:
             break
         when = api.asset_time(asset)
@@ -169,6 +180,21 @@ def link_day(db: Session, user, day: date, url: str, key: str,
         seen.add(asset["id"])
         added += 1
     return added
+
+
+def link_day(db: Session, user, day: date, url: str, key: str,
+             seen: set[str]) -> int:
+    """Sucht Fotos für EINEN Tag und hängt sie an das Datum. Ohne Commit.
+
+    Kein Orts-Abgleich, anders als beim Ereignis: der Tag ist ein Behälter der
+    ZEITachse (Anmerkung 87), und ein Ortsfilter auf einen Behälter, der
+    ausdrücklich nicht vom Ort handelt, wäre in sich widersprüchlich. Wer
+    vormittags Besuche in Düsseldorf hat und abends in München fotografiert,
+    hat ein Foto von diesem Tag — und sonst hätte es gar keinen Platz.
+    """
+    start = datetime(day.year, day.month, day.day)
+    end = start.replace(hour=23, minute=59, second=59, microsecond=999999)
+    return add_day_media(db, user, api.search_assets(url, key, start, end), seen)
 
 
 def detach_machine_links(db: Session, user_id: str) -> int:

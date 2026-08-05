@@ -210,6 +210,34 @@ any `MINOR`.
   life moves; plus how many countries and cities each year of your life touched.
 
 ### Fixed
+- **A country now appears once, under one name.** “Deutschland · 14,087
+  entries” and “Germany · 2,685 entries” stood one under the other in *Top
+  countries* — the same country, named by two sources: OpenStreetMap answers in
+  the language you are using, Immich always labels its photos in English. The
+  lists now speak the language of the interface, and the stored places are left
+  as their source wrote them. This also corrects a figure rather than just a
+  label: *Reach per year* counts **different** countries, so two spellings in
+  the same year made it one country too many.
+- **Your home is one place in the statistics, not two.** A residence you
+  entered and what a device export made of the same address — usually the side
+  street — were listed as separate places, one with all the days and no
+  entries, the other the other way round. Anything within 150 m of a residence
+  now counts as that residence, in both the bars and the list, and the name you
+  typed wins over the one a geocoder guessed. Only the statistics are affected;
+  the map, the filters and the stored entries are untouched.
+- **Days that only have photo entries now show their photos.** *Photo in
+  Groningen* stood in the timeline without a single picture beside it: the
+  “Photos of this day” strip existed, but it was only ever filled by the
+  separate *Link photos* run, which asks Immich about every day one at a time.
+  The photo-entry run now builds the strip straight from the pictures it has
+  just read — same twelve per day, spread across the day, no extra request.
+- **The statistics panels no longer leave large empty gaps.** *Farthest from
+  home* is one line and sat next to *Reach per year*, which is forty — the grid
+  stretched the short panel to the tall one's height, so most of it was empty
+  white. The short summaries now sit together in one row, the long list has
+  moved in with the rankings, and any list longer than ten lines scrolls inside
+  its panel with the total shown in its heading, so every panel is the same
+  height and nothing is cut off.
 - **The years in which only your residence is recorded now appear in the
   weather statistics.** Rainy days, hours of sunshine and every weather record
   were computed over days that carry an *entry* — so a year with nothing but a

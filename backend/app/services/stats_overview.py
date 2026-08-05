@@ -183,11 +183,19 @@ def compute_overview(db: Session, user_id: str, *, today: datetime | None = None
     # Korrektur, die A31/Anmerkung 64 für die Wettertafeln schon gemacht hat;
     # sie hatte hier nur nie stattgefunden.
     day_key = day_number(Event.date_start)
-    place_rows = (db.query(Location.name, func.count(func.distinct(day_key)))
+    # Anmerkung 197: Koordinaten mit, und deshalb auch nach ihnen gruppiert —
+    # ein Ort im Umkreis eines Wohnorts trägt dessen Namen, und ohne
+    # Koordinate ließe sich das nicht fragen. Die Regel steht in
+    # `baseline.home_naming`, weil die Rangliste darunter dieselbe liest:
+    # zwei Umbenennungen wären zwei Antworten auf dieselbe Frage, und die
+    # beiden Ansichten stehen im selben Reiter untereinander.
+    place_rows = (db.query(Location.name, Location.lat, Location.lng,
+                           func.count(func.distinct(day_key)))
                   .join(Event, Event.location_id == Location.id)
                   .filter(*mine, Location.name.isnot(None),
                           Event.date_start.isnot(None))
-                  .group_by(Location.name).all())
+                  .group_by(Location.name, Location.lat, Location.lng).all())
+    at_home = baseline.home_naming(db, user_id)
     # F20: Die abgeleiteten Tage zählen VOLL mit (Entscheidung des Users zu
     # Anmerkung 144). Ein Kindheitstag im Elternhaus war ein Tag in Bad
     # Segeberg — eine Statistik, die ihn wegließe, beschriebe die Aufzeichnung
@@ -197,8 +205,8 @@ def compute_overview(db: Session, user_id: str, *, today: datetime | None = None
     # benutzt — sonst liefe der Kalender für Orte, Städte und Zähler dreimal.
     b_days = baseline.day_counts(db, user_id)
     per_place: dict[str, int] = {}
-    for name, n in place_rows:
-        short = _short_place(name)
+    for name, lat, lng, n in place_rows:
+        short = _short_place(at_home(name, lat, lng))
         if short:
             per_place[short] = per_place.get(short, 0) + n
     for name, n in b_days["places"].items():

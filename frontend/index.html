@@ -296,6 +296,20 @@
     background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px;
   }
   .panel h3 { margin: 0 0 16px; font-size: 15px; }
+  /* Anmerkung 195 — „das sieht doof aus mit großer Lücke".
+     Ein Raster streckt jede Zelle auf die Höhe der höchsten — neben
+     „Reichweite je Jahr" (vierzig Zeilen) stand deshalb ein leeres weißes
+     Feld von einem Meter Höhe, in dem EINE Zeile lag. `start` lässt jede
+     Kachel so hoch sein, wie sie Inhalt hat; die Höhen gleicht statt der
+     Streckung der Deckel darunter an (`.panel-rows.capped`). */
+  #stats-tops .grid { align-items: start; }
+  /* Zehn Zeilen sind die Höhe, die alle Ranglisten teilen (TOP_N im Server).
+     Wer mehr hat — die Jahre —, bekommt sie nicht abgeschnitten, sondern
+     scrollend: eine Ansicht darf auswählen, aber nichts verschweigen. Die
+     Gesamtzahl steht dafür in der Überschrift. */
+  .panel-rows.capped { max-height: 340px; overflow-y: auto; padding-right: 4px; }
+  .panel-rows.capped .bar-row:last-child { margin-bottom: 0; }
+  .panel h3 .panel-count { color: var(--text-dim); font-weight: 400; }
   .bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
   .bar-label { width: 105px; font-size: 12px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
   /* Anmerkung 156: Ranglisten-Zeile. Anders als beim Balken ist hier die
@@ -7837,11 +7851,22 @@ function photoPanel(p) {
     + topPanel(t('tops.ph.days', '📷 Tage mit den meisten Fotos'), days, '')
     + `</div>`;
 }
+// Wie viele Zeilen eine Rangliste hoch ist, bevor sie scrollt. Dieselbe Zehn,
+// die der Server als `TOP_N` liefert — die Kacheln haben damit alle dieselbe
+// Höhe, statt dass eine von ihnen (die Jahre) die Reihe daneben streckt.
+const TOP_PANEL_ROWS = 10;
 function topPanel(title, rows, empty) {
+  // Anmerkung 195: Eine Liste, die über die Kachelhöhe hinausgeht,
+  // wird gescrollt und NICHT gekürzt — und die Überschrift sagt, wie viele
+  // es insgesamt sind. Ein Deckel, der schweigt, sieht aus wie das Ende der
+  // Daten (dieselbe Regel wie bei der Fotoleiste und den Lücken).
+  const capped = rows.length > TOP_PANEL_ROWS;
   return `<div class="panel">
-    <h3>${esc(title)}</h3>
-    ${rows.length ? rows.join('')
-                  : `<div class="stat-label">${esc(empty)}</div>`}
+    <h3>${esc(title)}${capped
+      ? ` <span class="panel-count">(${rows.length.toLocaleString(LOC())})</span>` : ''}</h3>
+    <div class="panel-rows${capped ? ' capped' : ''}">${
+      rows.length ? rows.join('')
+                  : `<div class="stat-label">${esc(empty)}</div>`}</div>
   </div>`;
 }
 function renderStatsTops(top) {
@@ -7889,15 +7914,18 @@ function renderStatsTops(top) {
            t('tops.reach.n', '{c} Länder').replace('{c}', y.countries),
            t('tops.reach.sub', '{s} Städte').replace('{s}', y.cities)));
 
+  // **Anmerkung 195 — gleich Großes nebeneinander.**
+  // Vorher stand „Am weitesten von zu Hause" (EINE Zeile) neben „Reichweite je
+  // Jahr" (vierzig) — eine Kachel, die zu neun Zehnteln leer war, und darüber
+  // die Serien allein über die volle Breite. Jetzt stehen die beiden kurzen
+  // Auskünfte zusammen in einer Reihe, und die Reichweite zieht zu den
+  // Ranglisten, wo alle Kacheln zehn Zeilen hoch sind.
   box.innerHTML =
-    topPanel(t('tops.streaks', '📏 Längste Serien'), streakRows, noData)
-    + (far || reach.length
-       ? `<div class="grid cols-2">`
-         + topPanel(t('tops.far', '🧭 Am weitesten von zu Hause'), farRows,
-                    t('tops.far.none', 'Trag einen Wohnort ein — ohne ihn gibt es kein „weit weg".'))
-         + topPanel(t('tops.reach', '🌍 Reichweite je Jahr'), reach, noData)
-         + `</div>`
-       : '')
+    `<div class="grid cols-2">`
+    + topPanel(t('tops.streaks', '📏 Längste Serien'), streakRows, noData)
+    + topPanel(t('tops.far', '🧭 Am weitesten von zu Hause'), farRows,
+               t('tops.far.none', 'Trag einen Wohnort ein — ohne ihn gibt es kein „weit weg".'))
+    + `</div>`
     + photoPanel(top.photos || {})
     + `<div class="grid cols-2">`
     + topPanel(t('tops.places', '📍 Top-Orte'), rank(top.places), noData)
@@ -7908,6 +7936,7 @@ function renderStatsTops(top) {
                (top.categories || []).map((r, i) =>
                  topRow(i, catLabel(r.name), dayCount(r.days), entryCount(r.events))),
                noData)
+    + topPanel(t('tops.reach', '🌍 Reichweite je Jahr'), reach, noData)
     + `</div>`
     + `<div class="grid cols-2">`
     + TOP_WEATHER.map(([key, i18n, de, unit]) => topPanel(

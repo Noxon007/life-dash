@@ -62,6 +62,7 @@ from app.models import (ConfirmState, DatePrecision, Event, EventEntityLink,
                         Source, Track)
 from app.services import immich as api
 from app.services.immich_link import PROVIDER
+from app.sqlutil import day_parts
 
 log = logging.getLogger("lifedash.immich")
 
@@ -321,7 +322,8 @@ def photo_proposals(assets: list[dict], my_id: str | None,
 
 def scan_year(db: Session, user, year: int, url: str, key: str,
               heartbeat=None, budget_s: float | None = None,
-              report: dict | None = None) -> list[PhotoProposal]:
+              report: dict | None = None,
+              keep_assets: bool = False) -> list[PhotoProposal]:
     """Was dieses Jahr an Foto-Ereignissen ergäbe — **ohne etwas anzulegen**.
 
     Genau dieselbe Funktion füttert die Vorschau und den Lauf. Zwei getrennte
@@ -329,6 +331,12 @@ def scan_year(db: Session, user, year: int, url: str, key: str,
 
     Jahresweise, und der Grund ist derselbe wie bei P2.1: eine zwanzig Jahre
     alte Bibliothek in einem Zug ist kein Lauf, sondern ein Zeitlimit.
+
+    `keep_assets` legt die gelesenen Assets in den Bericht (Anmerkung 196) —
+    daraus baut der Lauf die Tagesleisten, ohne ein zweites Mal zu fragen. Die
+    VORSCHAU bekommt sie ausdrücklich nicht: sie legt nichts an, und
+    zwanzigtausend Asset-Wörterbücher in eine HTTP-Antwort zu hängen wäre eine
+    Datenmenge für eine Zahl.
     """
     report = report if report is not None else {}
     my_id = api.own_user_id(url, key)
@@ -348,6 +356,8 @@ def scan_year(db: Session, user, year: int, url: str, key: str,
     props = photo_proposals(assets, my_id, district_index(db, user.id),
                             known_slots(db, user.id), report)
     report["seen"] = len(assets)
+    if keep_assets:
+        report["assets"] = assets
     log.info("Foto-Ereignisse %d: %d Fotos gelesen, %d neu — ohne Ereignis: %s",
              year, len(assets), len(props),
              "; ".join(drop_reasons(report)) or "keins")
@@ -408,6 +418,62 @@ def create_photo_events(db: Session, user, props: list[PhotoProposal]) -> int:
         ))
         created += 1
     return created
+
+
+def fill_day_strips(db: Session, user, assets: list[dict]) -> int:
+    """**Anmerkung 196 — „Foto in Groningen" ohne ein einziges Foto daneben.**
+
+    Gemeldet wurde genau das: Der Lauf legt tausende Foto-Ereignisse an, und im
+    Zeitstrahl steht darüber keine Leiste „Fotos dieses Tages". Die Regel dafür
+    gab es längst (`immich_link.day_candidates`: ein Tag mit maschinellen
+    Einträgen bekommt seine Bilder über den TAG, höchstens zwölf, gleichmäßig
+    gestreut) — sie hing nur an einem ZWEITEN Lauf, der jeden dieser Tage
+    einzeln bei Immich nachfragt. Bei zwanzig Jahren Bibliothek sind das
+    tausende Anfragen für Bilder, die dieser Lauf gerade in der Hand hatte.
+
+    **Warum das keine zweite Regel ist.** Verknüpft wird über
+    `immich_link.add_day_media` — dieselbe Funktion, die auch der Verknüpfungs-
+    Lauf ruft, mit derselben Zwölfer-Deckelung und derselben Streuung. Anders
+    ist nur, WOHER die Assets kommen: aus dem Jahresdurchlauf statt aus einer
+    Tagesabfrage. Das ist dieselbe Menge — beide fragen Immich nach allem in
+    einem Zeitfenster, das eine je Tag, das andere je Jahr.
+
+    **Nur Tage, an denen jetzt ein Foto-Ereignis steht.** Ein Tag ohne jeden
+    Eintrag ist nicht Teil der Lebensdatenbank, und Fotos an ihn zu hängen
+    hieße, die halbe Immich-Bibliothek zu importieren (`day_candidates` sagt
+    denselben Satz). Tage, die schon eine Leiste tragen, bleiben unberührt —
+    sonst hinge nach jedem Lauf dasselbe Bild ein weiteres Mal da.
+    """
+    from app.services import immich_link as link
+
+    if not assets:
+        return 0
+    mine = {(int(a), int(b), int(c)) for a, b, c in
+            db.query(*day_parts(Event.date_start))
+            .filter(Event.user_id == user.id,
+                    Event.external_id.like(f"{SLOT_PREFIX}%"),
+                    Event.date_start.isnot(None))
+            .group_by(*day_parts(Event.date_start)).all()}
+    if not mine:
+        return 0
+    taken = link.days_with_media(db, user.id)
+    by_day: dict[tuple[int, int, int], list[dict]] = defaultdict(list)
+    for asset in assets:
+        when = api.asset_time(asset)
+        if when is None or not asset.get("id"):
+            continue
+        key = (when.year, when.month, when.day)
+        if key in mine and key not in taken:
+            by_day[key].append(asset)
+    if not by_day:
+        return 0
+    seen = link.linked_asset_ids(db, user.id)
+    added = 0
+    for day_assets in by_day.values():
+        added += link.add_day_media(db, user, day_assets, seen)
+    log.info("Foto-Ereignisse: %d Bilder an %d Tage gehängt (user=%s)",
+             added, len(by_day), user.id)
+    return added
 
 
 def _describe(prop: PhotoProposal) -> str:

@@ -366,6 +366,35 @@ def resolve(name: str | None) -> Country | None:
     return BY_ISO.get(iso) if iso else None
 
 
+def name_in(country: Country, lang: str | None) -> str:
+    """Der Landesname in der Sprache der Oberfläche (F10)."""
+    return country.name_en if lang == "en" else country.name_de
+
+
+def display(name: str | None, lang: str | None = None) -> str | None:
+    """**Anmerkung 198 — EIN Land, EIN Name.**
+
+    Gemeldet wurde eine Rangliste, in der „Deutschland · 14.087 Einträge" und
+    „Germany · 2.685 Einträge" untereinander standen. Beides ist dasselbe Land;
+    die zwei Namen sind nur zwei Quellen: Nominatim antwortet in der
+    angefragten Sprache (bei deutscher Oberfläche „Deutschland"), Immich liefert
+    seine EXIF-Geokodierung immer englisch (`exifInfo.country`, siehe
+    `services/photo_points.py`). Eine dritte Quelle wäre die KI, und die schreibt,
+    was im Text stand.
+
+    **Umgeschrieben wird beim LESEN, nicht beim Schreiben.** Der gespeicherte
+    Ort behält, was seine Quelle gesagt hat — das ist die Auskunft, die wirklich
+    vorlag. Zusammengeführt wird dort, wo gezählt und angezeigt wird (Schicht 4),
+    und damit rückwirkend für den ganzen Bestand statt erst für den nächsten
+    Import. Ein Land, das die Stammdaten nicht kennen, behält seinen Namen
+    unverändert: eine Zeile still zu verschlucken wäre der teurere Fehler.
+    """
+    if not name:
+        return None
+    hit = resolve(name)
+    return name_in(hit, lang) if hit else name
+
+
 def by_continent() -> dict[str, list[Country]]:
     """Alle Länder je Kontinent, alphabetisch — Grundlage der Checklisten."""
     out: dict[str, list[Country]] = {key: [] for key in CONTINENTS}

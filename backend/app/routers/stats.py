@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import User
-from app.services import gaps
+from app.services import gaps, geocode
 from app.services.stats import compute_widgets
 from app.services.stats_overview import compute_overview
 from app.services.stats_toplists import compute_toplists
@@ -36,8 +36,12 @@ def toplists(db: Session = Depends(get_db),
     bei jedem Öffnen des Reiters geholt, diese Listen erst, wenn jemand sie
     ansieht — dieselbe Regel, mit der A37 die Karte von der Startseite getrennt
     hat. Eine Ansicht bezahlt, was sie zeigt.
+
+    Die Sprache geht mit (Anmerkung 198): sie entscheidet, wie ein Land HEISST
+    — dieselbe Angabe, mit der auch das Geocoding fragt, damit ein Ort und die
+    Rangliste über ihn nicht in zwei Sprachen antworten.
     """
-    return compute_toplists(db, user.id)
+    return compute_toplists(db, user.id, lang=geocode.lang_for(user))
 
 
 @router.get("/tracks")

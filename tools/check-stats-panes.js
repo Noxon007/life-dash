@@ -64,8 +64,11 @@ const TOPLISTS = {
             days: [{ day: '2021-09-09', count: 137 }] },
   farthest: { km: 8412.5, place: 'Kuta Beach', city: 'Denpasar',
               country: 'Indonesien', date: '2016-03-12', home: 'Elternhaus' },
+  // Anmerkung 195: bewusst MEHR als zehn Jahre — der Deckel greift erst
+  // darüber, und ein Wächter, der ihn nie auslöst, prüft ihn nicht.
   reach: [{ year: 2016, countries: 7, cities: 23 },
-          { year: 2017, countries: 2, cities: 5 }],
+          ...Array.from({ length: 13 }, (_, i) => (
+            { year: 2017 + i, countries: 2, cities: 5 }))],
 };
 // Wege — eigener Endpunkt, eigener Reiter, andere Herkunft.
 const TRACKS = {
@@ -249,6 +252,43 @@ setTimeout(async () => {
      + 'Lebensmittelpunkt wandert');
   ok('Die Reichweite je Jahr steht da', /7/.test(txt) && /23/.test(txt),
      txt.slice(0, 400));
+
+  // --- 5b. Anmerkung 195: die Kacheln passen aufeinander ------------------- //
+  //
+  // Gemeldet wurde „das sieht doof aus mit großer Lücke": „Am weitesten von zu
+  // Hause" (EINE Zeile) stand neben „Reichweite je Jahr" (vierzig) und wurde
+  // vom Raster auf dessen Höhe gestreckt — ein weißes Feld, das zu neun
+  // Zehnteln leer war. Geprüft wird deshalb die ANORDNUNG, nicht das Aussehen:
+  // welche Kachel steht in welcher Reihe.
+  const panelOf = re => [...(tops ? tops.querySelectorAll('.panel') : [])]
+    .find(p => re.test((p.querySelector('h3') || {}).textContent || ''));
+  const far = panelOf(/weitesten|Farthest/);
+  const streaks = panelOf(/Längste Serien|Longest streaks/);
+  const reachPanel = panelOf(/Reichweite|Reach per year/);
+  const years = panelOf(/Top-Jahre|Top years/);
+  ok('Die beiden kurzen Auskünfte stehen in DERSELBEN Reihe',
+     !!far && !!streaks && far.parentElement === streaks.parentElement,
+     'eine einzeilige Kachel neben einer vierzigzeiligen wird auf deren Höhe '
+     + 'gestreckt — genau die gemeldete Lücke');
+  ok('…und die Reichweite steht bei den Ranglisten',
+     !!reachPanel && !!years && reachPanel.parentElement === years.parentElement,
+     'dort sind alle Kacheln zehn Zeilen hoch');
+  // Der Deckel selbst: gescrollt, nicht gekürzt — und er SAGT, wie viele es
+  // sind. Ein Deckel, der schweigt, sieht aus wie das Ende der Daten.
+  const capped = reachPanel && reachPanel.querySelector('.panel-rows.capped');
+  ok('Die lange Liste wird gedeckelt statt gestreckt', !!capped,
+     'ohne Deckel zieht sie die Reihe daneben auf ihre Höhe');
+  ok('…zeigt aber weiterhin ALLE Zeilen',
+     !!capped && capped.querySelectorAll('.top-row').length === 14,
+     `Zeilen: ${capped ? capped.querySelectorAll('.top-row').length : '-'} — `
+     + 'gedeckelt heißt gescrollt, nicht abgeschnitten');
+  ok('…und die Überschrift nennt die Gesamtzahl',
+     !!reachPanel && /\(\s*14\s*\)/.test(reachPanel.querySelector('h3').textContent),
+     reachPanel ? reachPanel.querySelector('h3').textContent : '(keine Kachel)');
+  const short = far && far.querySelector('.panel-rows');
+  ok('Eine kurze Kachel bekommt KEINEN Deckel',
+     !!short && !short.classList.contains('capped'),
+     'ein Rollbalken um eine einzelne Zeile wäre die Lücke nur anders');
 
   // --- 6. Die Wege: eigener Reiter, eigene Herkunft ----------------------- //
   calls.length = 0;

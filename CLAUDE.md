@@ -21,7 +21,7 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI,
-  Geocoding aus) — 691 Tests, ~17 s, SQLite im Arbeitsspeicher
+  Geocoding aus) — 725 Tests, ~17 s, SQLite im Arbeitsspeicher
 - **Tests gegen echtes PostgreSQL** (das, worauf betrieben wird): `pwsh
   tools/pg-test.ps1` — **kein Docker**, legt mit den installierten Binärdateien
   einen eigenen Cluster in `backend/_pgtest/` auf Port **55432** an und stoppt
@@ -257,6 +257,14 @@ die Punkte 1 und 2):
 - **Das Zeichen ist gewählt** (Anmerkung 180): Biene als Hauptzeichen, Wabe als
   Beizeichen. Erledigt, hier nur noch als Hinweis, dass die Frage keine offene
   mehr ist.
+
+**Rückmeldung 2026-08-05, zweiter Satz (Anmerkungen 195–198) ist erledigt** —
+Statistik-Layout, Fotos am Tag, Wohnort-Umkreis, EIN Name je Land. Offen blieb
+daraus bewusst **eine** Sache: der **Welt-Reiter ist deutsch verdrahtet**
+(`world.py` nimmt `name_de`, die Kontinent-Namen kommen als deutscher Text aus
+`data/countries.py` und haben im Frontend keinen Katalog-Eintrag). Beide
+Hälften gehören zusammen umgestellt; eine allein ergäbe einen halb übersetzten
+Reiter. Das ist F10-Arbeit, kein Rest von Anmerkung 198.
 
 **Doku-Umbau 2026-08-04.** `KONZEPT.md` ist aufgelöst: was das System IST steht
 in `ARCHITECTURE.md`, was OFFEN ist in `ROADMAP.md`, die geschlossenen Kapitel

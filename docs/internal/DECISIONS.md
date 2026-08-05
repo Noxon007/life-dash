@@ -1293,6 +1293,52 @@ and no change, and one that turned out to be the same defect in two places.
 
     Guards: three cases in `test_f20_baseline.py` (balance, a record held by a residence day, and the counter-rule for the warmest trip) plus the display half in `check-weather-summary.js` — the tile and the ranking row must show neither “null” nor a derived day dressed as a recorded one. All run against the pre-fix state as note 108 requires.
 
+**Feedback round 2026-08-05, second batch (notes 195–198).** Four points from the statistics tab. Three of them are the same shape as most findings in this project: nothing broken, two rules that had quietly drifted apart. The fourth (195) is the only purely visual one — and it is in this list because a layout that wastes a screen is a report about the data underneath it.
+
+195. ✅ **“That looks silly, with the big gap — and generally, match the sizes of the panels to one another.”** Reported with a screenshot: *Farthest from home* (one line) stood beside *Reach per year* (thirty-five), and CSS grid stretched the short cell to the tall one's height. Nine tenths of a white panel, empty.
+
+    Three changes, and only the first is CSS. `#stats-tops .grid { align-items: start }` stops the stretching — but on its own that only turns a stretched panel into a ragged one, because the underlying problem is that **panels of wildly different length were paired**. So the two one-to-three-line summaries (*Longest streaks*, *Farthest from home*) now sit together in one row, and *Reach per year* moved in with the rankings, where every panel is ten rows because the server caps at `TOP_N = 10`.
+
+    That leaves the years, which are as many as the life is long. They are **capped in height and scrolled, not cut** — a ranking that silently ends at ten looks like the end of the data, which is the rule from note 110 (a view that cannot show everything must say so). The heading carries the total, so the number is where the eye already is.
+
+    Guard: six checks in `check-stats-panes.js`, all about **arrangement** rather than appearance (jsdom has no layout): which panel shares a parent with which, that the long list carries `.panel-rows.capped` and still contains all its rows, that the heading names the total, and — the counter-direction — that a short panel gets no cap, since a scrollbar around a single line is the same gap in a different shape. The guard's fixture had to grow past ten years first: one that never trips the cap does not test it. All six red against a faithful reconstruction of the old layout.
+
+196. ✅ **“There are entries *Photo in Groningen*, but no Immich photos are linked there?”** Correct, and it was a deliberate decision (note 139: “the map is the place for the picture, the timeline the place for the fact”). Asked what should hold instead, the user did not ask for the decision to be reversed but for the **existing** mechanism to apply: “the way it already is for other entries, with *Photos of this day*, max 12 per day.”
+
+    That mechanism was already right and already covered these days — `day_candidates` has included `Source.immich` since note 111. It hung on a **second run**: *Link photos* walks the open days and asks Immich about each one separately. After a photo-entry run over twenty years that is thousands of requests, one per day, for pictures the first run had just held in its hands.
+
+    So the photo-entry run now fills the strips itself, from the assets of the year it has already read. **Not a second rule:** it calls `immich_link.add_day_media`, which was extracted out of `link_day` for exactly this — same cap of twelve, same even spread, same de-duplication. What differs is only where the assets come from, and that is the same set: both ask Immich for everything in a time window, one per day, the other per year. The “this day is already covered” mark likewise has one source now (`days_with_media`), read by both the candidate list and this run; two versions of it would have attached every picture a second time.
+
+    The separate run stays as the safety net for days a stopped or already-ticked year left behind.
+
+    Guards: five cases in `test_anm196_198_feedback.py` — the strip appears, a day *without* an entry stays empty (otherwise the run imports half the library), a day that already has one is left alone, the twelve are spread rather than sliced, and the local day decides rather than UTC. Red against the pre-fix state.
+
+197. ✅ **“Barmbeker Straße 13 · 0 entries · 1,142 days” and “Knickweg · 1,161 entries · 665 days” are the same home.** Asked with a constraint that shaped the answer: “it has to be something automated, not a personal fix.”
+
+    The two names are the residence the user entered and what a device export made of the same flat — Google puts the fix on the side street. **The rule chosen (from four offered): anything within 150 m of a residence counts as that residence, and the name a human gave wins over the name a machine guessed.** That is the same precedence the whole system runs on — machines do not get the last word over what a person confirmed.
+
+    Three boundaries are deliberate. It renames **only for display** (layer 4): the stored place keeps what its source said, and the map, the filters and the entries are untouched. It needs a **coordinate** — guessing by name similarity would be nonsense (“Knickweg” resembles nothing), and folding by city would call half a district home. And the radius is a **constant, not a setting**: a number every user tunes turns a ranking into a statement about the setting.
+
+    The rule lives in `services/baseline.py` as `home_naming` because it has two readers — the bars in the overview and the ranking below them, which sit in the same tab one under the other. Two renamings would be two answers to one question, and it would show: “Knickweg” above, “Barmbeker Straße 13” below. Both place queries now group by name **and** coordinate, since without one the question cannot be asked at all.
+
+    The known inaccuracy, stated rather than hidden: days are added across the folded places, so a day with entries at both counts twice. That is the same approximation `_place_ranking` has made since note 156, and computing it exactly means pulling every day into the process for a ten-row list.
+
+    Guards: five cases — inside the radius folds, outside stays (a radius that swallows everything is indistinguishable from a broken list), bars and list agree, without a residence nothing is renamed, and a place without coordinates is left alone.
+
+198. ✅ **“*Germany* in one row and *Deutschland* in another — why once German and once English? There are more examples of this.”** From *Top countries*.
+
+    Three sources write `Location.country` and each answers in its own language: Nominatim in the language it was asked in (German interface → “Deutschland”), Immich's EXIF geocoding always in English (`exifInfo.country`), the AI in whatever the text said. The reference table that resolves all three has existed since F5 (`data/countries.py`, German + English + aliases → ISO) — nobody had asked it.
+
+    **Rewritten on reading, not on writing.** The stored place keeps its source's wording, which is the answer that actually came in; the merge happens where things are counted and displayed, and therefore applies to the whole existing corpus at once instead of only to the next import. A country the table does not know keeps its name — swallowing a row silently is the more expensive mistake.
+
+    **This was not only cosmetic.** *Reach per year* counts **distinct** countries: two spellings in one year made it two, and “2025 · 10 countries” was one too high. The ranking showed the doubling twice over; the reach figure hid it. Both now go through the same function.
+
+    The language comes from the same setting the geocoder is asked with (`geocode.lang_for`), so a place and the ranking about it cannot answer in two languages.
+
+    **Still open, deliberately:** the *World* tab hard-codes `name_de` for countries and German labels for continents — it is German-only in both halves, and fixing one of them would leave a tab that is half translated. That is an F10 job of its own, not part of this note.
+
+    Guards: six cases, including the counter-direction (an unknown country keeps its name) and the residence half — residence days arrive with the raw name and would otherwise stand as a second row under the renamed one, the same defect one level down.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

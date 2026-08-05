@@ -528,7 +528,7 @@ def _run_photo_points(db: Session, job: Job) -> tuple[str, str]:
 
     job.unit = "Ereignisse angelegt"
     db.commit()
-    seen = created = 0
+    seen = created = strips = 0
     # Die Ausschlussgründe über alle Jahre aufaddiert — `drop_reasons` liest
     # genau diese Form, also wird sie zusammengeführt statt neu erfunden.
     total_report: dict = {"dropped": {}}
@@ -539,7 +539,7 @@ def _run_photo_points(db: Session, job: Job) -> tuple[str, str]:
         report: dict = {}
         try:
             props = pp.scan_year(
-                db, user, year, url, key,
+                db, user, year, url, key, keep_assets=True,
                 heartbeat=lambda: _tick(db, job.id, 0, None), report=report)
         except immich_api.ScanAborted:
             stopped = True
@@ -580,6 +580,17 @@ def _run_photo_points(db: Session, job: Job) -> tuple[str, str]:
             total_report["dropped"][reason] = total_report["dropped"].get(reason, 0) + count
         if stopped:
             break
+
+        # **Anmerkung 196: die Fotos gleich mit an ihren Tag.** Ein
+        # „Foto in Groningen" ohne ein einziges Bild daneben war der gemeldete
+        # Defekt — die Regel dafür gab es, sie hing nur an einem zweiten Lauf,
+        # der jeden Tag einzeln nachfragt. Die Assets dieses Jahres liegen hier
+        # schon vor; verknüpft wird mit derselben Funktion wie dort
+        # (`immich_link.add_day_media`), also mit derselben Zwölfer-Deckelung.
+        # Erst NACH den Ereignissen: `fill_day_strips` fragt, an welchen Tagen
+        # welche stehen, und vorher stünde dort noch keiner.
+        strips += pp.fill_day_strips(db, user, report.get("assets") or [])
+        db.commit()
         pp.mark_scanned(db, user, year)
         db.commit()
         scanned.append(year)
@@ -602,6 +613,10 @@ def _run_photo_points(db: Session, job: Job) -> tuple[str, str]:
     reasons = pp.drop_reasons(total_report)
     if reasons:
         msg += " Ohne Ereignis: " + ", ".join(reasons) + "."
+    # Die zweite Zahl gehört genannt: sie erklärt, warum im Zeitstrahl jetzt
+    # Bilder stehen, die kein einziges Ereignis „besitzt" (Anmerkung 196).
+    if strips:
+        msg += f" {strips} Bilder an ihren Tag gehängt."
     if stopped:
         msg += " Gestoppt — die restlichen Jahre sind offen."
     return "done" if not stopped else "stopped", msg
