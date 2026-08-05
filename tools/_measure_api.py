@@ -21,7 +21,7 @@ from app.database import SessionLocal       # noqa: E402
 from app.main import app                    # noqa: E402
 from app.models import (BaselineLocation, ConfirmState,  # noqa: E402
                         DatePrecision, DayMetric, Event, Location, Metric,
-                        Source, User)
+                        MediaRef, Source, Track, User)
 
 N_EVENTS = int(os.environ.get("N", "20000"))
 CITIES = [("Detmold", 51.93, 8.87), ("London", 51.50, -0.12), ("Palma", 39.57, 2.65),
@@ -82,6 +82,25 @@ with TestClient(app):
         n_days += 1
     db.commit()
     print(f"{n_days} Wohnort-Tage mit je 3 Wetterwerten angelegt")
+
+    # Anmerkung 189: Fotos und Wege. Ohne sie messen die beiden neuen
+    # Auskünfte über leere Tabellen, also nichts.
+    for i in range(20000):
+        db.add(MediaRef(user_id=user.id, provider=("local" if i % 50 == 0 else "immich"),
+                        external_id=f"m{i}", bytes=(2_000_000 if i % 50 == 0 else None),
+                        captured_at=base + timedelta(hours=i * 4)))
+        if i % 4000 == 0:
+            db.commit()
+    for i in range(50000):
+        when = base + timedelta(minutes=i * 90)
+        db.add(Track(user_id=user.id, date_start=when,
+                     date_end=when + timedelta(minutes=30), points=[],
+                     activity_type=("drive", "walk", "cycle", None)[i % 4],
+                     distance_m=(None if i % 97 == 0 else 1500.0 + i % 40000)))
+        if i % 5000 == 0:
+            db.commit()
+    db.commit()
+    print("20.000 Fotos und 50.000 Wege angelegt")
     db.close()
 
     client = TestClient(app)
@@ -121,6 +140,8 @@ with TestClient(app):
     print("\n=== Auf Klick ===")
     timed("/api/achievements", "/api/achievements")
     timed("/api/stats/overview", "/api/stats/overview")
+    timed("/api/stats/toplists", "/api/stats/toplists")
+    timed("/api/stats/tracks", "/api/stats/tracks")
     timed("/api/events/map (ohne Fotos)", "/api/events/map?machine_proposals=0&photos=0")
     timed("/api/events/map (mit Fotos)", "/api/events/map?machine_proposals=0")
     timed("/api/world", "/api/world")

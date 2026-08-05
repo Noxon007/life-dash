@@ -121,3 +121,60 @@ def test_fremde_wege_bleiben_draussen(db, user):
     db.commit()
     res = list_tracks(db=db, user=user)
     assert res["total"] == 1
+
+
+# --------------------------------------------------------------------------- #
+# Anmerkung 189 — die Kilometer, zum ersten Mal zusammengezählt
+# --------------------------------------------------------------------------- #
+def test_track_stats_sum_by_mode_and_year(db, user):
+    """`distance_m` und `activity_type` lagen seit dem Timeline-Import in der
+    Datenbank und wurden nirgends ausgewertet.
+
+    Zwei Zusagen, die man dem Ergebnis nicht ansieht:
+
+    * **Ein Weg OHNE Strecke zählt als Weg mit.** `distance_m` kann `NULL`
+      sein. Ihn aus der ANZAHL zu nehmen wäre eine zweite Auswahl für dieselbe
+      Frage — „wie viele Wege" darf nicht davon abhängen, ob eine Strecke
+      dabeisteht.
+    * **`None` bleibt `None`.** „Google wusste die Art nicht" (`unknown`) und
+      „im Export stand gar nichts" (`NULL`) sind zwei Fälle; sie hier
+      zusammenzuwerfen nähme der Oberfläche die Möglichkeit, es zu sagen.
+    """
+    from app.services.stats_tracks import compute_tracks
+
+    db.add_all([
+        Track(user_id=user.id, date_start=datetime(2024, 3, 1, 8),
+              date_end=datetime(2024, 3, 1, 9), points=[],
+              activity_type="drive", distance_m=42000.0),
+        Track(user_id=user.id, date_start=datetime(2024, 3, 2, 8),
+              date_end=datetime(2024, 3, 2, 9), points=[],
+              activity_type="drive", distance_m=8000.0),
+        Track(user_id=user.id, date_start=datetime(2025, 5, 5, 8),
+              date_end=datetime(2025, 5, 5, 9), points=[],
+              activity_type="walk", distance_m=3500.0),
+        # ohne Strecke UND ohne Art
+        Track(user_id=user.id, date_start=datetime(2025, 5, 6, 8),
+              date_end=datetime(2025, 5, 6, 9), points=[],
+              activity_type=None, distance_m=None),
+    ])
+    db.commit()
+
+    r = compute_tracks(db, user.id)
+    assert r["count"] == 4, "der Weg ohne Strecke ist trotzdem ein Weg"
+    assert r["total_km"] == 53.5
+    modes = {m["mode"]: m for m in r["modes"]}
+    assert modes["drive"]["km"] == 50.0 and modes["drive"]["count"] == 2
+    assert None in modes and modes[None]["km"] == 0.0
+    years = {y["year"]: y for y in r["years"]}
+    assert years[2024]["km"] == 50.0 and years[2025]["count"] == 2
+    assert r["longest"][0]["km"] == 42.0
+    assert r["first"] == "2024-03-01" and r["last"] == "2025-05-06"
+
+
+def test_track_stats_stay_empty_without_tracks(db, user):
+    """Eine Null ist hier keine Auskunft, sondern der Anlass, gar nichts zu
+    zeigen — die Oberfläche sagt dann, wo der Import steht."""
+    from app.services.stats_tracks import compute_tracks
+
+    r = compute_tracks(db, user.id)
+    assert r["count"] == 0 and r["modes"] == [] and r["first"] is None

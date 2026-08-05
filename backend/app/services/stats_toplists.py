@@ -17,12 +17,13 @@ sie stimmt: die längste ERFASSTE Reise, nicht die längste, die stattfand.
 """
 from __future__ import annotations
 
-from datetime import date, timedelta
+import math
+from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import Event, Location, Metric, Source
+from app.models import Event, Location, MediaRef, Metric, Source
 from app.services import baseline, gaps
 from app.services import stats_overview as ov
 from app.sqlutil import day_number
@@ -263,7 +264,183 @@ def compute_toplists(db: Session, user_id: str, n: int = TOP_N) -> dict:
         # es „event" — hieße, eine Aussage zu erfinden, die niemand gemacht hat.
         "categories": _ranked(db, user_id, Event.category),
         "streaks": _streaks(db, user_id),
+        "photos": _photo_stats(db, user_id, n),
+        "farthest": _farthest_from_home(db, user_id),
+        "reach": _reach_per_year(db, user_id),
         "baseline_days": b["total"],
+    }
+
+
+def _farthest_from_home(db: Session, user_id: str) -> dict | None:
+    """**Anmerkung 189 — wie weit war ich je von zu Hause weg?**
+
+    Die Frage ist erst beantwortbar, seit es Wohnorte gibt: „weit weg" braucht
+    ein Bezugssystem, und ein Lebensmittelpunkt wandert. Gemessen wird deshalb
+    gegen den Wohnort, der AN DIESEM TAG galt — nicht gegen den heutigen. Sonst
+    wäre die Kindheit an der Ostsee eine Fernreise, sobald jemand nach München
+    zieht.
+
+    **Gruppiert wird über ORTE, nicht über Ereignisse.** Der entfernteste Punkt
+    ist eine Eigenschaft des Orts; zwanzigtausend Ereignisse dafür in den
+    Prozess zu holen hieße, dieselbe Koordinate hundertmal zu rechnen. Ein
+    Bestand hat Hunderte Orte und Zehntausende Einträge.
+
+    Ohne Wohnort gibt es keine Antwort — und dann steht hier `None` statt einer
+    Null, die wie „war nie weg" aussieht.
+    """
+    periods = baseline.spans(db, user_id)
+    if not periods:
+        return None
+    best: dict | None = None
+    for start, end, row in periods:
+        home = row.location
+        if home is None or home.lat is None or home.lng is None:
+            continue
+        rows = (db.query(Location.name, Location.city, Location.country,
+                         Location.lat, Location.lng,
+                         func.min(Event.date_start).label("first"))
+                .join(Event, Event.location_id == Location.id)
+                .filter(Event.user_id == user_id,
+                        Event.date_start >= datetime.combine(start, time.min),
+                        Event.date_start <= datetime.combine(end, time.max),
+                        Location.lat.isnot(None), Location.lng.isnot(None))
+                .group_by(Location.id, Location.name, Location.city,
+                          Location.country, Location.lat, Location.lng).all())
+        for name, city, country, lat, lng, first in rows:
+            km = _haversine_km(home.lat, home.lng, lat, lng)
+            if best is None or km > best["km"]:
+                best = {"km": round(km, 1),
+                        "place": ov._short_place(name) or name,
+                        "city": city, "country": country,
+                        "date": first.date().isoformat() if first else None,
+                        "home": row.label or (ov._short_place(home.name)
+                                              or home.name)}
+    return best
+
+
+def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Luftlinie in Kilometern.
+
+    In Python und nicht in SQL: `sin`/`cos` sind in SQLite nur vorhanden, wenn
+    es mit `SQLITE_ENABLE_MATH_FUNCTIONS` gebaut wurde — eine Abfrage, die auf
+    der einen Datenbank rechnet und auf der anderen abstürzt, ist genau die
+    Dialektfalle, für die es `tools/pg-test.ps1` gibt. Gerechnet wird ohnehin
+    über Orte, nicht über Ereignisse (siehe oben).
+    """
+    r = 6371.0088
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp, dl = math.radians(lat2 - lat1), math.radians(lng2 - lng1)
+    a = (math.sin(dp / 2) ** 2
+         + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2)
+    return 2 * r * math.asin(min(1.0, math.sqrt(a)))
+
+
+def _reach_per_year(db: Session, user_id: str) -> list[dict]:
+    """Wie viele verschiedene Länder und Städte je Jahr — Reichweite statt Menge.
+
+    **Der Wohnort zählt mit**, und das ist keine Kleinigkeit: ein Jahr, das
+    jemand ganz zu Hause verbracht hat, stünde sonst mit „0 Länder" da, obwohl
+    er in einem war. Dieselbe Regel wie überall seit F20 — wer eine Zahl über
+    TAGE oder über ORTE bildet, muss ihn mitzählen (nur Zahlen über EINTRÄGE
+    dürfen es nicht).
+    """
+    rows = (db.query(func.extract("year", Event.date_start).label("y"),
+                     Location.country, Location.city)
+            .join(Location, Event.location_id == Location.id)
+            .filter(Event.user_id == user_id, Event.date_start.isnot(None))
+            .distinct().all())
+    by_year: dict[int, tuple[set, set]] = {}
+    for year, country, city in rows:
+        lands, towns = by_year.setdefault(int(year), (set(), set()))
+        if country:
+            lands.add(country)
+        if city:
+            towns.add(city)
+    for start, end, row in baseline.spans(db, user_id):
+        loc = row.location
+        if loc is None:
+            continue
+        for year in range(start.year, end.year + 1):
+            lands, towns = by_year.setdefault(year, (set(), set()))
+            if loc.country:
+                lands.add(loc.country)
+            if loc.city:
+                towns.add(loc.city)
+    return [{"year": y, "countries": len(lands), "cities": len(towns)}
+            for y, (lands, towns) in sorted(by_year.items())]
+
+
+def _photo_stats(db: Session, user_id: str, n: int) -> dict:
+    """**Anmerkung 189 — was von den Fotos zu sagen ist.**
+
+    Bis hierher gab es über Medien keine einzige Zusammenfassung. Sie sind
+    dabei die zweitgrößte Menge im Bestand: nach einem Immich-Abgleich stehen
+    zehntausende Verweise da, und niemand konnte fragen, in welchem Jahr sie
+    liegen.
+
+    **Der Tag eines Fotos ist `captured_at`, ersatzweise das Datum seines
+    Ereignisses.** Beides kommt vor, und zwar aus einem Grund (F18): ein Bild
+    kann an einem Ereignis hängen ODER an einem Tag. Nur eines von beiden zu
+    lesen ließe die halbe Sammlung aus einer Statistik verschwinden, die
+    vollständig aussieht.
+
+    **Hochgeladen und verknüpft werden getrennt gezählt** (Anmerkung 57): ein
+    hochgeladenes Bild ist Lebensdatenbank, ein Immich-Verweis eine Ableitung,
+    die ein Abgleich jederzeit neu bildet. Eine gemeinsame Zahl verspräche
+    einen Bestand, von dem ein Teil woanders liegt — und der Unterschied ist
+    genau der, den ein Backup merkt.
+    """
+    day_of = func.coalesce(MediaRef.captured_at, Event.date_start)
+    base = (db.query(MediaRef)
+            .outerjoin(Event, MediaRef.event_id == Event.id)
+            .filter(MediaRef.user_id == user_id))
+
+    total = base.count()
+    if not total:
+        return {"total": 0, "uploads": 0, "linked": 0, "events_with_photo": 0,
+                "events_total": 0, "first": None, "last": None,
+                "years": [], "days": [], "bytes": 0}
+
+    kinds = dict(db.query(MediaRef.provider, func.count(MediaRef.id))
+                 .filter(MediaRef.user_id == user_id)
+                 .group_by(MediaRef.provider).all())
+    # Nur Hochgeladenes belegt Platz auf DIESER Platte — ein Immich-Verweis
+    # ist ein paar Zeichen. Sie zusammenzuzählen wäre eine Größenangabe über
+    # ein fremdes System.
+    size = (db.query(func.sum(MediaRef.bytes))
+            .filter(MediaRef.user_id == user_id,
+                    MediaRef.provider == "local").scalar() or 0)
+
+    dated = base.filter(day_of.isnot(None))
+    span = dated.with_entities(func.min(day_of), func.max(day_of)).one()
+    years = (dated.with_entities(func.extract("year", day_of).label("y"),
+                                 func.count(MediaRef.id))
+             .group_by("y").order_by("y").all())
+    days = (dated.with_entities(day_number(day_of).label("d"),
+                                func.count(MediaRef.id).label("n"))
+            .group_by("d").order_by(func.count(MediaRef.id).desc(), "d")
+            .limit(n).all())
+
+    def _iso(num) -> str:
+        num = int(num)
+        return f"{num // 10000:04d}-{num // 100 % 100:02d}-{num % 100:02d}"
+
+    return {
+        "total": total,
+        "uploads": int(kinds.get("local", 0)),
+        "linked": total - int(kinds.get("local", 0)),
+        # „An wie vielen deiner Einträge hängt ein Bild?" — die Zahl ist erst
+        # mit ihrem Nenner eine Aussage.
+        "events_with_photo": (db.query(func.count(func.distinct(MediaRef.event_id)))
+                              .filter(MediaRef.user_id == user_id,
+                                      MediaRef.event_id.isnot(None)).scalar() or 0),
+        "events_total": (db.query(func.count(Event.id))
+                         .filter(Event.user_id == user_id).scalar() or 0),
+        "first": span[0].date().isoformat() if span[0] else None,
+        "last": span[1].date().isoformat() if span[1] else None,
+        "bytes": int(size),
+        "years": [{"year": int(y), "count": int(c)} for y, c in years],
+        "days": [{"day": _iso(d), "count": int(c)} for d, c in days],
     }
 
 

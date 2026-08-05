@@ -44,7 +44,14 @@ _WX_KEYS = ("temperature_c", "temp_max_c", "temp_min_c", "sunshine_h",
             # Ereignisses. Gespeicherte Daten, die nirgends zusammengefasst
             # werden, sind Ballast; ein Rekord ist der Sinn eines Extremwerts.
             "uv_max", "gust_max_kmh", "apparent_temp_max_c",
-            "apparent_temp_min_c", "daylight_h")
+            "apparent_temp_min_c", "daylight_h",
+            # Anmerkung 189: Regenstunden. Seit F12 geholt und bis hierher in
+            # keiner Zusammenfassung — genau der Ballast, den der Absatz
+            # darüber beschreibt. „Nassester Tag" misst Millimeter; wie LANGE
+            # es geregnet hat, ist eine andere Frage, und ERA5 beantwortet sie
+            # (geprüft: 18 h am 21.06.2024 in Hamburg, gegen 0 h zwei Tage
+            # später).
+            "rain_h")
 
 # Extremwert-Kacheln: Name -> (Metrik-Schlüssel …, Richtung, nur echte Werte?)
 # „nur echte Werte" heißt: 0 zählt nicht als Rekord. Bei Regen und Schnee ist
@@ -65,6 +72,11 @@ _EXTREMES: tuple[tuple[str, tuple[str, ...], str, bool], ...] = (
     # die historical-forecast-API und nur ab ~2022; das wäre ein zweiter
     # Endpunkt mit eigenen Fehlerpfaden, kein Kachelwert. "Sonnigster Tag"
     # (Sonnenstunden, oben) deckt "Sonne" ab und steht IM Archiv.
+    # Anmerkung 189: „am längsten geregnet" — eine andere Frage als „am
+    # meisten geregnet" (`rainy`, Millimeter). Ein Landregen über 18 Stunden
+    # und ein Wolkenbruch von zwanzig Minuten können dieselbe Menge bringen.
+    # `positive_only`, weil 0 h kein Rekord ist, sondern ein trockener Tag.
+    ("rain_long", ("rain_h",), "max", True),
     ("gust", ("gust_max_kmh",), "max", True),
     ("felt_hot", ("apparent_temp_max_c",), "max", False),
     ("felt_cold", ("apparent_temp_min_c",), "min", False),

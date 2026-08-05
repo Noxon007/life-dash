@@ -1652,6 +1652,13 @@
                eine Lebensdatenbank nicht beantworten kann, indem sie ansieht,
                was sie hat. -->
           <div class="zoom-btn" data-stats="gaps" data-i18n="stats.tab.gaps">🕳️ Lücken</div>
+          <!-- Anmerkung 189: die fünfte Ansicht, und sie ist die einzige mit
+               einer anderen HERKUNFT. Alles links davon rechnet über Erfasstes,
+               hier steht ausschließlich, was ein Google-Export hergab. Genau
+               deshalb ein eigener Reiter statt einer Tafel dazwischen: dort
+               stünden diese Zahlen neben erfassten Tatsachen, als wären sie
+               welche (A40). -->
+          <div class="zoom-btn" data-stats="tracks" data-i18n="stats.tab.tracks">🛣️ Wege</div>
         </div>
         <div class="stats-pane" data-stats-pane="tiles">
         <div class="grid cols-4" style="margin-bottom:24px">
@@ -1690,6 +1697,15 @@
             <div class="stat-num" id="stat-rainy">–</div>
             <div class="stat-label" data-i18n="stat.rain">🌧️ Nassester Tag</div>
             <div class="stat-sub" id="stat-rainy-sub">–</div>
+          </div>
+          <!-- Anmerkung 189: „am längsten" ist eine andere Frage als „am
+               meisten" — ein Landregen über 18 Stunden und ein Wolkenbruch von
+               zwanzig Minuten können dieselbe Menge bringen. Der Wert wird
+               seit F12 mitgeholt und stand bis hierher in keiner Übersicht. -->
+          <div class="stat-card" data-event-slot="rain_long">
+            <div class="stat-num" id="stat-rain-long">–</div>
+            <div class="stat-label" data-i18n="stat.rainlong">🌧️ Längster Regen</div>
+            <div class="stat-sub" id="stat-rain-long-sub">–</div>
           </div>
           <div class="stat-card" data-event-slot="windy">
             <div class="stat-num" id="stat-windy">–</div>
@@ -1803,6 +1819,24 @@
 
         <div class="stats-pane" data-stats-pane="gaps" style="display:none">
           <div id="stats-gaps"><div class="hint" data-i18n="loading">lade…</div></div>
+        </div>
+
+        <div class="stats-pane" data-stats-pane="tracks" style="display:none">
+          <!-- Die Warnung steht ÜBER den Zahlen und nicht darunter: wer eine
+               Jahressumme liest, hat die Fußnote schon hinter sich. -->
+          <div class="panel" style="border-color:var(--warn, #c9a227)">
+            <b data-i18n="tr.warn.title">⚠️ Diese Zahlen kommen ausschließlich aus dem Google-Timeline-Import</b>
+            <div class="hint" style="margin-top:6px" data-i18n="tr.warn.desc">
+              Sie sagen nicht, wie viel du zurückgelegt hast, sondern was Google davon aufgezeichnet hat —
+              und das kann <b>sehr ungenau</b> sein. Ohne Telefon in der Tasche gibt es die Fahrt nicht.
+              Die Fortbewegungsart ist Googles <b>Vermutung</b> (ein Fußweg im Bus zählt gern als Radfahrt).
+              Die Strecke kommt aus dem Export, und wo sie dort fehlt, wird sie aus der Punktfolge gerechnet:
+              bei grober Aufzeichnung ist das zu wenig, bei GPS-Rauschen im Stand zu viel.
+              Zeiträume ohne Export fehlen ganz — und ein Jahr ohne Daten sieht genauso aus wie eines,
+              in dem du zu Hause geblieben bist. Als Größenordnung taugt es, als Kilometerstand nicht.
+            </div>
+          </div>
+          <div id="stats-tracks"><div class="hint" data-i18n="loading">lade…</div></div>
         </div>
 
         <div class="hint" style="margin-top:24px" data-i18n="stats.hint">
@@ -3334,6 +3368,7 @@ const I18N_EN = {
   'stat.cold': "❄️ Coldest day",
   'stat.sun': "☀️ Sunniest day",
   'stat.rain': "🌧️ Wettest day",
+  'stat.rainlong': "🌧️ Longest rain",
   'stat.wind': "💨 Windiest day",
   'stat.snow': "❄️ Snowiest day",
   'stat.sub.weather': "run weather enrichment",
@@ -3958,6 +3993,31 @@ const I18N_EN = {
   'tops.nowx': "no weather data yet",
   'tops.none': "nothing recorded yet",
   'tops.streaks': "📏 Longest streaks",
+  // Anmerkung 189 — die Fotos
+  // Anmerkung 189 — Reichweite und Wege
+  'tops.far': "🧭 Farthest from home", 'tops.far.sub': "{d} · straight line from “{h}”",
+  'tops.far.none': "Add a residence — without one there is no “far away”.",
+  'tops.reach': "🌍 Reach per year", 'tops.reach.n': "{c} countries",
+  'tops.reach.sub': "{s} cities",
+  'stats.tab.tracks': "🛣️ Paths",
+  'tr.warn.title': "⚠️ These figures come solely from the Google Timeline import",
+  'tr.warn.desc': "They do not say how far you travelled, but how much of it Google recorded — and that can be <b>very imprecise</b>. Without a phone in your pocket the journey does not exist. The mode of travel is Google's <b>guess</b> (a walk on a bus happily counts as cycling). The distance comes from the export, and where it is missing there it is computed from the sequence of points: with coarse recording that is too little, with GPS noise while standing still too much. Periods without an export are missing entirely — and a year without data looks exactly like one you spent at home. Useful as an order of magnitude, not as an odometer.",
+  'tr.fail': "The paths could not be computed.",
+  'tr.none': "No paths imported yet — the Google Timeline import is under “My data”.",
+  'tr.sum': "🛣️ Total", 'tr.modes': "🚦 By mode of travel", 'tr.years': "📅 Per year",
+  'tr.longest': "📏 Longest single paths",
+  'tr.total': "Recorded distance in total", 'tr.total.sub': "{n} paths · {von} – {bis}",
+  'tr.n.ways': "{n} paths",
+  'tr.mode.walk': "🚶 on foot", 'tr.mode.run': "🏃 running",
+  'tr.mode.cycle': "🚲 by bike", 'tr.mode.drive': "🚗 by car",
+  'tr.mode.transit': "🚌 public transport",
+  'tr.mode.unknown': "❓ not determined by Google",
+  'tr.mode.none': "— no information in the export",
+  'tops.photos': "📷 Photos", 'tops.ph.days': "📷 Days with the most photos",
+  'tops.ph.total': "Photos in total", 'tops.ph.up': "{n} uploaded",
+  'tops.ph.link': "{n} linked from Immich", 'tops.ph.evs': "Entries with a photo",
+  'tops.ph.share': "{p} % of your entries",
+  'tops.ph.span': "Oldest to newest photo", 'tops.ph.n': "{n} photos",
   'tops.run': "Longest streak with entries",
   'tops.gap': "Longest gap without entries",
   'tops.trip': "Longest recorded trip",
@@ -7401,6 +7461,8 @@ async function loadStats(op) {
   const newDataHint = t('wx.newdata', 'kommt mit neuen Wetter-Anreicherungen (ab v0.14)');
   tempCard('stat-sunny', ex.sunny, ' h', newDataHint);
   tempCard('stat-rainy', ex.rainy, ' mm', newDataHint);
+  // Anmerkung 189: der Wert kommt aus F12 — deshalb steht unten der
+  // 0.22-Hinweis daran und nicht der von 0.14 (siehe `f12Hint`).
   tempCard('stat-windy', ex.windy, ' km/h', newDataHint);
   tempCard('stat-snowy', ex.snowy, ' cm', newDataHint);
   // Anmerkung 114: Diese sechs gibt es erst ab v0.22 (F12) — ältere
@@ -7408,6 +7470,7 @@ async function loadStats(op) {
   // richtige Version; „ab v0.14" wäre hier eine Auskunft, nach der man
   // vergeblich sucht.
   const f12Hint = t('wx.newdata12', 'kommt mit neuen Wetter-Anreicherungen (ab v0.22)');
+  tempCard('stat-rain-long', ex.rain_long, ' h', f12Hint);
   tempCard('stat-gust', ex.gust, ' km/h', f12Hint);
   tempCard('stat-felt-hot', ex.felt_hot, ' °C', f12Hint);
   tempCard('stat-felt-cold', ex.felt_cold, ' °C', f12Hint);
@@ -7480,6 +7543,7 @@ function showStatsPane(which) {
   // jedes Mal dieselbe Antwort neu erfragt.
   if (which === 'tops') loadStatsTops();
   if (which === 'gaps') loadStatsGaps();
+  if (which === 'tracks') loadStatsTracks();     // Anmerkung 189
 }
 document.querySelectorAll('#stats-tabs .zoom-btn').forEach(btn =>
   btn.addEventListener('click', () => showStatsPane(btn.dataset.stats)));
@@ -7545,6 +7609,7 @@ const TOP_WEATHER = [
   ['cold', 'stat.cold', '❄️ Kältester Tag', ' °C'],
   ['sunny', 'stat.sun', '☀️ Sonnigster Tag', ' h'],
   ['rainy', 'stat.rain', '🌧️ Nassester Tag', ' mm'],
+  ['rain_long', 'stat.rainlong', '🌧️ Längster Regen', ' h'],
   ['windy', 'stat.wind', '💨 Windigster Tag', ' km/h'],
   ['snowy', 'stat.snow', '❄️ Schneereichster Tag', ' cm'],
   ['gust', 'stat.gust', '🌪️ Stärkste Böe', ' km/h'],
@@ -7562,6 +7627,53 @@ function topRow(i, label, value, sub, attrs = '') {
       sub ? `<span class="stat-label"> · ${esc(sub)}</span>` : ''}</div>
     <div class="bar-val">${esc(value)}</div>
   </div>`;
+}
+// **Anmerkung 189 — die Fotos, zum ersten Mal zusammengefasst.**
+//
+// Über Medien gab es bis hierher keine einzige Zahl, obwohl sie nach einem
+// Immich-Abgleich die zweitgrößte Menge im Bestand sind.
+//
+// Drei Entscheidungen stecken darin, und alle drei sind Antworten auf „was
+// sagt die Zahl eigentlich":
+//
+//  * **Hochgeladen und verknüpft stehen getrennt** (Anmerkung 57). Ein
+//    hochgeladenes Bild liegt HIER und ist Lebensdatenbank; ein
+//    Immich-Verweis zeigt in ein fremdes System und ist eine Ableitung. Eine
+//    gemeinsame Zahl verspräche einen Bestand, von dem der größere Teil
+//    woanders liegt — und genau den Unterschied merkt ein Backup.
+//  * **„An wie vielen Einträgen hängt ein Bild" steht mit seinem Nenner da.**
+//    „412 Einträge mit Bild" ist keine Auskunft, „412 von 8.900" ist eine.
+//  * **Der Platz zählt nur das Hochgeladene.** Was in Immich liegt, belegt
+//    nicht diese Platte, und eine Größenangabe über ein fremdes System wäre
+//    eine Behauptung über etwas, das dieses Programm nicht kennt.
+function photoPanel(p) {
+  if (!p || !p.total) return '';
+  const n = v => (v || 0).toLocaleString(LOC());
+  const mb = p.bytes ? `${(p.bytes / 1048576).toFixed(p.bytes > 1073741824 ? 0 : 1)} MB` : '';
+  const rows = [
+    topRow(0, t('tops.ph.total', 'Fotos insgesamt'), n(p.total),
+           [p.uploads ? t('tops.ph.up', '{n} hochgeladen').replace('{n}', n(p.uploads)) : '',
+            p.linked ? t('tops.ph.link', '{n} aus Immich verknüpft').replace('{n}', n(p.linked)) : '',
+            mb].filter(Boolean).join(' · ')),
+    topRow(1, t('tops.ph.evs', 'Einträge mit Bild'),
+           `${n(p.events_with_photo)} / ${n(p.events_total)}`,
+           p.events_total
+             ? t('tops.ph.share', '{p} % deiner Einträge')
+                 .replace('{p}', (p.events_with_photo / p.events_total * 100).toFixed(1))
+             : ''),
+    p.first ? topRow(2, t('tops.ph.span', 'Ältestes bis neuestes Foto'),
+                     `${fmtDay(p.first)} – ${fmtDay(p.last)}`, '') : '',
+  ].filter(Boolean);
+  // Die Tage führen in den Zeitstrahl DIESES Tages — dieselbe Bewegung wie bei
+  // den Rekord-Kacheln (Anmerkung 142): eine Zahl, die einen Tag nennt, muss
+  // zu ihm führen können.
+  const days = (p.days || []).map((d, i) =>
+    topRow(i, fmtDay(d.day), t('tops.ph.n', '{n} Fotos').replace('{n}', n(d.count)),
+           '', ` data-top-day="${esc(d.day)}"`));
+  return `<div class="grid cols-2">`
+    + topPanel(t('tops.photos', '📷 Fotos'), rows, '')
+    + topPanel(t('tops.ph.days', '📷 Tage mit den meisten Fotos'), days, '')
+    + `</div>`;
 }
 function topPanel(title, rows, empty) {
   return `<div class="panel">
@@ -7594,8 +7706,37 @@ function renderStatsTops(top) {
                `${streak.longest_trip.title} · ${span(streak.longest_trip)}`) : '',
   ].filter(Boolean);
 
+  // **Anmerkung 189 — „wie weit war ich je weg?"** Die Frage ist erst
+  // beantwortbar, seit es Wohnorte gibt: „weit weg" braucht ein Bezugssystem.
+  // Gemessen wird gegen den Wohnort, der AN DEM TAG galt — sonst wäre die
+  // Kindheit an der Ostsee eine Fernreise, sobald jemand nach München zieht.
+  // Ohne Wohnort steht die Zeile gar nicht da statt mit einer Null, die wie
+  // „war nie weg" aussieht.
+  const far = top.farthest;
+  const farRows = far ? [
+    topRow(0, [far.place, far.city, far.country].filter(Boolean).join(' · '),
+           `${(far.km || 0).toLocaleString(LOC(), { maximumFractionDigits: 0 })} km`,
+           t('tops.far.sub', '{d} · Luftlinie von „{h}"')
+             .replace('{d}', fmtDay(far.date)).replace('{h}', far.home || ''),
+           far.date ? ` data-top-day="${esc(far.date)}"` : ''),
+  ] : [];
+  // Reichweite je Jahr: nicht „wie viel", sondern „wie weit gestreut". Der
+  // Wohnort zählt mit — ein Jahr ganz zu Hause stünde sonst bei „0 Länder".
+  const reach = (top.reach || []).slice().reverse().map((y, i) =>
+    topRow(i, String(y.year),
+           t('tops.reach.n', '{c} Länder').replace('{c}', y.countries),
+           t('tops.reach.sub', '{s} Städte').replace('{s}', y.cities)));
+
   box.innerHTML =
     topPanel(t('tops.streaks', '📏 Längste Serien'), streakRows, noData)
+    + (far || reach.length
+       ? `<div class="grid cols-2">`
+         + topPanel(t('tops.far', '🧭 Am weitesten von zu Hause'), farRows,
+                    t('tops.far.none', 'Trag einen Wohnort ein — ohne ihn gibt es kein „weit weg".'))
+         + topPanel(t('tops.reach', '🌍 Reichweite je Jahr'), reach, noData)
+         + `</div>`
+       : '')
+    + photoPanel(top.photos || {})
     + `<div class="grid cols-2">`
     + topPanel(t('tops.places', '📍 Top-Orte'), rank(top.places), noData)
     + topPanel(t('tops.cities', '🏙️ Top-Städte'), rank(top.cities), noData)
@@ -7644,6 +7785,79 @@ function renderStatsTops(top) {
 // Der Deckel und die Herkunft der Zahlen stehen sichtbar dabei (A40): eine
 // Liste der zwanzig längsten Strecken sieht aus wie die ganze Wahrheit, wenn
 // niemand sagt, dass es vierhundert sind.
+// --------------------------------------------------------------------------- //
+// **Anmerkung 189 — die Wege, in einem eigenen Reiter.**
+//
+// Dieselbe Bauform wie die Lücken daneben (erst beim Ansehen holen, den Stand
+// merken, einen Fehlschlag NICHT merken). Der Unterschied liegt nicht in der
+// Technik, sondern in der Herkunft: hier steht ausschließlich, was ein
+// Google-Export hergab, und die Warnung darüber steht im Markup — nicht in
+// dieser Funktion, damit sie auch dann dasteht, wenn der Abruf scheitert.
+let statsTracksFor = null;
+async function loadStatsTracks(force) {
+  const box = document.getElementById('stats-tracks');
+  if (!box) return;
+  let stamp = null;
+  try { stamp = (await fetchIndex(true)).revision || ''; } catch (_) {}
+  if (!force && stamp && stamp === statsTracksFor && box.dataset.filled) return;
+  let r;
+  try { r = await api('/api/stats/tracks'); }
+  catch (err) {
+    statsTracksFor = null;
+    box.innerHTML = `<div class="hint">${esc(t('tr.fail',
+      'Die Wege konnten nicht gerechnet werden.'))}</div>`;
+    return;
+  }
+  statsTracksFor = stamp;
+  box.dataset.filled = '1';
+  renderStatsTracks(r);
+}
+// Googles Vermutung, in Worten. `unknown` und `null` sind ZWEI Fälle: das eine
+// heißt „Google wusste es nicht", das andere „im Export stand gar nichts".
+// Beide als „unbekannt" auszugeben wäre bequem und eine Angabe weniger.
+const TRACK_MODES = {
+  walk: '🚶 zu Fuß', run: '🏃 gelaufen', cycle: '🚲 mit dem Rad',
+  drive: '🚗 mit dem Auto', transit: '🚌 öffentlich', unknown: '❓ von Google nicht bestimmt',
+};
+const trackMode = m => (m == null
+  ? t('tr.mode.none', '— ohne Angabe im Export')
+  : t('tr.mode.' + m, TRACK_MODES[m] || m));
+function renderStatsTracks(r) {
+  const box = document.getElementById('stats-tracks');
+  if (!box) return;
+  if (!r || !r.count) {
+    box.innerHTML = `<div class="hint">${esc(t('tr.none',
+      'Noch keine Wege importiert — der Google-Timeline-Import steht unter „Meine Daten".'))}</div>`;
+    return;
+  }
+  const km = v => `${(v || 0).toLocaleString(LOC(), { maximumFractionDigits: 0 })} km`;
+  const head = [
+    topRow(0, t('tr.total', 'Aufgezeichnete Strecke insgesamt'), km(r.total_km),
+           t('tr.total.sub', '{n} Wege · {von} – {bis}')
+             .replace('{n}', (r.count || 0).toLocaleString(LOC()))
+             .replace('{von}', fmtDay(r.first)).replace('{bis}', fmtDay(r.last))),
+  ];
+  const modes = (r.modes || []).map((m, i) =>
+    topRow(i, trackMode(m.mode), km(m.km),
+           t('tr.n.ways', '{n} Wege').replace('{n}', (m.count || 0).toLocaleString(LOC()))));
+  const years = (r.years || []).slice().reverse().map((y, i) =>
+    topRow(i, String(y.year), km(y.km),
+           t('tr.n.ways', '{n} Wege').replace('{n}', (y.count || 0).toLocaleString(LOC()))));
+  // Anmerkung 142: eine Zahl, die einen Tag nennt, führt zu ihm.
+  const longest = (r.longest || []).map((w, i) =>
+    topRow(i, fmtDay(w.date), km(w.km), trackMode(w.mode),
+           ` data-top-day="${esc(w.date)}"`));
+  box.innerHTML =
+    topPanel(t('tr.sum', '🛣️ Summe'), head, '')
+    + `<div class="grid cols-2">`
+    + topPanel(t('tr.modes', '🚦 Nach Fortbewegungsart'), modes, '')
+    + topPanel(t('tr.years', '📅 Je Jahr'), years, '')
+    + `</div>`
+    + topPanel(t('tr.longest', '📏 Längste einzelne Wege'), longest, '');
+  box.querySelectorAll('[data-top-day]').forEach(row =>
+    row.addEventListener('click', () => tlShowDay(row.dataset.topDay)));
+}
+
 let statsGapsFor = null;
 async function loadStatsGaps(force) {
   const box = document.getElementById('stats-gaps');

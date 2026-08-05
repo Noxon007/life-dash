@@ -177,6 +177,26 @@ any `MINOR`.
   longest run of consecutive days with entries, the longest gap without any,
   and your longest recorded trip.
 
+### Added
+- **Kilometres from your imported paths — in a tab of their own.** *Statistics →
+  Paths* adds up what the Google Timeline import brought: your total distance,
+  split by mode of travel and by year, and the longest single paths. Those
+  figures had been sitting in the database since the first import and were never
+  added up. They live in their own tab, with the warning above them rather than
+  below, because they are the only numbers here that do not come from what you
+  recorded: no phone in your pocket means no journey, the mode of travel is
+  Google's guess, and a year without an export looks exactly like a year you
+  spent at home. Useful as an order of magnitude, not as an odometer.
+- **Three more things your data already knew.** *How long* it rained is now a
+  record of its own beside *how much* — a downpour of twenty minutes and a
+  drizzle lasting eighteen hours can bring the same millimetres. **Your photos**
+  finally have a summary: how many there are, how many you uploaded yourself
+  against how many are linked from Immich, how many of your entries carry a
+  picture (with the total beside it, not just the count), the oldest and newest,
+  and the days with the most. And **how far you have ever been from home** —
+  measured against the residence that applied *on that day*, because a centre of
+  life moves; plus how many countries and cities each year of your life touched.
+
 ### Fixed
 - **The weather now comes from one named source instead of whichever one the
   service felt like.** Until now the request left the choice to Open-Meteo — and

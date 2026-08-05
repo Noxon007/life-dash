@@ -11,6 +11,7 @@ from app.services import gaps
 from app.services.stats import compute_widgets
 from app.services.stats_overview import compute_overview
 from app.services.stats_toplists import compute_toplists
+from app.services.stats_tracks import compute_tracks
 
 router = APIRouter(prefix="/api/stats", tags=["Statistik"])
 
@@ -37,6 +38,21 @@ def toplists(db: Session = Depends(get_db),
     hat. Eine Ansicht bezahlt, was sie zeigt.
     """
     return compute_toplists(db, user.id)
+
+
+@router.get("/tracks")
+def track_stats(db: Session = Depends(get_db),
+                user: User = Depends(get_current_user)) -> dict:
+    """Anmerkung 189: Kilometer aus den importierten Wegen.
+
+    **Eigener Endpunkt UND eigener Reiter, wegen der Herkunft.** Alles andere
+    in der Statistik rechnet über Erfasstes; hier steht ausschließlich, was ein
+    Google-Timeline-Export hergab — mit Googles Vermutung zur Fortbewegungsart
+    und einer Strecke, die bei grober Aufzeichnung zu klein und bei GPS-Rauschen
+    zu groß ist. Diese Zahlen zwischen die Ranglisten zu mischen hieße, sie als
+    gleichwertig auszugeben (A40).
+    """
+    return compute_tracks(db, user.id)
 
 
 @router.get("/gaps")

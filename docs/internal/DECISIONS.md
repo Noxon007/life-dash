@@ -1222,6 +1222,27 @@ and no change, and one that turned out to be the same defect in two places.
 
     The lasting change is a comment at the WMO table in `services/weather.py`. It maps 95/96/99 and therefore reads like a promise that they occur; the next person to build “thunderstorm days” on it would get a view that is permanently empty and looks finished — this project's most expensive class of defect.
 
+189. ✅ **Four things that were already in the database and had never been added up.** Asked what else could be pulled out of the existing data. The answer came from a sweep for fields that are *stored and read nowhere* — not from brainstorming.
+
+    **One of the four was wrong, and the check caught it.** “UV index: fetched, loaded, thrown away” looked like a hole because `uv_max` sits in `_WX_KEYS` while no record tile uses it. It is not a hole: note 123 removed that tile in 0.24 because ERA5 returns `null` for historical UV. Verified again before building anything — seven summer days in Hamburg, `uv_index_max` `None` every time. Nothing built.
+
+    What was real:
+
+    - **Hours of rain.** `rain_h` has been fetched since F12 and appeared in no summary at all, not even in the statistics' key list. “Wettest day” measures millimetres; *how long* it rained is a different question, and ERA5 answers it (18 h on 21 June 2024 in Hamburg against 0 h two days later). One entry in `_EXTREMES` — from which both the tile and the top-ten list are built, so both appeared at once.
+    - **Photos.** No statistic over media existed. A photo's day is `captured_at`, falling back to its entry's date, because F18 allows a photo to hang on a *day* instead of an entry — reading only one of the two would drop half the collection out of a view that looks complete. Uploaded and linked are counted **separately** (note 57: one is the life database, the other a reference into a foreign system, and that is exactly the difference a backup notices), and the size counts only uploads, since what sits in Immich does not occupy this disk. “Entries with a photo” is shown with its denominator: 812 is not a statement, 812 of 8,900 is.
+    - **Farthest from home.** Only answerable since residences exist: “far away” needs a frame of reference, and a centre of life moves. Measured against the residence valid **on that day** — otherwise a childhood on the Baltic becomes a long-haul trip the moment someone moves to Munich. Grouped over *places*, not entries: the farthest point is a property of the place, and a record has hundreds of places against tens of thousands of entries. Without a residence it returns `None` rather than a zero that reads as “never went anywhere”. Haversine in Python, not SQL — `sin`/`cos` exist in SQLite only when it was built with `SQLITE_ENABLE_MATH_FUNCTIONS`.
+    - **Reach per year.** How many distinct countries and cities a year touched — the residence counts, or a year spent entirely at home would report “0 countries” while the person was in one.
+
+190. ✅ **Kilometres from the imported paths — in a tab of their own, because of where they come from.** `Track.distance_m` and `activity_type` had been in the database since the first timeline import and were read by exactly one thing: a popup showing a single path's length on the map.
+
+    They are now summed by mode of travel, by year and as a lifetime total, with the longest single paths. **In a fifth statistics tab rather than among the rankings**, at the user's explicit request and for the reason the rankings exist: everything else there is computed over what the user recorded, while these figures are solely what a Google export happened to contain. Between the other panels they would stand next to recorded facts as though they were some (A40, the same sentence as the weather source in note 186).
+
+    The warning sits **above** the numbers, not under them — whoever reads a yearly total has already passed a footnote. It names the four ways these figures mislead: no phone means no journey; the mode of travel is Google's guess; the distance comes from the export and, where missing, from the sum of straight lines between recorded points (too little with coarse recording, too much with GPS noise while standing still); and periods without an export look exactly like periods spent at home.
+
+    Two details the tests pin: a path **without** a distance still counts as a path (`distance_m` may be `NULL`, and “how many paths” must not depend on whether a distance came along), and `unknown` (“Google could not tell”) stays distinct from `NULL` (“nothing in the export”) — collapsing them would take from the interface the ability to say which it was.
+
+    Measured with `tools/_measure_api.py`, which now builds 20,000 photos and 50,000 paths as well: `/api/stats/toplists` 304 → 389 ms with all of note 189 added, `/api/stats/tracks` 105 ms. Both are click-endpoints, and both are computation over data that was already paid for — no new network call anywhere.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

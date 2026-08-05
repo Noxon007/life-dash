@@ -39,6 +39,8 @@ const dynamic = [
   ['cat.', 'catLabels'], ['job.', 'JOB_LABELS'], ['jobstatus.', 'JOB_STATUS_DE'],
   ['ent.type.', 'ENT_TYPES'], ['track.', 'TRACK_LABELS'], ['prec.', 'PRECISION_LABELS'],
   ['theme.', 'THEME_LABELS'],
+  // Anmerkung 189: Googles Vermutung zur Fortbewegungsart, in Worten.
+  ['tr.mode.', 'TRACK_MODES'],
 ];
 // Schlüssel, deren Präfix aus einer Struktur mit anderem Bau kommt.
 const fromStructure = w => {

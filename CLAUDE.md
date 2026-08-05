@@ -86,7 +86,8 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
   achievements) · `services/` (ingestion, enrichment = Wetter, geocode =
   Nominatim/LocationIQ mit 429-Backoff, translit = Umschrift Griechisch/
   Kyrillisch für Ortsnamen, weather = Open-Meteo, baseline, gaps,
-  weather_day, stats_*) · `data/countries.py` (passt zu
+  weather_day, stats_* inkl. `stats_tracks` = Kilometer aus dem
+  Timeline-Import, eigener Reiter wegen der Herkunft) · `data/countries.py` (passt zu
   `frontend/world-countries.geojson`)
 - `frontend/index.html`: EIN File (CSS+HTML+JS, ~13.000 Zeilen) — **gezielt per
   Grep und Read mit offset/limit lesen, nie komplett**

@@ -16,11 +16,12 @@ Stellen, an denen so eine Liste still falsch wird:
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 import pytest
 
-from app.models import (ConfirmState, DatePrecision, Event, Location, Metric,
+from app.models import (BaselineLocation, ConfirmState, DatePrecision, Event,
+                        Location, MediaRef, Metric,
                         Source, User, UserRole)
 from app.services.stats_overview import compute_overview
 from app.services.stats_toplists import compute_toplists
@@ -294,3 +295,88 @@ def test_an_empty_corpus_answers_with_nothing_not_with_zero(db, user):
                               "longest_trip": None}
     assert top["places"] == [] and top["cities"] == []
     assert all(rows == [] for rows in top["weather"].values())
+
+
+# --------------------------------------------------------------------------- #
+# Anmerkung 189 — was bisher ungenutzt in der Datenbank lag
+# --------------------------------------------------------------------------- #
+def test_photos_count_the_day_from_both_anchors(db, user):
+    """Ein Bild hängt an einem EREIGNIS oder an einem TAG (F18) — beides kommt
+    vor, und nur eines zu lesen ließe die halbe Sammlung aus einer Statistik
+    verschwinden, die vollständig aussieht.
+
+    Und: hochgeladen und verknüpft bleiben getrennt (Anmerkung 57). Das eine
+    ist Lebensdatenbank, das andere ein Verweis in ein fremdes System.
+    """
+    ev = _event(db, user, datetime(2024, 5, 4))
+    _event(db, user, datetime(2024, 5, 5))          # ohne Bild — der Nenner
+    # am Ereignis, ohne eigenen Zeitstempel
+    db.add(MediaRef(user_id=user.id, event_id=ev.id, provider="local",
+                    external_id="a.jpg", bytes=2048))
+    # am TAG, ohne Ereignis
+    for i in range(3):
+        db.add(MediaRef(user_id=user.id, provider="immich",
+                        external_id=f"i{i}",
+                        captured_at=datetime(2024, 5, 4, 12 + i)))
+    db.commit()
+
+    p = compute_toplists(db, user.id)["photos"]
+    assert p["total"] == 4
+    assert (p["uploads"], p["linked"]) == (1, 3)
+    assert p["bytes"] == 2048, "nur Hochgeladenes belegt DIESE Platte"
+    assert p["events_with_photo"] == 1 and p["events_total"] == 2
+    # Alle vier liegen auf demselben Tag — der eine über sein Ereignis, die
+    # drei über `captured_at`.
+    assert p["days"][0] == {"day": "2024-05-04", "count": 4}
+    assert p["first"] == "2024-05-04"
+
+
+def test_farthest_is_measured_against_the_home_of_that_time(db, user):
+    """**Ein Lebensmittelpunkt wandert.** Gemessen wird gegen den Wohnort, der
+    AN DEM TAG galt — sonst wäre die Kindheit an der Ostsee eine Fernreise,
+    sobald jemand nach München zieht.
+    """
+    kiel = _loc(db, user, "Kiel", city="Kiel", country="Deutschland")
+    kiel.lat, kiel.lng = 54.32, 10.14
+    muenchen = _loc(db, user, "München", city="München", country="Deutschland")
+    muenchen.lat, muenchen.lng = 48.14, 11.58
+    hamburg = _loc(db, user, "Hamburg", city="Hamburg", country="Deutschland")
+    hamburg.lat, hamburg.lng = 53.55, 10.00
+    db.add_all([
+        BaselineLocation(user_id=user.id, location_id=kiel.id,
+                         date_start=date(2000, 1, 1), date_end=date(2009, 12, 31)),
+        BaselineLocation(user_id=user.id, location_id=muenchen.id,
+                         date_start=date(2010, 1, 1), date_end=date(2019, 12, 31)),
+    ])
+    # Hamburg: 90 km von Kiel, aber 600 km von München.
+    _event(db, user, datetime(2005, 6, 1), loc=hamburg, title="damals")
+    db.commit()
+    near = compute_toplists(db, user.id)["farthest"]
+    assert near and near["home"] and 80 < near["km"] < 110, near
+
+    # Derselbe Ort, andere Zeit — jetzt ist es weit weg.
+    _event(db, user, datetime(2015, 6, 1), loc=hamburg, title="später")
+    db.commit()
+    far = compute_toplists(db, user.id)["farthest"]
+    assert far["km"] > 500 and far["date"] == "2015-06-01", far
+
+
+def test_without_a_residence_there_is_no_far_away(db, user):
+    """`None` statt einer Null, die wie „war nie weg" aussieht."""
+    loc = _loc(db, user, "Hamburg", city="Hamburg", country="Deutschland")
+    loc.lat, loc.lng = 53.55, 10.00
+    _event(db, user, datetime(2015, 6, 1), loc=loc)
+    db.commit()
+    assert compute_toplists(db, user.id)["farthest"] is None
+
+
+def test_reach_counts_the_residence_too(db, user):
+    """Ein Jahr ganz zu Hause stünde sonst mit „0 Länder" da — obwohl der
+    Mensch in einem war. Dieselbe Regel wie überall seit F20."""
+    home = _loc(db, user, "Kiel", city="Kiel", country="Deutschland")
+    home.lat, home.lng = 54.32, 10.14
+    db.add(BaselineLocation(user_id=user.id, location_id=home.id,
+                            date_start=date(2015, 1, 1), date_end=date(2015, 12, 31)))
+    db.commit()
+    reach = {r["year"]: r for r in compute_toplists(db, user.id)["reach"]}
+    assert reach[2015]["countries"] == 1 and reach[2015]["cities"] == 1

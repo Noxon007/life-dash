@@ -39,6 +39,11 @@ const TOPLISTS = {
             date_precision: 'day', place: 'Detmold' }],
     cold: [], sunny: [], rainy: [], windy: [], snowy: [], gust: [],
     felt_hot: [], felt_cold: [], longest_day: [], shortest_day: [],
+    // Anmerkung 189: „am längsten geregnet" — eine andere Frage als „am
+    // meisten geregnet", und der Wert lag seit F12 ungenutzt herum.
+    rain_long: [{ value: 18.0, id: 'e9', title: 'Dauerregen',
+                  date_start: '2024-06-21T09:00:00', date_precision: 'day',
+                  place: 'Hamburg' }],
   },
   places: [{ name: 'Kaiserstraße 5', days: 4711, events: 8123 }],
   cities: [{ name: 'Schwerin', days: 317, events: 902 }],
@@ -51,6 +56,25 @@ const TOPLISTS = {
     longest_trip: { id: 't1', title: 'Interrail', from: '2011-07-01',
                     to: '2011-07-24', days: 24 },
   },
+  // --- Anmerkung 189 ---
+  photos: { total: 7412, uploads: 91, linked: 7321, events_with_photo: 812,
+            events_total: 8900, first: '2004-08-03', last: '2026-07-30',
+            bytes: 268435456,
+            years: [{ year: 2004, count: 12 }],
+            days: [{ day: '2021-09-09', count: 137 }] },
+  farthest: { km: 8412.5, place: 'Kuta Beach', city: 'Denpasar',
+              country: 'Indonesien', date: '2016-03-12', home: 'Elternhaus' },
+  reach: [{ year: 2016, countries: 7, cities: 23 },
+          { year: 2017, countries: 2, cities: 5 }],
+};
+// Wege — eigener Endpunkt, eigener Reiter, andere Herkunft.
+const TRACKS = {
+  total_km: 184213.4, count: 51987, first: '2013-05-02', last: '2026-07-28',
+  modes: [{ mode: 'drive', count: 20114, km: 152880.2 },
+          { mode: null, count: 33, km: 12.7 }],
+  years: [{ year: 2013, count: 400, km: 6120.5 },
+          { year: 2014, count: 900, km: 9042.1 }],
+  longest: [{ date: '2015-08-14', mode: 'drive', km: 913.6 }],
 };
 const OVERVIEW = {
   counts: { events: 2, unconfirmed: 0, places: 1, cities: 1, concerts: 0,
@@ -75,7 +99,8 @@ function makeDom(stored) {
         const p = String(u);
         calls.push([(opt && opt.method) || 'GET', p]);
         let body = [];
-        if (/stats\/toplists/.test(p)) body = TOPLISTS;
+        if (/stats\/tracks/.test(p)) body = TRACKS;
+        else if (/stats\/toplists/.test(p)) body = TOPLISTS;
         else if (/stats\/overview/.test(p)) body = OVERVIEW;
         else if (/stats\/widgets/.test(p)) body = [];
         else if (/events\/index/.test(p)) body = { revision: 'r1', total: 2, dated: 2,
@@ -176,9 +201,16 @@ setTimeout(async () => {
   ok('…mit Ort und Anlass', /Sevilla/.test(txt) && /Andalusien/.test(txt),
      txt.slice(0, 300));
   // Anmerkung 142: der Klick führt zum TAG.
-  const row = tops && tops.querySelector('[data-top-day]');
-  ok('Eine Wetter-Zeile trägt ihren Tag', !!row && row.dataset.topDay === '2019-06-26',
-     `${row && row.dataset.topDay}`);
+  //
+  // **Gezielt gesucht und nicht „die erste".** Seit Anmerkung 189 gibt es
+  // mehrere Sorten anklickbarer Zeilen (der entfernteste Punkt, die Foto-Tage),
+  // und `querySelector` nahm die oberste — die Prüfung hätte dann eine andere
+  // Zeile geprüft als die, um die es geht, und wäre grün geblieben.
+  const row = tops && [...tops.querySelectorAll('[data-top-day]')]
+    .find(r => r.dataset.topDay === '2019-06-26');
+  ok('Eine Wetter-Zeile trägt ihren Tag', !!row,
+     [...(tops ? tops.querySelectorAll('[data-top-day]') : [])]
+       .map(r => r.dataset.topDay).join(', '));
   if (row) {
     row.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
     await wait(120);
@@ -187,6 +219,71 @@ setTimeout(async () => {
        `tl.day = ${inPage(w, 'tl.day')} — nicht in den Bearbeiten-Dialog eines `
        + 'Eintrags, der zufällig den Messwert trägt (Anmerkung 142)');
   }
+
+  // --- 5. Anmerkung 189: was bisher ungenutzt herumlag -------------------- //
+  ok('Die Regenstunden haben eine eigene Rangliste', /18/.test(txt)
+     && /Dauerregen/.test(txt),
+     '„nassester Tag" misst Millimeter — wie LANGE es geregnet hat, ist eine '
+     + 'andere Frage, und der Wert lag seit F12 in jeder Zeile');
+
+  // Fotos: die Zahl steht mit ihrem Nenner da, und hochgeladen/verknüpft
+  // bleiben getrennt (Anmerkung 57 — das eine ist Lebensdatenbank, das andere
+  // eine Ableitung, und genau den Unterschied merkt ein Backup).
+  ok('Die Foto-Tafel nennt die Gesamtzahl', /7[.,]412/.test(txt), txt.slice(0, 400));
+  ok('…und trennt Hochgeladenes von Verknüpftem',
+     /91/.test(txt) && /7[.,]321/.test(txt),
+     'eine gemeinsame Zahl verspräche einen Bestand, von dem der größere Teil '
+     + 'in einem fremden System liegt');
+  ok('…und nennt den Nenner, nicht nur den Zähler',
+     /812/.test(txt) && /8[.,]900/.test(txt),
+     '„812 Einträge mit Bild" ist keine Auskunft, „812 von 8.900" ist eine');
+  ok('Der Tag mit den meisten Fotos steht da', /137/.test(txt), txt.slice(0, 400));
+
+  // Am weitesten weg — die Frage gibt es erst mit dem Wohnort.
+  // Gerundet angezeigt (8.412,5 -> „8.413 km") — Kilometer mit Nachkommastelle
+  // wären eine Genauigkeit, die eine Luftlinie über 8.000 km nicht hat.
+  ok('Der entfernteste Punkt steht da mit seiner Entfernung',
+     /8[.,]41[23]/.test(txt) && /Kuta Beach/.test(txt), txt.slice(0, 400));
+  ok('…und sagt, WOVON gemessen wurde', /Elternhaus/.test(txt),
+     'ohne den Bezugspunkt ist „8.412 km" keine Aussage — ein '
+     + 'Lebensmittelpunkt wandert');
+  ok('Die Reichweite je Jahr steht da', /7/.test(txt) && /23/.test(txt),
+     txt.slice(0, 400));
+
+  // --- 6. Die Wege: eigener Reiter, eigene Herkunft ----------------------- //
+  calls.length = 0;
+  const trTab = d.querySelector('#stats-tabs [data-stats="tracks"]');
+  ok('Es gibt einen eigenen Reiter für die Wege', !!trTab,
+     'zwischen den Ranglisten stünden diese Zahlen neben erfassten Tatsachen, '
+     + 'als wären sie welche');
+  if (trTab) trTab.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await wait(200);
+  ok('Der Klick zeigt sie', visiblePanes(d).join(',') === 'tracks',
+     `sichtbar: ${visiblePanes(d).join(', ')}`);
+  ok('…und holt sie erst jetzt', calls.some(([, p]) => /stats\/tracks/.test(p)),
+     JSON.stringify(calls.map(c => c[1])));
+  const trPane = d.querySelector('[data-stats-pane="tracks"]');
+  const trTxt = (trPane ? trPane.textContent : '').replace(/\s+/g, ' ');
+  // **Die eigentliche Zusage dieses Reiters.** Die Warnung steht ÜBER den
+  // Zahlen und ist ANZEIGE, nicht deutscher Quelltext — unter jsdom startet
+  // die Seite englisch, und ein ins Markup gebauter Hinweis erreichte die
+  // Prüfung nie (Anmerkung 116/160).
+  ok('Die Herkunft steht über den Zahlen',
+     /Google/.test(trTxt) && /imprecise|ungenau/i.test(trTxt),
+     trTxt.slice(0, 200));
+  const warnPos = trTxt.indexOf('Google');
+  ok('…und zwar VOR ihnen, nicht als Fußnote',
+     warnPos >= 0 && warnPos < trTxt.indexOf('184'),
+     `Warnung bei ${warnPos}, erste Zahl bei ${trTxt.indexOf('184')} — wer eine `
+     + 'Jahressumme liest, hat die Fußnote schon hinter sich');
+  ok('Die Summe steht da', /184[.,]213|184213/.test(trTxt.replace(/\s/g, '')),
+     trTxt.slice(0, 300));
+  ok('…und die Fortbewegungsart in Worten',
+     /car|Auto/.test(trTxt), trTxt.slice(0, 300));
+  ok('Ein Weg OHNE Angabe wird nicht zu „unbekannt" gemacht',
+     /export|Export/.test(trTxt),
+     '`unknown` heißt „Google wusste es nicht", `null` heißt „im Export stand '
+     + 'nichts" — zwei Fälle, zwei Sätze');
 
   console.log(fail ? `\nAnm. 155/156: ${fail} Prüfung(en) fehlgeschlagen`
                    : '\nAnm. 155/156: alles grün');
