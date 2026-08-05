@@ -504,8 +504,16 @@
   .stage-arrow { display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 24px; }
   /* A24: Karte füllt den Viewport statt fixer 520 px (Topbar+Filter ≈ 330 px) */
   #map { height: max(420px, calc(100dvh - 330px)); border-radius: var(--radius); border: 1px solid var(--border); }
-  /* Am Schreibtisch gibt es den Klapp-Knopf nicht — dort ist Platz für beides. */
-  #mp-filter-toggle { display: none; }
+  /* Am Schreibtisch gibt es den Klapp-Knopf nicht — dort ist Platz für beides.
+     Anmerkung 192: und damit auch die Pfeile daneben nicht; sie stehen dort im
+     Kasten, der ohnehin offen ist. Zwei sichtbare Paare wären zwei Antworten
+     auf „wo blättere ich?". */
+  .mp-mobile-bar { display: none; }
+  /* Ein Knopf, der gerade nichts bewirken kann, muss das ZEIGEN — derselbe
+     Satz wie bei `.filter-chip.inert`, nur für Knöpfe (Anmerkung 192: am
+     ersten und letzten Zeitraum gibt es kein Zurück bzw. kein Weiter). */
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn:disabled:hover { filter: none; }
   /* A38: war ein Inline-Stil und damit im Mobilblock nicht aufhebbar. */
   .mp-range-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .time-range-label { min-width: 150px; text-align: center; }
@@ -618,6 +626,16 @@
      muss, ist ein halber Schalter. Die Kategorie-Chips bleiben unberührt —
      sie setzen ihre Farbe per Inline-Stil und schlagen diese Regel. */
   .filter-chip.active:not([data-cat]) { background: var(--bg-elev); border-color: var(--accent); }
+  /* Anmerkung 191 — „alle“ und „keine“ sind BEFEHLE, keine Zustände. Als Chip
+     gebaut wären sie zwei weitere Schalter in einer Reihe von zwölf, und einer,
+     der nach dem Drücken nicht eingeschaltet bleibt, sieht kaputt aus. Also
+     bewusst die andere Bauform: Text, kein Rahmen, kein Ein-Zustand. */
+  .chip-bulk {
+    font-family: inherit; font-size: 12px; padding: 6px 4px;
+    background: none; border: 0; color: var(--text-dim); cursor: pointer;
+    text-decoration: underline; text-underline-offset: 3px;
+  }
+  .chip-bulk:hover { color: var(--text); }
   /* Anmerkung 160 — vier benannte Stufen statt eines Ein/Aus, dessen Bedeutung
      die Zoomstufe entschied. Als eigene Bauform und nicht als vier Chips: eine
      Reihe Chips liest sich als „mehrere davon dürfen an sein“, und genau das
@@ -1000,10 +1018,23 @@
     .map-layout #map { flex: 0 0 auto; height: 55dvh; width: 100%; }
     #mp-stops { width: 100%; max-height: none; }
     /* A38: Karte groß, Filter weggeklappt (Versprechen aus Kap. 5.7) */
+    .mp-mobile-bar { display: flex; gap: 8px; margin-bottom: 12px; }
     #mp-filter-toggle {
       display: flex; align-items: center; justify-content: space-between; gap: 8px;
-      width: 100%; min-height: 44px; margin-bottom: 12px; text-align: left;
+      /* Anmerkung 192: der Knopf nimmt, was die Pfeile übrig lassen — `flex: 1`
+         statt `width: 100%`, sonst drückt er sie aus der Zeile. */
+      flex: 1; min-width: 0; min-height: 44px; text-align: left;
     }
+    /* Quadratisch und mindestens 44 px: das ist die Fläche, die ein Daumen
+       trifft, und die Pfeile werden öfter gedrückt als alles andere in dieser
+       Ansicht. `flex: 0 0 auto`, damit sie beim langen Zeitraumnamen nicht
+       schrumpfen. */
+    .mp-step {
+      flex: 0 0 auto; width: 44px; min-height: 44px; padding: 0;
+      font-size: 20px; line-height: 1; text-align: center;
+    }
+    /* Ein Sammelbefehl braucht denselben Daumen wie ein Chip daneben. */
+    .chip-bulk { min-height: 44px; padding: 6px 10px; }
     #view-map.filters-open .mp-caret { transform: rotate(180deg); }
     .mp-caret { transition: transform .15s; }
     #view-map:not(.filters-open) .map-filters { display: none; }
@@ -1409,27 +1440,41 @@
              zusammengefasst, „Kategorien" = was ist es). Es sind dieselben
              drei Fragen, also ist es dieselbe Leiste.
 
-             Was der Zeitstrahl NICHT bekommt: „Von Hand" (das IST die Liste —
-             ein Schalter, der sie leerte, wäre kein Angebot) und „Wege" (ein
-             Zeitstrahl zeichnet keine Linien). Ein Bedienelement, das nichts
-             tun kann, gehört nicht hin — auch nicht der Symmetrie zuliebe.
+             Was der Zeitstrahl NICHT bekommt: „Wege" — ein Zeitstrahl zeichnet
+             keine Linien. Ein Bedienelement, das nichts tun kann, gehört nicht
+             hin, auch nicht der Symmetrie zuliebe.
+
+             Anmerkung 191: und auch hier EINE Reihe statt zweier. Der
+             Zeitstrahl hatte den Sammelgriff „Von Hand" nie (das IST die
+             Liste), aber dieselbe Trennung „Ebenen" über „Kategorien" — und
+             damit dieselbe unsichtbare Verschachtelung.
              ══════════════════════════════════════════════════════════════ -->
         <div class="map-filters" id="tl-filters-box">
-          <div class="filter-group">
-            <label data-i18n="map.layers">Ebenen</label>
+          <div class="filter-group" style="flex-basis:100%">
+            <label data-i18n="tl.what">Was steht im Zeitstrahl</label>
             <div class="filter-chips">
+              <span id="tl-filters" style="display:contents"></span>
               <span class="filter-chip off" id="tl-visits-toggle" data-i18n-title="tl.visits.tip" title="Automatisch erfasste Einträge (Google-Besuche, Immich-Fototage) im Zeitstrahl anzeigen — auf der Karte sind sie immer sichtbar" data-i18n="tl.visits.chip">🛰️ Automatisch erfasst</span>
-              <!-- A45: Fotopunkte als eigene, ausblendbare Ebene — genau wie die
+              <!-- A45: Fotopunkte als eigene, ausblendbare Sorte — genau wie die
                    importierten Besuche daneben, und aus demselben Grund: es sind
                    zu viele, um sie ungefragt in den Zeitstrahl zu kippen. -->
               <span class="filter-chip off" id="tl-photos-toggle" data-i18n-title="tl.photos.tip" title="Verortete Fotos als eigene Zeilen im Zeitstrahl, je Tag und Ort zusammengefasst — muss zuerst unter „Meine Daten → Immich“ verortet werden" data-i18n="tl.photos">📷 Fotos</span>
+              <!-- Anmerkung 178: derselbe Chip wie auf der Karte, an derselben
+                   Stelle. Bis dahin waren die abgeleiteten Wohnort-Tage im
+                   Zeitstrahl gar nicht abschaltbar — in einem Jahr ohne
+                   Einträge bestand er ausschließlich aus ihnen, und wer das
+                   nicht wollte, hatte keinen Griff. -->
+              <span class="filter-chip active" id="tl-baseline-toggle" data-i18n-title="map.baseline.tip" title="Deine Wohnort-Zeiträume — ein Zeichen je Zeitraum, dort wo du in dieser Zeit gewohnt hast. Abgeleitet, nicht erfasst."><span class="fdot" style="background:var(--baseline-dot)"></span><span data-i18n="map.baseline">🏠 Wohnort</span></span>
               <!-- Anmerkung 135: unbestätigte Google-/Immich-Vorschläge sind
                    Beleg, kein Ereignis — sie stehen nicht mehr zwischen den
                    bestätigten Karten. Dieser Hinweis sagt, dass es sie gibt, und
-                   führt zu ihrer Liste (Moderation), statt es zu verschweigen. -->
+                   führt zu ihrer Liste (Moderation), statt es zu verschweigen.
+                   Er ist KEIN Schalter und trägt deshalb auch keine Marke. -->
               <span class="filter-chip" id="tl-pending-hint" style="display:none"
                     data-i18n-title="tl.pending.tip"
                     title="Unbestätigte Vorschläge aus Google/Immich — sie werden erst nach der Prüfung in der Moderation zu Ereignissen"></span>
+              <button type="button" class="chip-bulk" id="tl-all" data-i18n-title="filter.all.tip" title="Alles einblenden, was es gibt" data-i18n="filter.all">alle</button>
+              <button type="button" class="chip-bulk" id="tl-none" data-i18n-title="filter.none.tip" title="Alles ausblenden — die Karte bleibt leer, bis wieder etwas gewählt ist" data-i18n="filter.none">keine</button>
             </div>
           </div>
           <div class="filter-group">
@@ -1451,18 +1496,6 @@
                   <option value="point" data-i18n="tl.level.point">Exakter Punkt</option>
                 </select>
               </label>
-            </div>
-          </div>
-          <div class="filter-group" style="flex-basis:100%">
-            <label data-i18n="map.cats">Kategorien</label>
-            <div class="filter-chips">
-              <!-- Anmerkung 178: derselbe Chip wie auf der Karte, an derselben
-                   Stelle. Bis hier waren die abgeleiteten Wohnort-Tage im
-                   Zeitstrahl gar nicht abschaltbar — in einem Jahr ohne
-                   Einträge bestand er ausschließlich aus ihnen, und wer das
-                   nicht wollte, hatte keinen Griff. -->
-              <span class="filter-chip active" id="tl-baseline-toggle" data-i18n-title="map.baseline.tip" title="Deine Wohnort-Zeiträume — ein Zeichen je Zeitraum, dort wo du in dieser Zeit gewohnt hast. Abgeleitet, nicht erfasst."><span class="fdot" style="background:var(--baseline-dot)"></span><span data-i18n="map.baseline">🏠 Wohnort</span></span>
-              <span id="tl-filters" style="display:contents"></span>
             </div>
           </div>
           <span class="hint" id="tl-level-note" style="display:none; flex-basis:100%"></span>
@@ -1501,10 +1534,29 @@
       <div class="view" id="view-map">
         <!-- A38: Auf dem Handy fressen die Filter den halben Schirm. Der Knopf
              klappt sie weg und zeigt stattdessen den Zeitraum, in dem man
-             gerade steckt — die Karte bekommt den Rest. Nur mobil sichtbar. -->
-        <button class="btn secondary" id="mp-filter-toggle" aria-expanded="false" aria-controls="mp-filters-box">
-          <span id="mp-filter-toggle-label">–</span> <span class="mp-caret">▾</span>
-        </button>
+             gerade steckt — die Karte bekommt den Rest. Nur mobil sichtbar.
+
+             **Anmerkung 192 — und daneben die Pfeile.** Gemeldet: „mobil die
+             Möglichkeit, tage- und wochenweise zu springen, ohne das Menü
+             aufklappen zu müssen." Genau so war es: ‹ zurück und weiter ›
+             lagen IM eingeklappten Kasten, also kostete jeder Tagesschritt
+             zweimal Aufklappen — und aufgeklappt ist die Karte halb so groß,
+             also klappte man wieder zu. Der Knopf nannte den Zeitraum bereits;
+             was fehlte, war, ihn auch verlassen zu können.
+
+             Es sind DIESELBEN Knöpfe wie im Kasten, nur an einer zweiten
+             Stelle — kein zweiter Weg, sondern derselbe: beide rufen `mpGo`,
+             und beide werden von `renderPeriod` außer Kraft gesetzt, wenn es
+             nichts mehr zu springen gibt. -->
+        <div class="mp-mobile-bar">
+          <button class="btn secondary mp-step" id="mp-prev-m" aria-label="zurück"
+                  data-i18n-title="map.prev.tip" title="Einen Zeitraum zurück">‹</button>
+          <button class="btn secondary" id="mp-filter-toggle" aria-expanded="false" aria-controls="mp-filters-box">
+            <span id="mp-filter-toggle-label">–</span> <span class="mp-caret">▾</span>
+          </button>
+          <button class="btn secondary mp-step" id="mp-next-m" aria-label="weiter"
+                  data-i18n-title="map.next.tip" title="Einen Zeitraum weiter">›</button>
+        </div>
         <div class="map-filters" id="mp-filters-box">
           <div class="filter-group">
             <label data-i18n="map.view">Ansicht</label>
@@ -1527,35 +1579,49 @@
             </div>
           </div>
           <!-- ══════════════════════════════════════════════════════════════
-               Anmerkung 160 — die Leiste ist nach der FRAGE geteilt, die sie
-               beantwortet (Entwurf „Zwei Fragen“ aus Anmerkung 154).
+               **Anmerkung 191 — EINE Reihe. „Ebenen" und „Kategorien" waren
+               nicht zwei Fragen nebeneinander, sondern eine Frage und ihre
+               Unterfrage.**
 
-               Bis 0.39 stand hier EINE Reihe „Darstellung“ mit vier Chips, die
-               vier verschiedene Sorten Ding waren: Datenebenen (was liegt
-               überhaupt auf der Karte), eine Zeichnung über den Daten (eine
-               Deutung, keine Aufzeichnung), ein Modus (zusammenfassen) und
-               Vollbild — eine Fensterfunktion, die mit Darstellung nichts zu
-               tun hat. Sie sahen gleich aus, weil alle vier Chips waren, also
-               las sich die Reihe als eine Liste gleichartiger Dinge und war
-               vier.
+               Anmerkung 160 hatte die Leiste nach der FRAGE geteilt, die sie
+               beantwortet: „Ebenen" = woher kommt es, „Kategorien" = was ist
+               es. Das las sich sauber und war beim Benutzen falsch: die
+               Kategorie-Chips filterten ausschließlich die VON HAND erfassten
+               Einträge (`mpFiltered` läuft über `mp.catFilter`), sie waren
+               also Kinder des Chips „Von Hand" — und standen als gleichrangige
+               Reihe darunter. Zwei Wege zu demselben Ergebnis: alle Kategorien
+               aus = „Von Hand" aus. Wer beides umlegte, schaltete zweimal
+               dasselbe ab und sah beim zweiten Mal keine Wirkung.
 
-               Jetzt: „Ebenen“ = woher kommt, was hier liegt. „Wie dicht“ =
-               wie es zusammengefasst wird. Vollbild sitzt in der Kartenecke,
-               wo Fensterfunktionen hingehören.
+               Jetzt EINE Reihe „Was liegt auf der Karte", in der jeder Chip
+               genau eine Sorte Marke abschaltet, die man auf der Karte sieht.
+               Die Ersparnis von Anmerkung 160 bleibt: ist keine Kategorie
+               gewählt, geht `manual=0` an den Server (`mpCatsChanged`), die
+               eigenen Einträge kommen dann gar nicht erst über die Leitung.
+
+               „Wie dicht" bleibt eigen — das ist wirklich eine zweite Frage
+               (nicht WAS liegt da, sondern wie es zusammengefasst wird).
+               Vollbild sitzt seit Anmerkung 160 in der Kartenecke, wo
+               Fensterfunktionen hingehören.
                ══════════════════════════════════════════════════════════════ -->
-          <div class="filter-group">
-            <label data-i18n="map.layers">Ebenen</label>
+          <div class="filter-group" style="flex-basis:100%">
+            <label data-i18n="map.what">Was liegt auf der Karte</label>
+            <!-- `display:contents` statt eines eigenen Kastens, damit
+                 `buildCatFilter` weiterhin genau EINEN Behälter füllt und die
+                 Chips trotzdem in derselben Reihe umbrechen. Die Kategorien
+                 stehen VORN: sie sind die Lebensdatenbank, das Übrige ist
+                 Eingesammeltes und Gefolgertes. -->
             <div class="filter-chips">
-              <!-- Der farbige Punkt ist die MARKE, die auf der Karte liegt —
-                   dieselbe Farbe, dieselbe Ebene. Damit muss niemand ein
-                   Sinnbild deuten: man schaltet das ab, was man sieht. -->
-              <span class="filter-chip active" id="mp-manual-toggle" data-i18n-title="map.manual.tip" title="Selbst erfasste Einträge — Reisen, Konzerte, Meilensteine. Auf der Karte die nummerierten Punkte in ihrer Kategoriefarbe."><span class="fdot" style="background:conic-gradient(var(--cat-trip) 0 25%, var(--cat-sighting) 0 50%, #ff5c9e 0 75%, #e85dff 0)"></span><span data-i18n="map.manual">Von Hand</span></span>
+              <span id="mp-filters" style="display:contents"></span>
               <!-- Anmerkung 160: dasselbe Sinnbild und derselbe Wortlaut wie
                    im Zeitstrahl. 🛰️ hieß hier bis 0.39 „zurückgelegte Wege“
                    und dort „automatisch erfasst“ — dasselbe Zeichen für zwei
-                   Dinge in zwei Reitern derselben App. -->
+                   Dinge in zwei Reitern derselben App.
+                   Der farbige Punkt ist die MARKE, die auf der Karte liegt —
+                   dieselbe Farbe, dieselbe Sorte. Damit muss niemand ein
+                   Sinnbild deuten: man schaltet das ab, was man sieht. -->
               <span class="filter-chip active" id="mp-visits-toggle" data-i18n-title="map.visits.tip" title="Aus dem Google-Timeline-Import übernommene Besuche — dieselbe Ebene, die der Zeitstrahl unter 🛰️ führt"><span class="fdot" style="background:var(--cat-media)"></span><span data-i18n="tl.visits.chip">🛰️ Automatisch erfasst</span></span>
-              <!-- A45: eine EIGENE Ebene, kein Ereignis. Ein Foto ist kein
+              <!-- A45: eine EIGENE Sorte, kein Ereignis. Ein Foto ist kein
                    Eintrag in der Lebensdatenbank, sondern ein Beleg dafür,
                    dass jemand dort war.
                    Anmerkung 178: eingeschaltet — siehe die Begründung bei
@@ -1565,6 +1631,20 @@
                    die beiden hießen bis 0.33 beide „Route“. Das Sinnbild ist
                    seit Anmerkung 160 🛣️, weil 🛰️ dem Zeitstrahl gehört. -->
               <span class="filter-chip active" id="mp-tracks-toggle" data-i18n-title="map.tracks.tip" title="Die tatsächlich zurückgelegten Wege aus dem Timeline-Import — echte Aufzeichnungen, eingefärbt nach Fortbewegungsart"><span class="fline"></span><span data-i18n="map.tracks">Zurückgelegte Wege</span></span>
+              <!-- Anmerkung 178: der Wohnort ist beim Benutzen eine SORTE
+                   Eintrag neben Reise, Konzert und Meilenstein — man blendet
+                   ihn aus demselben Grund aus wie eine Kategorie: er soll die
+                   Karte gerade nicht füllen. Die eigene Marke bleibt: was hier
+                   steht, ist gefolgert. -->
+              <span class="filter-chip active" id="mp-baseline-toggle" data-i18n-title="map.baseline.tip" title="Deine Wohnort-Zeiträume — ein Zeichen je Zeitraum, dort wo du in dieser Zeit gewohnt hast. Abgeleitet, nicht erfasst."><span class="fdot" style="background:var(--baseline-dot)"></span><span data-i18n="map.baseline">🏠 Wohnort</span></span>
+              <!-- Anmerkung 191: „alle"/„keine" sind BEFEHLE, keine Zustände —
+                   deshalb kein Chip-Aussehen. Ein rundes Etikett neben zwölf
+                   Schaltern liest sich als dreizehnter Schalter, und einer,
+                   der nach dem Drücken nicht eingeschaltet bleibt, sieht
+                   kaputt aus. Sie sind der Ersatz für den weggefallenen
+                   Sammelgriff „Von Hand" — nur ehrlich benannt. -->
+              <button type="button" class="chip-bulk" id="mp-all" data-i18n-title="filter.all.tip" title="Alles einblenden, was es gibt" data-i18n="filter.all">alle</button>
+              <button type="button" class="chip-bulk" id="mp-none" data-i18n-title="filter.none.tip" title="Alles ausblenden — die Karte bleibt leer, bis wieder etwas gewählt ist" data-i18n="filter.none">keine</button>
             </div>
           </div>
           <div class="filter-group">
@@ -1584,24 +1664,6 @@
                    über tausend Punkte ist ein Knäuel, und wer sie sehen will,
                    fragt ausdrücklich danach. -->
               <span class="filter-chip off" id="mp-route-toggle" data-i18n-title="map.route.tip" title="Verbindet die Orte dieses Zeitraums in ihrer zeitlichen Reihenfolge — eine gedachte Linie, kein gefahrener Weg. Bei zusammengefassten Punkten gibt es keine Reihenfolge zu zeigen." data-i18n="map.route">🧭 Reihenfolge verbinden</span>
-            </div>
-          </div>
-          <div class="filter-group" style="flex-basis:100%">
-            <label data-i18n="map.cats">Kategorien</label>
-            <!-- **Anmerkung 178 — der Wohnort steht bei den Kategorien.**
-                 Er stand in „Ebenen", und das war eine vertretbare Lesart
-                 („woher kommt, was hier liegt?"). Beim Benutzen ist er aber
-                 keine Herkunft, sondern eine SORTE Eintrag neben Reise,
-                 Konzert und Meilenstein — man blendet ihn aus demselben Grund
-                 aus wie eine Kategorie: er soll die Karte gerade nicht füllen.
-                 Die eigene Marke bleibt: was hier steht, ist gefolgert.
-
-                 `display:contents` statt eines eigenen Kastens, damit
-                 `buildCatFilter` weiterhin genau EINEN Behälter füllt und die
-                 Chips trotzdem in derselben Reihe umbrechen. -->
-            <div class="filter-chips">
-              <span class="filter-chip active" id="mp-baseline-toggle" data-i18n-title="map.baseline.tip" title="Deine Wohnort-Zeiträume — ein Zeichen je Zeitraum, dort wo du in dieser Zeit gewohnt hast. Abgeleitet, nicht erfasst."><span class="fdot" style="background:var(--baseline-dot)"></span><span data-i18n="map.baseline">🏠 Wohnort</span></span>
-              <span id="mp-filters" style="display:contents"></span>
             </div>
           </div>
         </div>
@@ -3124,6 +3186,35 @@ async function runForeground(title, fn, opts = {}) {
     },
     note(text) { op.noteText = text; fgRender(op); },
     check() { if (op.aborted) throw new FgAbort(); },
+    // ----------------------------------------------------------------- //
+    // **Anmerkung 193 — der Balken zählt ANFRAGEN, keine Abschnitte.**
+    // ----------------------------------------------------------------- //
+    // Gemeldet: „bei der Statistik steht das Ladefenster die ganze Zeit auf
+    // 0/2 und ist dann direkt fertig." Genau so war es. `loadStats` meldete
+    // zwei Abschnitte, holte im ersten VIER Endpunkte auf einmal und konnte
+    // dazwischen nichts sagen — der Zähler stand also über die gesamte
+    // Wartezeit auf 0 und sprang beim Verschwinden auf 2. Das ist der Satz
+    // aus `fgRender` eine Ebene höher: ein Balken, der bei 0 steht und nie
+    // wächst, behauptet Stillstand. Er war sogar schlechter als kein Balken,
+    // weil er zusätzlich eine Gesamtmenge nennt, an der man ihn misst.
+    //
+    // Vier gleichzeitige Anfragen sind aber sehr wohl vier zählbare Dinge —
+    // nur eben nicht in ihrer REIHENFOLGE. Deshalb zählt hier jede EINZELN,
+    // sobald sie zurückkommt (auch die fehlgeschlagene: sie ist erledigt,
+    // und ein Zähler, der Fehler auslässt, kommt nie an).
+    //
+    // Der Zähler wird dabei übernommen, nicht fortgeschrieben — wer `all`
+    // benutzt, sagt damit „DAS ist der Vorgang". Zwei geschachtelte Bündel
+    // wären zwei Deckelungen an einer Tabelle (siehe CLAUDE.md).
+    all(list, note) {
+      op.total = list.length;
+      op.done = 0;
+      if (note != null) op.noteText = note;
+      fgRender(op);
+      const tick = () => { op.done++; fgRender(op); };
+      return Promise.all(list.map(p => Promise.resolve(p)
+        .then(r => { tick(); return r; }, e => { tick(); throw e; })));
+    },
   };
   const onCancel = () => {
     op.aborted = true;
@@ -3288,18 +3379,25 @@ const I18N_EN = {
   'map.range': "Range",
   'map.prev': "‹ back",
   'map.next': "next ›",
+  // Anmerkung 192: dieselben zwei Sprünge, mobil neben dem Zeitraum-Knopf
+  'map.prev.tip': "One period back",
+  'map.next.tip': "One period forward",
   'map.pickday': "Pick a day from the calendar",
   'map.route': "🧭 Connect in order",
   'map.route.tip': "Joins this period's places in the order they happened — a drawn line, not a route you travelled. With points merged there is no order left to show.",
   'map.route.blocked': "Not possible while points are merged — there is no order left to show.",
-  'map.layers': "Layers",
   'map.density': "How dense",
-  // Anmerkung 178: „Kategorien" stand als einzige Gruppenüberschrift der
-  // Kartenleiste ohne `data-i18n` im Markup — in der englischen Oberfläche
-  // war es der einzige deutsche Wort in der Reihe. Genau die Sorte Lücke,
-  // die auffällt, sobald dieselbe Leiste ein zweites Mal auftaucht.
-  'map.cats': "Categories",
-  // Anmerkung 178: die Zahlen AUF den Ebenen-Schaltern meinen den gezeigten
+  // Anmerkung 191: aus „Ebenen" und „Kategorien" ist EINE Reihe geworden, und
+  // ihre Überschrift nennt die Frage, die sie beantwortet, statt die Bauart
+  // der Antwort. Sie lautet in beiden Ansichten anders, weil sie in beiden
+  // etwas anderes meint — eine Karte zeigt einen Zeitraum, eine Liste blättert.
+  'map.what': "What is on the map",
+  'tl.what': "What the timeline shows",
+  'filter.all': "all",
+  'filter.all.tip': "Show everything there is",
+  'filter.none': "none",
+  'filter.none.tip': "Hide everything — stays empty until something is picked again",
+  // Anmerkung 178: die Zahlen AUF den Quellen-Schaltern meinen den gezeigten
   // Zeitraum, der Bestand steht daneben im Titel.
   'map.n.total': "In the whole database: {n}",
   // Anmerkung 179 — die Sammel-Ansichten kommen aus dem Index
@@ -3312,8 +3410,6 @@ const I18N_EN = {
   'map.baseline.none': "No residence entered yet — the form is under “My data”.",
   'tl.baseline.n': "residence days",
   'tl.baseline.tip': "Days with no entry but a residence that applies — derived, not recorded. The number covers your whole record; how far the list currently reaches is written at its foot.",
-  'map.manual': "By hand",
-  'map.manual.tip': "Entries you recorded yourself — trips, concerts, milestones. On the map the numbered points in their category colour.",
   'map.visits.tip': "Visits taken from the Google Timeline import — the same layer the timeline lists under 🛰️",
   'map.visits.none': "Nothing imported yet — the Google Timeline import lives under “My data”.",
   'map.dens.point': "Every point",
@@ -3895,7 +3991,6 @@ const I18N_EN = {
   'fg.map.photos': "Photo stock",
   'fg.map.draw': "Drawing the map",
   'fg.stats.numbers': "Numbers and collections",
-  'fg.stats.pane': "The open panel",
   'adm.fg.left': "{r} {u} to go",
   'adm.fg.prepare': "Counting what needs doing …",
   'wipemine.running': "Deleting entries, items, places, routes, photos and raw records …",
@@ -4718,11 +4813,7 @@ function applyModules() {
   tl.catFilter = new Set(FILTER_CATS);
   mp.catFilter = new Set(FILTER_CATS);
   buildCatFilter('tl-filters', tl.catFilter, () => tlRefilter());
-  buildCatFilter('mp-filters', mp.catFilter, () => {
-    const keep = mp.periods.length ? mp.periods[mp.index] : null;
-    rebuildPeriods(keep);
-    renderPeriod();
-  });
+  buildCatFilter('mp-filters', mp.catFilter, () => mpCatsChanged());
   rebuildCompTabs();
   rebuildCategorySelects();
   // 3) Statistik-Kacheln/-Charts abgewählter Module ausblenden
@@ -5636,7 +5727,11 @@ async function loadToday() {
   // Nachladen keine Stille mehr, sondern eine Ansage — und die Kacheln,
   // Startformular und Begrüßung stehen, sobald sie stehen können.
   await runForeground(t('fg.today', '📅 Heute wird geladen …'), async op => {
-    op.step(0, 1, t('fg.today.counts', 'Zählwerk und Zeitraum'));
+    // Anmerkung 193: EINE Anfrage, also keine Zahlen darunter. „0 / 1" ist
+    // kein Fortschritt, sondern ein Balken mit genau zwei Ständen — und der
+    // erste steht die ganze Wartezeit. Der Satz sagt, worauf gewartet wird;
+    // das ist hier die ganze Auskunft, die es gibt.
+    op.note(t('fg.today.counts', 'Zählwerk und Zeitraum'));
     try {
       const idx = await fetchIndex();
       document.getElementById('today-events').textContent = idx.total.toLocaleString(LOC());
@@ -5653,7 +5748,6 @@ async function loadToday() {
       const empty = idx.total === 0 && localStorage.getItem('seed-done') !== '1';
       document.getElementById('seed-form').style.display = empty ? '' : 'none';
     } catch (_) { /* Kacheln bleiben auf „–" */ }
-    op.step(1, 1);
   });
   // Ohne `await`: der Block trägt seinen eigenen Ladezustand. Fehlschläge
   // landen dort als Hinweis, nicht in der Konsole — deshalb braucht es hier
@@ -6518,6 +6612,29 @@ function tlSyncBaselineChip() {
     ? t('map.baseline.none', 'Noch kein Wohnort eingetragen — das Formular steht unter „Meine Daten".')
     : t('tl.baseline.tip', 'Tage, an denen kein Eintrag steht, aber ein Wohnort gilt — abgeleitet, nicht erfasst. Die Zahl ist die des gesamten Bestandes; wie weit die Liste gerade zurückreicht, sagt ihr Fuß.');
 }
+// Anmerkung 191: derselbe Sammelgriff wie auf der Karte, über dieselbe Reihe.
+// Neu GEHOLT wird auch hier, weil „automatisch erfasst" und „Fotos" die Abfrage
+// ändern und nicht die Anzeige (A37) — der Wohnort dagegen ist eine Ableitung
+// im Browser und käme mit einem Neuzeichnen aus. Ein Aufruf für beides ist
+// richtig: `loadTimeline` zeichnet am Ende ohnehin neu.
+function tlSetAll(on) {
+  tl.catFilter.clear();
+  if (on) FILTER_CATS.forEach(c => tl.catFilter.add(c));
+  document.querySelectorAll('#tl-filters [data-cat]').forEach(chip => {
+    chip.classList.toggle('active', on);
+    chip.classList.toggle('off', !on);
+  });
+  tl.showVisits = tl.showPhotos = tl.showBaseline = on;
+  const vis = document.getElementById('tl-visits-toggle');
+  if (vis) { vis.classList.toggle('active', on); vis.classList.toggle('off', !on); }
+  // Die Foto- und Wohnort-Chips setzen ihre Klassen selbst — sie können außer
+  // Kraft sein, und `.inert` darf ein Sammelbefehl nicht übermalen (A40).
+  mpSyncPhotoChip();
+  tlSyncBaselineChip();
+  loadTimeline();
+}
+document.getElementById('tl-all')?.addEventListener('click', () => tlSetAll(true));
+document.getElementById('tl-none')?.addEventListener('click', () => tlSetAll(false));
 // A47: Stufe wechseln = neu abfragen. Verdichtet wird auf dem Server, also
 // ist das keine Anzeige-Einstellung (A39: verdichtet wird VOR dem Blättern).
 document.getElementById('tl-level')?.addEventListener('change', function () {
@@ -7405,17 +7522,37 @@ async function loadStats(op) {
   // Anmerkung 155: Die gemerkte Ansicht herstellen, BEVOR die Zahlen kommen —
   // sonst steht beim Öffnen eine Sekunde lang die falsche da, und der letzte
   // Zustand wäre eine Empfehlung statt einer Einstellung.
-  showStatsPane(statsPane);
+  const pane = showStatsPane(statsPane);
   // Anmerkung 176: vier Endpunkte auf einmal — der Overlay sagt das, statt
-  // einen Kreisel zu drehen. Ein Schritt, weil sie parallel laufen: zwei
-  // Balkenstände für einen einzigen Wartevorgang wären eine erfundene Ordnung.
-  if (op) op.step(0, 2, t('fg.stats.numbers', 'Zahlen und Sammlungen'));
-  const [ov, animals, countries, artists] = await Promise.all([
+  // einen Kreisel zu drehen.
+  //
+  // **Anmerkung 193: und er zählt sie einzeln.** Hier standen zwei Schritte
+  // mit der Begründung, zwei Balkenstände für EINEN Wartevorgang wären eine
+  // erfundene Ordnung. Das stimmte für die Reihenfolge und war als Zähler
+  // falsch: „0/2" stand die ganze Wartezeit still und sprang beim Verschwinden
+  // auf „2/2". Vier gleichzeitige Anfragen sind vier zählbare Dinge, nur eben
+  // ohne Reihenfolge — genau dafür ist `op.all` da. Die fünfte Zeile ist die
+  // Tafel darunter, die ihre eigenen Endpunkte holt.
+  const bundle = [
     api("/api/stats/overview"),
     api("/api/compendium/animal").catch(() => []),
     api("/api/compendium/country").catch(() => []),
     api("/api/compendium/artist").catch(() => []),
-  ]);
+    // Anmerkung 176: Ranglisten und Lücken holt `showStatsPane` erst beim
+    // Ansehen (A37) — sie hängen aber am selben Ansichtswechsel. Ohne dieses
+    // Abwarten schließt der Overlay, und die offene Tafel füllt sich danach
+    // still weiter: genau der Zustand, gegen den F23 gebaut ist.
+    //
+    // Anmerkung 193: sie steht jetzt IM Bündel statt dahinter. Sie braucht
+    // nichts aus den vier Zeilen darüber, wartete aber trotzdem auf sie — und
+    // ein zweiter Abschnitt hätte den Balken von voll auf null zurückgesetzt,
+    // was wie ein Rückschritt aussieht. Die Lader fangen ihre Fehler selbst ab
+    // und tragen sie in ihren Kasten.
+    ...(pane ? [pane] : []),
+  ];
+  const [ov, animals, countries, artists] = op
+    ? await op.all(bundle, t('fg.stats.numbers', 'Zahlen und Sammlungen'))
+    : await Promise.all(bundle);
   const num = (id, value) => { document.getElementById(id).textContent = value; };
   const c = ov.counts;
 
@@ -7507,14 +7644,6 @@ async function loadStats(op) {
                                    entityId ? `${entityId}|${name}` : null]);
   renderBars('chart-animals', animalData.length ? animalData : [["—", 0]],
     key => { const [id, ...n] = key.split('|'); jumpToEntity('animal', id, n.join('|')); });
-  // Anmerkung 176: Ranglisten und Lücken holt `showStatsPane` erst beim
-  // Ansehen (A37) — sie hängen aber am selben Ansichtswechsel. Ohne dieses
-  // Abwarten schließt der Overlay, und die offene Tafel füllt sich danach
-  // still weiter: genau der Zustand, gegen den F23 gebaut ist.
-  if (op) op.step(1, 2, t('fg.stats.pane', 'Die geöffnete Tafel'));
-  if (statsPane === 'tops') await loadStatsTops();
-  if (statsPane === 'gaps') await loadStatsGaps();
-  if (op) op.step(2, 2);
 }
 
 // --------------------------------------------------------------------------- //
@@ -7541,9 +7670,18 @@ function showStatsPane(which) {
   // Erst beim Ansehen holen (A37). Und **einmal** — `statsTopsFor` merkt sich,
   // für welchen Bestand die Listen gelten, damit ein Hin- und Herklicken nicht
   // jedes Mal dieselbe Antwort neu erfragt.
-  if (which === 'tops') loadStatsTops();
-  if (which === 'gaps') loadStatsGaps();
-  if (which === 'tracks') loadStatsTracks();     // Anmerkung 189
+  //
+  // **Anmerkung 193: der Lauf wird ZURÜCKGEGEBEN, nicht nur angestoßen.** Wer
+  // hier klickt, will nur umschalten und wartet auf nichts; `loadStats` dagegen
+  // muss ihn abwarten, sonst schließt der Overlay über einer Tafel, die sich
+  // noch füllt (Anmerkung 176). Bis hier startete `loadStats` ihn deshalb ein
+  // ZWEITES Mal — die Merkzelle greift erst, wenn der erste Lauf durch ist, und
+  // beim Öffnen ist er das nie. Ein Anstoß, dessen Ergebnis man wegwirft, ist
+  // kein Anstoß, sondern eine zweite Anfrage.
+  if (which === 'tops') return loadStatsTops();
+  if (which === 'gaps') return loadStatsGaps();
+  if (which === 'tracks') return loadStatsTracks();     // Anmerkung 189
+  return null;
 }
 document.querySelectorAll('#stats-tabs .zoom-btn').forEach(btn =>
   btn.addEventListener('click', () => showStatsPane(btn.dataset.stats)));
@@ -9196,11 +9334,14 @@ const mp = { mode: 'day', periods: [], index: 0, showRoute: false, showTracks: t
   density: mpStoredDensity(), located: [], catFilter: new Set(FILTER_CATS),
   // Anmerkung 160: die beiden maschinellen Quellen sind auf der Karte getrennt
   // schaltbar — wie im Zeitstrahl, mit demselben Sinnbild und derselben Zahl.
-  // `showManual` gibt es nur hier: im Zeitstrahl wäre „meine eigenen Einträge
-  // ausblenden" sinnlos (das IST die Liste), auf einer Karte mit 6.000
-  // importierten Besuchen ist es die nützlichste Ansicht überhaupt.
+  //
+  // **`showManual` hat seit Anmerkung 191 keinen eigenen Schalter mehr**, ist
+  // aber geblieben: er ist der Serverparameter zu der Frage, die die
+  // Kategorie-Chips beantworten („ist überhaupt eine gewählt?"). Gesetzt wird
+  // er nur noch in `mpCatsChanged` und `mpSetAll` — wer ihn anderswo umlegt,
+  // baut den zweiten Weg zu demselben Zustand wieder auf.
   showManual: true, showVisits: true, visitTotal: 0,
-  // F20: eigene Ebene, eigener Schalter — sie zeigt weder Erfasstes noch
+  // F20: eigene Sorte, eigener Schalter — sie zeigt weder Erfasstes noch
   // Importiertes, sondern Gefolgertes.
   showBaseline: true,
   // A45 — Fotopunkte als eigene Ebene. `showPhotos` war AUS, weil zwanzig
@@ -9284,21 +9425,14 @@ const mpNum = n => (n || 0).toLocaleString(LOC());
 // Karte) — und weil es eine Zahl ÜBER DIE ANZEIGE ist, keine über den Bestand.
 mp.trackShown = 0;
 
-// Anmerkung 160: die beiden übrigen Quellen-Schalter. „Von Hand" kann nicht
-// außer Kraft treten — es ist die Lebensdatenbank, und die gibt es immer;
-// „Automatisch erfasst" schon, nämlich solange nichts importiert wurde.
+// Anmerkung 160: der Schalter für die importierten Besuche. Er kann außer Kraft
+// treten, nämlich solange nichts importiert wurde.
+//
+// Anmerkung 191: „Von Hand" stand hier daneben und ist weg — die Kategorie-Chips
+// sind dieser Schalter (siehe `mpCatsChanged`). Seine Zahl fehlt niemandem: sie
+// war die Summe der Zahlen, die jetzt auf den Kategorie-Chips einzeln stehen.
 function mpSyncSourceChips() {
   const here = mpPeriodEvents();
-  const man = document.getElementById('mp-manual-toggle');
-  if (man) {
-    man.classList.toggle('active', mp.showManual);
-    man.classList.toggle('off', !mp.showManual);
-    const n = mp.showManual
-      ? here.filter(e => !MACHINE_SOURCES.includes(e.source)).length : 0;
-    mpChipCount('mp-manual-toggle',
-      `${mpNum(n)} ${t('map.manual', 'Von Hand')}`,
-      t('map.manual.tip', 'Selbst erfasste Einträge — Reisen, Konzerte, Meilensteine. Auf der Karte die nummerierten Punkte in ihrer Kategoriefarbe.'));
-  }
   const vis = document.getElementById('mp-visits-toggle');
   if (!vis) return;
   const empty = !mp.visitTotal;
@@ -9838,6 +9972,57 @@ async function mpLoadPoints(force) {
   }
 }
 
+// --------------------------------------------------------------------------- //
+// **Anmerkung 191 — die Kategorie-Chips SIND der Schalter „Von Hand".**
+// --------------------------------------------------------------------------- //
+// `mp.showManual` gibt es weiter, aber niemand legt ihn mehr eigenhändig um: er
+// ist die Antwort auf „ist überhaupt eine Kategorie gewählt?". Der Chip daneben
+// war der zweite Weg zu demselben Ergebnis (alle Kategorien aus = von Hand aus),
+// und zwei Wege zu einem Zustand laufen still auseinander — hier besonders
+// leise, weil der eine im Browser filterte und der andere den Server fragte.
+//
+// **Die Ersparnis von Anmerkung 160 bleibt genau deshalb erhalten.** Ist keine
+// Kategorie gewählt, geht `manual=0` mit, und die eigenen Einträge kommen gar
+// nicht erst über die Leitung. Das ist auch der Grund, warum hier neu GEHOLT
+// wird und nicht nur neu gezeichnet: ein Filter, der nur in eine Richtung wirkt,
+// macht aus dem Wiedereinschalten eine Handlung ohne Wirkung (derselbe Satz wie
+// beim Foto-Schalter, Anmerkung 139).
+function mpCatsChanged() {
+  const keep = mp.periods.length ? mp.periods[mp.index] : null;
+  const wanted = mp.catFilter.size > 0;
+  if (wanted === mp.showManual) {
+    rebuildPeriods(keep);
+    renderPeriod();
+    return;
+  }
+  mp.showManual = wanted;
+  mpLoadPoints().then(() => { rebuildPeriods(keep); renderPeriod(); });
+}
+
+// **Anmerkung 191 — „alle" und „keine" für die ganze Reihe.**
+//
+// Mit der flachen Reihe fällt ein Sammelgriff weg, den es vorher gab: „Von
+// Hand" schaltete acht Kategorien auf einmal ab. Der Ersatz ist ein Griff über
+// ALLES, was die Reihe zeigt — und damit ehrlicher benannt als der alte, der
+// eine Herkunft hieß und eine Auswahl war.
+//
+// Auch außer Kraft gesetzte Sorten (Wege in der Jahresansicht, Fotos ohne
+// verortete Bilder) werden mitgesetzt. Das ist Absicht: `.inert` sagt „geht
+// gerade nicht", nicht „ist nicht gewollt" — der Wunsch gilt wieder, sobald die
+// Ansicht ihn zulässt (A40).
+function mpSetAll(on) {
+  mp.catFilter.clear();
+  if (on) FILTER_CATS.forEach(c => mp.catFilter.add(c));
+  document.querySelectorAll('#mp-filters [data-cat]').forEach(chip => {
+    chip.classList.toggle('active', on);
+    chip.classList.toggle('off', !on);
+  });
+  mp.showVisits = mp.showPhotos = mp.showTracks = mp.showBaseline = on;
+  const keep = mp.periods.length ? mp.periods[mp.index] : null;
+  mp.showManual = on;
+  mpLoadPoints().then(() => { rebuildPeriods(keep); renderPeriod(); });
+}
+
 async function openMapView(op) {
   // Anmerkung 176: Vier Etappen, und der Overlay nennt sie. Ohne die Namen ist
   // ein Kartenaufbau über 20.000 Punkte eine Sanduhr — mit ihnen sieht man,
@@ -10140,6 +10325,23 @@ function mpDotIcon(cat, radius) {
   });
 }
 
+// **Anmerkung 192 — die Blätter-Knöpfe sagen, wann sie am Ende sind.**
+// Vier Knöpfe (zwei am Schreibtisch, zwei mobil), eine Regel: am ersten
+// Zeitraum gibt es kein Zurück, am letzten kein Weiter. Bis hierher blieben sie
+// aussehen wie immer und `mpGo` klemmte den Index still fest — ein Druck ohne
+// Wirkung, und der Nutzer sucht den Fehler bei der Karte statt am Rand der
+// Zeit. Der Titel sagt den Grund; die Ausgrauung allein wäre eine Behauptung
+// ohne Begründung.
+function mpSyncSteps() {
+  const last = mp.periods.length - 1;
+  [['mp-prev', mp.index <= 0], ['mp-prev-m', mp.index <= 0],
+   ['mp-next', mp.index >= last], ['mp-next-m', mp.index >= last]]
+    .forEach(([id, done]) => {
+      const b = document.getElementById(id);
+      if (!b) return;
+      b.disabled = !mp.periods.length || done;
+    });
+}
 function renderPeriod() {
   mapMarkers.clearLayers();
   if (mapCluster) mapCluster.clearLayers();
@@ -10153,12 +10355,21 @@ function renderPeriod() {
     const btn = document.getElementById('mp-filter-toggle-label');
     if (btn) btn.textContent = `🗓️ ${txt}`;
   };
+  mpSyncSteps();
   if (!mp.periods.length) {
     mapTracks.clearLayers();
-    // Auch hier: ob Wege gezeichnet werden KÖNNEN, hängt an der Zoomstufe und
-    // nicht am Inhalt. Ohne diese Zeile bliebe der Schalter in der leeren
-    // Ansicht auf dem Stand von vorhin stehen.
-    mpSyncTrackChip();
+    // Ob Wege gezeichnet werden KÖNNEN, hängt an der Zoomstufe und nicht am
+    // Inhalt. Ohne diese Zeile bliebe der Schalter in der leeren Ansicht auf
+    // dem Stand von vorhin stehen.
+    //
+    // **Anmerkung 191: und die übrigen Schalter genauso.** Hier stand nur der
+    // Wege-Schalter, also trugen alle anderen in der leeren Ansicht weiter die
+    // Zahlen des letzten Zeitraums — „🛰️ 7 automatisch erfasst" über einer
+    // Karte, auf der nichts liegt. Aufgefallen ist es erst, als die Reihe einen
+    // Sammelbefehl bekam, mit dem man sie WIRKLICH leer schalten kann; vorher
+    // war der leere Zweig kaum je erreichbar. Genau die Sorte Auskunft über
+    // etwas, das nicht gezeigt wird, gegen die Anmerkung 178 gebaut ist.
+    mpSyncChips(false);
     mpDrawPhotos([]);
     mpDrawBaselines(null);
     mpCapNote(0, 0);
@@ -10813,17 +11024,17 @@ function mpGo(delta) {
   mp.index = Math.min(mp.periods.length - 1, Math.max(0, mp.index + delta));
   renderPeriod();
 }
-document.getElementById('mp-prev').addEventListener('click', () => mpGo(-1));
-document.getElementById('mp-next').addEventListener('click', () => mpGo(1));
+// Anmerkung 192: vier Knöpfe, zwei Richtungen — die Pfeile der Mobil-Leiste
+// sind dieselbe Handlung an einer zweiten Stelle und nicht ein zweiter Weg
+// dorthin. Deshalb `mpGo` und nicht je eine eigene Rechnung.
+[['mp-prev', -1], ['mp-prev-m', -1], ['mp-next', 1], ['mp-next-m', 1]]
+  .forEach(([id, d]) => document.getElementById(id)
+    ?.addEventListener('click', () => mpGo(d)));
 document.getElementById('mp-date').addEventListener('change', ev => mpJumpToDate(ev.target.value));
 
 // Kategorie-Filter-Chips (Timeline + Karte)
 buildCatFilter('tl-filters', tl.catFilter, () => tlRefilter());
-buildCatFilter('mp-filters', mp.catFilter, () => {
-  const keep = mp.periods.length ? mp.periods[mp.index] : null;
-  rebuildPeriods(keep);
-  renderPeriod();
-});
+buildCatFilter('mp-filters', mp.catFilter, () => mpCatsChanged());
 document.getElementById('mp-route-toggle').addEventListener('click', function () {
   // Klassen setzt `mpSyncChips` — hier nur die Wahl umlegen (Anmerkung 106:
   // zwei Antworten auf „wie sieht der Schalter aus?" laufen auseinander).
@@ -10844,12 +11055,11 @@ document.getElementById('mp-baseline-toggle')?.addEventListener('click', functio
   rebuildPeriods(keep);
   renderPeriod();
 });
-document.getElementById('mp-manual-toggle').addEventListener('click', function () {
-  mp.showManual = !mp.showManual;
-  mpSyncSourceChips();
-  const keep = mp.periods[mp.index];
-  mpLoadPoints().then(() => { rebuildPeriods(keep); renderPeriod(); });
-});
+// Anmerkung 191: die Sammelbefehle der Reihe. Kein Umschalter („alles an/aus"),
+// sondern zwei Befehle — ein Umschalter müsste einen Zustand behaupten, den es
+// bei zwölf einzeln schaltbaren Sorten nicht gibt.
+document.getElementById('mp-all')?.addEventListener('click', () => mpSetAll(true));
+document.getElementById('mp-none')?.addEventListener('click', () => mpSetAll(false));
 document.getElementById('mp-visits-toggle').addEventListener('click', function () {
   if (this.classList.contains('inert')) {
     toast(t('map.visits.none', 'Noch nichts importiert — der Google-Timeline-Import steht unter „Meine Daten".'), 'warn', 7000);

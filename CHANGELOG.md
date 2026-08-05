@@ -28,11 +28,23 @@ any `MINOR`.
   *Day*, *Week* and *Month*, where there is no such overview to build.
 - **The residence can be switched off in the timeline.** Until now the
   derived days were always there — in a year without any entries the timeline
-  consisted of nothing else, and there was no handle. The switch sits with the
-  categories, in the timeline and on the map, and says how many days it is
-  contributing. Both views now have the same three groups of controls
-  (*Layers*, *How dense*, *Categories*) instead of one flat row of chips in one
-  and a tidy panel in the other.
+  consisted of nothing else, and there was no handle. The switch says how many
+  days it is contributing, and it sits in the same place in both views.
+- **Map and timeline now have one row of switches instead of two.** *Layers*
+  and *Categories* looked like two questions side by side and were a question
+  and its sub-question: the category chips only ever filtered what the *By
+  hand* switch turned off as a whole, so switching every category off and
+  switching *By hand* off were two ways to the same result. Now one row —
+  **What is on the map** / **What the timeline shows** — lists everything that
+  can appear, each with the mark it carries, plus *all* and *none* for the
+  whole row. *By hand* is gone; the categories are that switch. Nothing is
+  fetched that you have not asked for: with no category picked, your own
+  entries are not requested from the server at all, exactly as before.
+- **On a phone the map can be paged without opening the filters.** The button
+  that names the period now has ‹ and › beside it, so a day or a week is one
+  tap away — until now both arrows sat inside the collapsed panel, and with
+  the panel open the map is half the size. At the first and last period the
+  arrows say so instead of quietly doing nothing.
 - **Place names in Greek or Cyrillic script are now written out in Latin
   letters.** OpenStreetMap only has a German or English name for the well-known
   places; a lane on Antipaxos or a chapel near Gaios has just its local name,
@@ -198,6 +210,13 @@ any `MINOR`.
   life moves; plus how many countries and cities each year of your life touched.
 
 ### Fixed
+- **The loading window's counter now moves while it waits.** Opening
+  *Statistics* showed “0 / 2” for the whole wait and then went straight to
+  done: one step covered four requests made at once, so the number had nothing
+  to say until they had all come back. Each request now counts for itself. On
+  *Today*, where there is only one request to wait for, the numbers are gone
+  entirely — “0 / 1” is not progress, it is a bar with two states. And the open
+  statistics panel is no longer fetched twice while the view is opening.
 - **The weather now comes from one named source instead of whichever one the
   service felt like.** Until now the request left the choice to Open-Meteo — and
   it chose by the age of the day: recent days came from one model, your

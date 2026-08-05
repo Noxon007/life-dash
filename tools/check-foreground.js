@@ -161,6 +161,41 @@ setTimeout(async () => {
   ok('Ein Lauf im Lauf benutzt denselben Vorgang', innerSawSame,
      'refreshAll() ruft fünf Lader — fünf Overlays wären fünfmal dasselbe Flackern');
 
+  // ---- 7. Anmerkung 193: der Balken zählt ANFRAGEN, keine Abschnitte -----
+  //
+  // Gemeldet: „bei der Statistik kommt das Ladefenster, steht die ganze Zeit
+  // auf 0/2 und ist dann direkt fertig, ohne auf einen Fortschritt zu
+  // springen." Der Zähler war nicht falsch, er war unbeweglich: ein Schritt
+  // umfasste vier gleichzeitige Anfragen, also stand er über die gesamte
+  // Wartezeit auf 0.
+  //
+  // **Deshalb prüft der Wächter nicht, DASS eine Zahl dasteht, sondern dass
+  // sie sich WÄHREND des Wartens ÄNDERT.** Das ist der Unterschied zwischen
+  // „es gibt einen Balken" und „der Balken sagt etwas" — und einer
+  // `step()`-Zeile sieht man ihn nicht an.
+  const marks = [];
+  const slow = ms => new Promise(r => w.setTimeout(r, ms));
+  await run('Zähler', async op => {
+    const timer = w.setInterval(() => marks.push(op.done), 10);
+    await op.all([slow(40), slow(80), slow(120)], 'drei Anfragen');
+    w.clearInterval(timer);
+  });
+  const stands = [...new Set(marks)];
+  ok('Der Zähler bewegt sich WÄHREND des Wartens', stands.length >= 3,
+     `gesehene Stände: ${stands.join(', ') || '(keine)'} — ein Zähler, der nur `
+     + 'am Anfang und am Ende einen Wert hat, behauptet Stillstand');
+
+  // Und die Stelle, aus der die Beschwerde kam: benutzt sie es auch? Ein
+  // Doppel statt eines echten Laufs, weil die Zahlen dahinter hier niemanden
+  // interessieren — nur, WIE der Fortschritt gemeldet wird.
+  let bundle = 0, steps = 0;
+  const spy = { note() {}, step() { steps++; }, check() {},
+                all(list) { bundle = list.length; return Promise.all(list); } };
+  try { await w.loadStats(spy); } catch (_) { /* die Zahlen fehlen, egal */ }
+  ok('Die Statistik meldet jede ihrer Anfragen einzeln', bundle >= 4,
+     `${bundle} gemeldete Anfragen bei ${steps} Abschnitten — vier Endpunkte `
+     + 'auf einmal sind vier zählbare Dinge, nur ohne Reihenfolge');
+
   finish();
 
   function finish() {

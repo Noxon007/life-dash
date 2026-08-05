@@ -12,8 +12,11 @@
 //      steht auf einem Schalter, den man beim Ansehen der Karte liest. Der
 //      Wächter prüft deshalb nicht „da steht eine Zahl", sondern **dass sie
 //      sich beim Blättern ÄNDERT** und dem Bestand widerspricht.
-//   3. **Der Wohnort steht bei den Kategorien**, in beiden Ansichten — nicht
-//      bei den Ebenen, wo er bis 0.39 lag.
+//   3. **Alles, was gezeigt werden kann, steht in EINER Reihe** — in beiden
+//      Ansichten. Anmerkung 178 hatte den Wohnort von den „Ebenen" zu den
+//      „Kategorien" geschoben; Anmerkung 191 hat den Schnitt ganz aufgehoben,
+//      weil die beiden Gruppen eine Frage und ihre Unterfrage waren. „Von
+//      Hand" ist damit weg: die Kategorie-Chips SIND dieser Schalter.
 //   4. **Der Wohnort ist im Zeitstrahl abschaltbar**, und das Abschalten
 //      räumt auch die Fußnote weg („300 von 7.300 gezeigt" unter einer Liste
 //      ohne eine einzige davon wäre eine Auskunft über etwas, das nicht da
@@ -157,28 +160,44 @@ setTimeout(async () => {
      'ein Schalter, dessen Aussehen nicht zu seinem Zustand passt, ist die '
      + 'stillste Sorte Falschaussage');
 
-  // --- 2. Der Wohnort steht bei den KATEGORIEN --------------------------- //
-  // Über die gemeinsame Gruppe geprüft und nicht über die Reihenfolge im
-  // Markup: „steht daneben" wäre auch dann grün, wenn beide in „Ebenen" lägen.
+  // --- 2. EINE Reihe, in beiden Ansichten -------------------------------- //
+  //
+  // Anmerkung 178 hatte den Wohnort von den „Ebenen" zu den „Kategorien"
+  // geschoben, weil er beim Benutzen eine SORTE Eintrag ist und keine
+  // Herkunft. Anmerkung 191 hat den Schnitt ganz aufgehoben: die beiden
+  // Gruppen waren eine Frage und ihre Unterfrage (die Kategorie-Chips
+  // filterten nur das, was „Von Hand" als Ganzes abschaltete). Geprüft wird
+  // über die gemeinsame Gruppe und nicht über die Reihenfolge im Markup —
+  // „steht daneben" wäre auch bei zwei Reihen grün.
   const sameGroup = (a, b) => {
     const ga = d.getElementById(a), gb = d.getElementById(b);
     return !!ga && !!gb && ga.closest('.filter-group') === gb.closest('.filter-group');
   };
-  ok('Karte: der Wohnort steht bei den Kategorien',
-     sameGroup('mp-baseline-toggle', 'mp-filters'),
-     'er lag in „Ebenen" — beim Benutzen ist er aber eine SORTE Eintrag');
-  ok('Zeitstrahl: ebenso', sameGroup('tl-baseline-toggle', 'tl-filters'),
+  ok('Karte: Kategorien, Wohnort und Quellen stehen in EINER Reihe',
+     sameGroup('mp-baseline-toggle', 'mp-filters')
+     && sameGroup('mp-visits-toggle', 'mp-filters')
+     && sameGroup('mp-photos-toggle', 'mp-filters'),
+     'zwei Reihen behaupteten zwei gleichrangige Fragen');
+  ok('Zeitstrahl: ebenso', sameGroup('tl-baseline-toggle', 'tl-filters')
+     && sameGroup('tl-visits-toggle', 'tl-filters'),
      'zwei Ansichten, dieselbe Frage, dieselbe Stelle');
-  ok('Karte: er steht NICHT mehr bei den Ebenen',
-     !sameGroup('mp-baseline-toggle', 'mp-visits-toggle'));
+  ok('Karte: „Von Hand" ist weg — die Kategorien SIND dieser Schalter',
+     !d.getElementById('mp-manual-toggle'));
+  ok('…dafür gibt es Sammelbefehle für die ganze Reihe',
+     !!d.getElementById('mp-all') && !!d.getElementById('mp-none')
+     && !!d.getElementById('tl-all') && !!d.getElementById('tl-none'),
+     'ohne sie wäre „nur die importierten Besuche" ein Dutzend Klicks');
 
   // --- 3. Die Zahlen meinen den gezeigten Zeitraum ------------------------ //
   await w.openMapView();
   w.eval("mp.mode = 'month'; rebuildPeriods(); renderPeriod();");
   await wait(120);
-  const man = d.getElementById('mp-manual-toggle');
   const vis = d.getElementById('mp-visits-toggle');
   const label = () => d.getElementById('mp-period-label').textContent;
+  // Anmerkung 191: die Zahl der eigenen Einträge steht nicht mehr auf einem
+  // Sammelchip, sondern auf den Kategorie-Chips einzeln — die Reise gibt es im
+  // Juli und im August nicht, also trägt sie den Wechsel genauso.
+  const catChip = (box, c) => d.querySelector(`#${box} [data-cat="${c}"]`);
 
   // Angesteuert wird ausdrücklich, nicht „der letzte": seit Anmerkung 167
   // bringt der Wohnort seine eigenen Zeiträume mit, die Liste endet also im
@@ -187,8 +206,9 @@ setTimeout(async () => {
   w.eval("mp.index = mp.periods.indexOf('2024-08'); renderPeriod();");
   await wait(120);
   ok('Es wird ein Monat angezeigt', /8|Aug/i.test(label()), label());
-  const augMan = num(man.textContent), augVis = num(vis.textContent);
-  ok('August: 1 von Hand', augMan === '1', `${man.textContent}`);
+  const augTrip = num(catChip('mp-filters', 'trip').textContent);
+  const augVis = num(vis.textContent);
+  ok('August: keine Reise', augTrip === '0', catChip('mp-filters', 'trip').textContent);
   ok('August: 7 automatisch erfasst', augVis === '7', `${vis.textContent}`);
   ok('…und das ist NICHT der Bestand', augVis !== String(VISIT_TOTAL),
      `${vis.textContent} — der Bestand (${VISIT_TOTAL}) beantwortet eine andere Frage`);
@@ -200,18 +220,61 @@ setTimeout(async () => {
   d.getElementById('mp-prev').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   await wait(120);
   ok('Zurückblättern zeigt den Vormonat', /7|Jul/i.test(label()), label());
-  ok('Juli: 3 von Hand', num(man.textContent) === '3', `${man.textContent}`);
+  ok('Juli: 1 Reise', num(catChip('mp-filters', 'trip').textContent) === '1',
+     catChip('mp-filters', 'trip').textContent);
   ok('Juli: 2 automatisch erfasst', num(vis.textContent) === '2', `${vis.textContent}`);
   ok('…die Zahlen sind also wirklich zeitraumbezogen',
-     num(man.textContent) !== augMan && num(vis.textContent) !== augVis,
+     num(catChip('mp-filters', 'trip').textContent) !== augTrip
+     && num(vis.textContent) !== augVis,
      'stünde überall dasselbe, wäre es weiterhin der Bestand');
 
-  // Gegenprobe: ausgeschaltet liegt nichts von dieser Ebene auf der Karte,
+  // Gegenprobe: ausgeschaltet liegt nichts von dieser Sorte auf der Karte,
   // also ist die Zahl null. Sie soll nicht auf dem letzten Stand stehen
   // bleiben — das wäre eine Auskunft über etwas, das gerade nicht gezeigt wird.
   w.eval('mp.showVisits = false; mpSyncSourceChips();');
   ok('Ausgeschaltet steht dort 0', num(vis.textContent) === '0', vis.textContent);
   w.eval('mp.showVisits = true; mpSyncSourceChips();');
+
+  // **Anmerkung 191 — der Zustand „von Hand" wird aus den Kategorien
+  // gebildet.** Nicht nur der Chip ist weg: ist keine Kategorie gewählt, muss
+  // `manual=0` an den Server gehen. Ohne diese Hälfte wäre die Ersparnis aus
+  // Anmerkung 160 still verloren — die Karte holte zehntausend Punkte und
+  // filterte sie gleich wieder weg.
+  w.eval('mp.catFilter.clear(); mpCatsChanged();');
+  await wait(120);
+  ok('Keine Kategorie gewählt heißt „ohne eigene Einträge"',
+     w.eval('mp.showManual') === false,
+     'dann fragt die Karte den Server gar nicht erst danach');
+  // Die MENGE füllen, nicht ersetzen: die Chip-Horcher aus `buildCatFilter`
+  // halten genau dieses Objekt fest. Ein `new Set(...)` hier ließe sie auf eine
+  // verwaiste Menge zeigen — und der nächste Klick schaltete etwas ein, was
+  // eingeschaltet aussieht. (Gilt für den Wächter wie für den Code: außer
+  // `applyModules`, das die Chips gleich danach neu baut, ersetzt sie niemand.)
+  w.eval('FILTER_CATS.forEach(c => mp.catFilter.add(c)); mpCatsChanged();');
+  await wait(120);
+  ok('…und wieder gewählt kommen sie zurück', w.eval('mp.showManual') === true,
+     'ein Filter, der nur in eine Richtung wirkt, macht aus dem Einschalten '
+     + 'eine Handlung ohne Wirkung');
+  // Und der Sammelbefehl legt die ganze Reihe um — Kategorien UND Quellen.
+  w.eval('mpSetAll(false);');
+  await wait(120);
+  ok('„keine" räumt die ganze Reihe ab',
+     w.eval('mp.catFilter.size === 0 && !mp.showVisits && !mp.showPhotos '
+            + '&& !mp.showTracks && !mp.showBaseline && !mp.showManual'),
+     'ein Sammelbefehl, der nur die Hälfte der Reihe trifft, ist der alte '
+     + 'Schnitt in neuer Verkleidung');
+  ok('…und die Chips zeigen es', catChip('mp-filters', 'trip').classList.contains('off')
+     && d.getElementById('mp-visits-toggle').classList.contains('off'),
+     'ein Zustand ohne Anzeige ist die stillste Sorte Falschaussage');
+  w.eval('mpSetAll(true);');
+  await wait(120);
+  ok('„alle" holt sie zurück',
+     w.eval('mp.catFilter.size === FILTER_CATS.length && mp.showVisits '
+            + '&& mp.showPhotos && mp.showTracks && mp.showBaseline'),
+     'ein Griff, der nur in eine Richtung wirkt, ist ein halber Griff');
+  // Zurück in den Juli — die Prüfungen darunter stehen dort.
+  w.eval("mp.index = mp.periods.indexOf('2024-07'); renderPeriod();");
+  await wait(120);
 
   // --- 3b. Anmerkung 181: die KATEGORIE-Chips nennen ihre Zahl ebenfalls --- //
   //
@@ -219,7 +282,6 @@ setTimeout(async () => {
   // angegeben, bei den anderen nicht — das ist nicht konsequent." Seit
   // Anmerkung 178 stehen sie in derselben Reihe; eine Reihe, in der ein Chip
   // eine Zahl trägt und sieben nicht, liest sich als Fehler in den sieben.
-  const catChip = (box, c) => d.querySelector(`#${box} [data-cat="${c}"]`);
   ok('Karte: jeder Kategorie-Chip trägt eine Zahl',
      w.eval('FILTER_CATS').every(c => /\d/.test((catChip('mp-filters', c) || {}).textContent || '')),
      w.eval('FILTER_CATS').map(c => (catChip('mp-filters', c) || {}).textContent).join(' | '));

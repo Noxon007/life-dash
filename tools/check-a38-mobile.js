@@ -140,6 +140,62 @@ setTimeout(() => {
   check('Karten-Filter klappbar', !!d.getElementById('mp-filter-toggle'));
   check('Zeitraum am Klapp-Knopf', !!d.getElementById('mp-filter-toggle-label'));
 
+  // ---- Anmerkung 192: blättern, ohne aufzuklappen ------------------------
+  //
+  // Gemeldet: „mobil die Möglichkeit, tage- und wochenweise zu springen, ohne
+  // das Menü aufklappen zu müssen." ‹ zurück und weiter › lagen IM
+  // eingeklappten Kasten — jeder Tagesschritt kostete zweimal Aufklappen, und
+  // aufgeklappt ist die Karte halb so groß.
+  //
+  // **Die entscheidende Prüfung ist, wo sie NICHT stehen.** „Es gibt zwei
+  // Pfeile" wäre auch dann grün, wenn sie mit dem Rest weggeklappt würden —
+  // also genau im gemeldeten Zustand.
+  const prevM = d.getElementById('mp-prev-m'), nextM = d.getElementById('mp-next-m');
+  check('Es gibt Pfeile neben dem Zeitraum-Knopf', !!prevM && !!nextM);
+  check('…und sie stehen AUSSERHALB der Filterleiste',
+        prevM && nextM && !prevM.closest('#mp-filters-box') && !nextM.closest('#mp-filters-box'),
+        'eingeklappt wären sie mit weg — genau der gemeldete Zustand');
+  check('…in derselben Zeile wie der Knopf',
+        prevM && prevM.closest('.mp-mobile-bar')
+        && prevM.closest('.mp-mobile-bar') === d.getElementById('mp-filter-toggle').closest('.mp-mobile-bar'));
+  {
+    // Der große Mobilblock ist der LETZTE — es gibt weiter oben noch einen
+    // kleinen für die Einstellungszeilen. Wer hier `indexOf` nimmt, schneidet
+    // an ihm ab und erklärt das halbe Stylesheet zum Mobilteil.
+    const mobile = html.slice(html.lastIndexOf('@media (max-width: 860px)'));
+    const desktop = html.slice(0, html.lastIndexOf('@media (max-width: 860px)'));
+    check('Am Schreibtisch sind sie weg',
+          /\.mp-mobile-bar\s*\{[^}]*display:\s*none/.test(desktop),
+          'dort steht das Paar im offenen Kasten — zwei sichtbare Paare sind '
+          + 'zwei Antworten auf „wo blättere ich?"');
+    check('…und mobil da', /\.mp-mobile-bar\s*\{[^}]*display:\s*flex/.test(mobile));
+    check('Der Daumen trifft sie', /\.mp-step\s*\{[^}]*min-height:\s*44px/.test(mobile),
+          'unter 44 px ist ein Knopf auf dem Handy Glückssache');
+  }
+  // Und sie tun dasselbe wie die Knöpfe im Kasten. Der Zustand wird HERGESTELLT
+  // (drei Zeiträume, in der Mitte stehend) statt den Auslieferungszustand zu
+  // lesen: ohne Zeiträume klemmt `mpGo` sofort, und die Prüfung wäre grün,
+  // weil nichts passiert ist.
+  try {
+    w.renderPeriod = () => {};
+    w.eval("mp.periods = ['2024-01','2024-02','2024-03']; mp.index = 1;");
+    prevM.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    check('Der Pfeil zurück springt einen Zeitraum', w.eval('mp.index') === 0,
+          `Index ${w.eval('mp.index')} — der Knopf hängt an nichts`);
+    nextM.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    nextM.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    check('…und der Pfeil weiter in die andere Richtung', w.eval('mp.index') === 2,
+          `Index ${w.eval('mp.index')}`);
+    // A40, derselbe Satz wie bei den Chips: am Rand der Zeit kann er nichts
+    // mehr, und dann muss er das ZEIGEN statt still zu klemmen.
+    w.eval('mpSyncSteps();');
+    check('Am letzten Zeitraum ist „weiter" außer Kraft', nextM.disabled === true,
+          'ein Druck ohne Wirkung schickt den Nutzer zur Karte statt an den Rand der Zeit');
+    check('…„zurück" aber nicht', prevM.disabled === false);
+  } catch (e) {
+    check('Die Pfeile sind verdrahtet', false, e.message);
+  }
+
   ok.forEach(n => console.log('  ok  ' + n));
   fails.forEach(n => console.log('  XX  ' + n));
   console.log(fails.length ? `\n${fails.length} Prüfung(en) fehlgeschlagen` : '\nA38: alles grün');

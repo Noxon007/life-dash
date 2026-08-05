@@ -79,20 +79,33 @@ setTimeout(async () => {
   check('Die Karte hat für diese Prüfungen wirklich Punkte',
         w.eval('mp.periods.length') > 0, 'sonst läuft alles durch den Leer-Zweig');
 
-  // --- 1. Zwei beschriftete Gruppen statt einer Reihe --------------------- //
+  // --- 1. EINE Reihe für das WAS, eine zweite fürs WIE --------------------- //
+  //
+  // Anmerkung 191: Hier standen bis dahin zwei beschriftete Gruppen — „Ebenen"
+  // und „Kategorien" —, und das las sich als zwei nebeneinanderstehende
+  // Fragen. Es war eine Frage und ihre Unterfrage: die Kategorie-Chips
+  // filterten ausschließlich das, was der Chip „Von Hand" als Ganzes
+  // abschaltete. Also teilen sie sich jetzt eine Reihe, und der Sammelchip ist
+  // weg. „Wie dicht" bleibt getrennt — das ist wirklich eine zweite Frage.
   const groupOf = id => {
     const el = d.getElementById(id);
     const g = el && el.closest('.filter-group');
     return g ? (g.querySelector('label') || {}).textContent : null;
   };
-  const layers = ['mp-manual-toggle', 'mp-visits-toggle', 'mp-photos-toggle', 'mp-tracks-toggle']
-    .map(groupOf);
-  check('Die vier Ebenen stehen in EINER Gruppe',
-        layers.every(g => g && g === layers[0]), JSON.stringify(layers));
+  const sorts = ['mp-filters', 'mp-visits-toggle', 'mp-photos-toggle',
+                 'mp-tracks-toggle', 'mp-baseline-toggle'].map(groupOf);
+  check('Alles, was auf der Karte liegen kann, steht in EINER Gruppe',
+        sorts.every(g => g && g === sorts[0]), JSON.stringify(sorts));
+  check('Den Sammelchip „Von Hand" gibt es nicht mehr',
+        !d.getElementById('mp-manual-toggle'),
+        'zwei Wege zu demselben Zustand — alle Kategorien aus = von Hand aus');
+  check('…dafür die Sammelbefehle für die ganze Reihe',
+        !!d.getElementById('mp-all') && !!d.getElementById('mp-none'),
+        'ohne sie wäre das Abschalten aller eigenen Einträge zwölf Klicks');
   check('…und die Verdichtung in einer ANDEREN',
-        groupOf('mp-density') && groupOf('mp-density') !== layers[0],
-        `${groupOf('mp-density')} / ${layers[0]}`);
-  check('Die Gruppen sind beschriftet', !!layers[0] && !!groupOf('mp-density'));
+        groupOf('mp-density') && groupOf('mp-density') !== sorts[0],
+        `${groupOf('mp-density')} / ${sorts[0]}`);
+  check('Die Gruppen sind beschriftet', !!sorts[0] && !!groupOf('mp-density'));
 
   // --- 2. Vollbild ist keine Darstellung ---------------------------------- //
   const fs_ = d.getElementById('mp-fullscreen');
@@ -274,7 +287,7 @@ setTimeout(async () => {
         'zwei gepflegte Farbwerte für dieselbe Ebene laufen auseinander');
 
   // --- 10. Jeder Schalter erklärt sich selbst ----------------------------- //
-  ['mp-tracks-toggle', 'mp-route-toggle', 'mp-manual-toggle', 'mp-visits-toggle',
+  ['mp-tracks-toggle', 'mp-route-toggle', 'mp-baseline-toggle', 'mp-visits-toggle',
    'mp-photos-toggle'].forEach(id => {
     const el = d.getElementById(id);
     check(`${id} hat eine Erklärung`, el && el.title && el.title.length > 40,

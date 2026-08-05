@@ -1243,6 +1243,40 @@ and no change, and one that turned out to be the same defect in two places.
 
     Measured with `tools/_measure_api.py`, which now builds 20,000 photos and 50,000 paths as well: `/api/stats/toplists` 304 → 389 ms with all of note 189 added, `/api/stats/tracks` 105 ms. Both are click-endpoints, and both are computation over data that was already paid for — no new network call anywhere.
 
+**Feedback round 2026-08-05 (notes 191–193).** Four points from use; the app-icon one turned out to be a stale install and needed no change (the bee has been `icon.svg`, the manifest icon and the touch icon since note 180).
+
+191. ✅ **“Is there a meaningful difference between *layer* and *category* on the map and the timeline?” — yes, and that was the defect.** Asked verbatim, with “can it be divided up better, or one of them dropped?”
+
+    The difference was real and it was the wrong shape: **the two groups were not two questions side by side, they were a question and its sub-question.** *Layers* decided what is fetched at all (`manual` / `visits` / `photos` as query parameters), *Categories* filtered — in the browser, over what came back — **only the by-hand entries**. Every category chip was therefore a child of the *By hand* chip, and both stood as equal-looking rows. Two routes to one state: all categories off = *By hand* off. Whoever used both switched the same thing twice and saw no effect the second time.
+
+    Note 160 had made that split deliberately and it read cleanly on paper (“where does it come from” over “what is it”); note 178 then moved the residence from one group to the other for the same paper reason. The split survived two revisions because **nothing about it is visible in the interface — the nesting only shows in the code that reads the two sets.**
+
+    **Now one row per view** (*What is on the map* / *What the timeline shows*), listing every sort that can appear with the mark it carries, plus *all* / *none* as the replacement for the bulk grip *By hand* was doing on the side. The saving from note 160 is kept and not re-derived: `mp.showManual` still exists as the server parameter, but it is now **set in exactly two places** (`mpCatsChanged`, `mpSetAll`) from one question — is any category picked? Anyone who sets it elsewhere rebuilds the second route.
+
+    Three options were written out and the user chose the flat list over “two groups, honestly named” and over “drop the duplicate chip only”.
+
+    **Found while building the guard, not while reading the code:** the empty branch of `renderPeriod` synced only the paths chip, so in a period with nothing on it every other switch kept the previous period's count — “🛰️ 7 auto-detected” over an empty map. It had been nearly unreachable before; a row with a *none* command reaches it in one click. `mpSyncChips(false)` now runs there too.
+
+    Guards: `check-layer-chips.js` (one row in both views, *By hand* gone, no category picked ⇒ `showManual` false and back, *all* / *none* over the whole row incl. the chips' appearance) and `check-a40-map-controls.js`. Both run against the pre-fix state as note 108 requires.
+
+192. ✅ **Paging the map on a phone required opening the filters first.** Reported: “on mobile, a way to jump day by day and week by week without having to open the menu.”
+
+    ‹ back and next › sat **inside** the collapsible panel (A38), so a single day's step cost two collapses — and with the panel open the map is half the height, which is why it gets collapsed. The button already named the period; what was missing was a way to leave it.
+
+    The arrows now flank that button, outside `#mp-filters-box`, and they are **the same buttons, not a second route**: all four call `mpGo`, and one function (`mpSyncSteps`) disables all four at the ends of the record. That last part is A40 again — until now `mpGo` clamped the index silently, so a press at the first period did nothing and sent the user looking at the map instead of at the edge of time.
+
+    Guard: `check-a38-mobile.js` checks above all **where they are not** — “there are two arrows” would be green in exactly the reported state. It also establishes the state (three periods, standing in the middle) instead of reading the shipped one, because without periods `mpGo` clamps immediately and the check would pass on nothing happening.
+
+193. ✅ **A progress counter that stands still claims a standstill.** Reported: “with *Statistics* the loading window comes up, sits on 0/2 the whole time and is then done immediately, without ever moving to a progress figure. With the map it at least flicks to 1/4 briefly.”
+
+    The number was not wrong, it was immobile: `loadStats` reported two steps and fetched **four endpoints at once** inside the first one, so 0 stood for the entire wait and 2 appeared as the overlay closed. `fgRender` already carries this rule one level down — *no total, no bar, because a bar at 0 % that never grows claims a standstill* — and “0 / 2” is worse than no bar, because it also names a total to measure it against.
+
+    **Four simultaneous requests are four countable things; they just have no order.** `op.all(list, note)` takes the counter over and ticks per request as each returns, failures included (a counter that skips failures never arrives). Where there is genuinely one request to wait for — *Today* — the numbers are gone rather than made up: `op.note()` says what is being waited for, the spinner carries the rest.
+
+    Two things fell out of the rewrite. The panel loaders (`tops` / `gaps`) moved **into** the bundle instead of following it: they need nothing from the four lines above them, and a second phase would have reset the bar from full to zero, which reads as going backwards. And `showStatsPane` now **returns** its loader instead of only starting it — `loadStats` was starting it a second time, since the “already loaded” marker only takes effect once the first run is through, which on opening it never is.
+
+    Guard: `check-foreground.js` samples `op.done` **during** the wait and requires at least three distinct readings — the point is not that a number is displayed but that it moves, and a `step()` line does not show which. Red against both broken states (the old two-step loader, and an `op.all` that ticks only at the end).
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

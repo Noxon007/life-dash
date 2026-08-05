@@ -209,7 +209,9 @@ The central view. Vertical, zoomable from decade to day.
 - **Condensation:** imported visits are grouped per (day, city, source) —
   *before* paging, so a page boundary cannot cut a group in half.
 - **Filters:** category, place, source, confirmed status, granularity
-  (country → city → district → point).
+  (country → city → district → point). They stand in **one row** with the same
+  wording as the map's (note 191) — same three questions, same bar; what a
+  timeline cannot do (draw paths) is left out rather than shown dead.
 - Photo strips follow the zoom level; a day header carries that day's weather.
 - Residence days appear as such, marked as derived.
 
@@ -218,9 +220,13 @@ The central view. Vertical, zoomable from decade to day.
 - Located events as points, with four **named** condensing levels — every
   point · by proximity · per place · per city — and the zoom level decides
   nothing about which one applies.
-- Layers with their own switches: manual entries · imported visits (Google) ·
-  photos (Immich) · paths · residences. A switch that cannot currently
-  do anything says so (`inert`) instead of lying.
+- **One row of switches, not two** (note 191): everything that can appear on
+  the map stands side by side — the event categories · imported visits
+  (Google) · photos (Immich) · paths · residences — each carrying the mark it
+  draws, plus *all* / *none* over the whole row. There is no separate *by
+  hand* switch: the category chips are it, and with none of them picked the
+  request carries `manual=0`, so the entries are not fetched at all. A switch
+  that cannot currently do anything says so (`inert`) instead of lying.
 - Photos and dense point sets are drawn on a **canvas with no object per
   point** — the object load, not the draw load, is what breaks a map.
 - Residences are drawn as **one mark per period, not per day**: six
@@ -295,6 +301,13 @@ made the interface inconsistent until note 172.
 Below both: a single short request gets the thin net bar at the top of the
 window and nothing else. The overlay waits 300 ms before appearing, so a view
 change that finishes in 120 ms never flashes one.
+
+**What the bar counts** (note 193): requests, not sections. A step that spans
+several simultaneous requests stands still for the whole wait and then jumps —
+which is the same claim as a bar stuck at 0 %, plus a total to measure it
+against. `op.all(list, note)` therefore ticks per request as each returns,
+failures included. Where there is genuinely one thing to wait for, the numbers
+are left out and the sentence carries the message.
 
 ---
 
