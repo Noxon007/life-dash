@@ -33,6 +33,7 @@ from app.services import baseline, weather_day
 from app.services.enrichment import enrich_weather
 from app.services.stats_overview import compute_overview
 from app.services.stats_toplists import compute_toplists
+from app.services.weather import ERA5_LAG_DAYS
 
 TODAY = date(2026, 8, 3)
 
@@ -299,8 +300,13 @@ def test_weather_run_fills_baseline_days_and_marks_them(db, user, fake_weather):
     Die Endlos-Abruf-Falle in ihrer nächsten Auflage: ohne Marke fragt jeder
     Lauf dieselben 14 600 Tage erneut bei Open-Meteo an.
     """
+    # Anmerkung 186: der Zeitraum muss ALT genug sein — die letzten Tage
+    # liefert ERA5 noch nicht, und der Lauf überspringt sie deshalb. Ein
+    # Zeitraum, der an HEUTE endet, prüfte sonst die Verzugs-Grenze statt der
+    # Marke, und der Test wäre grün, weil gar nichts gefragt wurde.
     loc = _loc(db, user, "Kiel")
-    _base(db, user, loc, TODAY - timedelta(days=4), TODAY)
+    last = TODAY - timedelta(days=ERA5_LAG_DAYS + 1)
+    _base(db, user, loc, last - timedelta(days=4), last)
     db.commit()
 
     enriched, remaining = enrich_weather(db)
@@ -411,6 +417,40 @@ def test_a_later_entry_takes_the_day_back_from_the_residence(db, user,
     # Und mit Wetter am Reise-Eintrag steht dessen Wert da, nicht der alte.
     enrich_weather(db)
     assert weather_day.day_values(db, user.id)["2024-08-10"]
+
+
+def test_discarding_weather_takes_the_marker_with_it(client, db, user, fake_weather):
+    """Anmerkung 186 — der ausdrückliche Lauf beim Quellenwechsel.
+
+    Er ist die einzige Stelle im Projekt, die Anreicherung an BESTÄTIGTEN
+    Ereignissen entfernt. Zwei Dinge müssen dabei stimmen, und das zweite ist
+    der stille Teil: der Revisionsmarker muss MIT weg. Bliebe er stehen, hielte
+    er die Ereignisse für erledigt, der folgende Lauf ginge an ihnen vorbei —
+    und der Knopf sähe gedrückt aus, ohne etwas zu bewirken.
+    """
+    loc = _loc(db, user, "Kiel")
+    old = TODAY - timedelta(days=ERA5_LAG_DAYS + 2)
+    _event(db, user, datetime.combine(old, datetime.min.time()), loc=loc)
+    _base(db, user, loc, old - timedelta(days=2), old - timedelta(days=1))
+    db.commit()
+    enrich_weather(db)
+    from app.models import Metric
+    assert db.query(Metric).filter(Metric.source == Source.weather).count() > 0
+    assert db.query(DayMetric).count() > 0
+
+    r = client.post("/api/weather/discard")
+    assert r.status_code == 200
+    assert r.json()["events"] > 0 and r.json()["days"] > 0
+    assert db.query(Metric).filter(Metric.source == Source.weather).count() == 0
+    assert db.query(DayMetric).count() == 0
+
+    # …und der nächste Lauf holt wirklich neu, statt die Ereignisse für
+    # erledigt zu halten.
+    fake_weather.clear()
+    enriched, _ = enrich_weather(db)
+    assert enriched > 0 and fake_weather, (
+        "der Revisionsmarker ist stehengeblieben — der Lauf hält die "
+        "Ereignisse für schon gefragt")
 
 
 def test_the_two_forms_of_the_gap_rule_agree(db, user):

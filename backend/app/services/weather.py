@@ -17,6 +17,48 @@ log = logging.getLogger("lifedash.weather")
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 
 # --------------------------------------------------------------------------- #
+# Anmerkung 186 — EINE Quelle, ausdrücklich benannt
+# --------------------------------------------------------------------------- #
+# Bis 0.39 stand hier keine Modellangabe, der Dienst wählte also selbst
+# („best_match"). **Und er wählt nach dem ALTER des Tages.** Gemessen am
+# 27.06.2026 in Hamburg (Baakenallee), gegen die DWD-Station Fuhlsbüttel mit
+# 39,1 °C gemessen:
+#
+#     best_match (bis hier)      31,3 °C     ← ECMWF IFS
+#     ERA5                       37,6 °C
+#     ERA5-Land                  36,8 °C
+#     ICON-D2 (2,2 km)           38,9 °C
+#
+# Für den 15.07.1990 und den 17.02.1962 antwortete dasselbe best_match dagegen
+# aus ERA5-Land. Ein Archiv über ein ganzes Leben verglich damit die Kindheit
+# in einem Modell mit der Gegenwart in einem anderen — an einem Hitzetag sechs
+# Kelvin auseinander. **Ein „wärmster Tag deines Lebens" war so keine Aussage
+# über das Leben, sondern eine über die Modellwahl des Dienstes.** Und weil
+# jeder Tag genau einmal gefragt wird (`weather_rev`), wäre jede spätere
+# Änderung dieser Wahl dauerhaft neben den alten Werten liegen geblieben.
+#
+# **Warum ERA5 und nicht das genaueste.** ICON-D2 träfe die Messung fast, gibt
+# es aber nur für Deutschland und erst ab 2021 — die letzten Jahre wären dann
+# systematisch heißer als alle davor, und jeder Rekord fiele automatisch in die
+# jüngste Zeit. ERA5-Land ist feiner (0,1° statt 0,25°), liefert aber über
+# Wasser nichts: geprüft mit `None` für die offene Nordsee UND für Paxos, das
+# der Landmaske zu klein ist. Eine Quelle, die bei jeder Insel- und
+# Schiffsreise aussetzt, erzwingt eine zweite — und damit genau das Gemisch,
+# das hier abgeschafft wird. ERA5 deckt 1940 bis heute ab, weltweit, Land wie
+# Wasser.
+#
+# Der Preis steht in der Oberfläche, statt verschwiegen zu werden: die Werte
+# sind ein Modellmittel über ~25 km und kein Thermometer. An einem Rekordtag
+# sind das 1,5 K zu wenig — aber gleichmäßig zu wenig, und darauf beruht die
+# Vergleichbarkeit, um die es geht.
+WEATHER_MODEL = "era5"
+# Wie viele Tage ERA5 hinterherhinkt. Geprüft: für vorgestern kam `None`.
+# Der Lauf überspringt so junge Tage deshalb, statt sie bei jedem Durchgang
+# vergeblich zu fragen — ohne Antwort wird keine Marke gesetzt, sie kommen
+# also von selbst dran, sobald sie alt genug sind.
+ERA5_LAG_DAYS = 6
+
+# --------------------------------------------------------------------------- #
 # Anmerkung 119 — derselbe Tag am selben Ort wird EINMAL gefragt
 # --------------------------------------------------------------------------- #
 # Wetter ist eine Eigenschaft von (Tag, Ort); gespeichert wird es je EREIGNIS.
@@ -96,6 +138,9 @@ def fetch_weather(lat: float, lng: float, day: datetime | date) -> dict | None:
                   "precipitation_hours,sunrise,sunset,daylight_duration,"
                   "windgusts_10m_max,uv_index_max"),
         "timezone": "auto",
+        # Anmerkung 186: ausdrücklich, sonst entscheidet der Dienst — und zwar
+        # je nach Alter des Tages verschieden.
+        "models": WEATHER_MODEL,
     })
     req = urllib.request.Request(f"{ARCHIVE_URL}?{params}")
     try:

@@ -25,6 +25,7 @@ from app.database import get_db
 from app.models import BaselineLocation, DayMetric, User
 from app.schemas import BaselineCreate, BaselineRead, BaselineUpdate
 from app.services import baseline
+from app.services.enrichment import discard_weather
 from app.services.ingestion import place_from_point, resolve_place
 
 router = APIRouter(prefix="/api", tags=["Wohnort"])
@@ -206,12 +207,13 @@ def clear_day_weather(
 
     Die einzige Aktion in diesem Router, die etwas WEGNIMMT, und sie darf es,
     weil `day_metrics` restlos wiederbeschaffbar ist. `metrics` stünde hier
-    nie: dort hinge dieselbe Aktion an bestätigten Ereignissen (Anmerkung 57).
+    nie: dort hinge dieselbe Aktion an bestätigten Ereignissen (Anmerkung 57) —
+    dafür gibt es seit Anmerkung 186 den eigenen, ausdrücklichen Knopf unter
+    `/api/weather/discard`, und beide gehen durch DIESELBE Funktion. Zwei
+    Löschwege für dieselbe Tabelle liefen sonst auseinander, sobald einer von
+    beiden eine Zeile mehr treffen muss.
     """
-    n = (db.query(DayMetric).filter(DayMetric.user_id == user.id)
-         .delete(synchronize_session=False))
-    db.commit()
-    return {"removed": int(n or 0)}
+    return {"removed": discard_weather(db, user.id, events=False)["days"]}
 
 
 @router.get("/days/baseline")

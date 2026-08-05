@@ -1182,6 +1182,27 @@ and no change, and one that turned out to be the same defect in two places.
 
     Measured with `tools/_measure_api.py` (20,000 entries, 5,844 residence days, now part of what the tool builds): `/api/days/weather` for one month 21 → 30 ms, for a whole life 192 → 204 ms, `/api/stats/overview` 345 → 367 ms, `/api/achievements` 125 → 196 ms. The badges pay the most because they run the query once per badge; a wrong badge is worse than a slow one, and the numbers are now reproducible rather than argued about.
 
+186. ✅ **The weather source is now named, because it was never one source.** Raised by the user: there is no single “the” weather value for a place and a day — stations, reanalyses, live networks and retrospective queries answer differently, so a life-long archive needs a deliberate choice of source or comparisons between days and years mean nothing.
+
+    Measured on the example given — 27 June 2026, Baakenallee in Hamburg's HafenCity — against the DWD station at Fuhlsbüttel, which recorded **39.1 °C** (Neuwiedenthal 39.4 °C):
+
+    | source | Baakenallee | Fuhlsbüttel |
+    |---|---|---|
+    | Life-Dash until now | **31.3 °C** | 32.6 °C |
+    | ERA5 | 37.6 °C | 36.8 °C |
+    | ERA5-Land | 36.8 °C | 36.6 °C |
+    | ICON-D2 (2.2 km) | 38.9 °C | 38.4 °C |
+
+    **The finding is worse than “we smooth extremes”.** The archive request carried no model, so Open-Meteo chose — and it chooses **by the age of the day**: 27 June 2026 was answered from ECMWF IFS, while 15 July 1990 and 17 February 1962 came from ERA5-Land. A “hottest day of my life” across forty years was therefore comparing one model against another, six kelvin apart on a hot day. And because every day is asked exactly once (`weather_rev`), whatever the service decides next would have settled next to the old values permanently.
+
+    **ERA5 is pinned** (`models=era5`), not the most accurate option, and the reasoning is the user's own argument applied consistently: ICON-D2 nearly hits the measurement but exists only for Germany and only since 2021 — the recent years would be systematically hotter than everything before, and every record would fall into the last few years by construction. ERA5-Land is finer (0.1°) but returns nothing over water: verified `None` for the open North Sea **and** for Paxos, which is too small for its land mask. A source that goes silent on every island and boat trip forces a second one, which is the mixture being abolished. ERA5 covers 1940 to today, worldwide, land and sea.
+
+    Three consequences, all deliberate:
+
+    - **The last few days have no weather.** ERA5 lags; verified `None` for two days ago. Asking anyway would be the same futile request on every run, and the job would report “not enrichable” about days that are perfectly fine. `_too_recent` skips them, and since no marker is written they arrive by themselves once they are old enough. The old boundary (“not in the future”) is replaced, and the test now pins the boundary from **both** sides — “today is skipped” alone would also be green if the filter dropped everything.
+    - **An explicit run converts an existing record** (`POST /api/weather/discard` plus the normal weather run, behind one button and one confirmation). `_add_weather` never overwrites, so bumping the generation would only move markers and burn one request per stored value while changing nothing. This is the only place in the project that removes enrichment from confirmed entries; it may, because a human asks for it and because weather is refetchable. The revision marker goes with it — left behind, it would make the following run walk past everything, and the button would look pressed while doing nothing.
+    - **The number says what it is.** “37.6 °C” reads like a thermometer; it is a modelled mean over a ~25 km grid. The sentence appears where the number is read: on the day line, under the weather rankings and in the admin section. The model name comes from `/health`, never from a frontend string — a provenance note that can drift from the server is worse than none, which is what `tools/check-weather-source.js` pins with a made-up model name.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

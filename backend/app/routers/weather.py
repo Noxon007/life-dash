@@ -19,6 +19,7 @@ from app.auth import get_current_user
 from app.database import get_db
 from app.models import User
 from app.services import weather_day
+from app.services.enrichment import discard_weather
 
 router = APIRouter(prefix="/api", tags=["Wetter"])
 
@@ -60,3 +61,26 @@ def day_weather_range(
     if (date_to - date_from).days > MAX_DAYS:
         raise HTTPException(400, f"Zeitraum zu groß (höchstens {MAX_DAYS} Tage).")
     return weather_day.day_weather(db, user.id, start=date_from, end=date_to)
+
+
+@router.post("/weather/discard")
+def discard_all_weather(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Alle Wetterwerte dieses Kontos verwerfen — Ereignisse UND Wohnort-Tage.
+
+    **Der ausdrückliche Lauf aus Anmerkung 186.** Er steht hier und nicht bei
+    den Wohnorten, weil er weiter reicht als der dortige Knopf: der wirft nur
+    Schicht 4 weg, dieser auch die Anreicherung an bestätigten Ereignissen.
+    Das ist die einzige Stelle, an der das geschieht, und sie hat genau einen
+    Anlass — die Wetterquelle hat gewechselt, und `_add_weather` überschreibt
+    grundsätzlich nichts, was schon dasteht.
+
+    Er löscht nur; geholt wird danach vom gewöhnlichen Wetterlauf. Zwei
+    Schritte statt einem, weil das Holen Stunden dauern kann und in den
+    Jobs-Reiter gehört, das Verwerfen aber sofort fertig ist. Wer nur den
+    ersten macht, hat einen Bestand ohne Wetter — verwerfbar ist es, das ist
+    der Grund, aus dem dieser Knopf überhaupt erlaubt ist.
+    """
+    return discard_weather(db, user.id)

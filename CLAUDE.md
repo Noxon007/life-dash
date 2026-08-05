@@ -34,7 +34,7 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
   der Server?) statt auf `pg_ctl` — das beendet sich auf Windows nicht
   verlässlich, und der gestartete Server erbt die Ausgabekanäle: hängt stdout an
   einer Pipe, bleibt der Lauf nach erfolgreichem Start stumm stehen.
-- Wächter: `cd tools` → `npm run check` (38 jsdom-Dateien)
+- Wächter: `cd tools` → `npm run check` (39 jsdom-Dateien)
 - **Smoke gegen ein HTTP-Doppel** (Immich): `<python> tools/immich_double.py &`
   dann `<python> tools/smoke_a45.py` — findet, was Unit-Tests prinzipiell nicht
   können (Blättern, Zeitzonen, echte DTOs). Immer aus dem Wurzelverzeichnis.
@@ -157,6 +157,12 @@ Der wiederkehrende Defekt in diesem Projekt ist nicht Kaputtheit, sondern
   gesucht.
 - **Zwei Fragen mit zwei Deckelungen teilen sich keine Tabelle.**
 - Bei jeder Invarianten-Reparatur fragen: **wo gilt derselbe Satz noch?**
+
+- **Eine fremde Schnittstelle ohne ausdrückliche Angabe ENTSCHEIDET selbst** —
+  und ändert die Entscheidung nach Kriterien, die nicht in unserem Code stehen
+  (Anmerkung 186: Open-Meteo wählte das Wettermodell nach dem ALTER des Tages,
+  sechs Kelvin Unterschied). Jede Vorgabe, die man weglassen kann, wird
+  irgendwann von der Gegenseite anders beantwortet als beim Bauen.
 
 **Deckeln, Anzeigen, Schweigen**
 - **Deckeln heißt nicht abschneiden.** `slice(0, N)` nimmt die ersten N

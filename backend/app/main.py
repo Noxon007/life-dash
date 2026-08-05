@@ -36,6 +36,7 @@ from app.routers import (
     world,
 )
 from app.seed import seed_demo
+from app.services.weather import WEATHER_MODEL
 from app.version import APP_VERSION, display_version, release_channel
 
 # Zentrales Logging (A9): ein Format für alle lifedash.*-Logger, Level per
@@ -151,6 +152,12 @@ def health() -> dict:
         "ai_provider": settings.ai_provider,
         "auth_mode": settings.auth_mode,
         "database": settings.database_url.split("://")[0],
+        # Anmerkung 186: Welches Wettermodell die Werte erzeugt hat. Es steht
+        # hier und nicht als Zeichenkette im Frontend, weil die Oberfläche
+        # sonst einen Namen NENNT, den der Server längst gewechselt haben kann
+        # — eine Herkunftsangabe, die auseinanderlaufen kann, ist schlimmer als
+        # keine. `tools/check-weather-source.js` hält beide Hälften zusammen.
+        "weather_model": WEATHER_MODEL,
     }
     # Anmerkung 86: Seit es Test-Images (:main) zwischen zwei Versionen gibt,
     # beantwortet die Versionsnummer nicht mehr die Frage „welcher Stand läuft

@@ -178,6 +178,22 @@ any `MINOR`.
   and your longest recorded trip.
 
 ### Fixed
+- **The weather now comes from one named source instead of whichever one the
+  service felt like.** Until now the request left the choice to Open-Meteo — and
+  it chose by the age of the day: recent days came from one model, your
+  childhood from another. Measured for 27 June 2026 in Hamburg, where a weather
+  station recorded 39.1 °C: the old request returned **31.3 °C**, the source now
+  used returns 37.6 °C. So a “hottest day of your life” was comparing two
+  different models across the decades. It is ERA5 from now on, for every day
+  from 1940 to today, worldwide, over land and sea — the only source that covers
+  a whole life without gaps, which matters more here than being right to the
+  last degree. **Every weather value also says what it is now**: a modelled
+  value over a roughly 25 km grid, not a station reading — good enough to
+  compare days and years, not to quote as a thermometer. Two side effects worth
+  knowing: the last few days have no weather until the archive catches up, and
+  under *My data → Weather* there is a new **discard and fetch again** button —
+  values fetched before this version came from the old, mixed choice, and the
+  normal run only fills gaps and cannot replace them.
 - **Days you take back from your residence no longer keep its weather.** Enter a
   two-week trip as single days — or shorten a residence period — and those days
   stop belonging to the residence. Their weather, fetched at home, used to stay

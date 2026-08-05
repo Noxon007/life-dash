@@ -2459,10 +2459,25 @@
             <div class="action-key">
               <button class="btn" id="btn-enrich" style="width:100%; text-align:left" data-i18n="act.weather">🌤️ Wetter ergänzen</button>
             </div>
-            <div class="action-desc" data-i18n="act.weather.desc"><b>Fehlendes Wetter nachtragen</b> (via Open-Meteo,
+            <div class="action-desc"><span data-i18n="act.weather.desc"><b>Fehlendes Wetter nachtragen</b> (via Open-Meteo,
               <b>additiv</b> — Vorhandenes wird nie überschrieben).<br>
               Steht hinten, weil jedes Ereignis genau einmal gefragt wird — der Lauf lohnt am meisten, wenn
-              Importe und Vorschläge durch sind. Läuft im Hintergrund, auch als Nachtplan.</div>
+              Importe und Vorschläge durch sind. Läuft im Hintergrund, auch als Nachtplan.</span>
+              <!-- Anmerkung 186: Woher die Zahlen kommen, steht dort, wo man
+                   sie holt. Der Modellname kommt aus /health und nicht aus
+                   dieser Zeichenkette — eine Herkunftsangabe, die gegenüber
+                   dem Server auseinanderlaufen kann, ist schlimmer als keine. -->
+              <div class="hint" style="margin-top:8px" id="wx-source"></div>
+              <div style="margin-top:8px">
+                <button class="btn secondary" id="btn-weather-refetch" data-i18n="act.weather.refetch">🔄 Wetter verwerfen und neu holen</button>
+              </div>
+              <span class="hint" style="display:block; margin-top:6px" data-i18n="act.weather.refetch.desc">Nur nötig, wenn
+                die Quelle gewechselt hat: Werte, die vor Version 0.40 geholt wurden, stammen aus der
+                automatischen Quellenwahl von Open-Meteo — und die entschied je nach Alter des Tages
+                verschieden, an Hitzetagen bis zu sechs Grad auseinander. Der Lauf oben ergänzt nur
+                Fehlendes und kann sie deshalb nicht ersetzen. Dieser hier wirft alles Wetter weg und
+                holt es neu; je nach Bestand dauert das Stunden.</span>
+            </div>
           </div>
         </div>
 
@@ -3860,6 +3875,12 @@ const I18N_EN = {
   'adm.runs.hint': "These runs happen <b>in the background on the server</b> — you can close the page. Progress, the stop button and the nightly schedule live in the <b>“Jobs”</b> tab; progress is kept when you stop, and a restart resumes where it left off.",
   'act.recompute.desc': "<b>Repeat the AI extraction.</b><br>Discards all <i>unconfirmed</i> events and rebuilds them from the raw inbox — with the current AI model and prompt. Confirmed events and manually corrected fields are left untouched. Useful after model or prompt changes. Stops cleanly when the AI quota runs out (whatever was computed is kept).",
   'act.weather.desc': "<b>Fill in missing weather</b> (via Open-Meteo, <b>additive</b> — existing values are never overwritten).<br>It comes last because each entry is asked exactly once — the run pays off most when imports and proposals are done. Runs in the background, and on the nightly schedule too.",
+  // Anmerkung 186 — die Quelle steht fest, und der Weg, Altbestand umzustellen
+  'act.weather.refetch': "🔄 Discard weather and fetch again",
+  'act.weather.refetch.desc': "Only needed when the source has changed: values fetched before version 0.40 come from Open-Meteo's automatic choice — which decided differently depending on how old the day was, up to six degrees apart on hot days. The run above only fills gaps and therefore cannot replace them. This one throws all weather away and fetches it again; depending on your record that takes hours.",
+  'wx.source': "Modelled value from {m} (Open-Meteo), grid ~25 km — not a weather station reading. Good enough to compare days and years, not to quote as a thermometer.",
+  'wx.refetch.ask': "Discard all weather values and fetch them again? Your entries and residences themselves are untouched — only the weather attached to them is thrown away and then fetched again from the fixed source. On a large record this can take hours.",
+  'wx.refetch.dropped': "{e} values on entries and {d} day values discarded — the run is fetching them again now.",
   'adm.links': "🔧 Diagnostics & links",
   'adm.links.hint': "Useful when self-hosting: the API UI lists every endpoint to try out (with your login), the health page says in one line whether the backend and database are up — the right target URL for an uptime monitor.",
   'adm.links.api': "📖 API documentation (/docs)",
@@ -6036,9 +6057,12 @@ function tlGroupWeather(g) {
   if (tl.zoom !== 'day') return '';
   const wx = dayWeatherLine(g.key);
   if (!wx) return '';
-  const tip = wx.regions > 1
+  // Anmerkung 186: und woher der Wert stammt. Angehängt statt eingebaut, damit
+  // der Satz an allen drei Stellen derselbe ist (`wxSourceNote`).
+  const tip = (wx.regions > 1
     ? t('tl.wx.regions.tip', 'An diesem Tag lagen die Einträge in mehreren Wettergegenden. Gezeigt wird der vorsichtigere (kleinere) Wert; ein Wetterzustand steht nur dort, wo alle Gegenden übereinstimmen.')
-    : t('tl.wx.tip', 'Das Wetter dieses Kalendertages — dieselbe Regel, aus der auch Statistik und Erfolge rechnen.');
+    : t('tl.wx.tip', 'Das Wetter dieses Kalendertages — dieselbe Regel, aus der auch Statistik und Erfolge rechnen.'))
+    + (wxSourceNote() ? `\n${wxSourceNote()}` : '');
   return ` <span class="tl-day-wx" title="${esc(tip)}">🌤️ ${esc(wx.line)}${
     wx.note ? ` · <span class="wx-regions">⚠ ${esc(wx.note)}</span>` : ''}</span>`;
 }
@@ -7482,6 +7506,36 @@ async function loadStatsTops(force) {
   box.dataset.filled = '1';
   renderStatsTops(top);
 }
+// --------------------------------------------------------------------------- //
+// **Anmerkung 186 — die Zahl sagt, was sie ist.**
+//
+// Ein Wetterwert in diesem Programm ist ein MODELLMITTEL über ein Gitter von
+// rund 25 km und keine Messung. Am 27.06.2026 in Hamburg standen dem 39,1 °C
+// einer DWD-Station 37,6 °C aus ERA5 gegenüber — gleichmäßig zu wenig, was für
+// Ranglisten genügt, aber „38,4 °C" liest sich wie ein Thermometer.
+//
+// Der Modellname kommt aus `/health` und steht NICHT in dieser Zeichenkette:
+// eine Herkunftsangabe, die gegenüber dem Server auseinanderlaufen kann, ist
+// schlimmer als keine (`tools/check-weather-source.js` hält beide Hälften
+// zusammen). Solange er noch nicht da ist, bleibt der Zusatz weg statt eine
+// Quelle zu behaupten.
+let WX_MODEL = '';
+function wxSourceNote() {
+  if (!WX_MODEL) return '';
+  return t('wx.source', 'Modellwert aus {m} (Open-Meteo), Gitter ~25 km — keine Messung einer Wetterstation. Für Vergleiche zwischen Tagen und Jahren taugt er, als Thermometerwert nicht.')
+    .replace('{m}', WX_MODEL.toUpperCase());
+}
+// Überall dorthin schreiben, wo eine Wetterzahl steht. EINE Funktion, weil es
+// drei Leser sind und drei Fassungen desselben Satzes auseinanderlaufen.
+function applyWeatherSource() {
+  const note = wxSourceNote();
+  const box = document.getElementById('wx-source');
+  if (box) box.textContent = note;
+  document.querySelectorAll('[data-wx-source]').forEach(el => {
+    const own = el.dataset.wxSource;
+    el.title = note ? (own ? `${own}\n${note}` : note) : own || '';
+  });
+}
 // Die elf Rekord-Listen in derselben Reihenfolge und mit denselben Einheiten
 // wie die Kacheln darüber. Die Tabelle steht hier EINMAL — die Kacheln lesen
 // ihre Einheit heute noch einzeln, aber eine zweite Liste in einer zweiten
@@ -7569,7 +7623,12 @@ function renderStatsTops(top) {
                  [r.place, r.title].filter(Boolean).join(' — '),
                  ` data-top-day="${esc((r.date_start || '').slice(0, 10))}"`)),
         noWx)).join('')
-    + `</div>`;
+    + `</div>`
+    // Anmerkung 186: unter den Wetter-Ranglisten steht, woher ihre Zahlen
+    // kommen — hier, wo man sie liest, und nicht in einer Einstellung.
+    + `<div class="hint" id="stats-wx-source" style="margin-top:4px"></div>`;
+  const src = document.getElementById('stats-wx-source');
+  if (src) src.textContent = wxSourceNote();
   box.querySelectorAll('[data-top-day]').forEach(row =>
     row.addEventListener('click', () => tlShowDay(row.dataset.topDay)));
 }
@@ -11704,6 +11763,34 @@ document.getElementById('btn-recompute-2').addEventListener('click', e =>
 // Wetter steht in „Meine Daten" (Anmerkung 115) — also bleibt der Reiter stehen.
 document.getElementById('btn-enrich').addEventListener('click', e =>
   startServerJob(e.target, 'weather', null, true));
+// **Anmerkung 186 — Wetter verwerfen und neu holen.**
+//
+// Zwei Aufrufe hinter einem Knopf, und das ist die richtige Aufteilung: das
+// Verwerfen ist sofort fertig, das Holen dauert Stunden und gehört deshalb in
+// den Jobs-Reiter. Der Nutzer will aber „neu holen" und nicht zwei Schritte.
+//
+// Die Rückfrage ist Pflicht: dies ist die EINZIGE Stelle, an der Anreicherung
+// an bestätigten Ereignissen verschwindet. Sie darf es nur, weil sie
+// wiederbeschaffbar ist — und weil ein Mensch ausdrücklich danach gefragt hat.
+document.getElementById('btn-weather-refetch')?.addEventListener('click', async ev => {
+  if (!await uiConfirm(t('wx.refetch.ask',
+      'Alle Wetterwerte verwerfen und neu holen? Die Ereignisse und Wohnorte selbst bleiben unberührt — nur das Wetter daran wird weggeworfen und anschließend aus der festgelegten Quelle neu geholt. Das kann bei großen Beständen Stunden dauern.'))) return;
+  const btn = ev.target;
+  btn.disabled = true;
+  try {
+    const r = await api('/api/weather/discard', { method: 'POST' });
+    toast(t('wx.refetch.dropped', '{e} Werte an Ereignissen und {d} Tageswerte verworfen — der Lauf holt sie jetzt neu.')
+      .replace('{e}', (r.events || 0).toLocaleString(LOC()))
+      .replace('{d}', (r.days || 0).toLocaleString(LOC())), 'ok', 8000);
+    // Die Ansichten halten Wetter im Zwischenspeicher — ohne das Vergessen
+    // zeigten sie die eben verworfenen Werte weiter und sähen dabei
+    // vollständig aus.
+    TL_DAY_WX.clear();
+    statsTopsFor = null;
+    await startServerJob(document.getElementById('btn-enrich'), 'weather', null, true);
+  } catch (err) { toast(err.message, 'error', 9000); }
+  finally { btn.disabled = false; }
+});
 // Anmerkung 131: „Embeddings berechnen" ist raus (semantische Suche entfernt).
 
 // ---------- EXPORT / IMPORT ----------
@@ -13253,6 +13340,10 @@ function enterOfflineCapture() {
     }
     const chip = document.getElementById('ki-provider');
     if (chip) chip.textContent = ` ${h.ai_provider}`;
+    // Anmerkung 186: das Wettermodell kommt vom Server, damit die Oberfläche
+    // keinen Namen nennt, den der Server längst gewechselt hat.
+    WX_MODEL = h.weather_model || '';
+    applyWeatherSource();
     // A30: Platzhalter zeigen, solange die erste (potenziell große) Antwort
     // unterwegs ist — ein leerer Zeitstrahl ist von einem kaputten nicht zu
     // unterscheiden.

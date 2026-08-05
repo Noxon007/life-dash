@@ -164,16 +164,28 @@ def test_candidates_are_prefiltered_in_sql(db, user):
     assert [e.id for e in _weather_candidates(db)] == [wanted.id]
 
 
-def test_todays_events_still_count_as_past(db, user):
-    """Die Grenze ist tagesgenau („Zukunft hat noch kein Wetter") — ein
-    Ereignis von heute Nachmittag darf der SQL-Vorfilter nicht wegschneiden,
-    sonst bekäme der heutige Tag nie Wetter."""
-    from app.services.enrichment import _weather_candidates
+def test_the_boundary_is_the_archives_lag_not_today(db, user):
+    """Anmerkung 186: die Grenze ist nicht mehr „Zukunft", sondern „so alt, dass
+    das Archiv es hat".
 
-    today = _event(db, user, _now().replace(hour=23, minute=59))
+    Bis 0.39 hieß sie „alles bis einschließlich heute". Seit die Quelle
+    ausdrücklich ERA5 ist, stimmt das nicht mehr: die letzten Tage liefert das
+    Archiv noch gar nicht, und sie zu fragen hieße, bei jedem Lauf denselben
+    vergeblichen Abruf zu machen und „nicht anreicherbar" über Tage zu melden,
+    mit denen alles in Ordnung ist.
+
+    Geprüft wird die Grenze von BEIDEN Seiten. Nur „heute fällt weg" wäre auch
+    dann grün, wenn der Filter alles wegschneidet — und ein Wetterlauf, der
+    nichts mehr findet, sieht aus wie einer, der fertig ist.
+    """
+    from app.services.enrichment import ERA5_LAG_DAYS, _weather_candidates
+
+    _event(db, user, _now().replace(hour=23, minute=59))            # heute
+    _event(db, user, _now() - timedelta(days=ERA5_LAG_DAYS - 1), lat=52.0)
+    ready = _event(db, user, _now() - timedelta(days=ERA5_LAG_DAYS + 1), lat=53.0)
     db.commit()
 
-    assert [e.id for e in _weather_candidates(db)] == [today.id]
+    assert [e.id for e in _weather_candidates(db)] == [ready.id]
 
 
 def test_already_enriched_events_drop_out(db, user):

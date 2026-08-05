@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models import BaselineLocation, DayMetric, Event, Location, Metric, Source
 from app.services import baseline
-from app.services.weather import fetch_weather
+from app.services.weather import ERA5_LAG_DAYS, WEATHER_MODEL, fetch_weather
 
 log = logging.getLogger("lifedash.enrichment")
 
@@ -34,15 +34,29 @@ _DAILY_KEYS = {"temp_min_c", "temp_max_c", "sunshine_h", "rain_mm",
                "snow_cm", "wind_max_kmh"}
 
 
+def _too_recent(day) -> bool:
+    """Ist der Tag jünger, als das Archiv reicht? (Anmerkung 186)
+
+    ERA5 hinterherhinkt ein paar Tage. Solche Tage zu FRAGEN wäre nicht falsch
+    — es käme nichts, es würde keine Marke gesetzt, und der nächste Lauf
+    versuchte es erneut. Es wäre nur bei jedem Durchgang derselbe vergebliche
+    Abruf, und der Lauf meldete „0 angereichert, N nicht anreicherbar" über
+    Tage, mit denen alles in Ordnung ist. Sie kommen von selbst dran, sobald
+    sie alt genug sind.
+    """
+    return day > datetime.now(timezone.utc).date() - timedelta(days=ERA5_LAG_DAYS)
+
+
 def _needs_weather(event: Event) -> bool:
     """Verortet, datiert, nicht in der Zukunft — und Wetter fehlt oder ist
     noch Alt-Format (vor 0.14.0, ohne Tageswerte)?"""
-    today = datetime.now(timezone.utc).date()
     loc = event.location
     if not loc or loc.lat is None or event.date_start is None:
         return False
-    if event.date_start.date() > today:
-        return False  # Zukunft hat noch kein Wetter
+    # Zukunft hat noch kein Wetter, und die letzten Tage hat das Archiv noch
+    # nicht (Anmerkung 186).
+    if _too_recent(event.date_start.date()):
+        return False
     weather = [m for m in event.metrics if m.source == Source.weather]
     if not weather:
         return True
@@ -236,7 +250,10 @@ def _day_weather_candidates(db: Session, user_id: str | None = None
                         DayMetric.key == _REVISION_KEY,
                         DayMetric.value >= WEATHER_REVISION).all()}
         for day in sorted(days):
-            if day in done:
+            # Anmerkung 186: dieselbe Grenze wie bei den Ereignissen. Eine
+            # zweite Antwort auf „ist der Tag alt genug?" liefe still
+            # auseinander — dieselbe Begründung wie beim Fehlschlag oben.
+            if day in done or _too_recent(day):
                 continue
             loc = days[day].location
             if loc is not None and loc.lat is not None and loc.lng is not None:
@@ -284,6 +301,39 @@ def _add_day_weather(db: Session, user_id: str, day, loc: Location) -> bool:
             marker.value = WEATHER_REVISION
             added += 1
     return added > 0
+
+
+def discard_weather(db: Session, user_id: str, *, events: bool = True,
+                    days: bool = True) -> dict:
+    """Wetterwerte wegwerfen, damit sie neu geholt werden können (Anm. 186).
+
+    **Die einzige Stelle im Projekt, die Anreicherung an BESTÄTIGTEN Daten
+    entfernt** — und sie darf es nur, weil ein Mensch sie ausdrücklich
+    auslöst. Der Anlass ist der Wechsel der Wetterquelle: seit Anmerkung 186
+    steht das Modell fest, aber `_add_weather` überschreibt grundsätzlich nicht
+    (`if key in have`), ein bloßes Hochzählen der Generation würde also nur die
+    Marken verschieben und für jeden Bestandswert eine Anfrage verbrennen, ohne
+    etwas zu ändern. Ohne diesen Weg bliebe ein Bestand für immer gemischt.
+
+    Der Revisionsmarker geht MIT. Bliebe er stehen, hielte er die Ereignisse
+    für erledigt, und der folgende Lauf ginge an ihnen vorbei — die Sorte
+    Stille, bei der ein Knopf gedrückt aussieht und nichts tut.
+
+    `events=False` ist der schmale Fall des Wohnort-Knopfes: nur Schicht 4,
+    ohne die Ereignisse anzufassen (siehe `routers/baselines.clear_day_weather`).
+    """
+    out = {"events": 0, "days": 0}
+    if events:
+        ids = db.query(Event.id).filter(Event.user_id == user_id).subquery()
+        out["events"] = int(db.query(Metric).filter(
+            Metric.source == Source.weather,
+            Metric.event_id.in_(db.query(ids.c.id))).delete(
+                synchronize_session=False) or 0)
+    if days:
+        out["days"] = int(db.query(DayMetric).filter(
+            DayMetric.user_id == user_id).delete(synchronize_session=False) or 0)
+    db.commit()
+    return out
 
 
 def enrich_weather(db: Session, limit: int | None = None,
