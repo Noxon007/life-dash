@@ -91,6 +91,25 @@ def reset_cache() -> None:
     _CACHE.clear()
 
 # WMO-Wettercodes -> deutsche Kurzbeschreibung
+#
+# **Anmerkung 188 — die Gewitter-Codes (95/96/99) kommen hier NIE an.** Nicht
+# weil ERA5 gewählt wurde: gemessen über den Sommer 2024 in Hamburg liefert
+# KEINES der Archiv-Modelle sie (era5, era5_land, ecmwf_ifs — alle null), und
+# über sechs Jahre kamen aus ERA5 genau neun verschiedene Codes, keiner davon
+# konvektiv. Eine Reanalyse rechnet auf 25 km; ein Gewitter ist kleiner als
+# eine Gitterzelle. Auch `showers_sum` steht im Antwortformat und bleibt in
+# ERA5 durchgehend 0,0 (615 Sommertage geprüft), und `cape` gibt es im Archiv
+# gar nicht.
+#
+# Die drei Zeilen bleiben trotzdem stehen: sie sind die Übersetzung eines
+# fremden Codes, nicht eine Zusage, dass er vorkommt. **Wer daraus eine
+# Auswertung bauen will („Gewittertage", „stärkstes Gewitter"), baut eine, die
+# für immer leer bleibt** — und eine Ansicht, die aussieht wie gebaut und immer
+# null zeigt, ist genau die Stille, die dieses Projekt teuer bezahlt. Gewitter
+# hat nur das Modell-Archiv (`historical-forecast-api`, ICON, 2,2 km), und das
+# reicht nur bis ~2021 zurück: für ein Leben wären das die letzten Jahre, und
+# eine Rangliste daraus wäre eine Aussage über sie, nicht über das Leben
+# (dieselbe Falle wie in Anmerkung 186).
 WMO = {
     0: "klar", 1: "überwiegend klar", 2: "teils bewölkt", 3: "bewölkt",
     45: "Nebel", 48: "Reifnebel",

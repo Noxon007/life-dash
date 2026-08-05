@@ -1211,6 +1211,17 @@ and no change, and one that turned out to be the same defect in two places.
 
     Two consequences of note 186 that meet this path and are deliberate: an entry from the last few days has no weather to begin with (ERA5 lags), so moving it loses nothing; and if the fetch fails, the entry is left without weather **and without a marker**, so the ordinary weather run picks it up later. Removing first and fetching second is what makes that self-healing.
 
+188. ❌ **“Strongest thunderstorm” — not answerable from a reanalysis, and the reason is worth writing down.** Asked whether a record like the strongest thunderstorm could be pulled out as well. Measured before answering:
+
+    - **ERA5 never emits a thunderstorm code.** Six years of daily codes for Hamburg: nine distinct codes, `95/96/99` **zero times out of 2,192 days**.
+    - **It is not a consequence of note 186.** The same summer through `era5_land` and `ecmwf_ifs` gives thunderstorm codes zero times as well — no archive model has them. A reanalysis runs on a ~25 km grid, and a thunderstorm is smaller than one cell.
+    - **The obvious substitutes are empty too.** `showers_sum` (convective precipitation) is accepted by the API and is `0.0` on all 615 summer days checked; `cape` does not exist in the archive at all, hourly or daily.
+    - **Only the model archive has them:** `historical-forecast-api` (ICON, 2.2 km) reports 13 × 95, 4 × 96 and 1 × 99 for the summer of 2024 — with intensity built into the code. It starts around 2021: 2016 returns nulls, 2010 is rejected.
+
+    So a thunderstorm list is possible only for roughly the last five years of a life, from a second source — the exact trade the user identified in note 186 and decided against. Building it anyway would produce a “records” list that is a statement about 2021 onwards while looking like one about a lifetime. What *is* covered is already there under its correct name: **strongest gust** is a record tile, and it comes from the same daily data.
+
+    The lasting change is a comment at the WMO table in `services/weather.py`. It maps 95/96/99 and therefore reads like a promise that they occur; the next person to build “thunderstorm days” on it would get a view that is permanently empty and looks finished — this project's most expensive class of defect.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into
