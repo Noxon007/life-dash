@@ -28,6 +28,7 @@ from app.services import media as media_svc
 from app.wipe import is_delete_word, wipe_user_rows
 from app.models import (
     BaselineLocation,
+    DayMetric,
     Entity,
     Event,
     EventEntityLink,
@@ -126,6 +127,15 @@ def export_data(
     # haben keine Quelle — sie sind selbst die Quelle.
     baselines = _loaded("Wohnorte", db.query(BaselineLocation)
                         .filter(BaselineLocation.user_id == user.id).all())
+    # **Anmerkung 199 — die zweite Hälfte des Wetters.** `metrics` (Wetter am
+    # Ereignis) stand hier seit jeher, `day_metrics` (dasselbe Wetter am
+    # Wohnort-Tag) nie. Beide sind Schicht 4 und beide wiederbeschaffbar — aber
+    # eine Sicherung, die die eine Hälfte mitnimmt und die andere auslässt,
+    # trifft keine Entscheidung, sie hat eine übersehen. Die Zeile hängt am
+    # KONTO und an keinem Ereignis; `exclude_source` gilt für sie nicht, weil
+    # ihre Quelle immer die Anreicherung ist.
+    day_metrics = _loaded("Tageswerte", db.query(DayMetric)
+                          .filter(DayMetric.user_id == user.id).all())
     event_ids = {e.id for e in events}
     links = [
         l for l in db.query(EventEntityLink).all() if l.event_id in event_ids
@@ -151,7 +161,8 @@ def export_data(
     # der Doku. Das schließt A29 (ZIP-Export mit Dateien) später sauber ab.
     uploads = sum(1 for m in media if m.provider == "local")
     total = sum(len(x) for x in (fragments, locations, entities, events,
-                                 links, media, metrics, tracks, baselines))
+                                 links, media, metrics, tracks, baselines,
+                                 day_metrics))
     log.info("Export fertig: %d Zeilen, davon %d Bilder als Verweis "
              "(Dateien liegen nicht im JSON)", total, uploads)
     return {
@@ -178,6 +189,9 @@ def export_data(
         # den Schlüssel eben nicht mit. Eine Versionsnummer hochzuzählen
         # hieße „ab hier inkompatibel", und das ist es nicht.
         "baseline_locations": [_row_to_dict(x) for x in baselines],
+        # Ebenfalls ein neuer Schlüssel ohne neue Export-Version, aus demselben
+        # Grund wie darüber: der Import liest jeden Block mit `get(key, [])`.
+        "day_metrics": [_row_to_dict(x) for x in day_metrics],
     }
 
 
@@ -303,6 +317,19 @@ def wipe_my_data(
     return {"deleted": deleted, "total": sum(deleted.values()), "media_files": files}
 
 
+def _day_metric_keys(db: Session, user_id: str) -> set[tuple[str, str]]:
+    """(Tag, Kennzahl) der schon vorhandenen Tageswerte — als ISO-Text.
+
+    Als Text und nicht als `date`, weil die Gegenseite aus dem JSON kommt und
+    dort ein Tag „1998-07-04" heißt. Beide Seiten auf dieselbe Form zu bringen
+    ist die halbe Arbeit an einem Vergleich; sie hier zu machen heißt, dass der
+    Aufrufer sie nicht ein zweites Mal anders macht.
+    """
+    return {(d.isoformat() if hasattr(d, "isoformat") else str(d)[:10], k)
+            for d, k in db.query(DayMetric.day, DayMetric.key)
+            .filter(DayMetric.user_id == user_id).all()}
+
+
 @router.post("/import")
 def import_data(
     payload: dict = Body(...),
@@ -331,6 +358,8 @@ def import_data(
         ("tracks", Track, True),
         # Nach `locations`: die Zeile zeigt per Fremdschlüssel auf einen Ort.
         ("baseline_locations", BaselineLocation, True),
+        # Anmerkung 199: hängt nur am Konto, kann also überall stehen.
+        ("day_metrics", DayMetric, True),
     ]
     imported: dict[str, int] = {}
     skipped = 0
@@ -343,12 +372,28 @@ def import_data(
     seen = 0
     for key, model, has_user in plan:
         count = 0
+        # **Die Kennung allein genügt nicht, wo eine FACHLICHE Eindeutigkeit
+        # zugesagt ist** (Anmerkung 199). `day_metrics` ist die einzige
+        # exportierte Tabelle mit einer solchen Zusage (`ux_day_metrics_key`
+        # über Konto, Tag, Kennzahl) — und sie greift hier besonders leicht:
+        # das Tageswetter entsteht bei JEDEM Anreicherungslauf neu, ein Konto
+        # trägt dieselbe Aussage also längst unter einer anderen Kennung. Ohne
+        # diesen Griff bräche der GANZE Import an einer Zeile ab, die nichts
+        # Neues sagt — und zwar erst beim Commit, also nachdem jede andere
+        # Tabelle schon als „importiert" gezählt war.
+        taken = _day_metric_keys(db, user.id) if key == "day_metrics" else None
         for row in payload.get(key, []):
             seen += 1
             progress.beat(seen, rows_total - seen, note=key)
             if not row.get("id") or db.get(model, row["id"]) is not None:
                 skipped += 1
                 continue
+            if taken is not None:
+                natural = (str(row.get("day") or "")[:10], row.get("key"))
+                if natural in taken:
+                    skipped += 1
+                    continue
+                taken.add(natural)
             kwargs = _dict_to_kwargs(model, row)
             if has_user:
                 kwargs["user_id"] = user.id

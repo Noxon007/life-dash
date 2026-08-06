@@ -330,8 +330,16 @@ def discard_weather(db: Session, user_id: str, *, events: bool = True,
             Metric.event_id.in_(db.query(ids.c.id))).delete(
                 synchronize_session=False) or 0)
     if days:
+        # `source == weather` wie im Zweig darüber (Anmerkung 199). Heute
+        # schreibt nur die Anreicherung in `day_metrics`, die Bedingung ändert
+        # also nichts — sie steht hier, weil der Ereignis-Zweig sie führt und
+        # eine Regel, die an zwei Stellen verschieden aufgeschrieben ist, beim
+        # ersten zweiten Schreiber auseinanderläuft. Ein „Wetter verwerfen",
+        # das eine fremde Kennzahl mitnimmt, meldet dabei nicht einmal etwas.
         out["days"] = int(db.query(DayMetric).filter(
-            DayMetric.user_id == user_id).delete(synchronize_session=False) or 0)
+            DayMetric.user_id == user_id,
+            DayMetric.source == Source.weather).delete(
+                synchronize_session=False) or 0)
     db.commit()
     return out
 

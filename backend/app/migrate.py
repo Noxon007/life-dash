@@ -251,10 +251,20 @@ def cleanup_searched_address_labels(engine: Engine) -> None:
 
 def ensure_weather_unique_index(engine: Engine) -> None:
     """DB-seitiger Dubletten-Schutz (A11): pro Event höchstens EINE
-    Wetter-Metrik je Kennzahl. Räumt vorhandene Dubletten auf (älteste Zeile
-    gewinnt) und legt dann einen partiellen Unique-Index an — damit können
-    auch zwei parallele Anreicherungs-Läufe keine Doppel-Zeilen erzeugen.
-    Syntax ist in SQLite und PostgreSQL identisch."""
+    Wetter-Metrik je Kennzahl. Räumt vorhandene Dubletten auf und legt dann
+    einen partiellen Unique-Index an — damit können auch zwei parallele
+    Anreicherungs-Läufe keine Doppel-Zeilen erzeugen. Syntax ist in SQLite und
+    PostgreSQL identisch.
+
+    **Welche der Dubletten gewinnt, ist willkürlich — aber fest.** Hier stand
+    bis zur Anmerkung 199 „älteste Zeile gewinnt", und das war schlicht falsch:
+    `id` ist eine UUID, `MIN(id)` also die lexikografisch kleinste und nicht
+    die zuerst geschriebene (dieselbe Falle, die Anmerkung 106 beim
+    Verdichtungs-Vertreter `min(id)` schon einmal gefunden hat). Folgenlos ist
+    es trotzdem, und deshalb bleibt es: Dubletten entstehen nur, wenn zwei
+    Läufe DENSELBEN Tag am DEMSELBEN Ort fragen, und beide bekommen dieselbe
+    Antwort. Wer die Werte wirklich austauschen will, hat seit Anmerkung 186
+    den ausdrücklichen Weg über `discard_weather`."""
     with engine.begin() as conn:
         conn.execute(text(
             "DELETE FROM metrics WHERE source = 'weather' AND id NOT IN ("

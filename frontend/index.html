@@ -7880,18 +7880,22 @@ function renderStatsTops(top) {
 
   const streak = top.streaks || {};
   const span = s => s ? `${fmtDay(s.from)} – ${fmtDay(s.to)}` : '';
+  // Anmerkung 199: erst auswählen, DANN nummerieren. Die Ränge standen hier
+  // als 0/1/2 im Quelltext und wurden danach gefiltert — ohne Lücke im
+  // Bestand (`longest_gap === null`, bei lückenlos erfassten Beständen der
+  // Normalfall) zeigte die Kachel „1." und „3.". Eine Zählung mit Loch liest
+  // sich wie eine verschwundene Zeile.
   const streakRows = [
-    streak.longest_run
-      ? topRow(0, t('tops.run', 'Längste Serie mit Einträgen'),
-               dayCount(streak.longest_run.days), span(streak.longest_run)) : '',
-    streak.longest_gap
-      ? topRow(1, t('tops.gap', 'Längste Lücke ohne Einträge'),
-               dayCount(streak.longest_gap.days), span(streak.longest_gap)) : '',
-    streak.longest_trip
-      ? topRow(2, t('tops.trip', 'Längste erfasste Reise'),
-               dayCount(streak.longest_trip.days),
-               `${streak.longest_trip.title} · ${span(streak.longest_trip)}`) : '',
-  ].filter(Boolean);
+    streak.longest_run && [t('tops.run', 'Längste Serie mit Einträgen'),
+                           dayCount(streak.longest_run.days),
+                           span(streak.longest_run)],
+    streak.longest_gap && [t('tops.gap', 'Längste Lücke ohne Einträge'),
+                           dayCount(streak.longest_gap.days),
+                           span(streak.longest_gap)],
+    streak.longest_trip && [t('tops.trip', 'Längste erfasste Reise'),
+                            dayCount(streak.longest_trip.days),
+                            `${streak.longest_trip.title} · ${span(streak.longest_trip)}`],
+  ].filter(Boolean).map(([label, value, sub], i) => topRow(i, label, value, sub));
 
   // **Anmerkung 189 — „wie weit war ich je weg?"** Die Frage ist erst
   // beantwortbar, seit es Wohnorte gibt: „weit weg" braucht ein Bezugssystem.

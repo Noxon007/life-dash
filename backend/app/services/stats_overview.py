@@ -116,6 +116,22 @@ def _as_day(value) -> date_type | None:
         return None
 
 
+def _by_count(item: tuple[str, int]) -> tuple[int, str]:
+    """Sortierschlüssel für „viele zuerst, bei Gleichstand alphabetisch".
+
+    **Anmerkung 199 — die zweite Stufe ist nicht Kosmetik.** `sorted` ist
+    stabil, die Reihenfolge bei Gleichstand ist also die des `place_rows`, und
+    die kommt aus einem `GROUP BY` ohne `ORDER BY`: auf PostgreSQL entscheidet
+    darüber die Hash-Aggregation, also die Datenbank und nicht die Zahl. Zwei
+    Orte mit je 40 Tagen konnten damit bei jedem Laden die Plätze tauschen —
+    und, schlimmer, gegen die Rangliste direkt darunter stehen, die seit
+    Anmerkung 156 genau diesen Stichentscheid führt (`_ranked`: Tage, Einträge,
+    Wert). Die Regel stand an zwei Orten und lief still auseinander.
+    """
+    name, count = item
+    return (-count, name)
+
+
 def _age_years(birth: datetime, when: datetime) -> int:
     """Volle Jahre — wie die Frontend-Rechnung, ohne Bibliothek."""
     years = when.year - birth.year
@@ -215,7 +231,7 @@ def compute_overview(db: Session, user_id: str, *, today: datetime | None = None
         short = _short_place(name)
         if short:
             per_place[short] = per_place.get(short, 0) + n
-    top_places = sorted(per_place.items(), key=lambda kv: -kv[1])[:TOP_N]
+    top_places = sorted(per_place.items(), key=_by_count)[:TOP_N]
 
     # ---------------- A39: Städte ------------------------------------------
     # Eigenes Feld statt Namens-Textteil: `Location.name` hängt davon ab,
@@ -230,7 +246,7 @@ def compute_overview(db: Session, user_id: str, *, today: datetime | None = None
     per_city = {c: n for c, n in city_rows}
     for city, n in b_days["cities"].items():
         per_city[city] = per_city.get(city, 0) + n
-    top_cities = sorted(per_city.items(), key=lambda kv: -kv[1])[:TOP_N]
+    top_cities = sorted(per_city.items(), key=_by_count)[:TOP_N]
 
     # ---------------- Textregeln: SQL grenzt ein, Python entscheidet ---------
     moves = len(_milestone_matches(db, user_id, _MOVE_WORDS, _MOVE_RE))
@@ -243,7 +259,11 @@ def compute_overview(db: Session, user_id: str, *, today: datetime | None = None
                    .join(Event, Event.id == EventEntityLink.event_id)
                    .filter(*mine, Entity.type == "animal")
                    .group_by(Entity.name, Entity.id)
-                   .order_by(func.count(EventEntityLink.id).desc())
+                   # Derselbe Stichentscheid wie oben — hier zusätzlich nötig,
+                   # weil das `LIMIT` bei Gleichstand entscheidet, WER
+                   # überhaupt in der Liste steht, nicht nur an welcher Stelle.
+                   .order_by(func.count(EventEntityLink.id).desc(),
+                             Entity.name.asc())
                    .limit(TOP_N).all())
     top_animals = [[name, n, eid] for name, eid, n in animal_rows]
 
@@ -618,7 +638,16 @@ def _weather_stats(db: Session, user_id: str) -> dict:
         if e.category != "trip" or temp is None:
             continue
         key = e.parent_event_id or i
-        entry = trips.setdefault(key, [0.0, 0, e.title])
+        # **Der Name kommt von dem, wonach gefragt wurde** (Anmerkung 199).
+        # Gruppiert wird über den Elternteil, benannt wurde bis hierher das
+        # erste KIND — die Kachel „Wärmste Reise" sagte damit „Andalusien —
+        # Tag 1". Sie traf ausgerechnet den Fall, für den diese Mittelung
+        # gebaut ist: eine ungeteilte Reise ist ihr eigener Schlüssel und
+        # hieß immer richtig, eine in Tage geschnittene nie. Fehlt der
+        # Elternteil in `events` (undatiert, also nie in dieser Auswahl),
+        # bleibt der Kindtitel — ein Name mit Zusatz ist mehr als keiner.
+        entry = trips.setdefault(
+            key, [0.0, 0, getattr(events.get(key), "title", None) or e.title])
         entry[0] += temp
         entry[1] += 1
     warmest = None

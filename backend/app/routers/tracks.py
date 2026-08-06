@@ -584,9 +584,17 @@ def import_timeline(
     0 = alle importieren (Default)."""
     min_probability = max(0.0, min(min_probability, 1.0))
     visits, moves = _normalize(payload)
+    # **Gezählt wird VOR dem Annotieren** (Anmerkung 199). `_annotate_paths`
+    # VERBRAUCHT die activity-Segmente, die einem Pfad seinen Typ und seine
+    # gemessene Strecke geben — sie verschwinden aus `moves`, weil ihre Auskunft
+    # jetzt im Pfad steht, und nicht, weil sie unlesbar wären. Danach gezählt
+    # meldete ein sauberer Geräte-Export „30 unbrauchbare Segmente" für 30
+    # Segmente, die restlos angekommen sind: eine Zahl, die genau dann Alarm
+    # schlägt, wenn alles gut ging.
+    readable = len(visits) + len(moves)
     moves = _annotate_paths(moves)
-    invalid = (len(payload.get("semanticSegments") or []) + len(payload.get("timelineObjects") or [])
-               - len(visits) - len(moves))
+    invalid = (len(payload.get("semanticSegments") or [])
+               + len(payload.get("timelineObjects") or []) - readable)
     skipped_lowprob = 0
     if min_probability > 0:
         kept = [v for v in visits if v["probability"] >= min_probability]

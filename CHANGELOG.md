@@ -210,6 +210,24 @@ any `MINOR`.
   life moves; plus how many countries and cities each year of your life touched.
 
 ### Fixed
+- **The backup now carries the weather of your residence days too.** The export
+  took the weather attached to your entries and left behind the weather attached
+  to the days a residence fills — so a restored account was missing exactly
+  those years in which nothing is recorded but where you lived. The file looked
+  complete, which is what made it worth fixing: nothing said anything was
+  missing. Restoring into an account that already has day weather is safe; the
+  same day is not stored twice.
+- **“Warmest trip” names the trip again, not its first day.** For a trip that
+  had been split into single days the tile read “Andalusia — day 1”. The
+  average was always right; only the label came from the wrong entry.
+- **Top places, cities and animals no longer change order between two visits.**
+  Where two entries have the same count, the list now decides alphabetically
+  instead of leaving it to the database — which also means the bars and the
+  ranking below them in the same tab can no longer disagree about which of two
+  equal places comes first.
+- **Importing a Google timeline no longer reports intact segments as
+  unreadable.** A clean device export could claim that dozens of segments could
+  not be read, when in fact they had been merged into the routes they belong to.
 - **A country now appears once, under one name.** “Deutschland · 14,087
   entries” and “Germany · 2,685 entries” stood one under the other in *Top
   countries* — the same country, named by two sources: OpenStreetMap answers in

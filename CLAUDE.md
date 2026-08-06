@@ -21,7 +21,7 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI,
-  Geocoding aus) — 725 Tests, ~17 s, SQLite im Arbeitsspeicher
+  Geocoding aus) — 738 Tests, ~20 s, SQLite im Arbeitsspeicher
 - **Tests gegen echtes PostgreSQL** (das, worauf betrieben wird): `pwsh
   tools/pg-test.ps1` — **kein Docker**, legt mit den installierten Binärdateien
   einen eigenen Cluster in `backend/_pgtest/` auf Port **55432** an und stoppt
@@ -76,7 +76,11 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
   Besitz-Bezug, `WIPE_KEEPS` = was mit Begründung stehen bleibt, `DELETE_WORDS`
   = das Losungswort). Drei Aufrufer lesen sie: „meine Daten", „alle Daten",
   „Nutzer löschen". Neue Tabelle mit Nutzerdaten → hier eintragen, sonst wird
-  `test_wipe_completeness.py` rot.
+  `test_wipe_completeness.py` rot. **Und gleich danach in `routers/data.py`**
+  (Export-Block UND `plan` im Import): was gelöscht werden kann, muss vorher zu
+  sichern sein — `day_metrics` stand in der Löschliste und fehlte im Backup
+  (Anmerkung 199). `test_anm199_review.py` prüft beide Seiten gegen
+  `Base.metadata`.
 - **Wo ein Lauf erscheint, sind ZWEI Fragen** (ARCHITECTURE Kap. 4.6): *wer
   taktet?* (Server → Jobs-Reiter, überlebt das Schließen der Seite; Browser →
   `runForeground()`-Overlay) und *ist er registriert?* (`startJob` = Sperre je
@@ -265,6 +269,16 @@ daraus bewusst **eine** Sache: der **Welt-Reiter ist deutsch verdrahtet**
 `data/countries.py` und haben im Frontend keinen Katalog-Eintrag). Beide
 Hälften gehören zusammen umgestellt; eine allein ergäbe einen halb übersetzten
 Reiter. Das ist F10-Arbeit, kein Rest von Anmerkung 198.
+
+**Code-Durchsicht 2026-08-06 (Anmerkung 199) ist erledigt** — Backup trägt
+`day_metrics`, wärmste Reise heißt wie die Reise, Stichentscheid im Überblick,
+`skipped_invalid` und `discard_weather`. Offen blieb daraus bewusst **eines**:
+**`_place_ranking` holt den ganzen Ortsbestand ohne `LIMIT`**, und
+`_farthest_from_home` fährt einen vollen Scan je Wohnort-Zeitraum. Die
+Kommentare dort sagen „Hunderte Orte" — seit Anmerkung 139 legt der Foto-Lauf
+mit `PLACE_ROUND = 5` (≈ 1 m) rund EINEN Ort je Foto an, bei zwanzigtausend
+Bildern also zehntausende. Zu deckeln würde ändern, welche Antwort herauskommt;
+das ist eine Entscheidung des Users und keine Reparatur.
 
 **Doku-Umbau 2026-08-04.** `KONZEPT.md` ist aufgelöst: was das System IST steht
 in `ARCHITECTURE.md`, was OFFEN ist in `ROADMAP.md`, die geschlossenen Kapitel

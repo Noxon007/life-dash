@@ -325,6 +325,37 @@ setTimeout(async () => {
      '`unknown` heißt „Google wusste es nicht", `null` heißt „im Export stand '
      + 'nichts" — zwei Fälle, zwei Sätze');
 
+  // --- 7. Anmerkung 199: eine Zählung ohne Loch -------------------------- //
+  //
+  // Die Ränge der Serien-Kachel standen als 0/1/2 im Quelltext und wurden
+  // DANACH gefiltert. Fehlt eine der drei Zeilen — und `longest_gap` fehlt bei
+  // jedem lückenlos erfassten Bestand —, zeigte die Kachel „1." und „3.".
+  // Eine Zählung mit Loch liest sich wie eine verschwundene Zeile.
+  //
+  // Der Fall wird HERGESTELLT und nicht abgewartet: die Fixtures oben haben
+  // alle drei Zeilen, und mit ihnen ist die Kachel immer stimmig — genau der
+  // Zustand, den jede bisherige Prüfung gesehen hat.
+  {
+    TOPLISTS.streaks = { ...TOPLISTS.streaks, longest_gap: null };
+    const w2 = makeDom('tops').window, d2 = w2.document;
+    await wait(160);
+    await w2.loadStats();
+    await wait(200);
+    const pane = d2.getElementById('stats-tops');
+    const panel = [...(pane ? pane.querySelectorAll('.panel') : [])]
+      .find(p => /Längste Serien|Longest streaks/
+        .test((p.querySelector('h3') || {}).textContent || ''));
+    const ranks = [...(panel ? panel.querySelectorAll('.top-rank') : [])]
+      .map(e => e.textContent.trim());
+    ok('Ohne Lücke im Bestand fehlt die Zeile, nicht die Zahl',
+       ranks.length === 2, `Zeilen: ${ranks.length}`);
+    ok('…und die Ränge zählen lückenlos weiter',
+       ranks.join(',') === '1,2',
+       `Ränge: ${ranks.join(', ')} — „1." und „3." sieht aus, als wäre eine `
+       + 'Zeile verschwunden');
+    w2.close();
+  }
+
   console.log(fail ? `\nAnm. 155/156: ${fail} Prüfung(en) fehlgeschlagen`
                    : '\nAnm. 155/156: alles grün');
   process.exit(fail ? 1 : 0);
