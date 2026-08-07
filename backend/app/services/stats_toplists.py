@@ -385,8 +385,10 @@ def _farthest_from_home(db: Session, user_id: str) -> dict | None:
 
 # Die Luftlinie steht seit Anmerkung 197 in `services/baseline.py` — dort
 # braucht sie der Wohnort-Umkreis, und hier die Frage „wie weit war ich weg".
-# Zwei Fassungen derselben Formel wären zwei Erdradien in Wartung.
-_haversine_km = baseline.haversine_km
+# Zwei Fassungen derselben Formel wären zwei Erdradien in Wartung. Gerufen wird
+# sie oben direkt als `baseline.haversine_km`; der Alias, der hier stand, war
+# ein zweiter Name für dieselbe Sache und damit genau das, wogegen der Absatz
+# argumentiert.
 
 
 def _reach_per_year(db: Session, user_id: str, label=None) -> list[dict]:

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date as date_type
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -761,8 +761,13 @@ def _visit_group_info(db: Session, user_id: str, events: list[Event],
                            column.label("place"), func.count(Event.id),
                            func.min(Event.date_start), func.max(Event.date_start),
                            Event.source.label("src"))
-            .filter(Event.date_start >= lo.replace(hour=0, minute=0, second=0),
-                    Event.date_start <= hi.replace(hour=23, minute=59, second=59))
+            # Auf den GANZEN Tag abrunden, Mikrosekunden eingeschlossen.
+            # `replace(hour=…)` allein lässt sie stehen: trägt `lo` welche,
+            # fällt ein Eintrag um exakt Mitternacht aus der Zählung, und die
+            # Karte sagt „5× Foto in Detmold" für sechs — eine leise falsche
+            # Zahl, wie sie diese Datei sonst überall vermeidet.
+            .filter(Event.date_start >= datetime.combine(lo.date(), time.min),
+                    Event.date_start <= datetime.combine(hi.date(), time.max))
             .group_by(y, m, d, column, Event.source).all())
     by_key = {(int(r[0]), int(r[1]), int(r[2]), r[3], r[7]): r for r in rows}
     out: dict[str, dict] = {}
@@ -960,8 +965,14 @@ def on_this_day(
         rows.sort(key=lambda r: (r.date_start, r.title or ""))
         picked[years_ago] = rows
     wanted = [r.id for rows in picked.values() for r in rows[:max_per_year]]
+    # `user_id` steht hier, obwohl die Kennungen schon aus der eigenen
+    # Vorauswahl stammen — dieselbe Begründung wie in `_child_counts` und
+    # `_weather_for`: „jede Abfrage ist auf den Nutzer eingeschränkt" (A12) ist
+    # eine Regel ohne Ausnahmen, sonst muss man bei jeder Änderung neu
+    # begründen, warum genau diese eine Stelle sicher ist.
     loaded = {e.id: e for e in (db.query(Event).options(*_EAGER)
-                                .filter(Event.id.in_(wanted)).all())} if wanted else {}
+                                .filter(Event.user_id == user.id,
+                                        Event.id.in_(wanted)).all())} if wanted else {}
 
     groups: list[OnThisDayGroup] = []
     for years_ago in sorted(picked):

@@ -5129,7 +5129,7 @@ function fetchEvents(params = {}) {
 // wird vorbelegt mit heute; ein Bild mit EXIF-Zeitpunkt behält seinen eigenen,
 // solange er auf diesen Tag fällt (der Server entscheidet das).
 document.getElementById('tl-dayphoto-btn')?.addEventListener('click', () => {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const day = prompt(t('tl.dayphoto.ask', 'An welchen Tag soll das Bild? (JJJJ-MM-TT)'), today);
   if (!day) return;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
@@ -5916,8 +5916,8 @@ function renderTimelineList() {
         // Feedback 2026-07-24: auch der Tageszoom deckelt jetzt auf zwölf. Ein
         // einzelner Tag kann hunderte Fotos tragen, und die alle als
         // Vorschaubild zu zeichnen ließ den Zeitstrahl ruckeln. Die Auswahl ist
-        // über den Tag gestreut (spreadPick), die Gesamtzahl steht daneben.
-        const row = { dayMedia: spreadPick(media, TL_PERIOD_PHOTOS), day: d,
+        // über den Tag gestreut (evenSpread), die Gesamtzahl steht daneben.
+        const row = { dayMedia: evenSpread(media, TL_PERIOD_PHOTOS), day: d,
                       total: media.length, date_start: `${d}T00:00:00` };
         // Anmerkung 114: NICHT anhängen. Die Gruppe zeigt nur die ersten
         // TL_GROUP_CAP Zeilen, der Rest steht hinter „x weitere anzeigen“ —
@@ -5940,7 +5940,7 @@ function renderTimelineList() {
           // ALLE Bilder der Woche, Anm. 110/114). Bei einer fotoreichen Woche
           // waren das schnell hunderte Vorschaubilder — es ruckelte. Die Zwölf
           // sind über die Woche gestreut, die Gesamtzahl steht in der Leiste.
-          dayMedia: spreadPick(all, TL_PERIOD_PHOTOS),
+          dayMedia: evenSpread(all, TL_PERIOD_PHOTOS),
           day: days[0], total: all.length,
           span: tl.zoom, date_start: `${days[0]}T00:00:00`,
         });
@@ -6197,7 +6197,7 @@ function tlAggDetailHtml(items) {
   const strip = [];
   days.forEach(d => (tlStripFor(d) || []).forEach(m => strip.push(m)));
   if (strip.length) {
-    rows.unshift({ dayMedia: spreadPick(strip, TL_PERIOD_PHOTOS), day: days[0],
+    rows.unshift({ dayMedia: evenSpread(strip, TL_PERIOD_PHOTOS), day: days[0],
                    total: strip.length, span: 'month', date_start: `${days[0]}T00:00:00` });
   }
   rows.sort((a, b) => dayOf(a) === dayOf(b) ? jr(b) - jr(a) : 0);
@@ -6510,15 +6510,34 @@ let TL_STRIP_SEQ = 0;
 // (und den Bild-Endpunkt) erschlagen — genau das hat den Verbindungspool
 // umgebracht, und genau das ließ den Zeitstrahl an fotoreichen Tagen ruckeln.
 const TL_PERIOD_PHOTOS = 12;
-// Gleichmäßig über den Zeitraum greifen statt vorne abzuschneiden: die ersten
-// zwölf eines Monats stammen alle vom ersten Tag, und dann zeigt die „Auswahl
-// aus diesem Zeitraum" einen einzigen Nachmittag. Bewusst DETERMINISTISCH und
-// nicht zufällig — eine Leiste, die bei jedem Nachladen andere Bilder zeigt,
-// verunsichert mehr, als die Abwechslung wert ist.
-function spreadPick(list, n) {
+// **Deckeln heißt nicht abschneiden** — DIE eine Fassung dieser Regel im
+// Browser, gleichlautend mit `sqlutil.even_spread` im Backend (Anmerkung 110,
+// A45, 160). Gleichmäßig über den Zeitraum greifen statt vorne abzuschneiden:
+// die ersten zwölf eines Monats stammen alle vom ersten Tag, und dann zeigt die
+// „Auswahl aus diesem Zeitraum" einen einzigen Nachmittag. Bewusst
+// DETERMINISTISCH und nicht zufällig — eine Leiste, die bei jedem Nachladen
+// andere Bilder zeigt, verunsichert mehr, als die Abwechslung wert ist.
+//
+// Der Zähler behält die Zeile, bei der `i · n / länge` über die nächste ganze
+// Zahl springt; das ergibt EXAKT `n` Zeilen für jedes Verhältnis, während „jede
+// k-te" bei 8.120 Zeilen und Platz für 5.000 nur 4.060 liefert und 940 Plätze
+// verschenkt.
+//
+// **Sie stand hier dreimal**: `spreadPick` (Fotoleisten) griff das ERSTE
+// Element jedes Fachs, `mpEvenSpread` (Stopp-Liste) und `even_spread` (SQL) das
+// letzte — dieselbe Frage, zwei Antworten, und die dritte im Backend. Sie
+// widersprachen sich nie sichtbar, weil sie nie nebeneinander standen; genau so
+// laufen zwei Kopien einer Regel auseinander. Maßgeblich ist die Fassung, die
+// die Datenbank ohnehin fahren muss.
+function evenSpread(list, n) {
   if (list.length <= n) return list;
-  const step = list.length / n;
-  return Array.from({ length: n }, (_, i) => list[Math.floor(i * step)]);
+  const out = [];
+  for (let i = 0; i < list.length; i++) {
+    if (Math.floor(i * n / list.length) < Math.floor((i + 1) * n / list.length)) {
+      out.push(list[i]);
+    }
+  }
+  return out;
 }
 function dayMediaCard(x) {
   const shots = x.dayMedia.map((m, i) =>
@@ -6696,7 +6715,7 @@ function jrPreview(show) {
     ? `✏️ ${t('jr.back', 'zurück zum Text')}` : `👁 ${t('jr.preview', 'Vorschau')}`;
 }
 function openJournal(dateStr) {
-  const d = dateStr || new Date().toISOString().slice(0, 10);
+  const d = dateStr || todayLocal();
   document.getElementById('jr-date').value = d;
   document.getElementById('journal-modal').classList.add('show');
   jrLoad(d);
@@ -6781,6 +6800,19 @@ function isoLocal(d) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
        + `T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
+// Der heutige Kalendertag — **nach der Uhr des Nutzers, nicht nach UTC.**
+//
+// Hier stand dreimal `new Date().toISOString().slice(0, 10)`, und das ist die
+// Zeit in Greenwich: in Europe/Berlin öffnete der Tagebuch-Knopf zwischen
+// Mitternacht und 1 Uhr (im Sommer 2 Uhr) den VORTAG — wortlos, mit dem Text
+// von gestern im Feld. Ein Tagebuch, das um halb eins nachts den falschen Tag
+// aufschlägt, ist genau die Sorte stiller Fehler, die dieses Projekt jagt: er
+// sieht nach einer Ansicht aus, nicht nach einem Defekt.
+//
+// Eine eigene Funktion und kein `isoLocal(new Date()).slice(0, 10)` an drei
+// Stellen: „welcher Tag ist heute" ist eine FRAGE, und eine Frage, die dreimal
+// buchstabiert wird, wird beim vierten Mal anders buchstabiert.
+function todayLocal() { return isoLocal(new Date()).slice(0, 10); }
 function prDateInput(id) {
   const v = document.getElementById(id).value;
   return v ? new Date(v + 'T00:00:00') : null;
@@ -9911,7 +9943,11 @@ function mpDrawBaselines(key) {
 function mpBaselineKeys() {
   if (!mp.showBaseline || !MP_BASELINES || !MP_BASELINES.length) return [];
   if (mp.mode === 'all') return ['alle'];
-  const today = new Date().toISOString().slice(0, 10);
+  // Lokal, nicht UTC: der Server begrenzt einen offenen Zeitraum mit SEINEM
+  // heute (`baseline.spans`), und in Europe/Berlin liegt UTC kurz nach
+  // Mitternacht noch im Vortag — dann fehlte genau der letzte Tag des laufenden
+  // Wohnorts auf der Karte.
+  const today = todayLocal();
   const keys = new Set();
   MP_BASELINES.forEach(b => {
     if (b.lat == null || b.lng == null || !b.date_start) return;
@@ -10255,24 +10291,6 @@ function cacheKeep(map, key, value) {
   while (map.size > CACHE_KEEP) map.delete(map.keys().next().value);
 }
 
-// **Deckeln heißt nicht abschneiden** — dieselbe Regel wie `sqlutil.even_spread`
-// im Backend, hier für eine Liste, die schon im Speicher liegt (Anmerkung 160).
-//
-// Der Zähler behält die Zeile, bei der `i · limit / n` über die nächste ganze
-// Zahl springt; das ergibt EXAKT `limit` Zeilen für jedes Verhältnis, während
-// „jede n-te" bei 8.120 Zeilen und Platz für 5.000 nur 4.060 liefert und 940
-// Plätze verschenkt.
-function mpEvenSpread(rows, limit) {
-  if (rows.length <= limit) return rows;
-  const out = [];
-  for (let i = 0; i < rows.length; i++) {
-    if (Math.floor(i * limit / rows.length) < Math.floor((i + 1) * limit / rows.length)) {
-      out.push(rows[i]);
-    }
-  }
-  return out;
-}
-
 // **„Fläche statt Ziffer" (Anmerkung 160).** Eine Zahlenblase ist fast immer
 // gleich groß — es sagt also nur die ZIFFER etwas, und zwei Ziffern zu
 // vergleichen heißt lesen, rechnen, vergleichen. Bei „12" neben „1.240" sieht
@@ -10493,7 +10511,7 @@ function renderPeriod() {
   const clustered = mp.density === 'near' && !!mapCluster;
   mpSyncChips(clustered);
   const MP_LIST_MAX = 300;       // nur die LISTE daneben, nicht die Karte
-  const items = mpEvenSpread(all, MP_LIST_MAX);
+  const items = evenSpread(all, MP_LIST_MAX);
   // Datepicker mit dem angezeigten Zeitraum synchron halten
   const dateInput = document.getElementById('mp-date');
   if (dateInput) dateInput.value = all.length ? all[0].date_start.slice(0, 10) : '';
@@ -12305,7 +12323,7 @@ document.getElementById('btn-export').addEventListener('click', async ev => {
     const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `lifedash-export-${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `lifedash-export-${todayLocal()}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
     const parts = [

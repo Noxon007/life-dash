@@ -229,21 +229,50 @@ def create_local_user(db: Session, *, email: str, password: str,
 # gegen Brute Force reicht das; das dokumentiert DEPLOY.md so.
 _FAIL_MAX = 5
 _LOCK_SECONDS = 900          # 15 Minuten
-_fail_state: dict[str, tuple[int, float]] = {}   # email -> (Versuche, gesperrt_bis)
+# email -> (Versuche, Ende des Fensters). **Der Zeitstempel ist beides:** bis
+# `_FAIL_MAX` das Ende der laufenden SERIE, danach das Ende der SPERRE. Zwei
+# getrennte Zeitstempel wären zwei Antworten auf „ist das noch aktuell?", und
+# die eine würde beim Aufräumen vergessen — den Fall hatte diese Datei schon
+# (siehe `login_locked_for`).
+_fail_state: dict[str, tuple[int, float]] = {}
 
 
 def login_locked_for(email: str) -> int:
-    """Verbleibende Sperrsekunden für diese E-Mail (0 = frei)."""
-    _, until = _fail_state.get(email.lower(), (0, 0.0))
-    return max(0, int(until - time.time()))
+    """Verbleibende Sperrsekunden für diese E-Mail (0 = frei).
+
+    **Ein abgelaufenes Fenster nimmt den Zähler mit.** Ohne das blieb `count`
+    bei 5 stehen: die fünfzehn Minuten liefen ab, und der nächste Tippfehler
+    sperrte sofort wieder fünfzehn Minuten — wer einmal fünfmal danebengegriffen
+    hat, wäre danach dauerhaft EINEN Vertipper von der Sperre entfernt gewesen.
+    Eine Bremse gegen Raten muss nach ihrer Zeit wieder loslassen, sonst ist sie
+    keine Bremse, sondern eine Strafe.
+
+    Dasselbe gilt für die Serie darunter: vier Fehlversuche vor einem Jahr sind
+    kein Rateversuch von heute. Aufgeräumt wird deshalb am ZEITSTEMPEL und nicht
+    an der Frage, ob gerade gesperrt ist — sonst verfiele nur die Sperre und die
+    Serie liefe ewig weiter.
+    """
+    key = email.lower()
+    count, until = _fail_state.get(key, (0, 0.0))
+    if not until:
+        return 0
+    if until <= time.time():
+        _fail_state.pop(key, None)
+        return 0
+    # Innerhalb des Fensters, aber noch unter der Grenze: mitgezählt, nicht
+    # gesperrt.
+    return int(until - time.time()) if count >= _FAIL_MAX else 0
 
 
 def note_login_failure(email: str) -> None:
     key = email.lower()
+    # Erst aufräumen: ist das Fenster durch, beginnt dieser Versuch eine neue
+    # Serie, statt eine längst vergessene fortzusetzen.
+    login_locked_for(key)
     count, _ = _fail_state.get(key, (0, 0.0))
-    count += 1
-    until = time.time() + _LOCK_SECONDS if count >= _FAIL_MAX else 0.0
-    _fail_state[key] = (count, until)
+    # Jeder Fehlversuch schiebt das Fenster — sowohl die Serie als auch eine
+    # bereits stehende Sperre. Wer während der Sperre weiterrät, verlängert sie.
+    _fail_state[key] = (count + 1, time.time() + _LOCK_SECONDS)
 
 
 def clear_login_failures(email: str) -> None:

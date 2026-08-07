@@ -232,6 +232,18 @@ any `MINOR`.
   your own network.
 
 ### Fixed
+- **Just after midnight, the journal opened yesterday.** The *Journal* button
+  worked out “today” from the clock in Greenwich rather than from yours, so in
+  Central European Time everything between midnight and 1 a.m. — 2 a.m. in
+  summer — opened the previous day, with yesterday's text already in the field.
+  The same slip put the wrong default date in *photo for a day*, and let the
+  last day of an ongoing residence drop off the map for those first hours.
+- **A login lockout now lets go again.** After five wrong passwords an address
+  was blocked for fifteen minutes, as intended — but the counter never reset, so
+  once the block expired a single further typo locked the address for another
+  fifteen minutes, and again after that. The lockout now clears with its
+  waiting time, and a run of failed attempts that has gone quiet for fifteen
+  minutes no longer counts towards the next one.
 - **The backup now carries the weather of your residence days too.** The export
   took the weather attached to your entries and left behind the weather attached
   to the days a residence fills — so a restored account was missing exactly

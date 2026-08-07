@@ -575,9 +575,18 @@ def asset_geo(asset: dict) -> tuple[float, float] | None:
         return None
 
 
-def _km(a: tuple[float, float], b: tuple[float, float]) -> float:
+def rough_km(a: tuple[float, float], b: tuple[float, float]) -> float:
     """Grobe Entfernung in km. Bewusst ohne Haversine: für „war das Foto in
-    der Nähe?" reicht die flache Näherung, und sie kostet keine Bibliothek."""
+    der Nähe?" reicht die flache Näherung, und sie kostet keine Bibliothek.
+
+    **Öffentlich, weil sie einen zweiten Leser hat** (`photo_points._district`).
+    Sie hieß `_km` und wurde von dort trotzdem gerufen — ein Unterstrich ist die
+    einzige Zusage, die es in Python gibt, und eine gebrochene Zusage ist
+    schlimmer als keine. Der Name sagt jetzt auch, was sie von
+    `baseline.haversine_km` unterscheidet: die eine schätzt Nähe, die andere
+    misst Entfernung. Zwei Formeln nebeneinander sind hier Absicht (siehe
+    `baseline.haversine_km`), und genau deshalb müssen beide Namen sie nennen.
+    """
     from math import cos, radians, sqrt
 
     dlat = (a[0] - b[0]) * 111.0
@@ -624,4 +633,4 @@ def matches(event, asset: dict, *, max_km: float = 25.0) -> bool:
     geo = asset_geo(asset)
     if geo is None:
         return True
-    return _km(geo, (loc.lat, loc.lng)) <= max_km
+    return rough_km(geo, (loc.lat, loc.lng)) <= max_km

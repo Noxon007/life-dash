@@ -186,7 +186,7 @@ setTimeout(async () => {
   // für die Liste gilt: die Karte zeigt alles.
   //
   // **Geprüft wird am ERGEBNIS, nicht an der Funktion.** Im ersten Anlauf stand
-  // hier `mpEvenSpread([...])` — die Funktion allein. Gegen den kaputten Stand
+  // hier `evenSpread([...])` — die Funktion allein. Gegen den kaputten Stand
   // gefahren (Deckel zurück auf `slice(0, 300)`) blieb das grün: die Funktion
   // gab es ja weiterhin, sie wurde nur nicht mehr benutzt. Anmerkung 108, und
   // schon wieder in der Form „prüft, dass es das GIBT, statt dass es WIRKT".
@@ -208,9 +208,19 @@ setTimeout(async () => {
   ok('…und sagt, dass die KARTE alles zeigt',
      /(alle|all) 2[.,]?003/.test(d.getElementById('mp-stops').textContent),
      d.getElementById('mp-stops').textContent.slice(0, 160));
+  // `evenSpread` hieß hier bis zur Zusammenlegung `mpEvenSpread` und stand als
+  // dritte Fassung derselben Regel neben `spreadPick` (Fotoleisten) und
+  // `sqlutil.even_spread` (SQL). Der Name nennt jetzt die Aufgabe statt den
+  // ersten Anwendungsfall — sonst sucht die zweite Ansicht ihn nicht.
   ok('…und trifft das Budget genau',
-     w.eval('mpEvenSpread(Array.from({length: 8120}, (_, i) => i), 5000).length') === 5000,
+     w.eval('evenSpread(Array.from({length: 8120}, (_, i) => i), 5000).length') === 5000,
      'jede n-te trifft es nur, wenn es aufgeht — bei 8.120 auf 5.000 wären es 4.060');
+  // Und dieselbe Funktion bedient die Fotoleisten (vormals `spreadPick`): eine
+  // Regel, ein Ergebnis. Ohne diese Zeile könnte jemand die zweite Fassung
+  // wieder einführen, ohne dass ein Wächter es merkt.
+  ok('…und es ist DIESELBE Funktion, die die Fotoleisten deckelt',
+     w.eval('typeof spreadPick === "undefined" && typeof mpEvenSpread === "undefined"'),
+     'eine zweite Fassung von „gleichmäßig verteilen" ist zurück');
 
   // --- 2c. Nummern nur mit Reihenfolge ------------------------------------ //
   //

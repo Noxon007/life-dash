@@ -207,6 +207,17 @@ def start_job(
 
 
 def _own_running_job(db: Session, job_id: str, user: User) -> Job:
+    """Nur der STARTER — bewusst enger als `/stop`, das auch den Admin zulässt.
+
+    Der Unterschied stand bisher nur im Code und war deshalb nicht von einem
+    Versehen zu unterscheiden. Er ist gewollt: `stop` ist eine Bitte an einen
+    fremden Lauf, sich zu beenden (der Lock ist global, ein hängender Lauf
+    blockiert alle), `progress` und `finish` sind BERICHTE des Laufs über sich
+    selbst. Ein fremder Bericht wäre eine Behauptung über eine Arbeit, die man
+    nicht getan hat. Ein vom Admin gestoppter Lauf endet trotzdem — sein
+    eigener Worker sieht `stopping` und schließt ab, und bleibt der aus, greift
+    `_reap_stale` nach `STALE_SECONDS`.
+    """
     job = db.get(Job, job_id)
     if not job or job.user_id != user.id:
         raise HTTPException(404, "Job nicht gefunden")
@@ -342,13 +353,14 @@ def _run_weather(db: Session, job: Job) -> tuple[str, str]:
         if remaining <= 0:
             return "done", f"{db.get(Job, job.id).done} Events mit Wetter angereichert"
         # 0.15.1: Ohne Fortschritt sauber stoppen statt Open-Meteo endlos
-        # anzufragen (z. B. Dienst nicht erreichbar oder Datum ohne Archiv)
+        # anzufragen (z. B. Dienst nicht erreichbar oder Datum ohne Archiv).
+        # Diese Prüfung stand hier zweimal, mit zwei verschiedenen Texten — die
+        # zweite hinter `if not cont` und damit unerreichbar. Ein Satz, den
+        # jemand für einen Fall geschrieben hat, war nie zu sehen.
         if enriched == 0:
             return "stopped", f"{remaining} nicht anreicherbar (Open-Meteo/Datum prüfen)"
         if not cont:
             return "stopped", "gestoppt"
-        if enriched == 0:
-            return "stopped", f"{remaining} nicht anreicherbar (Wetterdienst prüfen)"
 
 
 def _run_embeddings(db: Session, job: Job) -> tuple[str, str]:

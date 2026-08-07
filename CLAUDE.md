@@ -21,7 +21,7 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI,
-  Geocoding aus) — 738 Tests, ~20 s, SQLite im Arbeitsspeicher
+  Geocoding aus) — 763 Tests, ~21 s, SQLite im Arbeitsspeicher
 - **Tests gegen echtes PostgreSQL** (das, worauf betrieben wird): `pwsh
   tools/pg-test.ps1` — **kein Docker**, legt mit den installierten Binärdateien
   einen eigenen Cluster in `backend/_pgtest/` auf Port **55432** an und stoppt
@@ -285,6 +285,24 @@ nichts), Admin-Rohansicht liefert `password_hash` und den Immich-Schlüssel aus,
 Offline-Karte), Container als root + `--forwarded-allow-ips "*"`, keine
 Security-Header, `esc()` ohne `'`, offene Erstregistrierung (gehört nach
 DEPLOY), `raw_text` ohne Längengrenze.
+
+**Code-Durchsicht 2026-08-07 (Anmerkung 201): fünf Reparaturen und vier
+Aufräumungen drin, drei Punkte bewusst offen — sie brauchen erst eine
+MESSUNG.** Repariert: `on_this_day` lädt mit `user_id`-Filter, „heute" kommt im
+Browser aus der lokalen Uhr statt aus UTC (`todayLocal()` — das Tagebuch öffnete
+nach Mitternacht den Vortag), toter Zweig in `_run_weather`, die Login-Sperre
+lässt nach ihrer Zeit wieder los (Zähler verfiel nie), `_visit_group_info`
+rundet bis auf die Mikrosekunde ab. Aufgeräumt: EIN `evenSpread` im Browser
+statt `spreadPick` + `mpEvenSpread` (die dritte Fassung war `sqlutil.even_spread`
+und die Fotoleisten wichen als einzige ab), `immich._km` heißt `rough_km` und
+ist öffentlich, `district_index` prüft beide Koordinaten, die Asymmetrie
+`/stop` (Starter ODER Admin) gegen `/finish` (nur Starter) steht jetzt im
+Docstring. **Offen und ausdrücklich als Messfrage stehen gelassen** — erst
+`tools/_measure_api.py`, dann umbauen: der Export lädt `metrics` und
+`event_entity_links` über ALLE Konten und filtert in Python; drei `IN (…)`-Listen
+sind ungeblockt, wo dieselbe Datei anderswo mit Begründung auf 500 blockt
+(`on_this_day`, `_OwnRows._promise`, `photo_points.remove_slots`); und
+`_day_weather_candidates` fährt den vollen Kalenderdurchlauf JE BATCH von 25.
 
 **Code-Durchsicht 2026-08-06 (Anmerkung 199) ist erledigt** — Backup trägt
 `day_metrics`, wärmste Reise heißt wie die Reise, Stichentscheid im Überblick,

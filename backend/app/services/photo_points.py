@@ -155,9 +155,14 @@ def district_index(db: Session, user_id: str) -> list[tuple[float, float, str]]:
     from app.sqlutil import DISTRICT_KEYS
 
     out: list[tuple[float, float, str]] = []
+    # BEIDE Koordinaten, nicht nur die Breite: `rough_km` rechnet mit beiden,
+    # und eine Zeile mit gesetztem `lat` und leerem `lng` risse den ganzen
+    # Jahreslauf mit einem `TypeError` ab — für einen Ortsteil, den niemand
+    # vermisst. `_farthest_from_home` prüft an derselben Frage längst beide.
     rows = (db.query(Location)
             .filter(Location.user_id == user_id,
-                    Location.lat.isnot(None), Location.address.isnot(None),
+                    Location.lat.isnot(None), Location.lng.isnot(None),
+                    Location.address.isnot(None),
                     (Location.type.is_(None)) | (Location.type != "photo"))
             .all())
     for loc in rows:
@@ -176,7 +181,7 @@ def _district(geo: tuple[float, float],
         return None
     best, best_km = None, DISTRICT_RADIUS_KM
     for lat, lng, name in index:
-        km = api._km(geo, (lat, lng))
+        km = api.rough_km(geo, (lat, lng))
         if km < best_km:
             best, best_km = name, km
     return best
