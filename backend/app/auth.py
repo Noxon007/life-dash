@@ -124,6 +124,31 @@ def cookie_secure() -> bool:
     return settings.public_base_url.lower().startswith("https")
 
 
+def set_auth_cookie(response, name: str, value: str, max_age: int) -> None:
+    """Setzt einen Anmelde-Cookie — mit ALLEN Schutzmerkmalen, an einer Stelle.
+
+    Anmerkung 200: Diese Funktion gibt es, weil die Merkmale vorher an jeder
+    Setzstelle einzeln aufgezählt waren, und eine Aufzählung, die man
+    wiederholt, wird beim Wiederholen kürzer. Der lokale Login trug
+    `secure=cookie_secure()`, der OIDC-Rückweg nicht — dieselbe Zusage,
+    zweimal geschrieben, eine Hälfte nachgezogen (die wiederkehrende Falle
+    „eine Regel an zwei Orten"). Bei OIDC-Betrieb hinter TLS ging das
+    Sitzungs-JWT damit auch über eine unverschlüsselte Verbindung mit.
+
+    Wer künftig einen dritten Anmeldeweg baut, ruft das hier und bekommt die
+    Merkmale, statt sie sich zu merken.
+    """
+    response.set_cookie(
+        name,
+        value,
+        max_age=max_age,
+        httponly=True,      # kein Zugriff aus JavaScript
+        samesite="lax",     # nicht bei fremden Formular-POSTs mitgeschickt
+        secure=cookie_secure(),
+        path="/",
+    )
+
+
 # --------------------------------------------------------------------------- #
 # Nutzer-Verwaltung (JIT-Provisioning)
 # --------------------------------------------------------------------------- #

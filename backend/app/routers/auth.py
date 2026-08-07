@@ -51,14 +51,9 @@ def _require_local_mode() -> None:
 def _session_response(user: User) -> JSONResponse:
     resp = JSONResponse({"id": user.id, "email": user.email,
                          "display_name": user.display_name, "role": user.role.value})
-    resp.set_cookie(
-        auth.SESSION_COOKIE,
-        auth.sign_cookie({"uid": user.id}, auth.session_max_age()),
-        max_age=auth.session_max_age(),
-        httponly=True,
-        samesite="lax",
-        secure=auth.cookie_secure(),
-    )
+    auth.set_auth_cookie(resp, auth.SESSION_COOKIE,
+                         auth.sign_cookie({"uid": user.id}, auth.session_max_age()),
+                         auth.session_max_age())
     return resp
 
 
@@ -167,6 +162,23 @@ def _settings_view(user: User) -> dict:
     }
 
 
+def _clean_immich_url(raw: str | None) -> str:
+    """Normalisiert die Immich-Adresse und lässt nur http/https durch.
+
+    Anmerkung 200: Diese Prüfung stand nur beim SPEICHERN. Der Verbindungstest
+    nimmt aber eine Adresse aus dem Rumpf entgegen und ruft sie sofort auf —
+    also der Pfad, auf dem eine ungeprüfte Adresse tatsächlich ins Netz geht,
+    und der ungeprüfte war. `urllib` bedient auch `file:` und `ftp:`; die
+    Fehlermeldung des Tests sagt dem Aufrufer dann, was dahinter antwortet.
+    Dass die Adresse frei wählbar ist, ist Absicht (der Immich-Server steht
+    beim Nutzer) — das SCHEMA ist es nicht.
+    """
+    url = (raw or "").strip().rstrip("/")
+    if url and not url.startswith(("http://", "https://")):
+        raise HTTPException(400, "immich.url: muss mit http:// oder https:// beginnen")
+    return url
+
+
 @router.get("/me/settings")
 def my_settings(user: User = Depends(get_current_user)) -> dict:
     """Anzeige-Einstellungen: Ortsnamen-Bausteine, Karten-Cluster-Schwelle."""
@@ -233,10 +245,7 @@ def update_my_settings(
             raise HTTPException(400, "immich: Objekt mit url/api_key erwartet")
         current = dict(prefs.get("immich") or {})
         if "url" in raw:
-            url = (raw["url"] or "").strip().rstrip("/")
-            if url and not url.startswith(("http://", "https://")):
-                raise HTTPException(400, "immich.url: muss mit http:// oder https:// beginnen")
-            current["url"] = url
+            current["url"] = _clean_immich_url(raw["url"])
         # Leerer Schlüssel = unverändert lassen. Sonst würde jedes Speichern
         # der Seite den Schlüssel löschen, weil das Feld ihn nie anzeigt.
         if raw.get("api_key"):
@@ -265,7 +274,7 @@ def test_immich(
     """
     from app.services import immich as immich_api
 
-    url = (payload.get("url") or "").strip().rstrip("/")
+    url = _clean_immich_url(payload.get("url"))
     key = (payload.get("api_key") or "").strip()
     if not (url and key):
         stored = immich_api.config_for(user)
@@ -300,13 +309,12 @@ def login() -> RedirectResponse:
     }
     url = disco["authorization_endpoint"] + "?" + urllib.parse.urlencode(params)
     resp = RedirectResponse(url)
-    resp.set_cookie(
-        auth.STATE_COOKIE,
+    # Der State-Cookie trägt den PKCE-Verifier — wer ihn mitliest, kann einen
+    # abgefangenen Code einlösen. Er braucht dieselben Merkmale wie die Sitzung.
+    auth.set_auth_cookie(
+        resp, auth.STATE_COOKIE,
         auth.sign_cookie({"state": state, "nonce": nonce, "verifier": verifier}, 600),
-        max_age=600,
-        httponly=True,
-        samesite="lax",
-    )
+        600)
     return resp
 
 
@@ -357,13 +365,9 @@ def callback(request: Request, code: str, state: str, db: Session = Depends(get_
 
     resp = RedirectResponse("/")
     resp.delete_cookie(auth.STATE_COOKIE)
-    resp.set_cookie(
-        auth.SESSION_COOKIE,
-        auth.sign_cookie({"uid": user.id}, auth.session_max_age()),
-        max_age=auth.session_max_age(),
-        httponly=True,
-        samesite="lax",
-    )
+    auth.set_auth_cookie(resp, auth.SESSION_COOKIE,
+                         auth.sign_cookie({"uid": user.id}, auth.session_max_age()),
+                         auth.session_max_age())
     return resp
 
 

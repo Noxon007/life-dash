@@ -209,6 +209,28 @@ any `MINOR`.
   measured against the residence that applied *on that day*, because a centre of
   life moves; plus how many countries and cities each year of your life touched.
 
+### Security
+- **The login cookie is now marked HTTPS-only on every path into the app.**
+  Signing in with e-mail and password already set it that way; signing in
+  through an identity provider did not, so on a site served over HTTPS the
+  session could still travel over an unencrypted connection. Both paths now go
+  through one place, along with the short-lived cookie that carries the login
+  handshake. Running locally over plain HTTP is unchanged.
+- **A hand-written import file can no longer reach into another account.**
+  Restoring a backup always filed everything under the account doing the
+  restoring — but a row carries more than its owner, and a file written by hand
+  could point one of those references at somebody else's entry, place or
+  object: a measurement attached to their entry, or their place name showing up
+  in your timeline. Every reference is now checked against what you actually
+  own, and the import reports how many rows it turned away. Genuine backups
+  bring everything they refer to and are unaffected, including the entries a
+  multi-day trip splits into.
+- **The Immich connection test now checks the address it is handed.** Saving an
+  address had always rejected anything that was not `http://` or `https://`; the
+  *test* button had not, although that is the path that actually calls the
+  address. Where your Immich lives is still entirely your choice, including on
+  your own network.
+
 ### Fixed
 - **The backup now carries the weather of your residence days too.** The export
   took the weather attached to your entries and left behind the weather attached

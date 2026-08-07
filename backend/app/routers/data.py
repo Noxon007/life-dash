@@ -16,12 +16,12 @@ from typing import Annotated, Any
 from dateutil import parser as dateparser
 from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
-from sqlalchemy import Date, DateTime
+from sqlalchemy import Date, DateTime, select
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.config import settings
-from app.database import get_db
+from app.database import Base, get_db
 from app.joblog import Progress
 from app.services import archive
 from app.services import media as media_svc
@@ -81,6 +81,100 @@ def _dict_to_kwargs(model, data: dict) -> dict:
             val = dateparser.parse(str(val)).date()
         kwargs[col.name] = val
     return kwargs
+
+
+# --------------------------------------------------------------------------- #
+# Anmerkung 200 — ein Verweis zeigt auf EIGENES, oder er kommt nicht an
+# --------------------------------------------------------------------------- #
+# Der Import schreibt `user_id` auf den anmeldenden Nutzer um und war damit
+# scheinbar sicher. Nur trägt eine Zeile mehr Verweise als ihren Besitzer:
+# `metrics` und `event_entity_links` haben gar kein `user_id` und behielten die
+# `event_id` aus der Datei, `media_refs` bekam einen neuen Besitzer und zeigte
+# weiter auf ein fremdes Ereignis, `baseline_locations` auf einen fremden Ort.
+# Eine von Hand geschriebene Datei konnte so an FREMDE Ereignisse anhängen —
+# und über `location_id` wäre der Name eines fremden Ortes im eigenen
+# Zeitstrahl gelandet.
+#
+# **Die Prüfung ist deshalb allgemein und nicht auf die beiden gemeldeten
+# Tabellen gemünzt** (die wiederkehrende Falle: eine Regel, die nach ihrem
+# ersten Anwendungsfall benannt ist, wird beim zweiten nicht gesucht). Gefragt
+# wird das Schema: JEDER Fremdschlüssel auf eine nutzergebundene Tabelle muss
+# auf eine Zeile dieses Nutzers zeigen. Eine neue Tabelle mit einem neuen
+# Verweis ist damit von sich aus mitgeprüft.
+#
+# Ein echtes Backup verletzt das nie — es bringt alle Zeilen mit, auf die es
+# sich beruft. Wer die Bedingung verletzt, hat die Datei geschrieben.
+def _user_scoped_refs(model) -> list[tuple[str, str]]:
+    """(Spalte, Zieltabelle) je Fremdschlüssel auf eine nutzergebundene Tabelle.
+
+    `user_id` selbst steht nicht darunter: `users` trägt keine `user_id`, und
+    die Spalte wird ohnehin überschrieben."""
+    refs: list[tuple[str, str]] = []
+    for col in model.__table__.columns:
+        for fk in col.foreign_keys:
+            if "user_id" in fk.column.table.columns:
+                refs.append((col.name, fk.column.table.name))
+    return refs
+
+
+class _OwnRows:
+    """Welche Zeilen darf diese Datei ansprechen? Je Tabelle einmal beantwortet.
+
+    Zwei Herkünfte, und die zweite ist der Grund, warum das eine Klasse ist und
+    keine Abfrage:
+
+    * **Was schon in der Datenbank steht** und mir gehört (Re-Import, Umzug auf
+      eine Instanz, die Teile davon schon hat).
+    * **Was diese Datei selbst mitbringt.** Ein Tages-Kind verweist auf sein
+      Eltern-Ereignis, und beide stehen in derselben Datei — in der Reihenfolge,
+      in der die Datenbank sie ausgelesen hat, also nicht verlässlich Eltern
+      zuerst. Zählte nur der Stand VOR dem Lauf, verlöre ein völlig gültiges
+      Backup seine Kinder. **Eine Prüfung, die Angriffe abwehrt und dabei den
+      Normalfall beschädigt, wird beim ersten Fehlalarm wieder ausgebaut** —
+      der Wächter dazu (`test_own_export_still_restores_completely`) hat genau
+      diesen Fall beim ersten Lauf gefunden.
+
+    Die zweite Herkunft zählt **nur für Kennungen, die es noch nicht gibt**.
+    Sonst wäre sie das Schlupfloch, das die ganze Prüfung aufhebt: eine Datei,
+    die die Kennung eines FREMDEN Ereignisses in ihrem `events`-Block nennt,
+    bekäme sie als „versprochen" gutgeschrieben — importiert würde die Zeile
+    nie (sie existiert ja), aber jeder Verweis darauf ginge durch.
+    """
+
+    def __init__(self, db: Session, user_id: str, payload: dict,
+                 promised_from: list[tuple[str, type]]) -> None:
+        self._db, self._user_id = db, user_id
+        self._cache: dict[str, set[str]] = {}
+        for key, model in promised_from:
+            ids = {r["id"] for r in payload.get(key, []) if r.get("id")}
+            if ids:
+                table = model.__table__.name
+                self._promise(table, ids)
+
+    def _ids(self, table: str) -> set[str]:
+        if table not in self._cache:
+            t = Base.metadata.tables[table]
+            self._cache[table] = set(self._db.execute(
+                select(t.c.id).where(t.c.user_id == self._user_id)).scalars())
+        return self._cache[table]
+
+    def _promise(self, table: str, ids: set[str]) -> None:
+        """Nimmt die Kennungen auf, die dieser Lauf ANLEGEN wird — also alle,
+        die es noch nicht gibt. Was es schon gibt, entscheidet die Datenbank."""
+        t = Base.metadata.tables[table]
+        known = set(self._db.execute(select(t.c.id).where(t.c.id.in_(ids))).scalars())
+        self._ids(table).update(ids - known)
+
+    def owns(self, table: str, value) -> bool:
+        return value in self._ids(table)
+
+    def revoke(self, model, row_id) -> None:
+        """Nimmt ein Versprechen zurück, wenn die Zeile doch nicht ankommt.
+
+        Sonst zeigte ein Kind auf ein Eltern-Ereignis, das der Lauf gerade
+        verworfen hat — ein Verweis ins Leere, auf PostgreSQL das Ende des
+        ganzen Imports."""
+        self._ids(model.__table__.name).discard(row_id)
 
 
 @router.get("/export")
@@ -363,6 +457,13 @@ def import_data(
     ]
     imported: dict[str, int] = {}
     skipped = 0
+    skipped_foreign = 0
+    # Anmerkung 200: Nur die nutzergebundenen Blöcke versprechen etwas — ihre
+    # Zeilen werden per `has_user` auf den anmeldenden Nutzer umgeschrieben und
+    # gehören ihm damit per Konstruktion. `metrics` und `event_entity_links`
+    # haben keinen Besitzer und können deshalb auch keinen zusagen.
+    own = _OwnRows(db, user.id, payload,
+                   [(key, model) for key, model, has_user in plan if has_user])
     # Der Import prüft jede Zeile einzeln gegen die Datenbank (Idempotenz) —
     # bei einem vollen Backup sind das zehntausende Abfragen. Ohne Zwischenstand
     # ist der Unterschied zwischen „arbeitet" und „hängt" nicht zu sehen.
@@ -382,6 +483,7 @@ def import_data(
         # Neues sagt — und zwar erst beim Commit, also nachdem jede andere
         # Tabelle schon als „importiert" gezählt war.
         taken = _day_metric_keys(db, user.id) if key == "day_metrics" else None
+        refs = _user_scoped_refs(model)          # Anmerkung 200
         for row in payload.get(key, []):
             seen += 1
             progress.beat(seen, rows_total - seen, note=key)
@@ -397,6 +499,20 @@ def import_data(
             kwargs = _dict_to_kwargs(model, row)
             if has_user:
                 kwargs["user_id"] = user.id
+            # Anmerkung 200: kein Verweis auf fremde Zeilen. Verworfen wird die
+            # ganze Zeile und nicht nur der Verweis — ein Messwert ohne sein
+            # Ereignis ist keine gerettete Hälfte, sondern eine Zeile ohne
+            # Aussage, und ein Ereignis ohne den fremden Ort hätte den Import
+            # stillschweigend zu einer Teil-Wiederherstellung gemacht.
+            foreign = [c for c, table in refs
+                       if kwargs.get(c) is not None and not own.owns(table, kwargs[c])]
+            if foreign:
+                skipped_foreign += 1
+                if has_user:
+                    own.revoke(model, row["id"])
+                log.warning("Import: %s %s übersprungen — %s zeigt auf fremde Daten",
+                            key, row["id"], ", ".join(sorted(foreign)))
+                continue
             db.add(model(**kwargs))
             count += 1
         db.flush()
@@ -405,6 +521,14 @@ def import_data(
             log.info("Import: %s — %d neu, %d schon vorhanden",
                      key, count, len(payload[key]) - count)
     db.commit()
-    progress.finish(f"{sum(imported.values())} neu, {skipped} übersprungen")
+    progress.finish(f"{sum(imported.values())} neu, {skipped} übersprungen"
+                    + (f", {skipped_foreign} mit fremdem Verweis" if skipped_foreign else ""))
+    if skipped_foreign:
+        log.warning("Import: %d Zeilen verwiesen auf fremde Daten und wurden "
+                    "verworfen (user=%s)", skipped_foreign, user.email or user.id)
+    # `skipped_foreign` steht auch dann in der Antwort, wenn es 0 ist: eine
+    # Zahl, die nur bei Ärger auftaucht, prüft niemand — und die Oberfläche
+    # könnte den Fall nicht anzeigen, ohne das Feld vorher zu kennen.
     return {"imported": imported, "skipped_existing": skipped,
+            "skipped_foreign": skipped_foreign,
             "total": sum(imported.values())}

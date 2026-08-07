@@ -270,6 +270,22 @@ daraus bewusst **eine** Sache: der **Welt-Reiter ist deutsch verdrahtet**
 Hälften gehören zusammen umgestellt; eine allein ergäbe einen halb übersetzten
 Reiter. Das ist F10-Arbeit, kein Rest von Anmerkung 198.
 
+**Sicherheits-Durchsicht 2026-08-07 (Anmerkung 200): drei Reparaturen drin,
+zehn Punkte bewusst offen.** Repariert: Anmelde-Cookies über EINE Stelle
+(`auth.set_auth_cookie` — der OIDC-Rückweg setzte kein `Secure`), der Import
+prüft **jeden Fremdschlüssel** gegen den Besitz statt nur `user_id`
+umzuschreiben, und der Immich-Verbindungstest prüft das Schema der Adresse.
+Offen und in Anmerkung 200 aufgeschrieben — **das sind Entscheidungen des
+Users, keine Reparaturen**: Bearer-Token ohne Audience-Prüfung
+(`verify_aud=False`, relevant sobald eine zweite App am selben Issuer hängt),
+Login-Sperre nur je E-Mail (als DoS gegen ein Konto benutzbar, Tabelle
+unbegrenzt), Sitzungen nicht widerrufbar (30 Tage, Passwortwechsel beendet
+nichts), Admin-Rohansicht liefert `password_hash` und den Immich-Schlüssel aus,
+**vier Kartenbibliotheken von unpkg ohne SRI und ohne CSP** (kostet auch die
+Offline-Karte), Container als root + `--forwarded-allow-ips "*"`, keine
+Security-Header, `esc()` ohne `'`, offene Erstregistrierung (gehört nach
+DEPLOY), `raw_text` ohne Längengrenze.
+
 **Code-Durchsicht 2026-08-06 (Anmerkung 199) ist erledigt** — Backup trägt
 `day_metrics`, wärmste Reise heißt wie die Reise, Stichentscheid im Überblick,
 `skipped_invalid` und `discard_weather`. Offen blieb daraus bewusst **eines**:
