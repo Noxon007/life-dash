@@ -442,18 +442,24 @@ def asset_country(asset: dict) -> str | None:
     return ((asset.get("exifInfo") or {}).get("country") or "").strip() or None
 
 
-def photo_years(url: str, key: str, my_id: str | None) -> dict[int, int]:
-    """Jahr -> Anzahl eigener, georeferenzierter Fotos im Immich-Zeitstrahl.
+def timeline_buckets(url: str, key: str, my_id: str | None, *,
+                     with_coordinates: bool = True) -> dict[str, int]:
+    """„JJJJ-MM" -> Anzahl eigener Fotos im Immich-Zeitstrahl. EIN Aufruf.
 
     `GET /timeline/buckets` liefert Monatszähler statt Assets — die Frage
-    „welche Jahre lohnen einen Lauf?" kostet damit EINEN Aufruf statt eines
-    Bibliotheks-Vollscans.
+    „was hat diese Bibliothek überhaupt?" kostet damit EINEN Aufruf statt eines
+    Vollscans.
 
-    Warum das nicht aus den eigenen Daten kommt, obwohl es billiger wäre:
-    Anmerkung 107 nennt ausgerechnet die Jahre **ohne** Timeline-Daten als die
-    wertvollsten („die Erinnerungen von vor dem Smartphone"). Eine Auswahlliste
-    aus den eigenen Ereignissen böte genau die nicht an — sie zeigte 2026 und
-    verstecke 2004.
+    **`with_coordinates` ist die Frage, WER fragt**, und die beiden Antworten
+    sind verschieden genug, dass sie ein Parameter sein muss:
+
+    * Die **Jahresauswahl** (`photo_years`) sucht Jahre, aus denen sich
+      Foto-EREIGNISSE bauen lassen — ohne Koordinaten wird daraus keins, also
+      zählt sie nur georeferenzierte.
+    * Der **Tagesleisten-Lauf** (Anmerkung 205) hängt Bilder an den KALENDERTAG,
+      und der ist ein Behälter der Zeitachse. Ein eingescanntes Bild von 1998
+      ohne GPS gehört genauso an seinen Tag — mit `withCoordinates=true` wären
+      ausgerechnet die Jahre unsichtbar, für die es sonst nichts gibt.
 
     **Die Parameter dieses Endpunkts sind eine wandernde Grenze** (Anmerkung
     113). `size=MONTH` war bis Immich 1.133 **Pflicht** und ist seit 1.134
@@ -468,15 +474,16 @@ def photo_years(url: str, key: str, my_id: str | None) -> dict[int, int]:
     Sprosse". Bei 401 oder „nicht erreichbar" wird NICHT weitergeraten; das
     Problem läge woanders und drei Fehlversuche machten es nur langsamer.
     """
+    coords = ["withCoordinates=true"] if with_coordinates else []
     ladder = [
         # Ab Immich 1.134: keine Bucket-Größe mehr, immer Monatsschritte.
-        ["visibility=timeline", "withCoordinates=true", "withPartners=false"],
+        ["visibility=timeline", *coords, "withPartners=false"],
         # 1.133 abwärts: `size` war Pflicht.
-        ["size=MONTH", "visibility=timeline", "withCoordinates=true",
-         "withPartners=false"],
+        ["size=MONTH", "visibility=timeline", *coords, "withPartners=false"],
         # Noch älter: kein `visibility`, kein `withCoordinates`. Die Zahl zählt
         # dann auch Fotos ohne Koordinaten, ist also zu hoch — sie ist eine
-        # Empfehlung („lohnt sich 2004?"), kein Versprechen.
+        # Empfehlung („lohnt sich 2004?"), kein Versprechen. Für den Lauf ohne
+        # Koordinaten-Filter ist diese Sprosse dagegen genau die richtige Zahl.
         ["size=MONTH", "isArchived=false", "withPartners=false"],
     ]
     last: ImmichError | None = None
@@ -493,14 +500,34 @@ def photo_years(url: str, key: str, my_id: str | None) -> dict[int, int]:
                      "&".join(params), exc)
             last = exc
             continue
-        years: dict[int, int] = {}
+        months: dict[str, int] = {}
         for bucket in data or []:
-            stamp = str(bucket.get("timeBucket") or "")[:4]
-            if not stamp.isdigit():
+            # `timeBucket` ist ein Zeitstempel („2024-05-01T00:00:00.000Z");
+            # die ersten sieben Zeichen sind der Monat. Geprüft statt geglaubt:
+            # ein Format, das wir nicht erkennen, darf keinen Monat „24-0" ergeben.
+            stamp = str(bucket.get("timeBucket") or "")[:7]
+            if len(stamp) != 7 or stamp[4] != "-" or not (
+                    stamp[:4].isdigit() and stamp[5:].isdigit()):
                 continue
-            years[int(stamp)] = years.get(int(stamp), 0) + int(bucket.get("count") or 0)
-        return years
+            months[stamp] = months.get(stamp, 0) + int(bucket.get("count") or 0)
+        return months
     raise last or ImmichError("Immich liefert keine Zeitachse")
+
+
+def photo_years(url: str, key: str, my_id: str | None) -> dict[int, int]:
+    """Jahr -> Anzahl eigener, georeferenzierter Fotos im Immich-Zeitstrahl.
+
+    Warum das nicht aus den eigenen Daten kommt, obwohl es billiger wäre:
+    Anmerkung 107 nennt ausgerechnet die Jahre **ohne** Timeline-Daten als die
+    wertvollsten („die Erinnerungen von vor dem Smartphone"). Eine Auswahlliste
+    aus den eigenen Ereignissen böte genau die nicht an — sie zeigte 2026 und
+    verstecke 2004.
+    """
+    years: dict[int, int] = {}
+    for month, count in timeline_buckets(url, key, my_id).items():
+        y = int(month[:4])
+        years[y] = years.get(y, 0) + count
+    return years
 
 
 # --------------------------------------------------------------------------- #

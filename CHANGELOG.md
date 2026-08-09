@@ -246,6 +246,23 @@ any `MINOR`.
   your own network.
 
 ### Fixed
+- **Every day with photos now gets its photo strip, not just days that already
+  had an entry.** *Link photos* used to build its list of days from your
+  entries, so a day covered only by your residence — no trip, no imported
+  visit, nothing written down — was never asked about, and years of ordinary
+  days stayed without a single picture beside them. The same went for a day
+  whose only entry was something you noted by hand: that entry collects photos
+  taken near it, and anything shot further afield that day found no place. The
+  run now asks Immich which days have photos at all, and fills them. Photos
+  still go to a matching entry first; the day only picks up what is left over.
+- **Linking photos got dramatically cheaper, and stops asking about days it has
+  already seen.** The run used to send Immich one request per day — for a long
+  record that is thousands of requests every time, including for days it had
+  already found empty, because an empty day left no trace. It now asks month by
+  month and remembers how many photos each month held, so a month that has not
+  changed is skipped entirely and one you upload new pictures to comes back on
+  its own. Discarding your Immich links clears that memory too, so rebuilding
+  them works as expected.
 - **The statistics tab opens noticeably faster.** The weather balance — days
   with weather, hours of sunshine, rainy days, the bar chart per year — was
   worked out by pulling every weather value of every day of your life into

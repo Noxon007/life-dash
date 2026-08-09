@@ -62,7 +62,6 @@ from app.models import (ConfirmState, DatePrecision, Event, EventEntityLink,
                         Source, Track)
 from app.services import immich as api
 from app.services.immich_link import PROVIDER
-from app.sqlutil import day_parts
 
 log = logging.getLogger("lifedash.immich")
 
@@ -425,50 +424,59 @@ def create_photo_events(db: Session, user, props: list[PhotoProposal]) -> int:
     return created
 
 
-def fill_day_strips(db: Session, user, assets: list[dict]) -> int:
+def fill_day_strips(db: Session, user, assets: list[dict],
+                    my_id: str | None = None) -> int:
     """**Anmerkung 196 — „Foto in Groningen" ohne ein einziges Foto daneben.**
 
     Gemeldet wurde genau das: Der Lauf legt tausende Foto-Ereignisse an, und im
     Zeitstrahl steht darüber keine Leiste „Fotos dieses Tages". Die Regel dafür
-    gab es längst (`immich_link.day_candidates`: ein Tag mit maschinellen
-    Einträgen bekommt seine Bilder über den TAG, höchstens zwölf, gleichmäßig
-    gestreut) — sie hing nur an einem ZWEITEN Lauf, der jeden dieser Tage
-    einzeln bei Immich nachfragt. Bei zwanzig Jahren Bibliothek sind das
-    tausende Anfragen für Bilder, die dieser Lauf gerade in der Hand hatte.
+    gab es längst (ein Tag bekommt seine Bilder über den TAG, höchstens zwölf,
+    gleichmäßig gestreut) — sie hing nur an einem ZWEITEN Lauf, der jeden
+    dieser Tage einzeln bei Immich nachfragt. Bei zwanzig Jahren Bibliothek
+    sind das tausende Anfragen für Bilder, die dieser Lauf gerade in der Hand
+    hatte.
 
     **Warum das keine zweite Regel ist.** Verknüpft wird über
     `immich_link.add_day_media` — dieselbe Funktion, die auch der Verknüpfungs-
     Lauf ruft, mit derselben Zwölfer-Deckelung und derselben Streuung. Anders
     ist nur, WOHER die Assets kommen: aus dem Jahresdurchlauf statt aus einer
-    Tagesabfrage. Das ist dieselbe Menge — beide fragen Immich nach allem in
-    einem Zeitfenster, das eine je Tag, das andere je Jahr.
+    Monatsabfrage. Das ist dieselbe Menge — beide fragen Immich nach allem in
+    einem Zeitfenster.
 
-    **Nur Tage, an denen jetzt ein Foto-Ereignis steht.** Ein Tag ohne jeden
-    Eintrag ist nicht Teil der Lebensdatenbank, und Fotos an ihn zu hängen
-    hieße, die halbe Immich-Bibliothek zu importieren (`day_candidates` sagt
-    denselben Satz). Tage, die schon eine Leiste tragen, bleiben unberührt —
-    sonst hinge nach jedem Lauf dasselbe Bild ein weiteres Mal da.
+    **Jeder Tag mit Fotos, nicht nur die mit Foto-Ereignis** (Anmerkung 205).
+    Bis dahin stand hier ein Filter auf die Tage, an denen dieser Lauf gerade
+    ein Ereignis angelegt hatte, mit der Begründung „ein Tag ohne Eintrag ist
+    nicht Teil der Lebensdatenbank". Diesen Satz hat Anmerkung 205 verworfen —
+    der Wohnort ist die vierte Sorte Aussage, und ein Tag ohne GPS-Foto hat
+    trotzdem Bilder. Der Filter machte aus einer Regel zwei: der
+    Verknüpfungs-Lauf hängte die Leiste an, dieser hier ließ denselben Tag aus.
+    Tage, die schon eine Leiste tragen, bleiben unberührt — sonst hinge nach
+    jedem Lauf dasselbe Bild ein weiteres Mal da.
+
+    **Der Besitzfilter kam mit dem Wegfall des Tagesfilters** (Anmerkung 205).
+    `assets` ist die ROHE Jahresliste; `photo_proposals` siebt fremde und
+    archivierte Bilder erst danach aus. Solange nur Tage mit eigenem
+    Foto-Ereignis gefüllt wurden, war das kaum zu sehen — jetzt wäre es der
+    geteilte Urlaubsordner eines Bekannten in der eigenen Tagesleiste. `my_id`
+    ist `report["own_user_id"]`; fehlt sie, wird ungefiltert verknüpft, genau
+    wie in `immich_link.link_month`.
     """
     from app.services import immich_link as link
 
     if not assets:
         return 0
-    mine = {(int(a), int(b), int(c)) for a, b, c in
-            db.query(*day_parts(Event.date_start))
-            .filter(Event.user_id == user.id,
-                    Event.external_id.like(f"{SLOT_PREFIX}%"),
-                    Event.date_start.isnot(None))
-            .group_by(*day_parts(Event.date_start)).all()}
-    if not mine:
-        return 0
     taken = link.days_with_media(db, user.id)
     by_day: dict[tuple[int, int, int], list[dict]] = defaultdict(list)
     for asset in assets:
+        if my_id is not None and not api.is_own(asset, my_id):
+            continue
+        if not api.is_in_timeline(asset):
+            continue
         when = api.asset_time(asset)
         if when is None or not asset.get("id"):
             continue
         key = (when.year, when.month, when.day)
-        if key in mine and key not in taken:
+        if key not in taken:
             by_day[key].append(asset)
     if not by_day:
         return 0

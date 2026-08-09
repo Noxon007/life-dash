@@ -257,17 +257,32 @@ def test_the_day_of_a_photo_event_gets_its_strip(db, user):
         "die Bilder hängen am TAG, nicht am Vorschlag (Anmerkung 111)"
 
 
-def test_a_day_without_an_entry_stays_empty(db, user):
-    """Die Grenze, die `day_candidates` schon zieht: ein Tag ohne jeden
-    Eintrag ist nicht Teil der Lebensdatenbank. Ohne diese Prüfung importierte
-    der Lauf die halbe Immich-Bibliothek."""
+def test_a_day_without_an_entry_gets_its_strip_too(db, user):
+    """**Anmerkung 205 hat diese Grenze verworfen — hier stand ihr Gegenteil.**
+
+    Bis dahin galt: „ein Tag ohne jeden Eintrag ist nicht Teil der
+    Lebensdatenbank", und dieser Test hielt die Regel fest. Der Satz war falsch
+    (ein Wohnort-Tag IST Lebensdatenbank), und er machte aus einer Regel zwei:
+    der Verknüpfungs-Lauf hängte die Leiste an, dieser Lauf ließ denselben Tag
+    aus. Jetzt füllt beides jeden Tag, an dem Immich Fotos hat."""
     from app.services import photo_points as pp
 
     _photo_event(db, user, date(2024, 5, 13), "a1")
     db.commit()
 
     added = pp.fill_day_strips(db, user, [_asset("a9", "2024-08-01T10:00:00")])
-    assert added == 0
+    assert added == 1
+
+
+def test_foreign_photos_stay_out_of_the_strips(db, user):
+    """Der Preis für den Wegfall des Tagesfilters: `assets` ist die ROHE
+    Jahresliste, aus der `photo_proposals` erst danach siebt. Ohne den
+    Besitzfilter hier stünde ein geteiltes Album in der eigenen Tagesleiste."""
+    from app.services import photo_points as pp
+
+    fremd = _asset("f1", "2024-05-13T10:00:00") | {"ownerId": "wer-anders"}
+    meins = _asset("m1", "2024-05-14T10:00:00") | {"ownerId": "me"}
+    assert pp.fill_day_strips(db, user, [fremd, meins], "me") == 1
 
 
 def test_a_day_that_already_has_a_strip_is_left_alone(db, user):

@@ -27,7 +27,11 @@ def _asset(aid: str, when: str, lat=None, lng=None) -> dict:
     exif = {"dateTimeOriginal": when}
     if lat is not None:
         exif |= {"latitude": lat, "longitude": lng}
-    return {"id": aid, "originalMimeType": "image/jpeg", "exifInfo": exif}
+    # `ownerId` gehört dazu, seit die Tagesleisten nach Besitz filtern
+    # (Anmerkung 205) — eine Attrappe, die ein Feld auslässt, ist keine
+    # Vereinfachung, sondern eine andere Funktion.
+    return {"id": aid, "ownerId": "me", "originalMimeType": "image/jpeg",
+            "exifInfo": exif}
 
 
 @pytest.fixture()
@@ -48,6 +52,43 @@ def fake_search(monkeypatch):
                 if (t := api.asset_time(a)) is not None and start <= t <= end]
 
     monkeypatch.setattr("app.services.immich.search_assets", _search)
+    return state
+
+
+@pytest.fixture()
+def fake_paged(monkeypatch):
+    """Dasselbe für die MONATSabfrage (Anmerkung 205).
+
+    Zwei Attrappen, weil es zwei Fragen sind: `search_assets` holt das Fenster
+    EINES Ereignisses, `search_assets_paged` den ganzen Monat. Eine gemeinsame
+    Attrappe würde verstecken, welcher der beiden Wege ein Foto verknüpft hat —
+    und genau das ist bei der Zwei-Phasen-Reihenfolge die Frage.
+    """
+    state = {"assets": [], "calls": []}
+
+    def _paged(url, key, start, end, **kw):
+        state["calls"].append((url, key, start, end))
+        return [a for a in state["assets"]
+                if (t := api.asset_time(a)) is not None and start <= t <= end]
+
+    monkeypatch.setattr("app.services.immich.search_assets_paged", _paged)
+    return state
+
+
+@pytest.fixture()
+def fake_library(monkeypatch):
+    """Immichs Zeitachse als Attrappe: `months` = {„JJJJ-MM": Fotozahl}.
+
+    Ohne sie greift `_run_immich` zur echten Adresse: die Job-Tests liefen je
+    drei Sekunden in einen DNS-Fehler und prüften am Ende den Zweig „Immich
+    antwortet nicht" — grün, aber nicht wegen dem, was draufstand. Genau die
+    Sorte Prüfung, die nichts prüft.
+    """
+    state = {"months": {}, "my_id": "me"}
+    monkeypatch.setattr("app.services.immich.own_user_id",
+                        lambda url, key: state["my_id"])
+    monkeypatch.setattr("app.services.immich.timeline_buckets",
+                        lambda url, key, my_id, **kw: dict(state["months"]))
     return state
 
 
@@ -302,66 +343,147 @@ def test_transient_errors_are_retried(monkeypatch):
     assert seen[:2] == [seen[0], seen[0]] and seen[0].endswith("/server/about")
 
 
-def test_immich_job_terminates_on_photoless_events(db, immich_user, fake_search):
-    """Regression: Ereignisse ohne passende Fotos bleiben Kandidaten. Der alte
-    Runner nahm im Kreis dieselben ersten 25 — Endlosschleife ohne Fortschritt
-    und ohne Fehlermeldung. Der neue prüft jedes Ereignis genau einmal."""
+def _run(db, user):
+    """Einen Immich-Lauf fahren und (Status, Meldung) zurückgeben."""
     from app.models import Job
     from app.routers.jobs import _run_immich
 
+    job = Job(user_id=user.id, type="immich", status="running")
+    db.add(job)
+    db.commit()
+    return _run_immich(db, job)
+
+
+def test_immich_job_terminates_on_photoless_events(db, immich_user, fake_search,
+                                                   fake_library):
+    """Regression: Ereignisse ohne passende Fotos bleiben Kandidaten. Der alte
+    Runner nahm im Kreis dieselben ersten 25 — Endlosschleife ohne Fortschritt
+    und ohne Fehlermeldung. Der neue prüft jedes Ereignis genau einmal."""
     # Fünf datierte Ereignisse, für die Immich NICHTS liefert
     for i in range(5):
         _event(db, immich_user, when=datetime(2024, 3, i + 1, 12, 0))
     fake_search["assets"] = []
 
-    job = Job(user_id=immich_user.id, type="immich", status="running")
-    db.add(job)
-    db.commit()
-
-    status, msg = _run_immich(db, job)      # muss zurückkehren, nicht hängen
+    status, msg = _run(db, immich_user)      # muss zurückkehren, nicht hängen
 
     assert status == "done"
     assert "5" in msg                        # 5 Ereignisse geprüft
     assert db.query(MediaRef).count() == 0   # nichts verknüpft (kein Foto)
 
 
-def test_same_photo_is_linked_only_once_across_events(db, immich_user, fake_search):
+def test_same_photo_is_linked_only_once_across_events(db, immich_user, fake_search,
+                                                      fake_library):
     """Regression (Nutzer-Bericht): Timeline-Import mit vielen Besuchen am
     selben Tag. Ein GPS-loses Foto wurde an JEDEN Besuch des Tages gehängt.
     Jetzt: genau einmal, am ersten passenden Ereignis."""
-    from app.models import Job
-    from app.routers.jobs import _run_immich
-
     # Fünf Besuche am selben Tag, je eigener Ort — wie ein Städtetag
     for i in range(5):
         _event(db, immich_user, when=datetime(2024, 5, 1, 9 + i, 0),
                loc=_loc(db, immich_user, f"Ort {i}", 51.0 + i * 0.01, 8.0))
     fake_search["assets"] = [_asset("ein-foto", "2024-05-01T12:00:00")]  # ohne GPS
 
-    job = Job(user_id=immich_user.id, type="immich", status="running")
-    db.add(job)
-    db.commit()
-    _run_immich(db, job)
+    _run(db, immich_user)
 
     refs = db.query(MediaRef).filter(MediaRef.external_id == "ein-foto").all()
     assert len(refs) == 1        # NICHT fünfmal
 
 
-def test_rerun_does_not_duplicate_existing_links(db, immich_user, fake_search):
+def test_rerun_does_not_duplicate_existing_links(db, immich_user, fake_search,
+                                                 fake_library):
     """Ein zweiter Lauf verknüpft ein bereits hängendes Foto nicht erneut."""
-    from app.models import Job
-    from app.routers.jobs import _run_immich
-
     _event(db, immich_user, when=datetime(2024, 5, 1, 12, 0))
     fake_search["assets"] = [_asset("foto", "2024-05-01T12:00:00")]
 
     for _ in range(2):
-        job = Job(user_id=immich_user.id, type="immich", status="running")
-        db.add(job)
-        db.commit()
-        _run_immich(db, job)
+        _run(db, immich_user)
 
     assert db.query(MediaRef).filter(MediaRef.external_id == "foto").count() == 1
+
+
+# --------------------------------------------------------------------------- #
+# Anmerkung 205 — Phase 2: die Tage kommen aus Immich, nicht aus dem Bestand
+# --------------------------------------------------------------------------- #
+def test_the_job_fills_days_that_have_no_entry_at_all(db, immich_user,
+                                                      fake_search, fake_paged,
+                                                      fake_library):
+    """**Der gemeldete Kern, auf der Ebene, auf der der Nutzer ihn sieht.**
+
+    Kein Ereignis, kein Besuch, kein Fotovorschlag — nur ein Wohnort-Tag, den
+    die alte Tagesliste aus der Ereignis-Tabelle nie gesehen hätte. Der Lauf
+    hängt trotzdem die Leiste an."""
+    fake_library["months"] = {"2019-03": 2}
+    fake_paged["assets"] = [_asset("m1", "2019-03-04T10:00:00"),
+                            _asset("m2", "2019-03-05T10:00:00")]
+
+    status, msg = _run(db, immich_user)
+
+    assert status == "done"
+    refs = db.query(MediaRef).all()
+    assert {r.external_id for r in refs} == {"m1", "m2"}
+    assert all(r.event_id is None for r in refs), "am TAG, nicht an einem Eintrag"
+    assert "2 Fotos verknüpft, davon 2 an ihren Tagen" in msg
+
+
+def test_the_job_skips_a_month_whose_count_did_not_change(db, immich_user,
+                                                          fake_search, fake_paged,
+                                                          fake_library):
+    """Die Marke gegen die Endlos-Abruf-Falle: ohne sie liefe der Nachtplan
+    jede Nacht über die ganze Bibliothek — auch über Monate ohne ein Foto."""
+    fake_library["months"] = {"2019-03": 1}
+    fake_paged["assets"] = [_asset("m1", "2019-03-04T10:00:00")]
+    _run(db, immich_user)
+    fake_paged["calls"].clear()
+
+    status, msg = _run(db, immich_user)
+
+    assert fake_paged["calls"] == [], "der Monat ist abgehakt — keine Anfrage mehr"
+    assert status == "done" and "alles aktuell" in msg
+
+
+def test_a_month_with_new_uploads_is_scanned_again(db, immich_user, fake_search,
+                                                   fake_paged, fake_library):
+    """Die Gegenrichtung: eine Marke, die von der Wirklichkeit widerlegt werden
+    kann, braucht keinen Knopf zum Zurücksetzen."""
+    fake_library["months"] = {"2019-03": 1}
+    fake_paged["assets"] = [_asset("m1", "2019-03-04T10:00:00")]
+    _run(db, immich_user)
+
+    fake_library["months"] = {"2019-03": 2}          # jemand hat nachgeladen
+    fake_paged["assets"] += [_asset("m2", "2019-03-09T10:00:00")]
+    _run(db, immich_user)
+
+    assert {r.external_id for r in db.query(MediaRef).all()} == {"m1", "m2"}
+
+
+def test_an_empty_month_is_marked_too(db, immich_user, fake_search, fake_paged,
+                                      fake_library):
+    """Der Fehlversuch muss eine Marke hinterlassen — sonst fragt der Lauf
+    ewig neu. Drei Zustände unterscheidbar halten, nicht zwei."""
+    fake_library["months"] = {"2019-03": 0}
+    fake_paged["assets"] = []
+    _run(db, immich_user)
+    fake_paged["calls"].clear()
+
+    _run(db, immich_user)
+    assert fake_paged["calls"] == []
+
+
+def test_the_job_says_when_it_could_not_read_the_timeline(db, immich_user,
+                                                          fake_search, monkeypatch):
+    """Ein Lauf, der die halbe Arbeit still weglässt, ist der teuerste Defekt
+    dieses Projekts. Phase 1 läuft, der Grund steht im ERGEBNIS."""
+    def _boom(*a, **kw):
+        raise api.ImmichError("Verbindung abgelehnt")
+
+    monkeypatch.setattr("app.services.immich.own_user_id", _boom)
+    _event(db, immich_user, when=datetime(2024, 5, 1, 12, 0))
+    fake_search["assets"] = [_asset("foto", "2024-05-01T12:00:00")]
+
+    status, msg = _run(db, immich_user)
+
+    assert status == "done"
+    assert db.query(MediaRef).count() == 1, "Phase 1 lief trotzdem"
+    assert "Tagesleisten übersprungen" in msg and "Verbindung abgelehnt" in msg
 
 
 def test_immich_job_reports_missing_config(db, user):
@@ -498,15 +620,26 @@ def test_importierte_besuche_sind_keine_ereignis_kandidaten(db, immich_user, bes
     assert candidates(db, immich_user.id) == []
 
 
-def test_der_tag_ist_das_ziel(db, immich_user, besuchstag, fake_search):
-    from app.services.immich_link import link_batch
+def _link_may(db, user, seen=None):
+    """Der Monatslauf über den Mai 2024 — die Phase 2 des Jobs, nackt.
 
-    fake_search["assets"] = [_asset(f"a{i}", f"2024-05-25T{h:02d}:30:00", 51.23, 6.78)
-                             for i, h in enumerate([9, 12, 16, 20])]
+    `taken` kommt aus `days_with_media`, genau wie im Job; `seen` aus dem, was
+    schon hängt. Beides zusammen ist die Entduplizierung.
+    """
+    from app.services.immich_link import (days_with_media, link_month,
+                                          linked_asset_ids)
 
-    processed, linked, remaining = link_batch(db, immich_user)
+    return link_month(db, user, "2024-05", "u", "k",
+                      linked_asset_ids(db, user.id) if seen is None else seen,
+                      None, taken=days_with_media(db, user.id))
 
-    assert (processed, linked, remaining) == (1, 4, 0), "ein Ziel: der Tag"
+
+def test_der_tag_ist_das_ziel(db, immich_user, besuchstag, fake_paged):
+    fake_paged["assets"] = [_asset(f"a{i}", f"2024-05-25T{h:02d}:30:00", 51.23, 6.78)
+                            for i, h in enumerate([9, 12, 16, 20])]
+
+    assert _link_may(db, immich_user) == 4
+    db.commit()
     refs = db.query(MediaRef).filter(MediaRef.provider == "immich").all()
     assert len(refs) == 4
     assert all(r.event_id is None for r in refs), "hängt an keinem Besuch mehr"
@@ -515,63 +648,73 @@ def test_der_tag_ist_das_ziel(db, immich_user, besuchstag, fake_search):
 
 
 def test_ein_echtes_ereignis_desselben_tages_geht_vor(db, immich_user, besuchstag,
-                                                      fake_search):
+                                                      fake_search, fake_paged):
     """Ein selbst erfasstes Ereignis ist eine Aussage darüber, was der Tag war —
-    sein engeres Fenster bekommt seine Fotos, der Tag sammelt den Rest auf."""
-    from app.services.immich_link import link_batch
+    sein engeres Fenster bekommt seine Fotos, der Tag sammelt den Rest auf.
+
+    Seit Anmerkung 205 ist das die Reihenfolge der beiden PHASEN und nicht mehr
+    die einer Zielliste: erst `link_batch` (Ereignisse), dann `link_month`. Der
+    Satz, den sie trägt, ist derselbe — und `seen` wandert durch beide.
+    """
+    from app.services.immich_link import link_batch, linked_asset_ids
 
     konzert = _event(db, immich_user, when=datetime(2024, 5, 25, 20, 0),
                      precision=DatePrecision.exact,
                      loc=_loc(db, immich_user, "Halle", 51.22, 6.78))
-    fake_search["assets"] = [
-        _asset("morgens", "2024-05-25T09:30:00", 51.23, 6.78),
-        _asset("konzert", "2024-05-25T20:30:00", 51.22, 6.78),
-    ]
+    beide = [_asset("morgens", "2024-05-25T09:30:00", 51.23, 6.78),
+             _asset("konzert", "2024-05-25T20:30:00", 51.22, 6.78)]
+    fake_search["assets"] = beide
+    fake_paged["assets"] = beide
 
     link_batch(db, immich_user)
+    _link_may(db, immich_user, seen=linked_asset_ids(db, immich_user.id))
+    db.commit()
 
     am_konzert = [m.external_id for m in konzert.media]
     am_tag = [m.external_id for m in db.query(MediaRef)
               .filter(MediaRef.event_id.is_(None)).all()]
     assert am_konzert == ["konzert"]
-    assert am_tag == ["morgens"]
+    assert am_tag == ["morgens"], "der Tag sammelt nur auf, was übrig blieb"
 
 
-def test_zweiter_lauf_verdoppelt_nichts(db, immich_user, besuchstag, fake_search):
-    from app.services.immich_link import link_batch
+def test_zweiter_lauf_verdoppelt_nichts(db, immich_user, besuchstag, fake_paged):
+    fake_paged["assets"] = [_asset("a0", "2024-05-25T12:00:00")]
+    assert _link_may(db, immich_user) == 1
+    db.commit()
 
-    fake_search["assets"] = [_asset("a0", "2024-05-25T12:00:00")]
-    link_batch(db, immich_user)
-    processed, linked, _ = link_batch(db, immich_user)
-
-    assert (processed, linked) == (0, 0), "der Tag ist erledigt und kein Ziel mehr"
+    assert _link_may(db, immich_user) == 0, "der Tag trägt schon eine Leiste"
+    db.commit()
     assert db.query(MediaRef).count() == 1
 
 
-def test_der_tag_filtert_nicht_nach_ort(db, immich_user, besuchstag, fake_search):
+def test_der_tag_filtert_nicht_nach_ort(db, immich_user, besuchstag, fake_paged):
     """Bewusst kein Orts-Abgleich: der Tag ist ein Behälter der ZEITachse
     (Anmerkung 87). Wer abends 500 km weiter fotografiert, hat trotzdem ein
     Foto von diesem Tag — und sonst hätte es gar keinen Platz."""
-    from app.services.immich_link import link_batch
+    fake_paged["assets"] = [_asset("weit_weg", "2024-05-25T21:00:00", 48.13, 11.58)]
 
-    fake_search["assets"] = [_asset("weit_weg", "2024-05-25T21:00:00", 48.13, 11.58)]
-    _, linked, _ = link_batch(db, immich_user)
-
-    assert linked == 1
+    assert _link_may(db, immich_user) == 1
 
 
 def test_foto_ohne_zeitstempel_bekommt_keinen_tag(db, immich_user, besuchstag,
-                                                  fake_search):
+                                                  fake_paged):
     """Ohne Aufnahmezeit gibt es keinen Kalendertag — und der Behälter IST das
     Datum. Ein Bild ohne Zeit hätte dort nur ein erfundenes."""
-    from app.services.immich_link import link_day, linked_asset_ids
+    fake_paged["assets"] = [{"id": "x", "originalMimeType": "image/jpeg",
+                             "exifInfo": {}}]
 
-    ohne_zeit = {"id": "x", "originalMimeType": "image/jpeg", "exifInfo": {}}
-    fake_search["assets"] = [ohne_zeit]
-    n = link_day(db, immich_user, datetime(2024, 5, 25).date(), "u", "k",
-                 linked_asset_ids(db, immich_user.id))
+    assert _link_may(db, immich_user) == 0
 
-    assert n == 0
+
+def test_ein_tag_ohne_jeden_eintrag_bekommt_seine_leiste(db, immich_user,
+                                                         fake_paged):
+    """**Anmerkung 205.** Vorher kam die Tagesliste aus der EREIGNIS-Tabelle:
+    ohne Besuch, ohne Fotovorschlag, ohne selbst erfassten Eintrag gab es kein
+    Ziel — und ein Tag, den nur der Wohnort deckt, blieb lautlos ohne Bilder.
+    Kein `besuchstag` in diesem Test, und genau das ist der Punkt."""
+    fake_paged["assets"] = [_asset("allein", "2024-05-25T12:00:00")]
+
+    assert _link_may(db, immich_user) == 1
 
 
 def test_bestandsverknuepfungen_an_besuchen_werden_geloest(db, immich_user,

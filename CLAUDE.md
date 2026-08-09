@@ -356,6 +356,27 @@ clientseitig); mit `psycopg3`/`asyncpg` wäre es ein harter Fehler.
 - **`day_values` ist die teure Auskunft** (eine Zeile je Tag UND Schlüssel).
   Für Zahlen, die man nur summiert oder zählt, ist sie die falsche.
 
+**Rückmeldung 2026-08-09 (Anmerkung 205): die Tagesliste kam aus der falschen
+Tabelle.** „Fotos verknüpfen" baute die Liste der Tage aus der EREIGNIS-Tabelle
+— ein Tag, den nur der Wohnort deckt, hatte dort keine Zeile und blieb lautlos
+ohne Bilder (der Verräter war wieder die Überschrift). Die Entscheidung des
+Users ist die weiteste: **jeder Tag, an dem Immich Fotos hat, bekommt seine
+Leiste** — ohne Rückfrage an den eigenen Bestand. Vier Sätze zum Weiterarbeiten:
+- **Der Lauf hat ZWEI Phasen** (`_run_immich`): erst die Ereignisse
+  (`targets` = nur noch Ereignisse), dann die Monate. `seen` wandert durch
+  beide — ein Ereignis greift zuerst, der Tag sammelt auf.
+- **Gefragt wird MONATSWEISE, nie je Tag.** `link_day`/`day_candidates` sind
+  weg; `timeline_buckets` sagt in EINEM Aufruf, welche Monate etwas hergeben
+  (mit `with_coordinates=False` — die Leiste braucht kein GPS, `photo_years`
+  schon).
+- **Die Marke ist die FOTOZAHL je Monat**, nicht ein Häkchen
+  (`open_months`/`mark_month`, `user.settings["immich_days"]`). Nur so sind
+  „nachgesehen, nichts da" und „nie nachgesehen" unterscheidbar, und ein
+  nachträglicher Upload macht den Monat von selbst wieder auf. `reset()` wirft
+  sie mit weg — sonst legt der Knopf den Lauf still, der die Leisten neu baut.
+- **`fill_day_strips` folgt derselben Regel** (jeder Tag mit Fotos) und filtert
+  seitdem nach Besitz: seine Eingabe ist die ROHE Jahresliste.
+
 **Doku-Umbau 2026-08-04.** `KONZEPT.md` ist aufgelöst: was das System IST steht
 in `ARCHITECTURE.md`, was OFFEN ist in `ROADMAP.md`, die geschlossenen Kapitel
 (MVP-Definition, Release-Risiken, beantwortete Fragen) wörtlich in

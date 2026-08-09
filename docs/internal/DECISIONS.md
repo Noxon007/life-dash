@@ -1468,6 +1468,31 @@ finding was not on the list.
 
     Guards: two cases in `test_anm204_export_scope.py` and six in `test_anm204_weather_totals.py`. The weather ones assert no timing — a promise about milliseconds is either worthless or fickle on someone else's hardware. They assert the **rules** the move to SQL had to carry: a day counts once however many entries it has, the smallest value of the day wins, both sources count, a year without rain still has a bar, and a day with only a temperature is still a day with weather. Run against two deliberately broken versions: dropping the min-stage turns two red, dropping the day-stage turns five red.
 
+**Round of 2026-08-09, fourth pass (note 205), on `main`, no version bump.**
+From the user's feedback: *“Link photos doesn't link on days where there is
+only a derived residence entry, does it? I want linked photos there too.”*
+Half right, and the half that was wrong is the more interesting one.
+
+205. ✅ **The list of days came out of the wrong table.** `day_candidates` enumerated the days that could receive a photo strip from `Event`, filtered to `MACHINE_SOURCES`. Everything that follows is downstream of that one `FROM`.
+
+    **The reported case.** A day covered only by a `BaselineLocation` has no event row, so it was never a target. That is precisely the trap `CLAUDE.md` names *“the giveaway is the heading”*: a set over **days** built by enumerating the **event** table is silently short, and what is missing is whole years. The justification in the docstring — *“a day without any entry is not part of the life database”* — was written before F20 made the residence the **fourth kind of statement**. A residence day *is* the life database; it just does not have a row in that table.
+
+    **The half that was wrong, and why saying so mattered.** The report also suspected days carrying only a photo entry. Those had worked since note 111 (`Source.immich` is in `MACHINE_SOURCES`) and note 196 (the photo-entry run fills the strip itself). Answering that half with “yes, you're right” would have sent the fix hunting in the wrong place.
+
+    **A third gap neither of us had named.** A day whose only entry is a hand-recorded event got no strip either: the event collects its own photos through a **25 km location filter**, so a picture taken 300 km away that day landed nowhere. Same root, one table over.
+
+    **The decision was the widest of the three offered: every day Immich has photos for gets its strip** — no question asked of the local corpus at all. That deletes the rule rather than widening it, and with it the question *“which source stood on this day?”* disappears from the day row.
+
+    **The cost is the actual rebuild.** `link_day` asked Immich **once per day**. Over thirty-two years of residence that is ~11,000 requests per run, and — the older defect — a day with no photos left **no mark**, so it was asked again every single run, forever. The ninth reprise of the endless-fetch trap, and at the new scale it would have been the first one to hurt. Days now come **by the month** through `search_assets_paged`, and *which* months are worth asking comes from `timeline_buckets` in **one** call. Thirty-two years is ~384 requests instead of 11,000, and an empty month costs exactly one.
+
+    **The mark is the photo count, not a tick**, and that is what makes it work in both directions. A month that had 312 photos last run and still has 312 is skipped — a tick could not do that, because “looked, found nothing” and “never looked” would read the same and the nightly plan would walk the whole library every night. Upload pictures from 2004 and the count changes, so the month reopens **by itself**: a mark that reality can contradict needs no reset button. It does need to be dropped when the links are, which is why `reset()` now clears it — otherwise that button deleted the strips and disabled the run that rebuilds them, reporting “everything up to date” over an empty corpus (the same rule `routers/photos.py` already followed for the year list).
+
+    **`timeline_buckets` had to learn a second question.** `photo_years` asks for **geo-referenced** photos, because without coordinates there is no photo *event*. A day strip has no such need — a scanned picture from 1998 belongs on its day like any other — and asking with `withCoordinates=true` would have hidden exactly the years note 107 calls the valuable ones. One parameter, two callers, one ladder against Immich's wandering API.
+
+    **And the rule had a second half that would have drifted.** `fill_day_strips` (note 196) filled only days where the run had just created a photo event. Left alone, the linking run would have hung a strip on a day the photo-entry run skipped — one rule, two answers, which is this project's most expensive defect. It fills every day of the scanned year now. That in turn **required an ownership filter**: its input is the *raw* year list, from which `photo_proposals` sifts foreign and archived assets only afterwards. Bounded by the old day filter this barely showed; unbounded it would be an acquaintance's shared holiday folder in your own day strip.
+
+    Guards: the run is now two phases and until this round **no test touched it** — the three job-level tests reached the real address, spent three seconds each in a DNS failure, and ended up asserting the “Immich unreachable” branch without ever saying so. A doubled timeline (`fake_library`) fixed that; the module went from 13 s to 1 s. Eleven new cases across `test_p21_immich.py` and `test_p21_review.py` cover the reported day, the mark in both directions, ownership, and the run reporting in its **result** when it could not read the timeline — a run that silently drops half its work is the defect this project pays for most. Run against two deliberately broken versions: restoring the event-table filter turns five red, neutering the mark turns four.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into
