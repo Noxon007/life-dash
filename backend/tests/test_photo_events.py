@@ -23,7 +23,10 @@ from __future__ import annotations
 from datetime import datetime
 
 import pytest
+from fastapi.testclient import TestClient
 
+from app.database import get_db
+from app.main import app
 from app.models import (ConfirmState, DatePrecision, Entity, Event,
                         EventEntityLink, Fragment, Location, MediaRef, Metric,
                         Source, User, UserRole)
@@ -55,6 +58,19 @@ def _asset(idx: int, *, hour: int = 10, minute: int = 0, day: int = 12,
 def _props(assets, db=None, user=None, known=None, report=None):
     districts = pp.district_index(db, user.id) if db is not None else []
     return pp.photo_proposals(assets, MY_ID, districts, known, report)
+
+
+@pytest.fixture()
+def client(db, user):
+    """Ohne `with`: im Kontextmanager fährt der Lifespan und fasst die
+    KONFIGURIERTE Datenbank an (siehe `test_f20_baseline.py`)."""
+    app.dependency_overrides[get_db] = lambda: db
+    from app.auth import get_current_user
+    app.dependency_overrides[get_current_user] = lambda: user
+    try:
+        yield TestClient(app)
+    finally:
+        app.dependency_overrides.clear()
 
 
 # --------------------------------------------------------------------------- #
@@ -269,6 +285,57 @@ def test_reset_takes_the_tombstones_with_it(db, user):
     assert pp.known_slots(db, user.id) == set()
     # Der Ort geht mit, sofern nichts mehr an ihm hängt.
     assert db.query(Location).filter(Location.type == "photo").count() == 0
+
+
+def test_reset_can_work_in_batches(db, user):
+    """**Anmerkung 215 — der Rückweg muss taktbar sein.**
+
+    Gemeldet wurde die Stille: „gibt keine saubere Meldung, wie lange das dauert
+    und ob er noch was macht." Ohne Deckelung ist dieser Knopf EINE Anweisung
+    über zehntausende bestätigte Zeilen — der Browser kann dazwischen nichts
+    sagen, weil es kein Dazwischen gibt.
+
+    Geprüft wird deshalb nicht nur, dass `limit` weniger löscht, sondern dass
+    die Stapel sich AUFSUMMIEREN und der letzte den Rest mitnimmt: ein Stapel,
+    der jedes Mal dieselben ersten zwei Zeilen ansähe, wäre die Endlosschleife
+    aus Anmerkung 206 in neuer Gestalt — und sie sähe von außen wie Fortschritt
+    aus.
+    """
+    pp.create_photo_events(
+        db, user, _props([_asset(i) for i in range(1, 6)], db, user))
+    db.commit()
+    assert pp.count_photo_events(db, user.id) == 5
+
+    seen = []
+    while True:
+        n = pp.reset(db, user.id, limit=2)
+        db.commit()
+        if not n:
+            break
+        seen.append(n)
+    assert seen == [2, 2, 1]
+    assert pp.count_photo_events(db, user.id) == 0
+    # Dieselbe Zusage wie beim Löschen in einem Rutsch: die Grabsteine gehen mit.
+    assert db.query(Fragment).count() == 0
+
+
+def test_reset_endpoint_reports_what_is_left(db, user, client):
+    """**Die Zahl, an der der Balken hängt.**
+
+    `remaining` wird NACH dem Löschen frisch gezählt und nicht aus der eigenen
+    Buchführung fortgeschrieben: derselbe Bestand hat mehr als einen Schreiber
+    (ein zweiter Tab, ein laufender Immich-Lauf). Eine fortgeschriebene Zahl
+    wäre genau dann falsch, wenn es darauf ankommt — und sie sähe richtig aus.
+    """
+    pp.create_photo_events(
+        db, user, _props([_asset(i) for i in range(1, 6)], db, user))
+    db.commit()
+
+    first = client.post("/api/photos/reset?limit=2").json()
+    assert (first["deleted"], first["remaining"]) == (2, 3)
+    # Ohne `limit` bleibt es der alte Knopf: alles auf einmal.
+    rest = client.post("/api/photos/reset").json()
+    assert (rest["deleted"], rest["remaining"]) == (3, 0)
 
 
 def test_reset_leaves_places_that_are_still_in_use(db, user):

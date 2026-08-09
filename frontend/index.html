@@ -2427,19 +2427,6 @@
             <div class="action-row">
               <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
                 <button class="btn" id="im-run" style="text-align:left" data-i18n="im.run">🖼️ Fotos aus Immich holen</button>
-                <details class="adv">
-                  <summary data-i18n="im.adv.reset">Erweitert: zurücknehmen</summary>
-                  <div class="adv-body">
-                    <button class="btn ghost" id="im-reset" style="text-align:left; width:100%" data-i18n="im.reset">↺ Verknüpfungen verwerfen</button>
-                    <span class="hint" data-i18n="im.reset.hint">„Verknüpfungen verwerfen"
-                    löscht nur die Zuordnungen — die Bilder in Immich und deine selbst hochgeladenen Fotos bleiben
-                    unangetastet. Der nächste Lauf baut die Zuordnungen neu auf.</span>
-                    <button class="btn secondary" id="pp-reset" style="text-align:left; width:100%; margin-top:10px" data-i18n="pp.reset">🗑️ Foto-Ereignisse verwerfen</button>
-                    <span class="hint" data-i18n="pp.reset.hint">„Foto-Ereignisse verwerfen" ist der andere Fall:
-                    das sind <b>Einträge</b>, keine Zuordnungen. Sie kommen beim nächsten Lauf wieder — aber was du
-                    an einem von ihnen von Hand geändert hast, ist dann weg.</span>
-                  </div>
-                </details>
               </div>
               <div class="action-desc">
                 <span data-i18n="im.desc"><b>Ein Lauf über deine ganze Immich-Bibliothek.</b> Er tut zweierlei:
@@ -2453,6 +2440,36 @@
                 Immich</b>, kopiert wird nichts. Der erste Lauf geht durch jeden Monat, den Immich kennt, und darf
                 lange dauern; danach fasst er nur noch an, wo sich etwas geändert hat. Er läuft im Hintergrund
                 weiter, auch wenn du die Seite schließt.</span>
+                <!-- Der Rückweg stand bis hierher in der KNOPFSPALTE (`action-key`,
+                     215 px breit, `flex-direction:column`). Dort war er an zwei
+                     Stellen falsch: `details.adv` trägt `flex:0 0 100%`, und in
+                     einem Spalten-Flex ist das eine Angabe über die HÖHE — die
+                     Breite blieb die der Spalte, also zwei Knöpfe und zwei
+                     Erklärkästen in einem Streifen. Und die Kästen waren
+                     `<span class="hint">` ohne `display:block`: ein Kasten mit
+                     Rahmen und Polsterung, den der Browser als INLINE-Box über
+                     mehrere Zeilen zerreißt.
+                     Beides ist hier geheilt: der Block sitzt in der breiten
+                     Beschreibungsspalte, wie beim Timeline-Import darüber. -->
+                <details class="adv">
+                  <summary data-i18n="im.adv.reset">Erweitert: zurücknehmen</summary>
+                  <div class="adv-body">
+                    <button class="btn ghost" id="im-reset" style="text-align:left" data-i18n="im.reset">↺ Verknüpfungen verwerfen</button>
+                    <span class="hint" style="display:block; margin:8px 0 0" data-i18n="im.reset.hint">„Verknüpfungen verwerfen"
+                    löscht nur die Zuordnungen — die Bilder in Immich und deine selbst hochgeladenen Fotos bleiben
+                    unangetastet. Der nächste Lauf baut die Zuordnungen neu auf.</span>
+                    <button class="btn secondary" id="pp-reset" style="text-align:left; margin-top:18px" data-i18n="pp.reset">🗑️ Foto-Ereignisse verwerfen</button>
+                    <span class="hint" style="display:block; margin:8px 0 0" data-i18n="pp.reset.hint">„Foto-Ereignisse verwerfen" ist der andere Fall:
+                    das sind <b>Einträge</b>, keine Zuordnungen. Sie kommen beim nächsten Lauf wieder — aber was du
+                    an einem von ihnen von Hand geändert hast, ist dann weg.</span>
+                    <!-- Anmerkung 215: die Zahl war seit Anmerkung 206 heimatlos.
+                         `ppLoadIndex()` schrieb sie nach `#pp-result` — das Feld
+                         fiel mit der Vorschau weg, die Funktion blieb, und damit
+                         schrieb sie ins Nichts. Sie gehört genau hierher: sie
+                         sagt, was der Knopf darüber löschen würde. -->
+                    <div id="pp-result" class="hint" style="display:none; margin:8px 0 0"></div>
+                  </div>
+                </details>
               </div>
             </div>
           </div>
@@ -3658,6 +3675,7 @@ const I18N_EN = {
   'pp.have': "{n} photo events created",
   'pp.none': "Nothing fetched from Immich yet. Until then the photo layer on the map stays empty — that does not mean there are no photos.",
   'pp.reset.done': "✓ {n} photo events discarded.",
+  'pp.unit': "photo events",
   // Immich block, variant B — connection card, numbered steps, effect badges
   'im.conn': "Connection",
   'im.conn.desc': "<b>Server URL and API key.</b> Your photos stay in Immich — nothing is copied.",
@@ -3730,6 +3748,7 @@ const I18N_EN = {
   'im.rights.ok': "✓ Version {v} — all required permissions present.",
   'im.reset.ask': "Only the links are deleted. Your pictures in Immich and your own uploaded photos are left untouched.",
   'im.reset.done': "✓ {n} link(s) discarded.",
+  'im.reset.work': "Removing the links — with many pictures this takes a moment.",
   'im.reset.hint': "“Discard links” removes only the associations — the pictures in Immich and your own uploaded photos stay untouched. The next run rebuilds them.",
   'field.photos': "📷 Photos",
   'media.drop': "Drag images here or pick them",
@@ -3880,6 +3899,7 @@ const I18N_EN = {
   'job.embeddings': "🧠 Embeddings",
   'job.resolve_names': "📍 Resolve/format place names",
   'job.photo_points': "📍 Place photos on the map",
+  'job.photo_reset': "🗑️ Discard photo events",
   'job.timeline_import': "🛰️ Timeline import",
   'job.data_import': "📥 Data import",
   // Anmerkung 120 — laufende Läufe, Vorschauen, „Alle Jahre"
@@ -11836,6 +11856,7 @@ const JOB_LABELS = { recompute: '🔄 KI-Vorschläge neu berechnen', weather: '�
                      embeddings: '🧠 Embeddings', resolve_names: '📍 Ortsnamen auflösen/formatieren',
                      immich: '🖼️ Fotos aus Immich verknüpfen',
                      photo_points: '📷 Ereignisse aus Fotos anlegen',
+                     photo_reset: '🗑️ Foto-Ereignisse verwerfen',
                      timeline_import: '🛰️ Timeline-Import', data_import: '📥 Daten-Import' };
 const JOB_STATUS_DE = { running: '⏳ läuft', done: '✅ fertig', stopped: '⏹ gestoppt', error: '⚠️ Fehler' };
 // F10: Status in der aktiven Sprache
@@ -13208,12 +13229,32 @@ document.getElementById('im-test').addEventListener('click', async ev => {
 });
 document.getElementById('im-run').addEventListener('click', e =>
   startServerJob(e.target, 'immich', null, true));
+// **Anmerkung 215 — beide Rückwege sagen jetzt, dass sie arbeiten.**
+// Gemeldet wurde die Stille: „gibt keine saubere Meldung, wie lange das dauert
+// und ob er noch was macht." Die Antwort ist für die beiden Knöpfe verschieden,
+// und zwar aus einem sachlichen Grund und nicht aus Geschmack:
+//
+//   `im-reset`  ist EINE Anweisung (ein Massenlöschen über `MediaRef`) — daran
+//               ist nichts zu takten. Es fehlte nur der Hinweis, dass gewartet
+//               wird: Overlay mit Kreisel, kein Balken. Ein Balken, der bei 0 %
+//               steht und nie wächst, behauptet Stillstand (siehe `fgRender`).
+//   `pp-reset`  löscht BESTÄTIGTE Zeilen, zehntausende davon, mit sieben
+//               abhängigen Tabellen je Stapel. Das ist echte Arbeit mit einer
+//               bekannten Gesamtmenge, also bekommt es einen echten Balken —
+//               und weil es Lebensdatenbank anfasst, auch einen Protokolleintrag
+//               im Jobs-Reiter. Beide Fragen aus Kap. 4.6, beide mit Ja.
 document.getElementById('im-reset').addEventListener('click', async () => {
   if (!(await uiConfirm(t('im.reset.ask',
       'Nur die Zuordnungen werden gelöscht. Deine Bilder in Immich und deine selbst hochgeladenen Fotos bleiben unangetastet.'),
       { title: t('im.reset', 'Verknüpfungen verwerfen'), okLabel: '↺' }))) return;
   try {
-    const res = await api('/api/media/immich/reset', { method: 'POST' });
+    const res = await runForeground(t('im.reset', 'Verknüpfungen verwerfen'), async op => {
+      op.note(t('im.reset.work', 'Die Zuordnungen werden gelöscht — bei vielen Bildern dauert das einen Moment.'));
+      const r = await api('/api/media/immich/reset', { method: 'POST' });
+      op.note(t('fg.refresh', 'Ansichten werden neu aufgebaut …'));
+      await refreshAll();
+      return r;
+    }, { cancellable: false });
     toast(t('im.reset.done', '✓ {n} Verknüpfung(en) verworfen.').replace('{n}', res.removed));
   } catch (err) { toast(err.message, 'error'); }
 });
@@ -13267,23 +13308,44 @@ async function ppLoadIndex() {
   } catch (_) { /* ohne Immich gibt es hier schlicht nichts zu zeigen */ }
 }
 document.getElementById('pp-reset')?.addEventListener('click', async ev => {
-  const btn = ev.target;
+  const btn = ev.currentTarget;
+  if (runningOps[btn.id]) { runBatchedAdmin(btn, {}); return; }   // zweiter Klick = Stopp
   // **Das löscht Bestätigtes** — anders als bei A45, wo eine Ableitung
   // weggeworfen wurde. Deshalb wird gefragt, und zwar mit der Zahl.
-  const n = mp.photoTotal || 0;
+  //
+  // Die Zahl wird HIER frisch geholt und nicht aus `mp.photoTotal` genommen:
+  // die Merkzelle füllt `ppLoadIndex()`, und wer den Reiter offen liegen ließ,
+  // während der Immich-Lauf arbeitete, bekäme sonst „es gibt keine" über
+  // achttausend Zeilen — eine Fehlmeldung, die den Knopf funktionslos aussehen
+  // lässt.
+  let n = 0;
+  try { n = (await fetchIndex(true)).photo_events || 0; }
+  catch (err) { toast(err.message, 'error', 8000); return; }
   if (!n) { toast(t('pp.reset.none', 'Es gibt keine Foto-Ereignisse zum Verwerfen.'), 'warn'); return; }
-  if (!confirm(t('pp.reset.ask', '{n} Foto-Ereignisse werden gelöscht. Sie lassen sich mit einem neuen Lauf wieder anlegen. Fortfahren?')
-      .replace('{n}', n.toLocaleString(LOC())))) return;
-  btn.disabled = true;
-  try {
-    const r = await api('/api/photos/reset', { method: 'POST' });
-    toast(t('pp.reset.done', '✓ {n} Foto-Ereignisse verworfen.').replace('{n}', r.deleted), 'ok', 6000);
-    // Der Kartenzustand ist ein anderer: neu holen, sonst zeichnet die Karte
-    // weiter die Punkte, die es nicht mehr gibt.
-    if (mapObj) { await mpLoadPoints(true); rebuildPeriods(); renderPeriod(); }
-    await ppLoadIndex();
-  } catch (err) { toast(err.message, 'error', 8000); }
-  finally { btn.disabled = false; }
+  if (!(await uiConfirm(t('pp.reset.ask', '{n} Foto-Ereignisse werden gelöscht. Sie lassen sich mit einem neuen Lauf wieder anlegen. Fortfahren?')
+      .replace('{n}', n.toLocaleString(LOC())),
+      { title: t('pp.reset', '🗑️ Foto-Ereignisse verwerfen'), okLabel: '🗑️', danger: true }))) return;
+  // Stapelweise (der Server deckelt auf 5.000 je Anfrage): das ist der
+  // Unterschied zwischen einer Seite, die steht, und einem Balken mit
+  // Rest-Schätzung — und der Stopp-Knopf wirkt zwischen zwei Stapeln, ohne dass
+  // das Gelöschte zurückkäme. `jobType` trägt den Lauf zusätzlich in den
+  // Jobs-Reiter ein.
+  await runBatchedAdmin(btn, {
+    reset: async () => n,
+    step: async () => {
+      const r = await api('/api/photos/reset?limit=500', { method: 'POST' });
+      return { done: r.deleted, remaining: r.remaining };
+    },
+    unit: t('pp.unit', 'Foto-Ereignisse'),
+    doneMsg: done => t('pp.reset.done', '✓ {n} Foto-Ereignisse verworfen.')
+      .replace('{n}', done.toLocaleString(LOC())),
+    jobType: 'photo_reset',
+  });
+  // Der Kartenzustand ist ein anderer: neu holen, sonst zeichnet die Karte
+  // weiter die Punkte, die es nicht mehr gibt. (`runBatchedAdmin` baut nur
+  // Zeitstrahl und Moderation neu auf.)
+  if (mapObj) { await mpLoadPoints(true); rebuildPeriods(); renderPeriod(); }
+  await ppLoadIndex();
 });
 
 // F13: eigene Kachelquelle — bewusst nur lokal (kein Server-Setting), weil die

@@ -260,8 +260,25 @@ any `MINOR`.
   *Discard photo events* removes everything the run created, and it asks with
   the number first. Discarding the photo *links* is separate and stays
   question-free — those are only references, and the next run rebuilds them.
+- **Discarding photo events now shows what it is doing.** It used to delete
+  everything in a single request: the page just sat there, sometimes for
+  minutes, with no way to tell whether anything was still happening. It works in
+  batches now and shows the same progress display as the other long runs —
+  a bar, *X of Y*, a rough time left, and a stop button that takes effect
+  between batches without bringing back what is already gone. It also appears in
+  the *Jobs* tab while it runs. *Discard links* is a single step and cannot be
+  broken up, but it no longer leaves you guessing either: the page dims and says
+  it is working.
 
 ### Fixed
+- **The number of photo events is visible again.** It disappeared from the
+  Immich settings when the preview was removed, so there was no way to see
+  whether the run had created anything — the discard button now says how many
+  entries it would remove, and the confirmation names the current number rather
+  than one read earlier.
+- **The two buttons under *Advanced: undo* are laid out properly.** They were
+  crammed into the narrow button column together with their explanations, whose
+  boxes were torn apart across every line break.
 - **The statistics tab loads again on larger collections.** On PostgreSQL the
   weather statistics could stop finishing altogether — the database ran at full
   CPU and the page eventually gave up with a gateway timeout, while the same

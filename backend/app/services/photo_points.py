@@ -601,7 +601,7 @@ def count_photo_events(db: Session, user_id: str) -> int:
 
 
 def remove_slots(db: Session, user_id: str, prefix: str,
-                 drop_fragments: bool = True) -> int:
+                 drop_fragments: bool = True, limit: int | None = None) -> int:
     """Löscht alles, was ein Lauf unter diesem Platz-Präfix angelegt hat.
 
     **Auch die Grabsteine**, und zwar mit Absicht: Dies ist „noch einmal von
@@ -623,8 +623,19 @@ def remove_slots(db: Session, user_id: str, prefix: str,
     einer Aufräumung. Getroffen hat es die Tagescluster aus Anmerkung 138: sie
     sind bestätigt und verortet, der Wetter-Lauf hat ihnen also Metriken
     angehängt, und die Testdoppel bauten sie nackt nach.
+
+    **`limit` macht daraus einen Stapel** (Anmerkung 215). Ohne ihn ist der Lauf
+    EINE Anweisung über zehntausende Zeilen: der Aufrufer kann nichts melden
+    („dauert das noch?"), und die sieben `IN`-Listen unten tragen jede einzelne
+    Kennung — `psycopg2` bindet die clientseitig, das wächst also mit dem
+    Bestand statt mit der Arbeit. Mit Stapel bleibt beides beschränkt, und der
+    Rest ist eine Zahl, die man ZEIGEN kann. Jeder Stapel ist für sich
+    vollständig: Fragmente, Orte und Anhänge gehören zu SEINEN Ereignissen.
     """
-    events = _slot_events(db, user_id, prefix).all()
+    q = _slot_events(db, user_id, prefix)
+    if limit:
+        q = q.order_by(Event.id).limit(limit)
+    events = q.all()
     if not events:
         return 0
     frag_ids = {e.origin_fragment_id for e in events if e.origin_fragment_id}
@@ -677,9 +688,9 @@ def remove_slots(db: Session, user_id: str, prefix: str,
     return len(ids)
 
 
-def reset(db: Session, user_id: str) -> int:
-    """Verwirft alle Foto-Ereignisse dieses Kontos."""
-    return remove_slots(db, user_id, SLOT_PREFIX)
+def reset(db: Session, user_id: str, limit: int | None = None) -> int:
+    """Verwirft alle Foto-Ereignisse dieses Kontos — oder einen Stapel davon."""
+    return remove_slots(db, user_id, SLOT_PREFIX, limit=limit)
 
 
 def count_day_clusters(db: Session, user_id: str) -> int:

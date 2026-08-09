@@ -1688,6 +1688,76 @@ complaint into a diagnosis, and one of them (524 is the **proxy's** timeout at
     186's rule about foreign interfaces, pointed inward: **the planner decides
     too, by criteria that are not in our code.**
 
+**Report of 2026-08-09, seventh pass (note 215), on `main`, no version bump.**
+The user, on the Immich block: *“advanced: undo unfolds two more buttons, they
+are badly formatted. of those, discard photo events gives no clean message about
+how long it takes or whether it is still doing anything. put it into the job
+overview, or blur the page and show progress.”* Two complaints about one panel,
+and they are not the same complaint: one is about where a box sits, the other
+about a run that says nothing while it deletes confirmed rows.
+
+215. ✅ **Two buttons in the wrong column, and a deletion that kept quiet.**
+
+    **The layout, and why it was wrong twice.** The `<details class="adv">`
+    block sat inside `.action-key` — the 215 px **button** column, which carries
+    `flex-direction: column`. `details.adv` declares `flex: 0 0 100%`, and in a
+    *column* flex container that is a statement about **height**, not width; the
+    element kept the column's 215 px. So two buttons and two explanation boxes
+    were squeezed into a strip beside a description column that was mostly
+    empty. On top of that both boxes were `<span class="hint">` without
+    `display: block`: `.hint` styles a bordered, padded card, and an inline box
+    with a border is torn across every line break by the browser. The two other
+    `details.adv` on the same page sit in `.action-desc`; this one now does too.
+    **A property that means one thing in a row and another in a column is the
+    kind of rule a copy carries across unchanged** — the block was written for
+    `.action-row` and pasted one level in.
+
+    **The silence, and the two answers it needs.** `pp-reset` deleted every
+    photo event in **one** request: a single statement over tens of thousands of
+    confirmed rows, seven dependent tables, each `IN` list carrying every id
+    (`psycopg2` binds those client-side, so the cost grew with the *corpus*, not
+    with the work). There is no *between* in one statement, so the browser had
+    nothing to report even if it had wanted to — the page simply stood there.
+    The repair follows chapter 4.6's two questions, and it answers them
+    differently for the two buttons on purpose:
+
+    - `im-reset` (discard links) is one bulk `DELETE` over `MediaRef` — a
+      derivation, and genuinely one step. It gets the foreground overlay with a
+      spinner and a sentence, **no bar**: a bar sitting at 0 % that never grows
+      claims a standstill (`fgRender`'s own rule).
+    - `pp-reset` (discard photo events) gets `?limit=` on the endpoint and runs
+      through `runBatchedAdmin`: a real bar with *X of Y*, an estimate, a stop
+      button that works between batches, **and** a `photo_reset` job row. Browser
+      **tacted**, server **registered** — the same combination as the backup
+      import, and the answer to two different questions rather than a
+      contradiction. The registration is not decoration: this run deletes
+      life-database, which belongs in the log, and the per-type lock keeps two
+      tabs from tearing batches out from under each other.
+
+    `remaining` is counted **fresh after each batch** instead of being carried
+    forward from the caller's own bookkeeping. The corpus has more than one
+    writer — a second tab, a running Immich job — and a carried-forward number
+    would be wrong exactly when it matters, while looking right.
+
+    **And the number that had been writing into nothing.** `ppLoadIndex()` still
+    filled `#pp-result`; that element disappeared with the preview in note 206
+    and the function was never told. So “8,412 photo events created” went
+    nowhere for a release — no error, no empty box, nothing. It is back, and
+    deliberately *under* the discard button, where it says what that button
+    would delete. The confirmation also moved from `window.confirm` to the app's
+    own dialog and now fetches the count **at click time** rather than reading
+    `mp.photoTotal`: whoever left the tab open while the Immich run worked would
+    have been told “there are none” over eight thousand rows.
+
+    Guards: `check-immich-run.js` drives the real dialog now — asks, names the
+    number, fetches it fresh, deletes **nothing** before consent, batches, and
+    appears in the job log. Run against three broken copies (no `?limit=`, no
+    `jobType`, count read from the memo cell): two, two and one check go red
+    respectively. `test_photo_events.py` gains the batch contract at both levels
+    — service (`[2, 2, 1]`, and the tombstones still go along) and endpoint
+    (`remaining` after a capped and an uncapped call). With `limit` ignored,
+    both fail.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

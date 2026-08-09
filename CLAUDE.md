@@ -347,6 +347,24 @@ schliessen, die kein Feature nach 1.0 sind.
 - **213** Wetter-Ereignisseite gemessen: 1710 -> 1611 ms. **Der Umbau der
   zwoelf Ranglisten nach SQL bleibt offen** — vier Regeln auf einmal in die
   Abfrage, und eine falsche Rangliste ist schlimmer als eine langsame.
+- **215** Rueckmeldung zum Immich-Block: „Erweitert: zurueckehmen" war schlecht
+  formatiert, und „Foto-Ereignisse verwerfen" meldete nichts. Zwei Dinge, drei
+  Saetze zum Weiterarbeiten:
+  - **`flex: 0 0 100%` heisst in einer SPALTE Hoehe, nicht Breite.** Der
+    `details.adv`-Block sass in `.action-key` (215 px, `flex-direction:column`)
+    und wurde deshalb nicht breit. Dazu `<span class="hint">` ohne
+    `display:block` — `.hint` ist ein Kasten mit Rahmen, und eine Inline-Box mit
+    Rahmen zerreisst der Browser an jedem Zeilenumbruch. Beide `details.adv` auf
+    derselben Seite sitzen in `.action-desc`; dieser jetzt auch.
+  - **Der Rueckweg ist stapelweise** (`/api/photos/reset?limit=`, Deckel 5.000)
+    und laeuft ueber `runBatchedAdmin` mit Job-Typ `photo_reset`: Browser
+    taktet, Server registriert — dieselbe Kombination wie der Backup-Import.
+    `remaining` wird nach JEDEM Stapel frisch gezaehlt, nie fortgeschrieben (der
+    Bestand hat mehr als einen Schreiber). `im-reset` bleibt EINE Anweisung und
+    bekommt nur das Overlay ohne Balken.
+  - **`#pp-result` gab es seit Anmerkung 206 nicht mehr**, `ppLoadIndex()`
+    schrieb also ins Nichts. Die Zahl steht jetzt unter dem Verwerfen-Knopf, und
+    die Rueckfrage holt sie beim Klick frisch statt aus `mp.photoTotal`.
 - **214** Die Einschraenkung aus 213 hat den Statistik-Reiter auf dem
   betriebenen PostgreSQL zum Stillstand gebracht (100 % CPU, 524 vom Proxy).
   Ursache war das `OR` zwischen zwei `IN`-Unterabfragen — siehe die neue Falle

@@ -40,7 +40,13 @@ const dom = new JSDOM(html, {
       let body = [];
       if (/\/api\/jobs\/start/.test(path)) body = { id: 'j1', type: 'immich', status: 'running', done: 0, started_at: '2026-08-09T10:00:00', updated_at: '2026-08-09T10:00:00' };
       else if (/\/api\/jobs/.test(path)) body = [];
-      else if (/\/api\/photos\/reset/.test(path)) { photoEvents = 0; body = { deleted: 1234 }; }
+      // Anmerkung 215: der Rückweg läuft stapelweise. Das Doppel muss deshalb
+      // BEIDE Zahlen liefern — `remaining` ist die, an der der Balken hängt und
+      // an der der Aufrufer erkennt, dass er fertig ist. Ein Doppel, das ein
+      // Feld auslässt, ist keine Vereinfachung, sondern eine andere Funktion:
+      // ohne `remaining` liefe die Schleife weiter, bis der Server nichts mehr
+      // hergibt, und der Wächter merkte davon nichts.
+      else if (/\/api\/photos\/reset/.test(path)) { photoEvents = 0; body = { deleted: 1234, remaining: 0 }; }
       else if (/\/api\/media\/immich\/reset/.test(path)) body = { removed: 7 };
       // Der ECHTE Startweg — ohne ihn kommt die Seite nie bis zu der Zeile,
       // die den Immich-Zustand zeichnet (Anmerkung 112).
@@ -121,15 +127,43 @@ setTimeout(async () => {
   // **Die Rückfrage gehört genau an EINEN der beiden Knöpfe.** Verknüpfungen
   // sind eine Ableitung; Foto-Ereignisse sind Einträge, und der Lauf hat
   // tausende davon angelegt, ohne dass jemand sie vorher gesehen hat.
+  //
+  // Gefragt wird im EIGENEN Dialog, nicht mit `window.confirm` (Anmerkung 215):
+  // die Rückfrage nennt die Zahl, und die holt der Knopf unmittelbar davor
+  // frisch — `mp.photoTotal` ist eine Merkzelle, und wer den Reiter offen
+  // liegen ließ, während der Immich-Lauf arbeitete, bekäme aus ihr „es gibt
+  // keine" über achttausend Zeilen.
   calls.length = 0;
   drop.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
-  await wait(60);
+  await wait(80);
+  const modal = d.getElementById('confirm-modal');
   ok('Das Verwerfen der Foto-Ereignisse fragt nach',
-     calls.some(([m]) => m === 'CONFIRM'),
+     !!modal && modal.classList.contains('show'),
      'tausend bestätigte Zeilen ohne Rückfrage zu löschen ist die Einbahnstraße andersherum');
-  const asked = calls.filter(([m]) => m === 'CONFIRM').length;
+  ok('…und nennt dabei die Zahl',
+     /1[.,]?234/.test(d.getElementById('cf-text').textContent),
+     `„${d.getElementById('cf-text').textContent}" — eine Rückfrage ohne Zahl ist keine Entscheidungsgrundlage`);
+  ok('…frisch geholt, nicht aus der Merkzelle',
+     calls.some(([m, p]) => m === 'GET' && /events\/index/.test(p)),
+     JSON.stringify(calls.map(c => c[1])));
+  // Die Gegenrichtung: solange niemand zugestimmt hat, ist nichts gelöscht.
+  ok('…und löscht nichts, bevor jemand zustimmt',
+     !calls.some(([m, p]) => m === 'POST' && /\/api\/photos\/reset/.test(p)),
+     'die Rückfrage wäre dann Zierde');
+  d.getElementById('cf-ok').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await wait(400);
   ok('…und löscht erst danach',
-     asked > 0 && calls.some(([m, p]) => m === 'POST' && /\/api\/photos\/reset/.test(p)));
+     calls.some(([m, p]) => m === 'POST' && /\/api\/photos\/reset/.test(p)));
+  // **Der Lauf sagt, dass er läuft** — das war die Rückmeldung: „keine saubere
+  // Meldung, wie lange das dauert und ob er noch was macht." Er ist deshalb
+  // stapelweise (jede Anfrage trägt ihre Deckelung) und registriert (er steht
+  // im Jobs-Reiter, obwohl der Browser ihn taktet).
+  ok('…stapelweise, damit es etwas zu melden gibt',
+     calls.some(([m, p]) => m === 'POST' && /\/api\/photos\/reset\?limit=\d+/.test(p)),
+     'ohne Deckelung ist es EINE Anweisung über zehntausende Zeilen — daran ist nichts zu takten');
+  ok('…und steht als Lauf im Protokoll',
+     started().some(([, , b]) => /photo_reset/.test(b || '')),
+     'ein Lauf, der Bestätigtes löscht, gehört in den Jobs-Reiter');
 
   console.log(fail ? `\nImmich-Lauf: ${fail} Prüfung(en) fehlgeschlagen`
                    : '\nImmich-Lauf: alles grün');

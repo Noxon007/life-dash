@@ -47,6 +47,12 @@ JOB_TYPES = {
     # abgeschlossene Zeilen tragen ihn, und „photo_points" als nackter
     # Schlüssel in der Tabelle wäre schlechter als ein Satz über etwas Altes.
     "photo_points": "Ereignisse aus Fotos anlegen (alt — jetzt Teil von „Fotos aus Immich“)",
+    # Anmerkung 215: vom BROWSER getaktet (steht deshalb nicht in
+    # SERVER_JOB_TYPES) und trotzdem ein Job — dieselbe Kombination wie beim
+    # Backup-Import. Registriert wird er aus zwei Gründen: er löscht
+    # Bestätigtes, das gehört ins Protokoll, und die Sperre je Typ hält zwei
+    # Tabs davon ab, sich gegenseitig die Stapel wegzulöschen.
+    "photo_reset": "Foto-Ereignisse verwerfen",
     "timeline_import": "Google-Timeline-Import",
     "data_import": "Daten-Import (JSON)",
 }

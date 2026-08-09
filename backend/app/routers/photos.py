@@ -18,8 +18,9 @@ das Bild selbst.
 from __future__ import annotations
 
 import logging
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
@@ -68,8 +69,12 @@ def photo_thumb(asset_id: str, db: Session = Depends(get_db),
 
 
 @router.post("/reset")
-def photo_reset(db: Session = Depends(get_db),
-                user: User = Depends(get_current_user)) -> dict:
+def photo_reset(
+    limit: Annotated[int, Query(ge=0, le=5000,
+                                description="0 = alles auf einmal")] = 0,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
     """Verwirft alle Foto-Ereignisse — und die Merkliste der Jahre dazu.
 
     **Das fasst jetzt Bestätigtes an**, anders als bei A45, wo eine Ableitung
@@ -82,11 +87,20 @@ def photo_reset(db: Session = Depends(get_db),
     Die Merkliste geht mit. Bliebe sie stehen, behauptete die Oberfläche nach
     dem Zurücksetzen „2004: nachgesehen, keine Fotos" — über einem Bestand, der
     gerade geleert wurde.
+
+    **Mit `limit` ein Stapel statt allem** (Anmerkung 215). Der Knopf löschte
+    zehntausende bestätigte Zeilen in EINER Anfrage: der Browser konnte
+    dazwischen nichts sagen, also stand die Seite ohne Auskunft — der
+    wiederkehrende Defekt ist die Stille. `remaining` ist die Zahl, an der der
+    Aufrufer seinen Balken misst; sie wird NACH dem Löschen frisch gezählt, statt
+    aus der eigenen Buchführung fortgeschrieben zu werden (ein zweiter Tab oder
+    ein laufender Immich-Lauf ändern denselben Bestand).
     """
-    count = pp.reset(db, user.id)
+    count = pp.reset(db, user.id, limit=limit or None)
     settings = dict(user.settings or {})
     settings.pop("photo_points", None)
     user.settings = settings
     db.commit()
-    log.info("Foto-Ereignisse verworfen: %d", count)
-    return {"deleted": count}
+    remaining = pp.count_photo_events(db, user.id)
+    log.info("Foto-Ereignisse verworfen: %d (noch %d)", count, remaining)
+    return {"deleted": count, "remaining": remaining}
