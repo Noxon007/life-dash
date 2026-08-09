@@ -197,7 +197,12 @@ any `MINOR`.
   collection of achievements that is emphatically *not* maxed out. It takes a
   few seconds and needs no internet connection at all: the weather is invented
   too, plausible for the latitude and the season, and the same every time it is
-  built. Everything and everyone in it is fictional. It only happens on a fresh
+  built. It comes with about 460 pictures, so the photo strips, the lightbox,
+  pictures on a day and the photo statistics have something to show — they are
+  generated colour fields with the place and date written across them, and they
+  say “Demo-Bild” on their face, because an invented picture that looked like a
+  real photograph is not something a life database should put in front of you.
+  Everything and everyone in it is fictional. It only happens on a fresh
   instance in development mode, and never on top of data you already have.
 - **Kilometres from your imported paths — in a tab of their own.** *Statistics →
   Paths* adds up what the Google Timeline import brought: your total distance,

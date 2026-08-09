@@ -236,8 +236,8 @@ Projektoberfläche) und **R2** (Doku-Seite) — Einzelheiten in `ROADMAP.md`.
 **Der Demo-Bestand steht (R1a, Anmerkung 203).** `app/demo/` baut hinter
 `SEED_DEMO=true` (nur dev-Modus, nur wenn das Konto leer ist) ein erfundenes
 Leben von 32 Jahren: ~8.500 Ereignisse, 29 Reisen, 5 Wohnorte, ~4.100 Wege,
-Wetter für jeden Tag, in ~5 s und **ohne Netz**. Vier Regeln, die beim Ändern
-zählen:
+~460 erzeugte Bilder, Wetter für jeden Tag, in ~12 s und **ohne Netz**. Fünf
+Regeln, die beim Ändern zählen:
 - **Gebaut, nicht durch die Pipeline gejagt** — sonst hinge der Bestand am
   KI-Anbieter und jeder Screenshot wäre ein Einzelstück.
 - **Das Wetter ist erfunden** (`demo/weather.py`, Hash über Ort+Tag, nur die
@@ -248,6 +248,11 @@ zählen:
   Lückenbericht etwas zu sagen hat. EINE Definition, drei Leser.
 - **Nichts ist später als gestern** datiert, und der Bestand ist nicht überall
   Platin (5 von 18) — beides bewusst, siehe Anmerkung 203.
+- **Die Bilder werden erzeugt** (`demo/photos.py`, Farbverlauf + Ort/Datum +
+  „Demo-Bild") und gehen über `media.store`, denselben Weg wie ein Upload.
+  Beide Sorten kommen vor: am Ereignis und am TAG (F18). **Die Foto-Ebene der
+  Karte bleibt leer** — die besteht aus `immich`-Ereignissen und lebt von
+  fremden Vorschaubildern; ohne Immich wären das tausende tote Verweise.
 
 **Offen aus den Rückmeldungen vom 2026-08-04** (Anmerkungen 168–182 sind
 erledigt, die zweite Rückmeldung mit elf Punkten vollständig, aus der dritten

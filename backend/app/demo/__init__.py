@@ -44,11 +44,12 @@ from datetime import date, datetime, time, timedelta
 
 from sqlalchemy.orm import Session
 
-from app.demo import life
+from app.demo import life, photos
 from app.demo.weather import synth_weather
 from app.models import (BaselineLocation, ConfirmState, DatePrecision, DayMetric,
                         Entity, Event, EventEntityLink, Fragment, FragmentStatus,
-                        Location, Metric, Source, Track, User)
+                        Location, MediaRef, Metric, Source, Track, User)
+from app.services import media
 from app.services.enrichment import WEATHER_REVISION, _too_recent
 
 log = logging.getLogger("lifedash.demo")
@@ -99,6 +100,7 @@ class _Builder:
         self.tracks: list[dict] = []
         self.metrics: list[dict] = []
         self.day_metrics: list[dict] = []
+        self.media: list[dict] = []
         self.today = date.today()
         # **Der Alltag endet gestern.** Ein Tagebucheintrag von heute 21 Uhr,
         # angelegt um halb elf am Morgen, ist ein Ereignis in der Zukunft — die
@@ -175,6 +177,29 @@ class _Builder:
             self._weather_for(eid, loc, when)
         return eid
 
+    # -- Bilder ------------------------------------------------------------ #
+    def photo(self, when: date, caption: str, loc: Location, *,
+              event_id: str | None = None, hour: int = 12, order: int = 0) -> None:
+        """Ein erzeugtes Platzhalterbild, gespeichert wie ein Upload.
+
+        `event_id=None` hängt es an den TAG statt an ein Ereignis (F18) — der
+        Ort, an den ein Foto am ehesten gehört, und bis 0.34 der einzige, an
+        den es nicht konnte. Beide Fälle kommen im Bestand vor, weil die
+        Foto-Statistik beide liest und nur eine Hälfte zu füllen eine
+        Auswertung ergäbe, die vollständig aussieht.
+        """
+        data = photos.make_photo(loc.city or loc.name, when.isoformat(), caption)
+        stored = media.store(self.user.id, data)
+        captured = _noon(when, hour, 0)
+        self.media.append({
+            "id": _uuid(), "user_id": self.user.id, "event_id": event_id,
+            "provider": "local", "external_id": stored["filename"],
+            "captured_at": captured, "mime": stored["mime"],
+            "bytes": stored["bytes"], "width": stored["width"],
+            "height": stored["height"], "caption": caption,
+            "sort_order": order, "created_at": captured,
+        })
+
     # -- Wetter ------------------------------------------------------------ #
     def _weather_rows(self, loc: Location, day: date) -> list[tuple[str, float | None, str | None, str | None]]:
         """(Schlüssel, Zahl, Text, Einheit) für einen Ort an einem Tag."""
@@ -217,9 +242,14 @@ class _Builder:
     # -- Schreiben --------------------------------------------------------- #
     def flush(self) -> None:
         self.db.flush()          # Orte und Entities brauchen ihre IDs
+        # **Reihenfolge ist hier eine Zusage, keine Bequemlichkeit.** Die
+        # Core-Inserts gehen an den ORM-Beziehungen vorbei, die sonst
+        # dafür sorgen; Bilder und Verknüpfungen verweisen auf
+        # Ereignisse, also stehen sie dahinter. Auf SQLite fiele ein
+        # Fehler hier gar nicht auf.
         for table, rows in ((Event, self.events), (EventEntityLink, self.links),
-                            (Track, self.tracks), (Metric, self.metrics),
-                            (DayMetric, self.day_metrics)):
+                            (MediaRef, self.media), (Track, self.tracks),
+                            (Metric, self.metrics), (DayMetric, self.day_metrics)):
             for chunk in _chunks(rows, 5000):
                 self.db.execute(table.__table__.insert(), chunk)
 
@@ -272,7 +302,27 @@ def _home_at(spans: list[tuple[date, date, Location]], day: date) -> Location:
 
 def _milestones(b: _Builder) -> None:
     for when, title, key in life.MILESTONES:
-        b.event(when, title, "milestone", b.place(key), hour=10)
+        loc = b.place(key)
+        eid = b.event(when, title, "milestone", loc, hour=10)
+        b.photo(when, title, loc, event_id=eid, hour=10)
+
+
+def _day_photos(b: _Builder, spans: list[tuple[date, date, Location]]) -> None:
+    """Bilder, die an einem TAG hängen und an keinem Ereignis (F18).
+
+    **Beide Sorten müssen vorkommen.** Die Foto-Statistik liest `captured_at`
+    ersatzweise das Datum des Ereignisses — wer nur eine Hälfte füllt, bekommt
+    eine Auswertung, die vollständig aussieht und es nicht ist. Und der Tag ist
+    der Ort, an den ein Bild am ehesten gehört: bis 0.34 war er der einzige, an
+    den es nicht konnte.
+    """
+    day = date(2015, 1, 1)
+    while day <= b.last_day:
+        day += timedelta(days=9 + b.rng.randrange(28))
+        if day > b.last_day or life.in_blank(day):
+            continue
+        home = _home_at(spans, day)
+        b.photo(day, f"Aus dem Alltag in {home.city}", home, hour=17)
 
 
 def _trips(b: _Builder) -> None:
@@ -290,10 +340,16 @@ def _trips(b: _Builder) -> None:
                 heading = f"Abreise aus {city}"
             else:
                 heading = life.FILLER_DAYS[offset % len(life.FILLER_DAYS)]
-            eid = b.event(day, heading, "trip", loc,
-                          hour=9 + (offset * 3) % 9,
+            hour = 9 + (offset * 3) % 9
+            eid = b.event(day, heading, "trip", loc, hour=hour,
                           note=title if offset == 0 else None)
             b.link(eid, country_entity, "mentioned")
+            # Auf einer Reise wird fotografiert, zu Hause seltener — deshalb
+            # sitzen die Bilder hier und nicht gleichverteilt über den Bestand.
+            # Ein Foto-Jahr, das aussieht wie jedes andere, wäre eine Aussage
+            # über den Generator statt über ein Leben.
+            for k in range(b.rng.randrange(3)):
+                b.photo(day, heading, loc, event_id=eid, hour=hour, order=k)
 
 
 def _concerts(b: _Builder) -> None:
@@ -303,6 +359,8 @@ def _concerts(b: _Builder) -> None:
         loc = b.place(key)
         eid = b.event(when, f"{artist} — {venue}", "concert", loc, hour=20)
         b.link(eid, b.entity("artist", artist))
+        if b.rng.random() < 0.6:
+            b.photo(when, artist, loc, event_id=eid, hour=20)
 
 
 def _habits(b: _Builder, spans: list[tuple[date, date, Location]]) -> None:
@@ -470,11 +528,13 @@ def seed_demo(db: Session, user: User) -> None:
     _concerts(b)
     _habits(b, spans)
     _timeline_import(b, spans)
+    _day_photos(b, spans)
     _queue(b)
     _residence_days(b, spans)
     b.flush()
     db.commit()
-    log.info("Demo-Bestand angelegt: %d Ereignisse, %d Wege, %d Orte, "
+    log.info("Demo-Bestand angelegt: %d Ereignisse, %d Wege, %d Orte, %d Bilder, "
              "%d Wetterwerte am Ereignis, %d am Wohnort-Tag (%.1f s)",
-             len(b.events), len(b.tracks), len(b.locations), len(b.metrics),
-             len(b.day_metrics), (datetime.now() - started).total_seconds())
+             len(b.events), len(b.tracks), len(b.locations), len(b.media),
+             len(b.metrics), len(b.day_metrics),
+             (datetime.now() - started).total_seconds())

@@ -20,15 +20,32 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.config import settings
 from app.data import countries as ref
 from app.database import Base
 from app.demo import _Builder, life, seed_demo
 from app.demo.weather import daylight_hours, synth_weather
 from app.models import (BaselineLocation, ConfirmState, DayMetric, Entity, Event,
-                        Fragment, FragmentStatus, Location, Metric, Source, Track,
-                        User, UserRole)
+                        Fragment, FragmentStatus, Location, MediaRef, Metric,
+                        Source, Track, User, UserRole)
+from app.services import media
 from app.services.enrichment import (_WEATHER_METRICS, _WEATHER_TEXT_METRICS,
                                      WEATHER_REVISION, _weather_candidates)
+
+
+@pytest.fixture(scope="module", autouse=True)
+def demo_media(tmp_path_factory):
+    """Die Bilder gehen in ein Wegwerf-Verzeichnis.
+
+    Ohne das schriebe die Suite vierhundert JPEGs nach `backend/media/` — in
+    das Verzeichnis, das im Betrieb die einzigen Daten hält, die der
+    JSON-Export nicht mitnimmt. Ein Test, der dort etwas ablegt, ist kein
+    Test mehr, sondern ein Schreibzugriff auf fremdes Eigentum.
+    """
+    before = settings.media_dir
+    settings.media_dir = tmp_path_factory.mktemp("demo-media")
+    yield settings.media_dir
+    settings.media_dir = before
 
 
 @pytest.fixture(scope="module")
@@ -124,13 +141,14 @@ def test_polar_day_and_night_do_not_crash():
 def test_the_schedule_is_reproducible(db, user, monkeypatch):
     """Zweimal aufgebaut, zweimal dieselben Ereignisse.
 
-    Das Wetter wird für diesen Vergleich abgeschaltet: es ist eine reine
-    Funktion von (Ort, Tag) und hat seine eigene Prüfung oben — was hier auf
-    dem Spiel steht, ist der GEWÜRFELTE Teil, also wann jemand laufen war.
-    Ohne das Abschalten kostete die Zusicherung zweihunderttausend Zeilen für
-    eine Frage, die keine einzige davon betrifft.
+    Wetter und Bilder sind für diesen Vergleich abgeschaltet: beide sind reine
+    Funktionen ihrer Eingaben und haben ihre eigenen Prüfungen — was hier auf
+    dem Spiel steht, ist der GEWÜRFELTE Teil, also wann jemand laufen war. Ohne
+    das Abschalten kostete die Zusicherung zweihunderttausend Metrikzeilen und
+    fünfhundert JPEGs auf der Platte, für eine Frage, die keines davon betrifft.
     """
     monkeypatch.setattr(_Builder, "_weather_rows", lambda self, loc, day: [])
+    monkeypatch.setattr(_Builder, "photo", lambda self, *a, **kw: None)
 
     def fingerprint(tag):
         second = User(oidc_subject=f"twin-{tag}", email=f"{tag}@example.org",
@@ -272,6 +290,45 @@ def test_nothing_at_all_happens_in_the_blank(corpus):
     assert db.query(Event).filter(Event.date_start.between(lo, hi)).count() == 0
     assert db.query(DayMetric).filter(
         DayMetric.day.between(life.BLANK[0], life.BLANK[1])).count() == 0
+
+
+def test_both_kinds_of_photo_exist_and_their_files_do_too(corpus, demo_media):
+    """Fotoleisten, Lightbox, Tagesbilder und die Foto-Tafel hängen daran.
+
+    **Und jedes Bild muss wirklich auf der Platte liegen, samt Vorschau.** Eine
+    Zeile ohne Datei ist im Zeitstrahl ein kaputtes Bild an jeder Karte — das
+    ist schlechter als gar keins, und es fällt nur im Browser auf, wo es
+    niemand prüft. Beide Sorten kommen vor: am Ereignis und am TAG (F18), weil
+    die Statistik beide liest und eine halb gefüllte Auswertung vollständig
+    aussieht.
+    """
+    db, user = corpus
+    at_event = db.query(MediaRef).filter(MediaRef.event_id.isnot(None)).count()
+    at_day = db.query(MediaRef).filter(MediaRef.event_id.is_(None)).count()
+    assert at_event > 50 and at_day > 20, (at_event, at_day)
+
+    for ref_row in db.query(MediaRef).limit(40).all():
+        assert ref_row.provider == "local"
+        original = media.path_for(user.id, ref_row.external_id)
+        assert original.exists() and original.stat().st_size > 0, original
+        assert media.path_for(user.id, ref_row.external_id
+                              + media.THUMB_SUFFIX).exists()
+        # Ein Bild ohne Aufnahmezeit hätte am TAG keinen Anker (F18).
+        assert ref_row.captured_at is not None
+        assert ref_row.width and ref_row.height and ref_row.bytes
+
+
+def test_photos_are_where_a_life_takes_them(corpus):
+    """Auf Reisen wird fotografiert, an einem Dienstag zu Hause seltener.
+
+    Gleichverteilte Bilder wären eine Aussage über den Generator statt über
+    ein Leben — und die Foto-Jahre der Statistik sähen aus wie eine Gerade.
+    """
+    db, _ = corpus
+    on_trips = (db.query(MediaRef).join(Event, MediaRef.event_id == Event.id)
+                .filter(Event.category == "trip").count())
+    with_event = db.query(MediaRef).filter(MediaRef.event_id.isnot(None)).count()
+    assert on_trips > with_event / 2, (on_trips, with_event)
 
 
 def test_the_collection_is_not_instantly_platinum(corpus):
