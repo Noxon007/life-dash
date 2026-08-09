@@ -40,6 +40,10 @@ Thumbs.db
 # Hochgeladene Medien (Lebensdatenbank, Anm. 57 — separat sichern)
 backend/media/
 media/
+# Die Bilder, die tools/_measure_api.py beim Messen anlegt (MEDIA_DIR-Vorgabe).
+# `media/` matcht das NICHT — der Ordner heisst nicht „media" — und so sind mit
+# 8820d67 einmal 926 Dateien / 20 MB Messartefakte in die Historie geraten.
+_measure_media/
 
 # Node steckt AUSSCHLIESSLICH in den Wächtern; die App hat keinen Build-Schritt
 # (Anm. 4). package-lock.json ist bewusst NICHT ignoriert: die CI installiert
