@@ -16,6 +16,11 @@ any `MINOR`.
 ## [Unreleased]
 
 ### Added
+- **Your age, exactly.** The statistics tab now has a block showing the time
+  since you were born in years, months, weeks, days, hours, minutes and
+  seconds, with the seconds running while the tab is open. Each cell counts the
+  whole elapsed time in its own unit — “1,847 weeks”, not “34 years and 2
+  weeks”. It appears once your birth is entered as a milestone.
 - **The timeline lists every year of your life at once.** In the *Year* and
   *Decade* views you no longer page your way backwards: every year that has
   anything in it is listed straight away, with its real count, and clicking one
@@ -246,6 +251,30 @@ any `MINOR`.
   your own network.
 
 ### Changed
+- **“Farthest from home” now answers the question for every place you have
+  lived.** It used to be a single line for your whole life, and that only ever
+  described the residence you happened to travel furthest from. You now get the
+  three furthest destinations **per residence**, with the period beside it — the
+  longest trip from your parents' house is a different piece of information from
+  the longest trip from where you live today, not an earlier draft of it. A
+  residence with nothing recorded says so rather than being left out.
+- **The “Moves” tile is now “Residences”.** It used to count milestones whose
+  text contained “moved”, so it read 0 for most people while several flats with
+  date ranges sat under *My data*. It counts those rows now, and clicking it
+  takes you to the form where you enter them.
+- **The loading views say what they are doing instead of counting.** *Statistics
+  → 3 / 4* never moved, because one of the four requests takes longer than the
+  other three together — a number that looks like a promise about the remaining
+  wait but is not one. Every view now names what it is working on in a sentence,
+  including the collections, the world map and the badges, which previously
+  showed nothing but their own title. Long runs that really do have a known
+  amount of work — backup import, timeline import, discarding photo events —
+  keep their bar and their *X of Y*.
+- **The Immich run counts its two phases separately.** The progress used to read
+  “241 events and months checked”, which is a total over two different things
+  and tells you neither. It now says “2 events checked” while it works through
+  your entries and starts again at “12 months checked · ~228 to go” for the
+  library pass.
 - **The two Immich runs are now one.** *Link photos* and *Create events from
   photos* were separate buttons with a year picker and a mandatory preview
   between them — and they asked Immich the same question, each answering half
@@ -404,12 +433,12 @@ any `MINOR`.
   trip* is unchanged and still asks about trips, because a residence day is not
   one. Statistics take roughly a fifth longer to compute as a result — that is
   the price of the first twenty years of a life appearing in them.
-- **The loading window's counter now moves while it waits.** Opening
-  *Statistics* showed “0 / 2” for the whole wait and then went straight to
-  done: one step covered four requests made at once, so the number had nothing
-  to say until they had all come back. Each request now counts for itself. On
-  *Today*, where there is only one request to wait for, the numbers are gone
-  entirely — “0 / 1” is not progress, it is a bar with two states. And the open
+- **The loading window no longer shows a counter that stands still.** Opening
+  *Statistics* used to show “0 / 2” for the whole wait and then jump to done.
+  Counting the individual requests instead did not fix it either — one of them
+  takes longer than the others together, so it simply stood at “3 / 4”. The
+  loading views now say what they are working on in a sentence and leave the
+  numbers to the runs that genuinely have a known amount of work. And the open
   statistics panel is no longer fetched twice while the view is opening.
 - **The weather now comes from one named source instead of whichever one the
   service felt like.** Until now the request left the choice to Open-Meteo — and
@@ -981,8 +1010,20 @@ any `MINOR`.
   changelog on screen. Their endpoints are still there if a run is ever needed.
 - **The “Strongest sun” (UV) statistics tile.** It could never fill: the weather
   archive used for past dates carries no UV values at all, so the tile stayed
-  empty no matter how much weather you added. “Sunniest day” (sunshine hours,
-  which the archive does provide) remains and covers the same ground.
+  empty no matter how much weather you added.
+- **Four weather records that could not tell two days apart:** *Sunniest day*,
+  *Longest rain*, *Longest day* and *Shortest day*, each with its ranking.
+  Every one of them is capped, and the cap is what they showed — sunshine
+  cannot last longer than daylight, so every cloudless day around midsummer
+  ties at the same number; a day has 24 hours, and a day that rains through is
+  not rare; and the length of a day is a property of the calendar, so the tile
+  named the solstice no matter what happened. The rankings underneath made it
+  plain: ten places, one value. Hours of sunshine still count towards the
+  yearly total in the weather balance, and all the values are still shown on
+  the individual entry.
+- **The “Days with the most photos” ranking.** A day's photo strip holds at most
+  twelve pictures, so the list showed twelve for every day in it — that is our
+  own limit, not a statement about the day you took the most photos.
 - **The “Build embeddings” button in the System tab.** With the AI-based search
   gone (see above), it had nothing left to do.
 - **The “Go to the timeline” tile on the Today page.** It was a navigation

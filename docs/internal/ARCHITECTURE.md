@@ -311,12 +311,22 @@ Below both: a single short request gets the thin net bar at the top of the
 window and nothing else. The overlay waits 300 ms before appearing, so a view
 change that finishes in 120 ms never flashes one.
 
-**What the bar counts** (note 193): requests, not sections. A step that spans
-several simultaneous requests stands still for the whole wait and then jumps —
-which is the same claim as a bar stuck at 0 %, plus a total to measure it
-against. `op.all(list, note)` therefore ticks per request as each returns,
-failures included. Where there is genuinely one thing to wait for, the numbers
-are left out and the sentence carries the message.
+**When the bar counts, and when it must not** (notes 193 and 216). A step that
+spans several simultaneous requests stands still for the whole wait and then
+jumps — the same claim as a bar stuck at 0 %, plus a total to measure it
+against. Note 193 answered that by counting requests instead of sections;
+note 216 found that this only made the standstill finer-grained, because one of
+four requests routinely takes longer than the other three together. **A counter
+over requests does not measure the waiting, but it looks like a promise about
+it.**
+
+The rule that survived: **a bar is a claim about the remaining time, so it
+belongs only where the total genuinely is the work** — backup import, timeline
+import, the photo undo, where `op.step(done, total, note)` counts rows or
+batches. Every view loader uses `op.note(text)` alone: a sentence names what is
+being waited for and promises nothing about how long. `check-foreground.js`
+holds both halves — a loader must report a non-empty sentence and must not call
+`step()`; the second check alone would pass for a loader that says nothing.
 
 ---
 

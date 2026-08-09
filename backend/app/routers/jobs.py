@@ -491,8 +491,24 @@ def _run_immich(db: Session, job: Job) -> tuple[str, str]:
                       "keine Foto-Ereignisse, und die Tagesleisten sind nicht "
                       "nach Besitz gefiltert.")
 
+    # ------------------------------------------------------------------ #
+    # **Anmerkung 216 — zwei Phasen, zwei Zähler.**
+    # ------------------------------------------------------------------ #
+    # Hier stand EINE Zahl über beide Phasen, mit der Einheit „Ereignisse und
+    # Monate geprüft". Gemeldet wurde, was daran nicht zu lesen ist: „241
+    # Ereignisse und Monate geprüft" nennt weder, wie viele Ereignisse es waren
+    # (im gemeldeten Fall: eines), noch wie viele Monate (240). Eine Summe über
+    # zwei verschiedene Dinge ist keine Auskunft über eines davon — dieselbe
+    # Verwechslung wie „Tage gegen Einträge", nur eine Ebene höher.
+    #
+    # Jede Phase zählt jetzt ihre eigene Einheit, und `job.done` fängt zum
+    # Phasenwechsel wieder bei null an. Der Rücksprung ist der Preis dafür,
+    # dass die Zahl daneben immer genau eine Sache bedeutet; die Einheit
+    # wechselt im selben Commit mit, sodass „1 Ereignis geprüft" nie zu
+    # „1 Monat geprüft" umgedeutet wird.
     total = len(events) + len(months)
-    job.unit = "Ereignisse und Monate geprüft"
+    job.unit = "Ereignisse geprüft"
+    job.done = 0
     db.commit()
     # Entduplizierung über den ganzen Lauf: jedes Foto genau einmal, am ersten
     # passenden Ereignis. Vorbelegt mit dem, was schon hängt — so verdoppelt
@@ -507,11 +523,12 @@ def _run_immich(db: Session, job: Job) -> tuple[str, str]:
 
     linked = ticked = 0
 
-    def _progress(i: int) -> bool:
-        """Fortschritt schreiben und ins Log — done = geprüfte Einheiten."""
+    def _progress(i: int, of: int) -> bool:
+        """Fortschritt schreiben und ins Log — `i` von `of` DIESER Phase."""
         nonlocal ticked
-        log.info("Immich-Lauf: %d/%d geprüft, %d Fotos verknüpft", i, total, linked)
-        ok = _tick(db, job.id, i - ticked, total - i)
+        log.info("Immich-Lauf: %d/%d %s, %d Fotos verknüpft",
+                 i, of, job.unit, linked)
+        ok = _tick(db, job.id, i - ticked, of - i)
         ticked = i
         return ok
 
@@ -524,12 +541,14 @@ def _run_immich(db: Session, job: Job) -> tuple[str, str]:
             db.rollback()      # paralleler Lauf war schneller — kein Schaden
         except immich_api.ImmichError as exc:
             db.rollback()
-            log.warning("Immich-Lauf gestoppt bei %d/%d: %s", i, total, exc)
+            log.warning("Immich-Lauf gestoppt bei Ereignis %d/%d: %s",
+                        i, len(events), exc)
             return "stopped", f"{linked} Fotos verknüpft, dann Abbruch: {exc}"
         # Alle 10 Einheiten Fortschritt schreiben (Balken) — ohne Spur ist ein
         # langsamer Lauf von einem hängenden nicht zu unterscheiden.
-        if (i % 10 == 0 or i == len(events)) and not _progress(i):
-            return "stopped", f"{linked} Fotos verknüpft (gestoppt bei {i}/{total})."
+        if (i % 10 == 0 or i == len(events)) and not _progress(i, len(events)):
+            return "stopped", (f"{linked} Fotos verknüpft (gestoppt bei "
+                               f"Ereignis {i}/{len(events)}).")
 
     # ---- Phase 2: die Bibliothek, Monat für Monat ---------------------------
     # Die drei Mengen EINMAL holen und fortschreiben: je Monat neu wären das
@@ -539,12 +558,25 @@ def _run_immich(db: Session, job: Job) -> tuple[str, str]:
     districts = pp.district_index(db, user.id)
     created = strips = 0
     dropped: dict[str, int] = {}
+    # Der Phasenwechsel: Einheit UND Zähler in EINEM Commit, sonst stünde für
+    # einen Wimpernschlag „240 Monate geprüft", während die 240 noch die
+    # Ereignisse der ersten Phase sind.
+    #
+    # **Nur, wenn es eine zweite Phase gibt.** Ohne offene Monate bliebe sonst
+    # „0 Monate geprüft" als Schlusszeile in der Job-Historie stehen — eine
+    # Null, die wie ein Fehlschlag aussieht, obwohl der Lauf die Ereignisse
+    # abgearbeitet hat. Die Zeile behält dann, was sie wirklich getan hat.
+    if months:
+        job.unit = "Monate geprüft"
+        job.done = 0
+        ticked = 0
+        db.commit()
 
     def _phase2_note(where: str) -> str:
         return (f"{created} Ereignisse angelegt, {linked} Fotos verknüpft "
                 f"(davon {strips} an ihren Tagen) — {where}.{month_note}")
 
-    for i, month in enumerate(months, len(events) + 1):
+    for i, month in enumerate(months, 1):
         report: dict = {}
         try:
             c, n = pp.scan_month(db, user, month, url, key, my_id,
@@ -570,9 +602,12 @@ def _run_immich(db: Session, job: Job) -> tuple[str, str]:
         strips += n
         for reason, count in (report.get("dropped") or {}).items():
             dropped[reason] = dropped.get(reason, 0) + count
-        if not _progress(i):
+        if not _progress(i, len(months)):
             return "stopped", _phase2_note(f"gestoppt bei {month}")
-    _progress(total)
+    # Kein abschließendes `_progress(total)` mehr: Phase 2 hakt JEDEN Monat ab,
+    # die letzte Runde setzt „noch 0" also schon. Der Aufruf danach war die
+    # einzige Stelle, an der `ticked` ohne zweite Phase rückwärts gelaufen wäre
+    # — er hätte `job.done` bei leerer Monatsliste auf null zurückgezogen.
 
     # **Die Meldung muss die Differenz erklären, nicht nur die Summe nennen.**
     # „8.000 gelesen, 17 angelegt" ließ genau die Frage offen, die man beim

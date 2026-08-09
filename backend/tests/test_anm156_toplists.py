@@ -129,23 +129,31 @@ def test_the_direction_of_the_record_picks_the_place_of_the_day(db, user):
     assert wx["cold"][0]["place"] == "Hamburg" and wx["cold"][0]["value"] == 14.0
 
 
-def test_a_zero_is_no_record_for_rain_but_is_one_for_daylight(db, user):
+def test_a_zero_is_no_record_for_rain_but_is_one_for_the_felt_cold(db, user):
     """Die Sonderfälle aus `_EXTREMES` gelten auch in der Liste — sonst wären
-    sie beim ersten Blick daneben widerlegt (Anmerkung 104)."""
+    sie beim ersten Blick daneben widerlegt (Anmerkung 104).
+
+    **Anmerkung 216: vorgeführt am Tageslicht ging nicht mehr**, denn die
+    beiden Tageslicht-Kacheln sind weg (die Tageslänge nennt die Sonnenwende,
+    egal was an dem Tag war). Die Regel selbst ist unverändert und braucht
+    weiterhin beide Seiten: 0 mm Regen ist KEIN Rekord, 0 °C gefühlte Kälte
+    schon — sonst verschwände jeder Tag um den Gefrierpunkt aus der Liste.
+    """
     dry = _event(db, user, datetime(2024, 1, 1))
     wet = _event(db, user, datetime(2024, 1, 2))
     db.add_all([
         Metric(event_id=dry.id, key="rain_mm", value=0.0, source=Source.weather),
         Metric(event_id=wet.id, key="rain_mm", value=14.0, source=Source.weather),
-        Metric(event_id=dry.id, key="daylight_h", value=0.0, source=Source.weather),
-        Metric(event_id=wet.id, key="daylight_h", value=8.0, source=Source.weather),
+        Metric(event_id=dry.id, key="apparent_temp_min_c", value=0.0,
+               source=Source.weather),
+        Metric(event_id=wet.id, key="apparent_temp_min_c", value=8.0,
+               source=Source.weather),
     ])
     db.commit()
 
     wx = compute_toplists(db, user.id)["weather"]
     assert [r["value"] for r in wx["rainy"]] == [14.0]
-    # Die Polarnacht IST der kürzeste Tag — und der interessanteste Wert.
-    assert wx["shortest_day"][0]["value"] == 0.0
+    assert wx["felt_cold"][0]["value"] == 0.0
 
 
 def test_the_order_is_stable_on_ties(db, user):
@@ -325,16 +333,27 @@ def test_photos_count_the_day_from_both_anchors(db, user):
     assert (p["uploads"], p["linked"]) == (1, 3)
     assert p["bytes"] == 2048, "nur Hochgeladenes belegt DIESE Platte"
     assert p["events_with_photo"] == 1 and p["events_total"] == 2
-    # Alle vier liegen auf demselben Tag — der eine über sein Ereignis, die
-    # drei über `captured_at`.
-    assert p["days"][0] == {"day": "2024-05-04", "count": 4}
+    # Beide Anker zählen mit: der Zeitraum reicht bis zu dem Tag, an dem die
+    # drei Immich-Bilder liegen — sie hängen an KEINEM Ereignis.
     assert p["first"] == "2024-05-04"
+    assert [(y["year"], y["count"]) for y in p["years"]] == [(2024, 4)]
+    # **Anmerkung 216: „Tage mit den meisten Fotos" gibt es nicht mehr.** Die
+    # Zahl war der Zwölfer-Deckel der Tagesleiste, nicht der Bestand des Tages.
+    # Geprüft wird das Feld und nicht die Anzeige: solange der Server es
+    # liefert, baut die Oberfläche früher oder später wieder eine Kachel daraus.
+    assert "days" not in p
 
 
 def test_farthest_is_measured_against_the_home_of_that_time(db, user):
     """**Ein Lebensmittelpunkt wandert.** Gemessen wird gegen den Wohnort, der
     AN DEM TAG galt — sonst wäre die Kindheit an der Ostsee eine Fernreise,
     sobald jemand nach München zieht.
+
+    **Anmerkung 216: eine Gruppe JE WOHNORT.** Bis dahin kam von hier genau
+    eine Zeile zurück, das globale Maximum — obwohl die Schleife schon immer
+    über alle Zeiträume lief. Derselbe Ort, zwei Zeiten: von Kiel aus sind es
+    90 km nach Hamburg, von München aus 600. Beide Zahlen sind eine Auskunft,
+    und die eine ist nicht der Vorentwurf der anderen.
     """
     kiel = _loc(db, user, "Kiel", city="Kiel", country="Deutschland")
     kiel.lat, kiel.lng = 54.32, 10.14
@@ -348,26 +367,66 @@ def test_farthest_is_measured_against_the_home_of_that_time(db, user):
         BaselineLocation(user_id=user.id, location_id=muenchen.id,
                          date_start=date(2010, 1, 1), date_end=date(2019, 12, 31)),
     ])
-    # Hamburg: 90 km von Kiel, aber 600 km von München.
     _event(db, user, datetime(2005, 6, 1), loc=hamburg, title="damals")
-    db.commit()
-    near = compute_toplists(db, user.id)["farthest"]
-    assert near and near["home"] and 80 < near["km"] < 110, near
-
-    # Derselbe Ort, andere Zeit — jetzt ist es weit weg.
     _event(db, user, datetime(2015, 6, 1), loc=hamburg, title="später")
     db.commit()
-    far = compute_toplists(db, user.id)["farthest"]
+
+    groups = compute_toplists(db, user.id)["farthest"]
+    # Chronologisch, wie `baseline.spans` sie liefert.
+    assert [g["home"] for g in groups] == ["Kiel", "München"], groups
+    assert [g["from"] for g in groups] == ["2000-01-01", "2010-01-01"]
+    near, far = groups[0]["tops"][0], groups[1]["tops"][0]
+    assert 80 < near["km"] < 110, near
     assert far["km"] > 500 and far["date"] == "2015-06-01", far
 
 
+def test_farthest_keeps_three_per_residence_and_sorts_them(db, user):
+    """Drei Ziele je Wohnort, absteigend — der vierte fällt weg.
+
+    Der Deckel steht in `FAR_PER_HOME` und nicht als Zahl in der Schleife: er
+    entscheidet, WAS zu sehen ist, und das gehört an eine Stelle, die man
+    benennen kann.
+    """
+    kiel = _loc(db, user, "Kiel", city="Kiel", country="Deutschland")
+    kiel.lat, kiel.lng = 54.32, 10.14
+    db.add(BaselineLocation(user_id=user.id, location_id=kiel.id,
+                            date_start=date(2000, 1, 1), date_end=date(2009, 12, 31)))
+    # Vier Ziele in steigender Entfernung — Hamburg (~90 km), Berlin (~300),
+    # München (~700), Lissabon (~2.600).
+    for name, lat, lng in [("Hamburg", 53.55, 10.00), ("Berlin", 52.52, 13.40),
+                           ("München", 48.14, 11.58), ("Lissabon", 38.72, -9.14)]:
+        place = _loc(db, user, name, city=name, country="X")
+        place.lat, place.lng = lat, lng
+        _event(db, user, datetime(2005, 6, 1), loc=place, title=name)
+    db.commit()
+
+    tops = compute_toplists(db, user.id)["farthest"][0]["tops"]
+    assert [r["place"] for r in tops] == ["Lissabon", "München", "Berlin"], tops
+    assert tops[0]["km"] > tops[1]["km"] > tops[2]["km"]
+
+
+def test_a_residence_without_anything_recorded_still_gets_its_group(db, user):
+    """**Anmerkung 216: „von hier aus nichts erfasst" ist eine Auskunft.**
+
+    Ein Wohnort, der einfach fehlt, sieht aus wie einer, den es nicht gibt —
+    und der Nutzer sucht dann in seinen Wohnort-Zeilen nach dem Fehler.
+    """
+    kiel = _loc(db, user, "Kiel", city="Kiel", country="Deutschland")
+    kiel.lat, kiel.lng = 54.32, 10.14
+    db.add(BaselineLocation(user_id=user.id, location_id=kiel.id,
+                            date_start=date(2000, 1, 1), date_end=date(2009, 12, 31)))
+    db.commit()
+    groups = compute_toplists(db, user.id)["farthest"]
+    assert len(groups) == 1 and groups[0]["tops"] == [], groups
+
+
 def test_without_a_residence_there_is_no_far_away(db, user):
-    """`None` statt einer Null, die wie „war nie weg" aussieht."""
+    """Eine leere Liste statt einer Null, die wie „war nie weg" aussieht."""
     loc = _loc(db, user, "Hamburg", city="Hamburg", country="Deutschland")
     loc.lat, loc.lng = 53.55, 10.00
     _event(db, user, datetime(2015, 6, 1), loc=loc)
     db.commit()
-    assert compute_toplists(db, user.id)["farthest"] is None
+    assert compute_toplists(db, user.id)["farthest"] == []
 
 
 def test_reach_counts_the_residence_too(db, user):

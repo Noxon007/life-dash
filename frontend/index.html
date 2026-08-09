@@ -290,6 +290,16 @@
   .bar-row[data-bar-key] { cursor: pointer; border-radius: 6px; }
   .bar-row[data-bar-key]:hover { background: var(--bg-elev); }
   .stat-num { font-size: 34px; font-weight: 700; letter-spacing: -1px; }
+  /* Anmerkung 216 — die Zellen im Alters-Block. Eigene Größe, weil dort
+     „1.135.849.203" steht und nicht „34": bei 34px bräche die Zahl um und die
+     Kachel wäre zwei Zeilen hoch, während ihre Nachbarn eine sind.
+     `tabular-nums` hält die Ziffern gleich breit — ohne das wackelt die
+     Sekundenzelle im Sekundentakt, und genau die sieht man an. */
+  .age-cell .stat-num {
+    font-size: 22px; letter-spacing: -.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .age-cell { padding: 14px 16px; }
   .stat-label { color: var(--text-dim); font-size: 13px; margin-top: 4px; }
   .stat-sub { font-size: 12px; margin-top: 8px; color: var(--accent-2); }
   .panel {
@@ -331,6 +341,14 @@
   .bl-row .bar-val { width: auto; flex-shrink: 0; font-weight: 600; color: var(--text); }
   .top-rank { width: 22px; flex-shrink: 0; text-align: right; font-size: 12px;
               font-weight: 700; color: var(--accent); }
+  /* Anmerkung 216 — Zwischenüberschrift in einer Rangliste („Am weitesten von
+     zu Hause" gruppiert je Wohnort). Sie muss sich von einer Zeile
+     unterscheiden LASSEN, sonst liest sich der Wohnort wie ein Reiseziel:
+     deshalb fett, ohne Rang und mit einer Linie darüber. Die erste bekommt
+     keine — eine Trennlinie direkt unter der Überschrift trennt nichts. */
+  .top-group { font-size: 13px; font-weight: 600; margin: 16px 0 8px;
+               padding-top: 12px; border-top: 1px solid var(--border); }
+  .panel-rows > .top-group:first-child { margin-top: 0; padding-top: 0; border-top: none; }
   .top-row[data-top-day] { cursor: pointer; border-radius: 6px; padding: 2px 4px; margin: 0 -4px 8px; }
   .top-row[data-top-day]:hover { background: var(--bg-elev); }
   .action-row { display: flex; gap: 16px; padding: 16px 18px; border-bottom: 1px solid var(--border); align-items: flex-start; }
@@ -1384,7 +1402,7 @@
                das?", „unscharf" fragt „wann war das?" — zwei Fragen, also zwei
                Kacheln statt einer gemischten Zahl. Erscheint nur, wenn es
                wirklich etwas zu tun gibt; eine Dauer-Null ist keine Aufgabe. -->
-          <div class="stat-card" id="today-fuzzy-card" data-go="admin:fuzzy-title"
+          <div class="stat-card" id="today-fuzzy-card" data-go="admin:moderation/fuzzy-title"
                style="cursor:pointer; display:none">
             <div class="stat-num" id="today-fuzzy">–</div>
             <div class="stat-label" data-i18n="today.fuzzy">Unscharf datiert</div>
@@ -1749,10 +1767,52 @@
           <div class="stat-card" data-go="comp:artist" data-req-mod="artist"><div class="stat-num" id="stat-artists">–</div><div class="stat-label" data-i18n="stat.artists">Künstler live</div><div class="stat-sub" data-i18n="stat.sub.collection">Kompendium</div></div>
           <div class="stat-card" data-go="timeline:milestone"><div class="stat-num" id="stat-age">–</div><div class="stat-label" data-i18n="stat.age">Alter</div><div class="stat-sub" id="stat-age-sub" data-i18n="stat.sub.age">Geburt als Meilenstein eintragen</div></div>
           <div class="stat-card" data-go="timeline:milestone"><div class="stat-num" id="stat-milestones">–</div><div class="stat-label" data-i18n="stat.milestones">Meilensteine</div><div class="stat-sub" data-i18n="stat.sub.milestones">Hochzeit, Geburt, Umzug …</div></div>
-          <div class="stat-card" data-go="timeline:milestone"><div class="stat-num" id="stat-moves">–</div><div class="stat-label" data-i18n="stat.moves">Umzüge</div><div class="stat-sub" data-i18n="stat.sub.frommilestones">aus Meilensteinen</div></div>
+          <!-- Anmerkung 216: Hier stand „Umzüge", gezählt aus dem TEXT von
+               Meilensteinen („Umzug"/„umgezogen"/„eingezogen"). Gemeldet:
+               steht auf 0, obwohl mehrere Wohnungen eingetragen sind — die
+               Kachel zählte die Beschriftung und zeigte sie als Tatsache.
+               Wohnorte sind seit F20 eine Zeile mit Zeitraum; die zählt sie
+               jetzt, und sie heißt danach. Der Klick führt dorthin, wo man sie
+               anlegt (Verwaltung → Meine Daten). -->
+          <div class="stat-card" data-go="admin:daten/bl-block"><div class="stat-num" id="stat-residences">–</div><div class="stat-label" data-i18n="stat.residences">Wohnorte</div><div class="stat-sub" data-i18n="stat.sub.residences">mit Zeitraum eingetragen</div></div>
           <div class="stat-card" data-go="timeline:meal" data-req-mod="food"><div class="stat-num" id="stat-meals">–</div><div class="stat-label" data-i18n="stat.meals">Mahlzeiten</div><div class="stat-sub" data-i18n="stat.sub.catmeal">Kategorie meal</div></div>
           <div class="stat-card" data-go="admin"><div class="stat-num" id="stat-unconfirmed">–</div><div class="stat-label" data-i18n="stat.unconfirmed">Unbestätigt</div><div class="stat-sub" data-i18n="stat.sub.tomoderate">zu moderieren</div></div>
         </div>
+
+        <!-- Anmerkung 216: Das Alter in sieben Einheiten. Die Kachel darüber
+             sagt „34" und beantwortet damit die Frage, die man einmal im Jahr
+             stellt; die interessante ist die andere — wie viel Zeit ist das
+             eigentlich? Deshalb ein eigener Block und kein Dialog: er steht da,
+             ohne dass man ihn suchen muss (Entscheidung des Users).
+
+             Jede Zelle ist die GESAMTE verstrichene Zeit in ihrer Einheit,
+             nicht der Rest nach der größeren — „1.847 Wochen" und nicht
+             „34 Jahre, 2 Wochen". Beides wäre richtig, aber nur eines ist in
+             sieben Zellen nebeneinander lesbar, und die Überschrift sagt es.
+
+             Ohne Geburts-Meilenstein bleibt der Block ganz weg statt mit
+             Nullen dazustehen: eine Null ist hier keine Auskunft, sondern eine
+             fehlende. -->
+        <div class="panel" id="age-exact" style="margin-bottom:24px; display:none">
+          <h3 data-i18n="age.exact.title">🎂 Dein Alter genau</h3>
+          <div class="action-desc" style="margin-bottom:12px" id="age-exact-sub"></div>
+          <!-- Die Beschriftungen stehen im MARKUP und nicht im Skript: sie
+               ändern sich nie, nur die Zahlen darüber. Damit übersetzt
+               `applyI18n` sie wie jedes andere Label, und der Wächter
+               `check-i18n-coverage.js` findet die Schlüssel — ein Katalog-
+               Eintrag, der nur in einem JS-Array steht, sieht für ihn wie ein
+               verwaister aus. -->
+          <div class="grid cols-4" id="age-cells">
+            <div class="stat-card age-cell"><div class="stat-num" data-age="years">–</div><div class="stat-label" data-i18n="age.u.years">Jahre</div></div>
+            <div class="stat-card age-cell"><div class="stat-num" data-age="months">–</div><div class="stat-label" data-i18n="age.u.months">Monate</div></div>
+            <div class="stat-card age-cell"><div class="stat-num" data-age="weeks">–</div><div class="stat-label" data-i18n="age.u.weeks">Wochen</div></div>
+            <div class="stat-card age-cell"><div class="stat-num" data-age="days">–</div><div class="stat-label" data-i18n="age.u.days">Tage</div></div>
+            <div class="stat-card age-cell"><div class="stat-num" data-age="hours">–</div><div class="stat-label" data-i18n="age.u.hours">Stunden</div></div>
+            <div class="stat-card age-cell"><div class="stat-num" data-age="minutes">–</div><div class="stat-label" data-i18n="age.u.minutes">Minuten</div></div>
+            <div class="stat-card age-cell"><div class="stat-num" data-age="seconds">–</div><div class="stat-label" data-i18n="age.u.seconds">Sekunden</div></div>
+          </div>
+        </div>
+
         <div class="grid cols-4" style="margin-bottom:24px">
           <div class="stat-card" data-event-slot="hot">
             <div class="stat-num" id="stat-hot">–</div>
@@ -1764,24 +1824,18 @@
             <div class="stat-label" data-i18n="stat.cold">❄️ Kältester Tag</div>
             <div class="stat-sub" id="stat-cold-sub" data-i18n="stat.sub.weather">Wetter-Enrichment ausführen</div>
           </div>
-          <div class="stat-card" data-event-slot="sunny">
-            <div class="stat-num" id="stat-sunny">–</div>
-            <div class="stat-label" data-i18n="stat.sun">☀️ Sonnigster Tag</div>
-            <div class="stat-sub" id="stat-sunny-sub">–</div>
-          </div>
+          <!-- Anmerkung 216: „☀️ Sonnigster Tag" und „🌧️ Längster Regen" sind
+               weg. Beide Werte sind nach oben gedeckelt — Sonnenschein kann die
+               Tageslänge nicht überschreiten, ein Tag hat 24 Stunden —, also
+               stand in der Rangliste darunter zehnmal derselbe Wert (16,4 h
+               bzw. 24 h). Ein Rekord, den jeder wolkenlose Sommertag einstellt,
+               unterscheidet nichts. Die Sonnenstunden bleiben als JAHRESSUMME
+               in der Wetterbilanz weiter unten — dort ist die Deckelung je Tag
+               ohne Belang. -->
           <div class="stat-card" data-event-slot="rainy">
             <div class="stat-num" id="stat-rainy">–</div>
             <div class="stat-label" data-i18n="stat.rain">🌧️ Nassester Tag</div>
             <div class="stat-sub" id="stat-rainy-sub">–</div>
-          </div>
-          <!-- Anmerkung 189: „am längsten" ist eine andere Frage als „am
-               meisten" — ein Landregen über 18 Stunden und ein Wolkenbruch von
-               zwanzig Minuten können dieselbe Menge bringen. Der Wert wird
-               seit F12 mitgeholt und stand bis hierher in keiner Übersicht. -->
-          <div class="stat-card" data-event-slot="rain_long">
-            <div class="stat-num" id="stat-rain-long">–</div>
-            <div class="stat-label" data-i18n="stat.rainlong">🌧️ Längster Regen</div>
-            <div class="stat-sub" id="stat-rain-long-sub">–</div>
           </div>
           <div class="stat-card" data-event-slot="windy">
             <div class="stat-num" id="stat-windy">–</div>
@@ -1794,13 +1848,13 @@
             <div class="stat-sub" id="stat-snowy-sub">–</div>
           </div>
           <!-- Anmerkung 114: Diese Kacheln rechnen aus Werten, die seit F12 bei
-               jeder Anreicherung mitkommen (Böen, gefühlte Temperatur,
-               Tageslicht) und bisher nur an einem einzelnen Ereignis standen.
-               Kein neuer Abruf, keine neue Spalte — nur die Frage gestellt.
+               jeder Anreicherung mitkommen (Böen, gefühlte Temperatur) und
+               bisher nur an einem einzelnen Ereignis standen. Kein neuer Abruf,
+               keine neue Spalte — nur die Frage gestellt.
                Anmerkung 123 (2026-07-24): die UV-Kachel „Stärkste Sonne" ist
                raus — Open-Meteos Archiv (ERA5) liefert `uv_index_max` für
                historische Tage grundsätzlich `null`; die Kachel konnte gar nicht
-               füllen. „Sonnigster Tag" (Sonnenstunden) bleibt und deckt Sonne ab. -->
+               füllen. -->
           <div class="stat-card" data-event-slot="gust">
             <div class="stat-num" id="stat-gust">–</div>
             <div class="stat-label" data-i18n="stat.gust">🌪️ Stärkste Böe</div>
@@ -1816,16 +1870,11 @@
             <div class="stat-label" data-i18n="stat.feltcold">🥶 Gefühlt kältester Tag</div>
             <div class="stat-sub" id="stat-felt-cold-sub">–</div>
           </div>
-          <div class="stat-card" data-event-slot="longest_day">
-            <div class="stat-num" id="stat-longest-day">–</div>
-            <div class="stat-label" data-i18n="stat.longestday">🌅 Längster Tag</div>
-            <div class="stat-sub" id="stat-longest-day-sub">–</div>
-          </div>
-          <div class="stat-card" data-event-slot="shortest_day">
-            <div class="stat-num" id="stat-shortest-day">–</div>
-            <div class="stat-label" data-i18n="stat.shortestday">🌆 Kürzester Tag</div>
-            <div class="stat-sub" id="stat-shortest-day-sub">–</div>
-          </div>
+          <!-- Anmerkung 216: „🌅 Längster Tag" und „🌆 Kürzester Tag" sind weg.
+               Die Tageslänge ist eine Eigenschaft des Kalenders und des
+               Breitengrads, keine des Lebens: die Kachel nannte die
+               Sonnenwende, egal was an dem Tag geschehen ist. `daylight_h` wird
+               weiter geholt und steht weiter am einzelnen Ereignis. -->
         </div>
 
         <!-- F11: Auswertungen aus bereits gespeicherten Wetterdaten -->
@@ -2514,7 +2563,7 @@
              Der Block ist bewusst ein FORMULAR und kein Lauf: hier wird eine
              Tatsache eingetragen, nicht etwas berechnet. Deshalb trägt er auch
              kein „ergänzt"-Abzeichen, sondern „Lebensdatenbank". -->
-        <div class="section-title eff-head"><span data-i18n="adm.baseline">6 · Wohnort</span><span class="eff layer" data-i18n="eff.lifedb">Lebensdatenbank</span></div>
+        <div class="section-title eff-head" id="bl-block"><span data-i18n="adm.baseline">6 · Wohnort</span><span class="eff layer" data-i18n="eff.lifedb">Lebensdatenbank</span></div>
         <div class="panel" style="padding:0">
           <div class="action-row">
             <div class="action-key"><b style="font-size:13px" data-i18n="bl.title">🏠 Wo hast du gewohnt?</b></div>
@@ -3197,34 +3246,22 @@ async function runForeground(title, fn, opts = {}) {
     note(text) { op.noteText = text; fgRender(op); },
     check() { if (op.aborted) throw new FgAbort(); },
     // ----------------------------------------------------------------- //
-    // **Anmerkung 193 — der Balken zählt ANFRAGEN, keine Abschnitte.**
+    // **Anmerkung 216 — `op.all` gibt es nicht mehr.**
     // ----------------------------------------------------------------- //
-    // Gemeldet: „bei der Statistik steht das Ladefenster die ganze Zeit auf
-    // 0/2 und ist dann direkt fertig." Genau so war es. `loadStats` meldete
-    // zwei Abschnitte, holte im ersten VIER Endpunkte auf einmal und konnte
-    // dazwischen nichts sagen — der Zähler stand also über die gesamte
-    // Wartezeit auf 0 und sprang beim Verschwinden auf 2. Das ist der Satz
-    // aus `fgRender` eine Ebene höher: ein Balken, der bei 0 steht und nie
-    // wächst, behauptet Stillstand. Er war sogar schlechter als kein Balken,
-    // weil er zusätzlich eine Gesamtmenge nennt, an der man ihn misst.
+    // Es war die Antwort auf Anmerkung 193 („der Balken zählt ANFRAGEN, keine
+    // Abschnitte") und hatte genau einen Aufrufer, die Statistik. Der zweite
+    // Bericht dazu war, dass auch das nicht hilft: von vier gleichzeitigen
+    // Anfragen dauert eine so viel länger als die drei anderen, dass „3 / 4"
+    // fast die ganze Wartezeit dasteht. **Ein Zähler über Anfragen misst nicht
+    // die Wartezeit, sieht aber aus wie ein Versprechen über sie** — und
+    // damit gehört er zu derselben Klasse wie das „0 / 2" davor, nur eine
+    // Ebene feiner aufgelöst.
     //
-    // Vier gleichzeitige Anfragen sind aber sehr wohl vier zählbare Dinge —
-    // nur eben nicht in ihrer REIHENFOLGE. Deshalb zählt hier jede EINZELN,
-    // sobald sie zurückkommt (auch die fehlgeschlagene: sie ist erledigt,
-    // und ein Zähler, der Fehler auslässt, kommt nie an).
-    //
-    // Der Zähler wird dabei übernommen, nicht fortgeschrieben — wer `all`
-    // benutzt, sagt damit „DAS ist der Vorgang". Zwei geschachtelte Bündel
-    // wären zwei Deckelungen an einer Tabelle (siehe CLAUDE.md).
-    all(list, note) {
-      op.total = list.length;
-      op.done = 0;
-      if (note != null) op.noteText = note;
-      fgRender(op);
-      const tick = () => { op.done++; fgRender(op); };
-      return Promise.all(list.map(p => Promise.resolve(p)
-        .then(r => { tick(); return r; }, e => { tick(); throw e; })));
-    },
+    // Geblieben ist `note()`: der Satz sagt, WORAUF gewartet wird, und
+    // behauptet nichts über wie lange. `step()` bleibt für die Läufe, bei
+    // denen die Gesamtmenge wirklich die Arbeit ist (Backup-Import,
+    // Timeline-Import, der Foto-Rückweg) — dort ist der Balken keine
+    // Schätzung, sondern eine Zählung.
   };
   const onCancel = () => {
     op.aborted = true;
@@ -3458,7 +3495,9 @@ const I18N_EN = {
   'stat.artists': "Artists seen live",
   'stat.age': "Age",
   'stat.milestones': "Milestones",
-  'stat.moves': "Moves",
+  // Anmerkung 216: „Moves"/„from milestones" sind weg — die Kachel zählt jetzt
+  // eingetragene Wohnorte statt Meilenstein-Titel.
+  'stat.residences': "Residences",
   'stat.meals': "Meals",
   'stat.unconfirmed': "Unconfirmed",
   'stat.sub.lifedb': "life database",
@@ -3466,15 +3505,19 @@ const I18N_EN = {
   'stat.sub.located': "events with a place",
   'stat.sub.catconcert': "category concert",
   'stat.sub.milestones': "wedding, birth, moving …",
-  'stat.sub.frommilestones': "from milestones",
+  'stat.sub.residences': "entered with a period",
   'stat.sub.catmeal': "category meal",
   'stat.sub.tomoderate': "to moderate",
   'stat.sub.age': "add your birth as a milestone",
+  // Anmerkung 216 — „Dein Alter genau"
+  'age.exact.title': "🎂 Your age, exactly",
+  'age.exact.sub': "Time elapsed since you were born on {d} — every cell counts all of it, not the remainder of the cell above.",
+  'age.u.years': "years", 'age.u.months': "months", 'age.u.weeks': "weeks",
+  'age.u.days': "days", 'age.u.hours': "hours", 'age.u.minutes': "minutes",
+  'age.u.seconds': "seconds",
   'stat.hot': "🔥 Hottest day",
   'stat.cold': "❄️ Coldest day",
-  'stat.sun': "☀️ Sunniest day",
   'stat.rain': "🌧️ Wettest day",
-  'stat.rainlong': "🌧️ Longest rain",
   'stat.wind': "💨 Windiest day",
   'stat.snow': "❄️ Snowiest day",
   'stat.sub.weather': "run weather enrichment",
@@ -3972,11 +4015,15 @@ const I18N_EN = {
   'fg.admin.work': "The server is working …",
   'fg.admin.tab': "Loading the tab …",
   'fg.refresh': "Rebuilding the views …",
-  'fg.map.points': "Fetching points",
-  'fg.map.baseline': "Residence periods",
-  'fg.map.photos': "Photo stock",
-  'fg.map.draw': "Drawing the map",
-  'fg.stats.numbers': "Numbers and collections",
+  'fg.map.points': "Fetching points …",
+  'fg.map.baseline': "Fetching residence periods …",
+  'fg.map.photos': "Counting the photo stock …",
+  'fg.map.draw': "Drawing the map …",
+  'fg.stats.numbers': "Calculating numbers, collections and rankings …",
+  // Anmerkung 216: die drei Ansichten, die bisher nur ihren Titel zeigten.
+  'fg.comp': "Assembling the collections …",
+  'fg.world': "Calculating the world map …",
+  'fg.ach': "Checking the badges …",
   'adm.fg.left': "{r} {u} to go",
   'adm.fg.prepare': "Counting what needs doing …",
   'wipemine.running': "Deleting entries, items, places, routes, photos and raw records …",
@@ -4076,8 +4123,12 @@ const I18N_EN = {
   'tops.streaks': "📏 Longest streaks",
   // Anmerkung 189 — die Fotos
   // Anmerkung 189 — Reichweite und Wege
-  'tops.far': "🧭 Farthest from home", 'tops.far.sub': "{d} · straight line from “{h}”",
+  // Anmerkung 216: je Wohnort drei Ziele. Der Wohnort steht als
+  // Zwischenüberschrift darüber und kommt aus dem Bestand, nicht aus dem
+  // Katalog — deshalb nennt der Untertitel ihn nicht mehr.
+  'tops.far': "🧭 Farthest from home", 'tops.far.sub': "straight line · first {d}",
   'tops.far.none': "Add a residence — without one there is no “far away”.",
+  'tops.far.empty': "nothing with a place recorded from here",
   'tops.reach': "🌍 Reach per year", 'tops.reach.n': "{c} countries",
   'tops.reach.sub': "{s} cities",
   'stats.tab.tracks': "🛣️ Paths",
@@ -4094,11 +4145,13 @@ const I18N_EN = {
   'tr.mode.transit': "🚌 public transport",
   'tr.mode.unknown': "❓ not determined by Google",
   'tr.mode.none': "— no information in the export",
-  'tops.photos': "📷 Photos", 'tops.ph.days': "📷 Days with the most photos",
+  // Anmerkung 216: „Days with the most photos" ist weg — die Zahl war der
+  // Zwölfer-Deckel der Tagesleiste, nicht der Bestand des Tages.
+  'tops.photos': "📷 Photos",
   'tops.ph.total': "Photos in total", 'tops.ph.up': "{n} uploaded",
   'tops.ph.link': "{n} linked from Immich", 'tops.ph.evs': "Entries with a photo",
   'tops.ph.share': "{p} % of your entries",
-  'tops.ph.span': "Oldest to newest photo", 'tops.ph.n': "{n} photos",
+  'tops.ph.span': "Oldest to newest photo",
   'tops.run': "Longest streak with entries",
   'tops.gap': "Longest gap without entries",
   'tops.trip': "Longest recorded trip",
@@ -4242,7 +4295,8 @@ const I18N_EN = {
   // Wetter-Extreme (F12-Werte, Anmerkung 114)
   'stat.gust': "🌪️ Strongest gust",
   'stat.felthot': "🥵 Hottest day (felt)", 'stat.feltcold': "🥶 Coldest day (felt)",
-  'stat.longestday': "🌅 Longest day", 'stat.shortestday': "🌆 Shortest day",
+  // Anmerkung 216: „Longest day"/„Shortest day" sind weg — die Tageslänge ist
+  // eine Eigenschaft des Kalenders, keine des Lebens.
   'wx.newdata12': "comes with new weather enrichment (v0.22 and later)",
   // Jobs
   'jobs.none': "No jobs have run yet.", 'jobs.col.status': "Status",
@@ -7375,9 +7429,18 @@ document.querySelectorAll('.stat-card[data-go]').forEach(card =>
       // Antwort — sie muss zu IHRER Liste führen. Die unscharfen Daten stehen
       // unter der Moderations-Queue; ohne das Scrollen landet man oben und
       // sucht selbst.
+      //
+      // **Anmerkung 216: der REITER steht jetzt dabei.** Hier war
+      // `showAdminTab('moderation')` fest verdrahtet, und was nach `admin:`
+      // kam, war eine Element-Kennung. Das ist die Falle „eine Regel, die nach
+      // ihrem ersten Anwendungsfall heißt": die zweite Kachel, die in die
+      // Verwaltung führt, wollte einen anderen Reiter — und hätte still auf
+      // der Moderation gelandet, weil dort das Element schlicht fehlt.
+      // Schreibweise: `admin:<Reiter>/<Element>`, das Element ist freiwillig.
+      const [tab, anchor] = go.slice(6).split('/');
       gotoView('admin');
-      showAdminTab('moderation');
-      const target = document.getElementById(go.slice(6));
+      showAdminTab(tab);
+      const target = anchor && document.getElementById(anchor);
       if (target) setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
     } else gotoView(go);   // input, timeline, admin, map …
   }));
@@ -7475,6 +7538,93 @@ async function renderModuleWidgets() {
   box.style.display = '';
 }
 
+// --------------------------------------------------------------------------- //
+// Anmerkung 216 — „Dein Alter genau"
+// --------------------------------------------------------------------------- //
+// Sieben Einheiten, jede die GESAMTE verstrichene Zeit seit der Geburt. Die
+// Kachel darüber nennt die vollen Jahre; das ist die Zahl, die man einmal im
+// Jahr braucht. Dieser Block beantwortet die andere Frage — wie viel Zeit das
+// eigentlich ist.
+//
+// **Gerechnet wird gegen die lokale Uhr** (`new Date()`), nicht gegen UTC.
+// Anmerkung 201 hat genau diesen Fehler im Tagebuch repariert: nach
+// Mitternacht öffnete es den Vortag. Hier wäre er kleiner und derselbe.
+//
+// **Jahre und Monate werden über den KALENDER gezählt, nicht über Divisionen.**
+// „Tage / 365,25" ist die Sorte Näherung, die am Geburtstag um einen Tag
+// danebenliegt — und der Geburtstag ist genau der Tag, an dem jemand hinsieht.
+// Wochen, Tage, Stunden, Minuten und Sekunden sind dagegen echte Divisionen:
+// eine Woche IST sieben Tage. Nur der Tag ist es nicht ganz — Sommerzeit macht
+// zwei Tage im Jahr 23 bzw. 25 Stunden lang. Deshalb kommen die Tage aus dem
+// Kalender (Mitternacht zu Mitternacht) und nicht aus `ms / 86.400.000`.
+let ageTimer = null;
+
+// Geburtstag plus `n` Monate — mit Klemmung auf die Länge des Zielmonats.
+// Ohne sie liefe der 31. Januar plus ein Monat auf den 3. März, und der
+// Vergleich darunter zählte einen Monat zu wenig. `setMonth` macht genau das,
+// deshalb wird der Tag hier vorher begrenzt.
+function addMonths(d, n) {
+  const m = d.getMonth() + n;
+  const lastDay = new Date(d.getFullYear(), m + 1, 0).getDate();
+  return new Date(d.getFullYear(), m, Math.min(d.getDate(), lastDay),
+                  d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds());
+}
+
+function ageParts(birth, now) {
+  // Erst die vollen Monate, dann die Jahre daraus. Andersherum wären es zwei
+  // Rechnungen für dieselbe Frage, und sie könnten sich am Geburtstag um einen
+  // Tag widersprechen — 25 volle Monate SIND zwei volle Jahre.
+  let months = (now.getFullYear() - birth.getFullYear()) * 12
+             + (now.getMonth() - birth.getMonth());
+  if (months > 0 && addMonths(birth, months) > now) months--;
+  months = Math.max(0, months);
+  // Ganze Kalendertage: beide Zeitpunkte auf Mitternacht ihres eigenen Tages,
+  // dann die Differenz gerundet. Das Runden ist die Sommerzeit-Korrektur — die
+  // Differenz zweier Mitternachte ist an zwei Tagen im Jahr keine ganze Zahl
+  // von 24-Stunden-Schritten.
+  const mid = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.max(0, Math.round((mid(now) - mid(birth)) / 86400000));
+  const secs = Math.max(0, Math.floor((now - birth) / 1000));
+  return {
+    years: Math.floor(months / 12), months,
+    weeks: Math.floor(days / 7), days,
+    hours: Math.floor(secs / 3600), minutes: Math.floor(secs / 60), seconds: secs,
+  };
+}
+
+// Nur die Zahlen tauschen, nie die Zellen neu bauen: einmal je Sekunde sieben
+// Kacheln zu erzeugen wäre „ein Zeichenobjekt je Element" im Kleinen, und die
+// Sekundenzelle flackerte sichtbar. Die Zellen stehen im Markup.
+function renderAgeExact(birth) {
+  const parts = ageParts(birth, new Date());
+  document.querySelectorAll('#age-cells [data-age]').forEach(el => {
+    const v = parts[el.dataset.age];
+    if (v != null) el.textContent = v.toLocaleString(LOC());
+  });
+}
+
+// Startet (oder beendet) den Block. Ohne Geburts-Meilenstein bleibt er weg —
+// mit Nullen dazustehen hieße behaupten, jemand sei heute geboren.
+function startAgeExact(birth) {
+  const box = document.getElementById('age-exact');
+  if (ageTimer) { clearInterval(ageTimer); ageTimer = null; }
+  if (!box) return;
+  const when = birth && birth.date_start ? new Date(birth.date_start) : null;
+  if (!when || isNaN(when)) { box.style.display = 'none'; return; }
+  box.style.display = '';
+  document.getElementById('age-exact-sub').textContent =
+    t('age.exact.sub', 'Verstrichene Zeit seit deiner Geburt am {d} — jede Zelle zählt sie ganz, nicht den Rest der Zelle darüber.')
+      .replace('{d}', fmtDate(birth));
+  renderAgeExact(when);
+  // Der Takt läuft weiter, solange die Seite offen ist, schreibt aber nur,
+  // wenn der Reiter wirklich zu sehen ist. Ein Intervall, das im Hintergrund
+  // sieben DOM-Knoten pro Sekunde anfasst, ist Arbeit für niemanden.
+  ageTimer = setInterval(() => {
+    const view = document.getElementById('view-stats');
+    if (view && view.classList.contains('active')) renderAgeExact(when);
+  }, 1000);
+}
+
 // A37: Eine Anfrage statt der ganzen Lebensdatenbank. Bis v0.31 holte diese
 // Funktion ALLE Ereignisse mit ihren Roh-Metriken (gemessen: 26 MB und 5,5 s
 // bei 12.000 Einträgen) und reduzierte im Browser darüber. Jetzt rechnet der
@@ -7489,13 +7639,21 @@ async function loadStats(op) {
   // Anmerkung 176: vier Endpunkte auf einmal — der Overlay sagt das, statt
   // einen Kreisel zu drehen.
   //
-  // **Anmerkung 193: und er zählt sie einzeln.** Hier standen zwei Schritte
-  // mit der Begründung, zwei Balkenstände für EINEN Wartevorgang wären eine
-  // erfundene Ordnung. Das stimmte für die Reihenfolge und war als Zähler
-  // falsch: „0/2" stand die ganze Wartezeit still und sprang beim Verschwinden
-  // auf „2/2". Vier gleichzeitige Anfragen sind vier zählbare Dinge, nur eben
-  // ohne Reihenfolge — genau dafür ist `op.all` da. Die fünfte Zeile ist die
-  // Tafel darunter, die ihre eigenen Endpunkte holt.
+  // **Anmerkung 193 zählte sie einzeln, Anmerkung 216 zählt sie gar nicht
+  // mehr.** Die Geschichte in einem Absatz: erst zwei Abschnitte („0/2" stand
+  // die ganze Wartezeit still), dann vier gleichzeitige Anfragen als vier
+  // zählbare Dinge (`op.all`). Gemeldet wurde jetzt, was auch daran nicht
+  // stimmt: **eine der vier Anfragen dauert so viel länger als die anderen,
+  // dass der Zähler von 3/4 nicht mehr weggeht.** Er misst Anfragen und tut so,
+  // als messe er Zeit — und die Zahl daneben lädt genau dazu ein, sie als
+  // Fortschritt zu lesen.
+  //
+  // Ein Balken ist eine Zusage über die verbleibende Wartezeit. Wo die nicht
+  // einzuhalten ist, ist der Satz die ehrlichere Auskunft: er sagt, WORAUF
+  // gewartet wird, und behauptet nichts über WIE LANGE. Dieselbe Regel wie beim
+  // Rückblick (Anmerkung 193, „ein Balken mit genau zwei Ständen").
+  //
+  // Die fünfte Zeile ist die Tafel darunter, die ihre eigenen Endpunkte holt.
   const bundle = [
     api("/api/stats/overview"),
     api("/api/compendium/animal").catch(() => []),
@@ -7513,9 +7671,8 @@ async function loadStats(op) {
     // und tragen sie in ihren Kasten.
     ...(pane ? [pane] : []),
   ];
-  const [ov, animals, countries, artists] = op
-    ? await op.all(bundle, t('fg.stats.numbers', 'Zahlen und Sammlungen'))
-    : await Promise.all(bundle);
+  if (op) op.note(t('fg.stats.numbers', 'Zahlen, Sammlungen und Ranglisten werden berechnet …'));
+  const [ov, animals, countries, artists] = await Promise.all(bundle);
   const num = (id, value) => { document.getElementById(id).textContent = value; };
   const c = ov.counts;
 
@@ -7528,7 +7685,9 @@ async function loadStats(op) {
   num('stat-artists', artists.length);
   num('stat-unconfirmed', c.unconfirmed);
   num('stat-milestones', c.milestones);
-  num('stat-moves', c.moves);
+  // Anmerkung 216: Wohnorte statt „Umzüge" — eine eingetragene Tatsache statt
+  // einer Textregel über Meilenstein-Titel.
+  num('stat-residences', c.residences ?? 0);
   num('stat-meals', c.meals);
 
   // Alter: aus dem Meilenstein „Geburt" (Anmerkung 72 — eine Wahrheit,
@@ -7538,6 +7697,7 @@ async function loadStats(op) {
   num('stat-age-sub', ov.birth
     ? `${t('stat.born', 'geboren')} ${fmtDate(ov.birth)}`
     : t('stat.born.hint', 'Geburt als Meilenstein eintragen'));
+  startAgeExact(ov.birth);
 
   // Wetter-Extreme. Der Server liefert je Kachel Wert, Datum, Ort und Titel.
   //
@@ -7561,23 +7721,20 @@ async function loadStats(op) {
   tempCard('stat-hot', ex.hot);
   tempCard('stat-cold', ex.cold);
   const newDataHint = t('wx.newdata', 'kommt mit neuen Wetter-Anreicherungen (ab v0.14)');
-  tempCard('stat-sunny', ex.sunny, ' h', newDataHint);
   tempCard('stat-rainy', ex.rainy, ' mm', newDataHint);
   // Anmerkung 189: der Wert kommt aus F12 — deshalb steht unten der
   // 0.22-Hinweis daran und nicht der von 0.14 (siehe `f12Hint`).
   tempCard('stat-windy', ex.windy, ' km/h', newDataHint);
   tempCard('stat-snowy', ex.snowy, ' cm', newDataHint);
-  // Anmerkung 114: Diese sechs gibt es erst ab v0.22 (F12) — ältere
-  // Anreicherungen tragen die Werte nicht. Der Hinweis nennt deshalb die
-  // richtige Version; „ab v0.14" wäre hier eine Auskunft, nach der man
-  // vergeblich sucht.
+  // Anmerkung 114: Diese gibt es erst ab v0.22 (F12) — ältere Anreicherungen
+  // tragen die Werte nicht. Der Hinweis nennt deshalb die richtige Version;
+  // „ab v0.14" wäre hier eine Auskunft, nach der man vergeblich sucht.
+  // Anmerkung 216: von sechs sind drei übrig (Regenstunden und die beiden
+  // Tageslicht-Kacheln sind weg).
   const f12Hint = t('wx.newdata12', 'kommt mit neuen Wetter-Anreicherungen (ab v0.22)');
-  tempCard('stat-rain-long', ex.rain_long, ' h', f12Hint);
   tempCard('stat-gust', ex.gust, ' km/h', f12Hint);
   tempCard('stat-felt-hot', ex.felt_hot, ' °C', f12Hint);
   tempCard('stat-felt-cold', ex.felt_cold, ' °C', f12Hint);
-  tempCard('stat-longest-day', ex.longest_day, ' h', f12Hint);
-  tempCard('stat-shortest-day', ex.shortest_day, ' h', f12Hint);
   renderWeatherSummary(ov);
   renderModuleWidgets();
 
@@ -7730,19 +7887,21 @@ function wxWho(r) {
 // wie die Kacheln darüber. Die Tabelle steht hier EINMAL — die Kacheln lesen
 // ihre Einheit heute noch einzeln, aber eine zweite Liste in einer zweiten
 // Reihenfolge wäre die Sorte Doppelung, die Anmerkung 106 beschreibt.
+// Anmerkung 216: vier Einträge weniger — „Sonnigster Tag", „Längster Regen",
+// „Längster Tag", „Kürzester Tag". Sie standen hier UND als Kachel darüber, und
+// die Rangliste hat sichtbar gemacht, was der Kachel allein nicht anzusehen
+// war: alle zehn Plätze tragen denselben Wert, weil er gedeckelt ist
+// (Sonnenschein ≤ Tageslänge, Regenstunden ≤ 24, Tageslänge = Kalender). Die
+// Begründung im Langen steht bei `_EXTREMES` im Server.
 const TOP_WEATHER = [
   ['hot', 'stat.hot', '🔥 Heißester Tag', ' °C'],
   ['cold', 'stat.cold', '❄️ Kältester Tag', ' °C'],
-  ['sunny', 'stat.sun', '☀️ Sonnigster Tag', ' h'],
   ['rainy', 'stat.rain', '🌧️ Nassester Tag', ' mm'],
-  ['rain_long', 'stat.rainlong', '🌧️ Längster Regen', ' h'],
   ['windy', 'stat.wind', '💨 Windigster Tag', ' km/h'],
   ['snowy', 'stat.snow', '❄️ Schneereichster Tag', ' cm'],
   ['gust', 'stat.gust', '🌪️ Stärkste Böe', ' km/h'],
   ['felt_hot', 'stat.felthot', '🥵 Gefühlt heißester Tag', ' °C'],
   ['felt_cold', 'stat.feltcold', '🥶 Gefühlt kältester Tag', ' °C'],
-  ['longest_day', 'stat.longestday', '🌅 Längster Tag', ' h'],
-  ['shortest_day', 'stat.shortestday', '🌆 Kürzester Tag', ' h'],
 ];
 // Eine Zeile einer Rangliste. Der Rang steht vorn, weil er die Aussage ist —
 // ohne ihn wäre es eine Liste, keine Rangliste.
@@ -7790,30 +7949,33 @@ function photoPanel(p) {
     p.first ? topRow(2, t('tops.ph.span', 'Ältestes bis neuestes Foto'),
                      `${fmtDay(p.first)} – ${fmtDay(p.last)}`, '') : '',
   ].filter(Boolean);
-  // Die Tage führen in den Zeitstrahl DIESES Tages — dieselbe Bewegung wie bei
-  // den Rekord-Kacheln (Anmerkung 142): eine Zahl, die einen Tag nennt, muss
-  // zu ihm führen können.
-  const days = (p.days || []).map((d, i) =>
-    topRow(i, fmtDay(d.day), t('tops.ph.n', '{n} Fotos').replace('{n}', n(d.count)),
-           '', ` data-top-day="${esc(d.day)}"`));
-  return `<div class="grid cols-2">`
-    + topPanel(t('tops.photos', '📷 Fotos'), rows, '')
-    + topPanel(t('tops.ph.days', '📷 Tage mit den meisten Fotos'), days, '')
-    + `</div>`;
+  // Anmerkung 216: „📷 Tage mit den meisten Fotos" stand hier daneben und ist
+  // weg. Die Zahl war der Deckel der Tagesleiste (höchstens zwölf Bilder je
+  // Tag, `immich_link.add_day_media`) — auf allen zehn Plätzen stand deshalb
+  // dieselbe Zwölf. Gezählt wurde, was dieses Programm behält, angezeigt als
+  // Aussage darüber, an welchem Tag am meisten fotografiert wurde.
+  // Nur noch die Kachel selbst, ohne eigenes Raster: sie steht seit
+  // Anmerkung 216 in der Reihe der Serien und bringt ihre Spalte nicht mit.
+  return topPanel(t('tops.photos', '📷 Fotos'), rows, '');
 }
 // Wie viele Zeilen eine Rangliste hoch ist, bevor sie scrollt. Dieselbe Zehn,
 // die der Server als `TOP_N` liefert — die Kacheln haben damit alle dieselbe
 // Höhe, statt dass eine von ihnen (die Jahre) die Reihe daneben streckt.
 const TOP_PANEL_ROWS = 10;
-function topPanel(title, rows, empty) {
+// `count` ist die Zahl in der Überschrift, wenn sie NICHT die Zahl der Zeilen
+// ist (Anmerkung 216). Die Wohnort-Gruppen im „Am weitesten"-Panel schieben
+// Zwischenüberschriften zwischen die Zeilen — „(20)" hieße dort fünf Wohnorte
+// plus fünfzehn Ziele, und das ist keine Menge, nach der jemand fragt.
+function topPanel(title, rows, empty, count = null) {
   // Anmerkung 195: Eine Liste, die über die Kachelhöhe hinausgeht,
   // wird gescrollt und NICHT gekürzt — und die Überschrift sagt, wie viele
   // es insgesamt sind. Ein Deckel, der schweigt, sieht aus wie das Ende der
   // Daten (dieselbe Regel wie bei der Fotoleiste und den Lücken).
   const capped = rows.length > TOP_PANEL_ROWS;
+  const shown = count == null ? rows.length : count;
   return `<div class="panel">
     <h3>${esc(title)}${capped
-      ? ` <span class="panel-count">(${rows.length.toLocaleString(LOC())})</span>` : ''}</h3>
+      ? ` <span class="panel-count">(${shown.toLocaleString(LOC())})</span>` : ''}</h3>
     <div class="panel-rows${capped ? ' capped' : ''}">${
       rows.length ? rows.join('')
                   : `<div class="stat-label">${esc(empty)}</div>`}</div>
@@ -7853,14 +8015,29 @@ function renderStatsTops(top) {
   // Kindheit an der Ostsee eine Fernreise, sobald jemand nach München zieht.
   // Ohne Wohnort steht die Zeile gar nicht da statt mit einer Null, die wie
   // „war nie weg" aussieht.
-  const far = top.farthest;
-  const farRows = far ? [
-    topRow(0, [far.place, far.city, far.country].filter(Boolean).join(' · '),
-           `${(far.km || 0).toLocaleString(LOC(), { maximumFractionDigits: 0 })} km`,
-           t('tops.far.sub', '{d} · Luftlinie von „{h}"')
-             .replace('{d}', fmtDay(far.date)).replace('{h}', far.home || ''),
-           far.date ? ` data-top-day="${esc(far.date)}"` : ''),
-  ] : [];
+  //
+  // **Anmerkung 216: je Wohnort drei Ziele statt einer Zeile fürs ganze
+  // Leben.** Der Server rechnete das schon immer je Zeitraum und warf alles
+  // außer dem globalen Maximum weg. Eine Zeile beantwortet aber nur die Frage
+  // nach dem weitesten Wohnort — und die weiteste Fahrt vom Elternhaus aus ist
+  // eine andere Auskunft als die weiteste Reise von der heutigen Wohnung.
+  // Der Zeitraum steht dabei, weil er die Zeile erst datiert; ein Wohnort ohne
+  // Treffer sagt das ausdrücklich, statt einfach zu fehlen.
+  const farRows = [];
+  (top.farthest || []).forEach(g => {
+    farRows.push(`<div class="top-group">${esc(g.home || '')}<span class="stat-label"> · ${
+      esc(`${fmtDay(g.from)} – ${fmtDay(g.to)}`)}</span></div>`);
+    if (!g.tops.length) {
+      farRows.push(`<div class="stat-label" style="padding:6px 10px">${
+        esc(t('tops.far.empty', 'von hier aus nichts Verortetes erfasst'))}</div>`);
+      return;
+    }
+    g.tops.forEach((r, i) => farRows.push(topRow(
+      i, [r.place, r.city, r.country].filter(Boolean).join(' · '),
+      `${(r.km || 0).toLocaleString(LOC(), { maximumFractionDigits: 0 })} km`,
+      t('tops.far.sub', 'Luftlinie · zuerst {d}').replace('{d}', fmtDay(r.date)),
+      r.date ? ` data-top-day="${esc(r.date)}"` : '')));
+  });
   // Reichweite je Jahr: nicht „wie viel", sondern „wie weit gestreut". Der
   // Wohnort zählt mit — ein Jahr ganz zu Hause stünde sonst bei „0 Länder".
   const reach = (top.reach || []).slice().reverse().map((y, i) =>
@@ -7871,17 +8048,22 @@ function renderStatsTops(top) {
   // **Anmerkung 195 — gleich Großes nebeneinander.**
   // Vorher stand „Am weitesten von zu Hause" (EINE Zeile) neben „Reichweite je
   // Jahr" (vierzig) — eine Kachel, die zu neun Zehnteln leer war, und darüber
-  // die Serien allein über die volle Breite. Jetzt stehen die beiden kurzen
-  // Auskünfte zusammen in einer Reihe, und die Reichweite zieht zu den
-  // Ranglisten, wo alle Kacheln zehn Zeilen hoch sind.
+  // die Serien allein über die volle Breite.
+  //
+  // **Anmerkung 216: die Reihe ist neu sortiert**, weil sich zwei Größen
+  // geändert haben. „Am weitesten" ist von einer Zeile auf vier Zeilen JE
+  // WOHNORT gewachsen und steht deshalb allein über die Breite; die Fotos
+  // haben ihre zweite Kachel („Tage mit den meisten Fotos") verloren und
+  // rücken zu den Serien, damit dort keine halbe Reihe leer bleibt.
   box.innerHTML =
     `<div class="grid cols-2">`
     + topPanel(t('tops.streaks', '📏 Längste Serien'), streakRows, noData)
-    + topPanel(t('tops.far', '🧭 Am weitesten von zu Hause'), farRows,
-               t('tops.far.none', 'Trag einen Wohnort ein — ohne ihn gibt es kein „weit weg".'))
-    + `</div>`
     + photoPanel(top.photos || {})
-    + `<div class="grid cols-2">`
+    + `</div>`
+    + topPanel(t('tops.far', '🧭 Am weitesten von zu Hause'), farRows,
+               t('tops.far.none', 'Trag einen Wohnort ein — ohne ihn gibt es kein „weit weg".'),
+               (top.farthest || []).length)
+    + `<div class="grid cols-2" style="margin-top:16px">`
     + topPanel(t('tops.places', '📍 Top-Orte'), rank(top.places), noData)
     + topPanel(t('tops.cities', '🏙️ Top-Städte'), rank(top.cities), noData)
     + topPanel(t('tops.countries', '🌍 Top-Länder'), rank(top.countries), noData)
@@ -10038,23 +10220,29 @@ async function openMapView(op) {
   // Anmerkung 176: Vier Etappen, und der Overlay nennt sie. Ohne die Namen ist
   // ein Kartenaufbau über 20.000 Punkte eine Sanduhr — mit ihnen sieht man,
   // ob es die Punkte, die Wohnorte oder das Zeichnen ist.
-  const at = (n, note) => op && op.step(n, 4, note);
-  at(0, t('fg.map.points', 'Punkte werden geholt'));
+  // **Anmerkung 216: die Etappen bleiben, ihre Nummern gehen.** Hier stand
+  // `op.step(n, 4, …)`, also „3 / 4" unter dem Satz. Vier Abschnitte sind vier
+  // ZÄHLBARE Dinge und trotzdem kein Fortschritt: das Zeichnen der Karte
+  // dauert länger als die drei Abrufe davor zusammen, „3 / 4" steht also fast
+  // die ganze Wartezeit da. Der Name der Etappe sagt, woran es hängt — das ist
+  // die Auskunft, die es hier gibt; die Zahl daneben versprach eine zweite.
+  const at = note => op && op.note(note);
+  at(t('fg.map.points', 'Punkte werden geholt …'));
   // A37: eigener schlanker Endpunkt statt der Zeitstrahl-Liste — und erst
   // jetzt, beim Öffnen des Reiters, statt beim Start der App.
   // Anmerkung 135: wie im Zeitstrahl — unbestätigte Google-/Immich-Vorschläge
   // sind Beleg, kein Ereignis, und tauchen erst nach der Moderation auf.
   await mpLoadPoints();
-  at(1, t('fg.map.baseline', 'Wohnort-Zeiträume'));
+  at(t('fg.map.baseline', 'Wohnort-Zeiträume werden geholt …'));
   // F20: die Wohnort-Zeiträume — eine Handvoll Zeilen, aus derselben Liste
   // wie das Formular unter „Meine Daten". Sie kommen VOR dem ersten Zeichnen,
   // sonst fehlt die Ebene beim Öffnen und erscheint erst beim nächsten Klick.
   await mpLoadBaselines();
-  at(2, t('fg.map.photos', 'Foto-Bestand'));
+  at(t('fg.map.photos', 'Foto-Bestand wird gezählt …'));
   // Wie viele Foto-Ereignisse es ÜBERHAUPT gibt — das entscheidet, ob der
   // Foto-Schalter etwas bewirken kann (A40).
   await ensurePhotoIndex();
-  at(3, t('fg.map.draw', 'Karte wird gezeichnet'));
+  at(t('fg.map.draw', 'Die Karte wird gezeichnet …'));
   if (!mapObj) {
     mapObj = L.map('map').setView([50, 6], 4);
     addTiles(mapObj, 19);                   // F13: wählbare Hintergrundkarte
@@ -11440,6 +11628,18 @@ function gotoView(v) {
 // Wohnorte und den Foto-Index, die Statistik vier Endpunkte auf einmal).
 // Ein Balken, der SAGT, woran er hängt, ist der Unterschied zwischen „es
 // dauert" und „es hängt".
+// **Anmerkung 216: jede Ansicht sagt einen SATZ, keine Zahlen.**
+// Drei Lader (Kompendium, Welt, Abzeichen) nahmen das Steuerobjekt gar nicht
+// entgegen und zeigten nur den Titel — bei ihnen stand also eine halbe Minute
+// „Welt wird geladen …" ohne einen Hinweis, was daran gerade dauert. Der Satz
+// wird hier gesetzt und nicht im Lader, weil er über die ANSICHT etwas sagt und
+// nicht über den einzelnen Abruf; `refreshCurrentView` ruft dieselben Lader
+// ohne Steuerobjekt, deshalb jedes Mal die Prüfung auf `op`.
+//
+// Ausgeschrieben statt über einen Helfer: `t('…', '…')` muss als solches im
+// Quelltext stehen, sonst hält `check-i18n-coverage.js` den Katalog-Eintrag
+// für verwaist — ein Wächter, den man mit einer Indirektion umgeht, prüft die
+// nächste Zeile nicht mehr.
 const VIEW_LOADERS = {
   today: op => loadToday(op),
   // Die Karte braucht den Moment, in dem ihr Container sichtbar ist —
@@ -11448,12 +11648,19 @@ const VIEW_LOADERS = {
   // abgewartet, und der Overlay verschwand, während die Karte noch lud.
   map: op => new Promise(r => setTimeout(() => r(openMapView(op)), 40)),
   stats: op => loadStats(op),
-  compendium: () => {
+  compendium: op => {
+    if (op) op.note(t('fg.comp', 'Die Sammlungen werden zusammengestellt …'));
     const tab = document.querySelector('#comp-tabs .zoom-btn.active');
     return tab ? loadCompendium(tab.dataset.type) : null;
   },
-  world: () => loadWorld(),
-  achievements: () => loadAchievements(),
+  world: op => {
+    if (op) op.note(t('fg.world', 'Die Weltkarte wird berechnet …'));
+    return loadWorld();
+  },
+  achievements: op => {
+    if (op) op.note(t('fg.ach', 'Die Abzeichen werden geprüft …'));
+    return loadAchievements();
+  },
   admin: op => loadAdminTab(adminTab, op),
 };
 

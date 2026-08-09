@@ -329,14 +329,18 @@ def compute_toplists(db: Session, user_id: str, n: int = TOP_N,
         # es „event" — hieße, eine Aussage zu erfinden, die niemand gemacht hat.
         "categories": _ranked(db, user_id, Event.category),
         "streaks": _streaks(db, user_id),
-        "photos": _photo_stats(db, user_id, n),
+        "photos": _photo_stats(db, user_id),
         "farthest": _farthest_from_home(db, user_id),
         "reach": _reach_per_year(db, user_id, label=land),
         "baseline_days": b["total"],
     }
 
 
-def _farthest_from_home(db: Session, user_id: str) -> dict | None:
+# Wie viele Ziele je Wohnort in der Liste stehen (Anmerkung 216).
+FAR_PER_HOME = 3
+
+
+def _farthest_from_home(db: Session, user_id: str) -> list[dict]:
     """**Anmerkung 189 — wie weit war ich je von zu Hause weg?**
 
     Die Frage ist erst beantwortbar, seit es Wohnorte gibt: „weit weg" braucht
@@ -350,14 +354,27 @@ def _farthest_from_home(db: Session, user_id: str) -> dict | None:
     Prozess zu holen hieße, dieselbe Koordinate hundertmal zu rechnen. Ein
     Bestand hat Hunderte Orte und Zehntausende Einträge.
 
-    Ohne Wohnort gibt es keine Antwort — und dann steht hier `None` statt einer
-    Null, die wie „war nie weg" aussieht.
+    ------------------------------------------------------------------------
+    **Anmerkung 216 — je Wohnort drei Ziele statt EINE Zeile für das Leben.**
+    ------------------------------------------------------------------------
+    Bis hierher rechnete diese Funktion genau das, was sie jetzt rechnet, und
+    warf es dann weg: Sie lief über alle Zeiträume und behielt das globale
+    Maximum. Herausgekommen ist eine Kachel mit einer einzigen Zeile — und die
+    beantwortet für ein Leben mit fünf Wohnorten nur die Frage nach dem
+    weitesten davon. **Die Rechnung war schon immer eine je Wohnort; nur die
+    Ausgabe war es nicht.**
+
+    Zurück kommt deshalb eine Liste in der Reihenfolge der Wohnorte
+    (chronologisch, wie `baseline.spans` sie liefert), je Wohnort bis zu
+    `FAR_PER_HOME` Ziele. Ein Wohnort ohne einen einzigen verorteten Eintrag
+    steht mit leerer Trefferliste da statt gar nicht: „von hier aus nichts
+    erfasst" ist eine Auskunft, ein Fehlen ist keine.
+
+    Ohne Wohnort gibt es gar keine Antwort — dann ist die Liste leer, und die
+    Oberfläche sagt, dass zuerst ein Wohnort fehlt.
     """
-    periods = baseline.spans(db, user_id)
-    if not periods:
-        return None
-    best: dict | None = None
-    for start, end, row in periods:
+    out: list[dict] = []
+    for start, end, row in baseline.spans(db, user_id):
         home = row.location
         if home is None or home.lat is None or home.lng is None:
             continue
@@ -371,16 +388,26 @@ def _farthest_from_home(db: Session, user_id: str) -> dict | None:
                         Location.lat.isnot(None), Location.lng.isnot(None))
                 .group_by(Location.id, Location.name, Location.city,
                           Location.country, Location.lat, Location.lng).all())
+        far = []
         for name, city, country, lat, lng, first in rows:
-            km = baseline.haversine_km(home.lat, home.lng, lat, lng)
-            if best is None or km > best["km"]:
-                best = {"km": round(km, 1),
+            far.append({"km": round(baseline.haversine_km(home.lat, home.lng,
+                                                          lat, lng), 1),
                         "place": ov._short_place(name) or name,
                         "city": city, "country": country,
-                        "date": first.date().isoformat() if first else None,
-                        "home": row.label or (ov._short_place(home.name)
-                                              or home.name)}
-    return best
+                        "date": first.date().isoformat() if first else None})
+        # Der Name als zweites Kriterium: nach dem Runden auf 100 m teilen sich
+        # zwei Orte einen Wert öfter, als man denkt (Serienaufnahmen vom selben
+        # GPS-Fix). Ohne die zweite Stufe entschiede die Reihenfolge der
+        # Datenbank, wer in den drei Zeilen steht — dieselbe Regel wie in
+        # `_extreme_tops` und `_ranked`.
+        far.sort(key=lambda r: (-r["km"], r["place"] or ""))
+        out.append({
+            "home": row.label or (ov._short_place(home.name) or home.name),
+            "from": start.isoformat(),
+            "to": end.isoformat(),
+            "tops": far[:FAR_PER_HOME],
+        })
+    return out
 
 
 # Die Luftlinie steht seit Anmerkung 197 in `services/baseline.py` — dort
@@ -434,7 +461,7 @@ def _reach_per_year(db: Session, user_id: str, label=None) -> list[dict]:
             for y, (lands, towns) in sorted(by_year.items())]
 
 
-def _photo_stats(db: Session, user_id: str, n: int) -> dict:
+def _photo_stats(db: Session, user_id: str) -> dict:
     """**Anmerkung 189 — was von den Fotos zu sagen ist.**
 
     Bis hierher gab es über Medien keine einzige Zusammenfassung. Sie sind
@@ -453,6 +480,22 @@ def _photo_stats(db: Session, user_id: str, n: int) -> dict:
     die ein Abgleich jederzeit neu bildet. Eine gemeinsame Zahl verspräche
     einen Bestand, von dem ein Teil woanders liegt — und der Unterschied ist
     genau der, den ein Backup merkt.
+
+    ------------------------------------------------------------------------
+    **Anmerkung 216 — „Tage mit den meisten Fotos" ist weg, und warum.**
+    ------------------------------------------------------------------------
+    Die Rangliste zählte `MediaRef`-Zeilen je Tag und zeigte auf allen zehn
+    Plätzen dieselbe Zwölf. Das war kein Fehler in der Abfrage: **eine
+    Tagesleiste nimmt höchstens zwölf Bilder auf** (`immich_link.add_day_media`,
+    gleichmäßig gestreut). Gezählt wurde also nicht, wie viele Fotos an einem
+    Tag entstanden sind, sondern wie viele davon dieses Programm behält — eine
+    Aussage über den eigenen Deckel, im Gewand einer Aussage über das Leben.
+
+    Die ehrliche Zahl liegt in Immich und müsste beim Monatslauf mitgeschrieben
+    werden; das wäre ein eigener Speicher für eine Rangliste. Der User hat
+    entschieden, sie stattdessen wegzulassen (2026-08-09). Was bleibt, ist die
+    Kachel „Fotos" daneben — sie zählt Summen und Jahre, und dort ist der
+    Deckel je Tag ohne Belang.
     """
     day_of = func.coalesce(MediaRef.captured_at, Event.date_start)
     base = (db.query(MediaRef)
@@ -463,7 +506,7 @@ def _photo_stats(db: Session, user_id: str, n: int) -> dict:
     if not total:
         return {"total": 0, "uploads": 0, "linked": 0, "events_with_photo": 0,
                 "events_total": 0, "first": None, "last": None,
-                "years": [], "days": [], "bytes": 0}
+                "years": [], "bytes": 0}
 
     kinds = dict(db.query(MediaRef.provider, func.count(MediaRef.id))
                  .filter(MediaRef.user_id == user_id)
@@ -480,14 +523,6 @@ def _photo_stats(db: Session, user_id: str, n: int) -> dict:
     years = (dated.with_entities(func.extract("year", day_of).label("y"),
                                  func.count(MediaRef.id))
              .group_by("y").order_by("y").all())
-    days = (dated.with_entities(day_number(day_of).label("d"),
-                                func.count(MediaRef.id).label("n"))
-            .group_by("d").order_by(func.count(MediaRef.id).desc(), "d")
-            .limit(n).all())
-
-    def _iso(num) -> str:
-        num = int(num)
-        return f"{num // 10000:04d}-{num // 100 % 100:02d}-{num % 100:02d}"
 
     return {
         "total": total,
@@ -504,7 +539,6 @@ def _photo_stats(db: Session, user_id: str, n: int) -> dict:
         "last": span[1].date().isoformat() if span[1] else None,
         "bytes": int(size),
         "years": [{"year": int(y), "count": int(c)} for y, c in years],
-        "days": [{"day": _iso(d), "count": int(c)} for d, c in days],
     }
 
 

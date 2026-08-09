@@ -343,15 +343,21 @@ def test_transient_errors_are_retried(monkeypatch):
     assert seen[:2] == [seen[0], seen[0]] and seen[0].endswith("/server/about")
 
 
-def _run(db, user):
-    """Einen Immich-Lauf fahren und (Status, Meldung) zurückgeben."""
+def _job(db, user):
+    """Die Job-Zeile eines Laufs — für alles, was am FORTSCHRITT hängt."""
     from app.models import Job
-    from app.routers.jobs import _run_immich
 
     job = Job(user_id=user.id, type="immich", status="running")
     db.add(job)
     db.commit()
-    return _run_immich(db, job)
+    return job
+
+
+def _run(db, user, job=None):
+    """Einen Immich-Lauf fahren und (Status, Meldung) zurückgeben."""
+    from app.routers.jobs import _run_immich
+
+    return _run_immich(db, job or _job(db, user))
 
 
 def test_immich_job_terminates_on_photoless_events(db, immich_user, fake_search,
@@ -422,6 +428,66 @@ def test_the_job_fills_days_that_have_no_entry_at_all(db, immich_user,
     assert {r.external_id for r in refs} == {"m1", "m2"}
     assert all(r.event_id is None for r in refs), "am TAG, nicht an einem Eintrag"
     assert "2 Fotos verknüpft (davon 2 an ihren Tagen)" in msg
+
+
+# --------------------------------------------------------------------------- #
+# Anmerkung 216 — der Fortschritt zählt zwei Dinge, also zwei Zähler
+# --------------------------------------------------------------------------- #
+def test_the_progress_counts_each_phase_in_its_own_unit(db, immich_user,
+                                                        fake_search, fake_paged,
+                                                        fake_library):
+    """**Gemeldet: „241 Ereignisse und Monate geprüft" sagt nichts.**
+
+    Es war eine Summe über zwei verschiedene Dinge — im gemeldeten Fall ein
+    Ereignis und 240 Monate —, und keine der beiden Zahlen stand irgendwo. Das
+    ist „Tage gegen Einträge" eine Ebene höher: zwei Mengen, die man nicht
+    addieren darf, addiert und mit einer gemeinsamen Einheit beschriftet.
+
+    Geprüft wird deshalb der ZUSTAND nach dem Lauf, nicht die Schlussmeldung:
+    die Einheit muss die der zweiten Phase sein und der Zähler ihre Menge —
+    nicht die Summe.
+    """
+    for i in range(2):
+        _event(db, immich_user, when=datetime(2019, 3, i + 1, 12, 0))
+    fake_search["assets"] = []
+    fake_library["months"] = {"2019-03": 1, "2019-04": 1, "2019-05": 1}
+    fake_paged["assets"] = [_asset("m1", "2019-03-04T10:00:00")]
+
+    job = _job(db, immich_user)
+    status, msg = _run(db, immich_user, job)
+
+    assert status == "done"
+    db.refresh(job)
+    assert job.unit == "Monate geprüft"
+    assert job.done == 3, "die drei Monate, nicht die fünf Einheiten insgesamt"
+    # Und die Schlussmeldung nennt weiterhin beide Mengen getrennt.
+    assert "2 Ereignisse und 3 Monate geprüft" in msg
+
+
+def test_without_a_second_phase_the_counter_keeps_the_first(db, immich_user,
+                                                            fake_search,
+                                                            fake_paged,
+                                                            fake_library):
+    """**Der Grund, warum der Phasenwechsel eine Bedingung hat.**
+
+    Ohne offene Monate gäbe es sonst „0 Monate geprüft" als Schlusszeile in der
+    Job-Historie — eine Null, die wie ein Fehlschlag aussieht, obwohl der Lauf
+    seine Ereignisse abgearbeitet hat. Die zweite Falle steckt im Zähler
+    selbst: `_tick` schreibt DIFFERENZEN fort, ein abschließender Aufruf mit
+    der Menge der leeren zweiten Phase hätte `done` auf null zurückgezogen.
+    """
+    for i in range(3):
+        _event(db, immich_user, when=datetime(2019, 3, i + 1, 12, 0))
+    fake_search["assets"] = []
+    fake_library["months"] = {}
+
+    job = _job(db, immich_user)
+    status, _msg = _run(db, immich_user, job)
+
+    assert status == "done"
+    db.refresh(job)
+    assert job.unit == "Ereignisse geprüft"
+    assert job.done == 3
 
 
 def test_the_job_skips_a_month_whose_count_did_not_change(db, immich_user,

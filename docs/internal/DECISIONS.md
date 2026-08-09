@@ -1758,6 +1758,116 @@ about a run that says nothing while it deletes confirmed rows.
     (`remaining` after a capped and an uncapped call). With `limit` ignored,
     both fail.
 
+**Report of 2026-08-09, eighth pass (note 216), on `main`, no version bump.**
+Nine points on the statistics tab and on what the loading views say. Four of
+them are the same defect in four costumes — **a number that describes its own
+ceiling and not the thing it is named after** — and the user chose the shortest
+repair for each: delete it.
+
+216. ✅ **A record every summer ties is not a record.**
+
+    Read the reports next to each other and one sentence covers four of them:
+    *“sunniest day, top 10 all have 16.4 h — that does not help.”* *“longest
+    rain, top 10 all have 24 h — that does not help.”* *“longest and shortest
+    day is not really meaningful either.”* *“days with the most photos: since we
+    cap at 12 they all have 12 photos.”*
+
+    None of these was a bug in a query. Each value is **capped**, and the cap,
+    not the day, is what the ranking shows:
+
+    - sunshine cannot exceed daylight, so every cloudless day near the solstice
+      hits the same number;
+    - a day has 24 hours, and a day that rains through is not rare;
+    - daylight length is a property of the calendar and the latitude — the tile
+      named the solstice regardless of what happened;
+    - and the photo count per day is **our own** twelve-picture limit on the day
+      strip (`immich_link.add_day_media`), so the ranking counted what this
+      program *keeps*, dressed as a statement about what was *photographed*.
+
+    The interesting part is that only one of the four made itself visible as a
+    tile. A single record reads plausibly — “16.4 h of sun” looks like an
+    answer. **It took note 156's ranking underneath it, showing the same value
+    ten times, for the ceiling to become legible.** A tile shows a value; a
+    ranking shows whether the value can tell two days apart, and that is the
+    property a record needs.
+
+    Deleted, not softened: `sunny`, `rain_long`, `longest_day`, `shortest_day`
+    from `_EXTREMES` and `TOP_WEATHER`, the days list from `_photo_stats`. A
+    tile without its ranking would have been the same value with fewer
+    witnesses. `rain_h` and `daylight_h` also left `_WX_KEYS` — a key there
+    costs a row per event *and* per residence day, and belongs there only while
+    somebody reads it; both are still fetched and still stand on the single
+    event. `sunshine_h` stays: the yearly total (“hours of sun”) counts over it.
+
+    The honest alternative for the photo days — storing the real per-day count
+    from Immich during the monthly scan — was offered and declined: it is a
+    dedicated store for one ranking.
+
+    **“Moves” counted how you label things, and showed it as a fact.** Same
+    class, different mechanism: the tile counted milestones whose *text* matched
+    `umzug|umgezogen|eingezogen`, and stood at 0 while five residences with date
+    ranges sat under *My data*. Since F20 the fact exists as a row, so the tile
+    counts rows and is named after them — **“Residences”, not “Moves”: a row is
+    a place you lived, not a change of address.** `_MOVE_RE`/`_MOVE_WORDS` are
+    gone; birth is the last text rule that carries a number, and there the text
+    really is the only source.
+
+    **“Farthest from home” already computed this and threw it away.** The
+    function looped over every residence period, kept the global maximum and
+    returned one line. But *“from Kiel it is 90 km to Hamburg, from Munich
+    600”* are two answers, not a draft and a final. It now returns a group per
+    residence — chronological, up to three destinations each (`FAR_PER_HOME`),
+    and **a residence with nothing recorded says so** instead of being absent;
+    a missing group looks like a missing residence, and the user goes looking
+    for a data-entry mistake that isn't there.
+
+    **Age, in seven units.** The tile says “34”, which answers the question you
+    ask once a year. The block below answers the other one. Months come from
+    the calendar and years from the months (`Math.floor(months / 12)`) rather
+    than from `days / 365.25`, because the approximation is off by a day on
+    the birthday — the one day someone looks. Days are counted midnight to
+    midnight and rounded, which is the DST correction: two days a year are not
+    24 hours long. The labels sit in the markup, not in a JS table, so
+    `applyI18n` translates them and `check-i18n-coverage.js` can find them —
+    **a catalogue key that only exists inside an array looks orphaned to the
+    guard.**
+
+    **And the counter that was never a promise it could keep.** Note 193 moved
+    the loading bar from *sections* to *requests* because “0 / 2” stood still
+    for the whole wait. The follow-up report is that “3 / 4” does the same: one
+    of the four requests takes longer than the other three together. **A
+    counter over requests does not measure the waiting, but it looks like a
+    promise about it.** `op.all` had exactly one caller and is gone; the map's
+    four stages keep their names and lose their numbers; compendium, world and
+    achievements say a sentence at all for the first time (they never even took
+    the control object). `step()` stays where the total genuinely *is* the work
+    — backup import, timeline import, the photo undo — because there the bar
+    counts rather than estimates.
+
+    **Two phases, two counters (Immich).** *“241 events and months checked”* is
+    a sum over two different things — one event and 240 months, in the reported
+    case — and neither number appeared anywhere. That is “days versus entries”
+    one level up. Each phase now counts its own unit and `job.done` restarts at
+    the phase boundary; the unit changes in the same commit, so “1 event
+    checked” is never reread as “1 month”. The switch is **conditional on there
+    being months at all** — otherwise “0 months checked” would be the closing
+    line of a run that did its work, and worse, the trailing reconciliation
+    `_progress(total)` would have pulled `done` back to zero, because `_tick`
+    carries differences.
+
+    Guards: `check-foreground.js` drops the “does the counter move” test (there
+    is no counter) and asserts both directions instead — a loader must report a
+    **non-empty sentence** and must **not** call `step()`; a test for only the
+    latter would be green when a loader says nothing at all, which is the state
+    before F23. Red against both broken copies (a `step()` put back into the
+    map: 1 red; the stats sentence removed: 1 red). `check-stats-panes.js`
+    checks the four removed rankings by **heading**, not by data field — a tile
+    the server no longer fills would just sit there empty and pass — and drives
+    a two-residence fixture where the second has no destinations.
+    `test_weather_extremes_f12.py` keeps its list of the removed keys in one
+    place (`GONE`); two enumerations would drift, and the shorter one would stay
+    green.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

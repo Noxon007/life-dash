@@ -182,6 +182,19 @@ Der wiederkehrende Defekt in diesem Projekt ist nicht Kaputtheit, sondern
   (`.inert` = außer Kraft, ≠ `.off` = vom Nutzer ausgeschaltet).
 - **Ein `catch`, das zwei verschiedene Fehler auf dieselbe Stille abbildet,
   trägt den Defekt statt ihn zu melden.**
+- **Ein Extremwert über eine gedeckelte Größe beschreibt den Deckel, nicht den
+  Tag** (Anmerkung 216). Vier Kacheln auf einmal: Sonnenschein ≤ Tageslänge,
+  Regenstunden ≤ 24, Tageslänge = Kalender, Fotos je Tag = unser eigenes
+  Zwölfer-Limit. **Die Probe ist die Rangliste, nicht die Kachel** — ein
+  einzelner Rekord liest sich immer plausibel, zehn identische Werte
+  untereinander nicht. Vor jeder neuen Rekord-Kachel fragen: kann diese Zahl
+  zwei Tage unterscheiden?
+- **Ein Fortschrittsbalken ist eine Zusage über die verbleibende ZEIT.** Wo die
+  Gesamtmenge nicht die Arbeit ist (vier Anfragen, von denen eine länger dauert
+  als die drei anderen zusammen), ist der Satz die ehrlichere Auskunft:
+  `op.note()` sagt, WORAUF gewartet wird, `op.step()` nur dort, wo gezählt und
+  nicht geschätzt wird. Zweimal repariert (Anmerkung 193, dann 216) — die erste
+  Runde hat den Stillstand nur feiner aufgelöst.
 
 **Last & Datenbank**
 - **Nie ein Zeichenobjekt je Element.** Der Canvas-Renderer ist die halbe
@@ -374,6 +387,36 @@ schliessen, die kein Feature nach 1.0 sind.
 **Damit sind die zehn offenen Punkte aus Anmerkung 200 geschlossen.** Offen
 bleiben aus R1 nur noch **b** (Screenshots/GIF, braucht den User), **c**
 (versionierte ghcr-Images) und **g** (Spendenlink) sowie **R2**.
+
+**Runde 2026-08-09, dritter Satz (Anmerkung 216) — der Statistik-Reiter und die
+Ladeansichten.** Neun Punkte, vier davon derselbe Defekt in vier Verkleidungen.
+Vier Sätze zum Weiterarbeiten:
+- **Ein Wert, der nach oben gedeckelt ist, ist kein Rekord.** Gestrichen sind
+  „Sonnigster Tag" (Sonnenschein ≤ Tageslänge), „Längster Regen" (≤ 24 h),
+  „Längster/Kürzester Tag" (= Kalender) und „Tage mit den meisten Fotos"
+  (= unser eigener Zwölfer-Deckel der Tagesleiste). **Sichtbar wurde es erst
+  durch die Rangliste unter der Kachel** — eine Kachel zeigt einen Wert, eine
+  Rangliste zeigt, ob er zwei Tage unterscheiden kann. Wer eine neue Kachel
+  baut: dieselbe Frage stellen. `rain_h`/`daylight_h` sind damit auch aus
+  `_WX_KEYS` raus (ein Schlüssel dort kostet eine Zeile je Ereignis UND je
+  Wohnort-Tag), `sunshine_h` bleibt für die Jahressumme.
+- **„Umzüge" ist „Wohnorte".** Die Kachel zählte Meilenstein-TITEL
+  (`umzug|umgezogen|eingezogen`) und stand auf 0, während fünf Wohnorte
+  eingetragen waren — die Falle „eine Zahl wird zur Aussage über die ZUFUHR".
+  Seit F20 gibt es die Tatsache als Zeile; `_MOVE_RE`/`_MOVE_WORDS` sind weg,
+  die Geburt ist die letzte Textregel, die eine Zahl trägt.
+- **`op.all` gibt es nicht mehr.** Ein Zähler über ANFRAGEN misst nicht die
+  Wartezeit, sieht aber aus wie ein Versprechen über sie („3 / 4" stand fest,
+  weil eine der vier Anfragen länger dauert als die anderen drei zusammen).
+  Ansichts-Lader sagen nur noch `op.note()`; `op.step()` bleibt dort, wo die
+  Gesamtmenge WIRKLICH die Arbeit ist (Backup-Import, Timeline-Import,
+  Foto-Rückweg). `check-foreground.js` prüft beide Richtungen — Satz da UND
+  kein `step()`.
+- **Der Immich-Lauf zählt je Phase.** `job.unit`/`job.done` wechseln beim
+  Phasenwechsel gemeinsam; **nur wenn es offene Monate GIBT**, sonst bliebe
+  „0 Monate geprüft" als Schlusszeile stehen — und das abschließende
+  `_progress(total)` hätte `done` auf null zurückgezogen (`_tick` schreibt
+  Differenzen fort).
 
 **Code-Durchsicht 2026-08-07 (Anmerkung 201): fünf Reparaturen und vier
 Aufräumungen drin, drei Punkte bewusst offen — sie brauchen erst eine

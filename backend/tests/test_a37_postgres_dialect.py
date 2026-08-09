@@ -21,7 +21,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.dialects import postgresql
 
 from app.models import ConfirmState, DatePrecision, Event, Location, Metric, Source
-from app.services.stats_overview import _MOVE_WORDS
+from app.services.stats_overview import _BIRTH_WORDS
 
 PG = postgresql.dialect()
 
@@ -78,14 +78,21 @@ def test_the_year_index_compiles_for_postgres(db, user):
 
 def test_the_text_rules_compile_for_postgres(db, user):
     """`ILIKE`: auf SQLite `lower() LIKE lower()`, auf PostgreSQL nativ —
-    beide unabhängig von der Groß-/Kleinschreibung, wie die Regel es braucht."""
-    like = [Event.title.ilike(f"%{w}%") for w in _MOVE_WORDS]
+    beide unabhängig von der Groß-/Kleinschreibung, wie die Regel es braucht.
+
+    Anmerkung 216: geprüft wird jetzt an der GEBURT statt am Umzug. Die
+    Umzugsregel gab es, weil eine Kachel Meilenstein-Titel zählte — die zählt
+    seitdem eingetragene Wohnorte, und die Regel ist mit ihr weggefallen. Die
+    Geburt ist die letzte Textregel, die eine Zahl trägt, und dort ist der Text
+    wirklich die einzige Quelle.
+    """
+    like = [Event.title.ilike(f"%{w}%") for w in _BIRTH_WORDS]
     query = (db.query(Event.id)
              .filter(Event.user_id == user.id, Event.category == "milestone",
                      or_(*like)))
     sql = _sql(query).lower()
     assert "ilike" in sql, sql
-    assert "umzug" in sql and "eingezogen" in sql
+    assert "geburt" in sql and "geboren" in sql
 
 
 def test_the_statistics_aggregates_compile_for_postgres(db, user):

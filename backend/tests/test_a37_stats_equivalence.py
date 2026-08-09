@@ -77,6 +77,15 @@ def _old_rules(events: list[dict]) -> dict:
     # vom Browser in den Server keine Zahl verändert hat. Diese eine Regel
     # wurde danach absichtlich ersetzt, und das steht hier, damit die Datei
     # nicht so aussieht, als sei sie an die Wirklichkeit angepasst worden.
+    #
+    # **Anmerkung 216: zwei Spiegelzahlen sind ersatzlos gestrichen** — die
+    # Kachel „Umzüge" (zählte Meilenstein-Titel, siehe
+    # `test_the_residence_tile_counts_rows_not_words`) und der Rekord
+    # „Sonnigster Tag" (Sonnenschein kann die Tageslänge nicht überschreiten,
+    # also stand auf allen zehn Plätzen dieselbe Zahl). Nicht „stimmt nicht
+    # mehr überein", sondern „gibt es nicht mehr" — und deshalb auch hier
+    # nicht mehr gespiegelt. Der Meilenstein „Umzug nach Kiel" bleibt im
+    # Bestand unten stehen; er zählt jetzt nur nirgends mehr mit.
     with_weather = [e for e in events
                     if metric_of(e, "temperature_c", "temp_max_c") is not None]
     by_day: dict[str, list] = {}
@@ -118,11 +127,9 @@ def _old_rules(events: list[dict]) -> dict:
         "concerts": sum(1 for e in events if e["category"] == "concert"),
         "milestones": len(milestones),
         "meals": sum(1 for e in events if e["category"] == "meal"),
-        "moves": sum(1 for e in milestones
-                     if re.search(r"umzug|umgezogen|eingezogen", text_of(e))),
         "age": age,
         "hot": hot, "cold": cold,
-        "sunny": metric_max("sunshine_h"), "rainy": metric_max("rain_mm"),
+        "rainy": metric_max("rain_mm"),
         "windy": metric_max("wind_max_kmh"), "snowy": metric_max("snow_cm"),
         "wx_days": len(days),
         "rain_days": sum(1 for d in days if (day_min(d, "rain_mm") or 0) >= 1),
@@ -216,12 +223,10 @@ def test_the_numbers_did_not_change(db, user):
     assert c["concerts"] == old["concerts"]
     assert c["milestones"] == old["milestones"]
     assert c["meals"] == old["meals"]
-    assert c["moves"] == old["moves"]
     assert new["age"] == old["age"]
 
     assert ex["hot"]["value"] == old["hot"]
     assert ex["cold"]["value"] == old["cold"]
-    assert ex["sunny"]["value"] == old["sunny"]
     assert ex["rainy"]["value"] == old["rainy"]
     assert ex["windy"]["value"] == old["windy"]
     assert ex["snowy"]["value"] == old["snowy"]

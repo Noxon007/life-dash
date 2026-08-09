@@ -37,13 +37,15 @@ const TOPLISTS = {
             date_precision: 'day', place: 'Sevilla' },
           { value: 31.5, id: 'e2', title: 'Balkon', date_start: '2022-07-19T15:00:00',
             date_precision: 'day', place: 'Detmold' }],
-    cold: [], sunny: [], rainy: [], windy: [], snowy: [], gust: [],
-    felt_hot: [], felt_cold: [], longest_day: [], shortest_day: [],
-    // Anmerkung 189: „am längsten geregnet" — eine andere Frage als „am
-    // meisten geregnet", und der Wert lag seit F12 ungenutzt herum.
-    rain_long: [{ value: 18.0, id: 'e9', title: 'Dauerregen',
-                  date_start: '2024-06-21T09:00:00', date_precision: 'day',
-                  place: 'Hamburg' }],
+    // Anmerkung 216: `sunny`, `rain_long`, `longest_day` und `shortest_day`
+    // gibt es nicht mehr — ihr Wert ist gedeckelt (Sonnenschein ≤ Tageslänge,
+    // Regenstunden ≤ 24, Tageslänge = Kalender), also stand auf allen zehn
+    // Plätzen dieselbe Zahl. Der Regen in MILLIMETERN bleibt und trägt hier
+    // die Prüfung, dass eine Wetter-Rangliste überhaupt Zeilen bekommt.
+    cold: [], windy: [], snowy: [], gust: [], felt_hot: [], felt_cold: [],
+    rainy: [{ value: 61.2, id: 'e9', title: 'Dauerregen',
+              date_start: '2024-06-21T09:00:00', date_precision: 'day',
+              place: 'Hamburg' }],
   },
   places: [{ name: 'Kaiserstraße 5', days: 4711, events: 8123 }],
   cities: [{ name: 'Schwerin', days: 317, events: 902 }],
@@ -57,13 +59,26 @@ const TOPLISTS = {
                     to: '2011-07-24', days: 24 },
   },
   // --- Anmerkung 189 ---
+  // Anmerkung 216: `days` gibt es nicht mehr — die Zahl war der Zwölfer-Deckel
+  // der Tagesleiste, nicht der Bestand des Tages.
   photos: { total: 7412, uploads: 91, linked: 7321, events_with_photo: 812,
             events_total: 8900, first: '2004-08-03', last: '2026-07-30',
             bytes: 268435456,
-            years: [{ year: 2004, count: 12 }],
-            days: [{ day: '2021-09-09', count: 137 }] },
-  farthest: { km: 8412.5, place: 'Kuta Beach', city: 'Denpasar',
-              country: 'Indonesien', date: '2016-03-12', home: 'Elternhaus' },
+            years: [{ year: 2004, count: 12 }] },
+  // Anmerkung 216: eine Gruppe JE WOHNORT mit bis zu drei Zielen. Der zweite
+  // Wohnort steht bewusst OHNE Treffer da — „von hier aus nichts erfasst" ist
+  // eine Auskunft, und ein Wächter, der nur den vollen Fall kennt, prüft die
+  // Hälfte.
+  farthest: [
+    { home: 'Elternhaus', from: '1990-04-02', to: '2006-08-31',
+      tops: [{ km: 8412.5, place: 'Kuta Beach', city: 'Denpasar',
+               country: 'Indonesien', date: '2016-03-12' },
+             { km: 1204.0, place: 'Lissabon', city: 'Lissabon',
+               country: 'Portugal', date: '2004-05-01' },
+             { km: 612.3, place: 'Zürich', city: 'Zürich',
+               country: 'Schweiz', date: '2005-09-14' }] },
+    { home: 'Kaiserstraße 5', from: '2006-09-01', to: '2026-08-09', tops: [] },
+  ],
   // Anmerkung 195: bewusst MEHR als zehn Jahre — der Deckel greift erst
   // darüber, und ein Wächter, der ihn nie auslöst, prüft ihn nicht.
   reach: [{ year: 2016, countries: 7, cities: 23 },
@@ -223,11 +238,20 @@ setTimeout(async () => {
        + 'Eintrags, der zufällig den Messwert trägt (Anmerkung 142)');
   }
 
-  // --- 5. Anmerkung 189: was bisher ungenutzt herumlag -------------------- //
-  ok('Die Regenstunden haben eine eigene Rangliste', /18/.test(txt)
-     && /Dauerregen/.test(txt),
-     '„nassester Tag" misst Millimeter — wie LANGE es geregnet hat, ist eine '
-     + 'andere Frage, und der Wert lag seit F12 in jeder Zeile');
+  // --- 5. Die Wetter-Ranglisten: nur die, die unterscheiden --------------- //
+  ok('Der nasseste Tag hat seine Rangliste', /61[.,]2/.test(txt)
+     && /Dauerregen/.test(txt), txt.slice(0, 400));
+  // **Anmerkung 216 — und die vier gedeckelten sind WIRKLICH weg.** Geprüft
+  // wird die Überschrift, nicht das Datenfeld: eine Kachel, die der Server
+  // nicht mehr füllt, stünde sonst leer da und wäre grün.
+  for (const [name, re] of [['Sonnigster Tag', /Sonnigster|Sunniest/],
+                            ['Längster Regen', /Längster Regen|Longest rain/],
+                            ['Längster Tag', /Längster Tag|Longest day/],
+                            ['Kürzester Tag', /Kürzester Tag|Shortest day/]]) {
+    ok(`„${name}" gibt es nicht mehr`, !re.test(txt),
+       'ein Rekord, den jeder wolkenlose Sommertag einstellt, unterscheidet '
+       + 'nichts — auf allen zehn Plätzen stand derselbe Wert');
+  }
 
   // Fotos: die Zahl steht mit ihrem Nenner da, und hochgeladen/verknüpft
   // bleiben getrennt (Anmerkung 57 — das eine ist Lebensdatenbank, das andere
@@ -240,7 +264,13 @@ setTimeout(async () => {
   ok('…und nennt den Nenner, nicht nur den Zähler',
      /812/.test(txt) && /8[.,]900/.test(txt),
      '„812 Einträge mit Bild" ist keine Auskunft, „812 von 8.900" ist eine');
-  ok('Der Tag mit den meisten Fotos steht da', /137/.test(txt), txt.slice(0, 400));
+  // Anmerkung 216: „Tage mit den meisten Fotos" ist weg — die Zahl war der
+  // Deckel der Tagesleiste. Geprüft wird die ÜBERSCHRIFT: ein leeres Feld
+  // `days` allein hätte die Kachel nur leer stehen lassen.
+  ok('„Tage mit den meisten Fotos" gibt es nicht mehr',
+     !/meisten Fotos|most photos/.test(txt),
+     'gezählt wurden höchstens zwölf Bilder je Tag — der eigene Deckel, im '
+     + 'Gewand einer Aussage über den Tag');
 
   // Am weitesten weg — die Frage gibt es erst mit dem Wohnort.
   // Gerundet angezeigt (8.412,5 -> „8.413 km") — Kilometer mit Nachkommastelle
@@ -250,6 +280,18 @@ setTimeout(async () => {
   ok('…und sagt, WOVON gemessen wurde', /Elternhaus/.test(txt),
      'ohne den Bezugspunkt ist „8.412 km" keine Aussage — ein '
      + 'Lebensmittelpunkt wandert');
+  // **Anmerkung 216 — je Wohnort DREI Ziele.** Bis dahin stand hier eine
+  // einzige Zeile für ein ganzes Leben; der Server rechnete es je Zeitraum und
+  // warf alles außer dem Maximum weg. Geprüft wird beides: dass die Plätze 2
+  // und 3 desselben Wohnorts dastehen, und dass der zweite Wohnort mit seinem
+  // Zeitraum erscheint, obwohl er nichts beizutragen hat.
+  ok('…und nennt auch Platz 2 und 3 desselben Wohnorts',
+     /Lissabon/.test(txt) && /Zürich/.test(txt), txt.slice(0, 600));
+  ok('Ein zweiter Wohnort bekommt seine eigene Gruppe',
+     /Kaiserstraße 5/.test(txt), txt.slice(0, 600));
+  ok('…und sagt, dass von dort nichts erfasst ist',
+     /nichts Verortetes|nothing with a place/.test(txt),
+     'ein Wohnort, der einfach fehlt, sieht aus wie einer, den es nicht gibt');
   ok('Die Reichweite je Jahr steht da', /7/.test(txt) && /23/.test(txt),
      txt.slice(0, 400));
 
@@ -264,12 +306,20 @@ setTimeout(async () => {
     .find(p => re.test((p.querySelector('h3') || {}).textContent || ''));
   const far = panelOf(/weitesten|Farthest/);
   const streaks = panelOf(/Längste Serien|Longest streaks/);
+  const photoPanel = panelOf(/📷 Fotos|📷 Photos/);
   const reachPanel = panelOf(/Reichweite|Reach per year/);
   const years = panelOf(/Top-Jahre|Top years/);
+  // **Anmerkung 216: die Reihe ist neu sortiert, weil sich zwei Größen geändert
+  // haben.** „Am weitesten" ist von einer Zeile auf vier je Wohnort gewachsen
+  // und steht deshalb über die volle Breite; die Fotos haben ihre zweite Kachel
+  // verloren und rücken zu den Serien, damit dort keine halbe Reihe leer bleibt.
   ok('Die beiden kurzen Auskünfte stehen in DERSELBEN Reihe',
-     !!far && !!streaks && far.parentElement === streaks.parentElement,
+     !!photoPanel && !!streaks && photoPanel.parentElement === streaks.parentElement,
      'eine einzeilige Kachel neben einer vierzigzeiligen wird auf deren Höhe '
      + 'gestreckt — genau die gemeldete Lücke');
+  ok('…und „Am weitesten" steht allein über die Breite',
+     !!far && !!streaks && far.parentElement !== streaks.parentElement,
+     'mit drei Zielen je Wohnort ist sie keine kurze Auskunft mehr');
   ok('…und die Reichweite steht bei den Ranglisten',
      !!reachPanel && !!years && reachPanel.parentElement === years.parentElement,
      'dort sind alle Kacheln zehn Zeilen hoch');
@@ -285,10 +335,10 @@ setTimeout(async () => {
   ok('…und die Überschrift nennt die Gesamtzahl',
      !!reachPanel && /\(\s*14\s*\)/.test(reachPanel.querySelector('h3').textContent),
      reachPanel ? reachPanel.querySelector('h3').textContent : '(keine Kachel)');
-  const short = far && far.querySelector('.panel-rows');
+  const short = photoPanel && photoPanel.querySelector('.panel-rows');
   ok('Eine kurze Kachel bekommt KEINEN Deckel',
      !!short && !short.classList.contains('capped'),
-     'ein Rollbalken um eine einzelne Zeile wäre die Lücke nur anders');
+     'ein Rollbalken um drei Zeilen wäre die Lücke nur anders');
 
   // --- 6. Die Wege: eigener Reiter, eigene Herkunft ----------------------- //
   calls.length = 0;

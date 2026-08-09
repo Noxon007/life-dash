@@ -161,40 +161,55 @@ setTimeout(async () => {
   ok('Ein Lauf im Lauf benutzt denselben Vorgang', innerSawSame,
      'refreshAll() ruft fünf Lader — fünf Overlays wären fünfmal dasselbe Flackern');
 
-  // ---- 7. Anmerkung 193: der Balken zählt ANFRAGEN, keine Abschnitte -----
+  // ---- 7. Anmerkung 216: eine Ansicht sagt einen SATZ, keine Zahlen -------
   //
-  // Gemeldet: „bei der Statistik kommt das Ladefenster, steht die ganze Zeit
-  // auf 0/2 und ist dann direkt fertig, ohne auf einen Fortschritt zu
-  // springen." Der Zähler war nicht falsch, er war unbeweglich: ein Schritt
-  // umfasste vier gleichzeitige Anfragen, also stand er über die gesamte
-  // Wartezeit auf 0.
+  // Die Vorgeschichte in zwei Zeilen: Anmerkung 193 hat den Zähler von
+  // Abschnitten auf Anfragen umgestellt („0 / 2" stand die ganze Wartezeit
+  // still). Gemeldet wurde danach, dass auch das nicht hilft — eine der vier
+  // Anfragen dauert so viel länger als die anderen, dass „3 / 4" genauso
+  // steht. Ein Zähler über Anfragen misst nicht die Wartezeit, sieht aber aus
+  // wie ein Versprechen über sie.
   //
-  // **Deshalb prüft der Wächter nicht, DASS eine Zahl dasteht, sondern dass
-  // sie sich WÄHREND des Wartens ÄNDERT.** Das ist der Unterschied zwischen
-  // „es gibt einen Balken" und „der Balken sagt etwas" — und einer
-  // `step()`-Zeile sieht man ihn nicht an.
-  const marks = [];
-  const slow = ms => new Promise(r => w.setTimeout(r, ms));
-  await run('Zähler', async op => {
-    const timer = w.setInterval(() => marks.push(op.done), 10);
-    await op.all([slow(40), slow(80), slow(120)], 'drei Anfragen');
-    w.clearInterval(timer);
-  });
-  const stands = [...new Set(marks)];
-  ok('Der Zähler bewegt sich WÄHREND des Wartens', stands.length >= 3,
-     `gesehene Stände: ${stands.join(', ') || '(keine)'} — ein Zähler, der nur `
-     + 'am Anfang und am Ende einen Wert hat, behauptet Stillstand');
+  // **Geprüft wird deshalb beides, und zwar in beide Richtungen:** der Lader
+  // muss einen nicht-leeren Satz melden (sonst dreht sich ein Kreisel ohne
+  // Auskunft), und er darf keine Gesamtmenge setzen (sonst ist der Balken
+  // wieder da). Eine Prüfung nur auf „kein `step`" wäre grün, wenn ein Lader
+  // gar nichts mehr sagt — das ist der Zustand vor F23.
+  //
+  // Ein Doppel statt eines echten Laufs, weil die Zahlen dahinter hier
+  // niemanden interessieren, nur WIE der Fortschritt gemeldet wird.
+  const spyFor = () => {
+    const seen = { notes: [], steps: 0 };
+    seen.op = { note(txt) { seen.notes.push(txt); }, step() { seen.steps++; },
+                check() {}, done: 0, total: 0 };
+    return seen;
+  };
+  const stats = spyFor();
+  try { await w.loadStats(stats.op); } catch (_) { /* die Zahlen fehlen, egal */ }
+  ok('Die Statistik sagt, woran sie arbeitet',
+     stats.notes.some(n => n && n.trim().length > 5),
+     `gemeldete Sätze: ${JSON.stringify(stats.notes)} — ohne Satz dreht sich `
+     + 'nur ein Kreisel mit dem Ansichtsnamen');
+  ok('… und zeigt dabei keinen Zähler', stats.steps === 0,
+     `${stats.steps} Aufruf(e) von step() — „3 / 4" misst Anfragen und liest `
+     + 'sich wie eine Zusage über die verbleibende Zeit');
 
-  // Und die Stelle, aus der die Beschwerde kam: benutzt sie es auch? Ein
-  // Doppel statt eines echten Laufs, weil die Zahlen dahinter hier niemanden
-  // interessieren — nur, WIE der Fortschritt gemeldet wird.
-  let bundle = 0, steps = 0;
-  const spy = { note() {}, step() { steps++; }, check() {},
-                all(list) { bundle = list.length; return Promise.all(list); } };
-  try { await w.loadStats(spy); } catch (_) { /* die Zahlen fehlen, egal */ }
-  ok('Die Statistik meldet jede ihrer Anfragen einzeln', bundle >= 4,
-     `${bundle} gemeldete Anfragen bei ${steps} Abschnitten — vier Endpunkte `
-     + 'auf einmal sind vier zählbare Dinge, nur ohne Reihenfolge');
+  // Dieselbe Regel für die Karte: sie hat VIER benannte Etappen, und genau
+  // deshalb stand dort die Zahl. Die Namen bleiben, die Nummern gehen.
+  const map = spyFor();
+  try { await w.openMapView(map.op); } catch (_) { /* Leaflet fehlt, egal */ }
+  ok('Die Karte nennt ihre Etappen weiter', map.notes.length >= 1,
+     'ohne die Namen ist ein Kartenaufbau über 20.000 Punkte eine Sanduhr');
+  ok('… und zählt sie nicht mehr durch', map.steps === 0,
+     `${map.steps} Aufruf(e) von step() — das Zeichnen dauert länger als die `
+     + 'drei Abrufe davor, „3 / 4" stünde also fast die ganze Wartezeit da');
+
+  // Und der Weg, der die Zahlen möglich machte, muss weg sein: `op.all` hatte
+  // genau einen Aufrufer (die Statistik). Bliebe die Methode stehen, käme sie
+  // beim nächsten Lader zurück — und der Wächter darüber wäre einer für die
+  // Vergangenheit.
+  ok('`op.all` gibt es nicht mehr', !/\bop\.all\(|^\s*all\(list/m.test(code),
+     'die Bündel-Zählung ist wieder da; ein Satz über die Ansicht genügt');
 
   finish();
 

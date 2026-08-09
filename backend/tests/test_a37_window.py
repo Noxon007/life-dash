@@ -15,8 +15,8 @@ from datetime import datetime
 import pytest
 from fastapi import HTTPException
 
-from app.models import (ConfirmState, DatePrecision, Entity, Event,
-                        EventEntityLink, Location, Metric, Source, User,
+from app.models import (BaselineLocation, ConfirmState, DatePrecision, Entity,
+                        Event, EventEntityLink, Location, Metric, Source, User,
                         UserRole)
 from app.routers.events import (events_index, get_event, list_events,
                                 list_map_events)
@@ -221,7 +221,10 @@ def test_overview_counts_match_the_old_client_rules(db, user):
     assert c["concerts"] == 2
     assert c["meals"] == 1
     assert c["milestones"] == 2
-    assert c["moves"] == 1
+    # Anmerkung 216: „Umzüge" gibt es nicht mehr. Der Meilenstein „Umzug nach
+    # Kiel" steht oben immer noch da — und zählt hier bewusst NICHT mehr mit.
+    assert "moves" not in c
+    assert c["residences"] == 0, "kein Wohnort eingetragen, also keiner gezählt"
     assert c["unconfirmed"] == 1
     # „Berlin, Deutschland" und „Berlin, Berlin, Deutschland" sind EIN Ort —
     # sonst zählt jede Nominatim-Langadresse einzeln (Frontend-Regel placeOf)
@@ -231,14 +234,31 @@ def test_overview_counts_match_the_old_client_rules(db, user):
     assert ov["top_places"][0] == ["Berlin", 2]
 
 
-def test_overview_move_needs_the_word_not_only_the_category(db, user):
-    """Das ILIKE der Vorauswahl ist großzügiger als die Regel — entscheiden
-    muss derselbe Ausdruck wie im Frontend."""
-    _event(db, user, "Abitur", category="milestone", when=datetime(2009, 6, 1))
+def test_the_residence_tile_counts_rows_not_words(db, user):
+    """**Anmerkung 216 — der gemeldete Fall, in einem Test.**
+
+    Hier stand bis 0.39 `test_overview_move_needs_the_word_not_only_the_category`:
+    Die Kachel „Umzüge" zählte Meilensteine, deren Titel oder Beschreibung
+    „Umzug"/„umgezogen"/„eingezogen" enthält. Gemeldet wurde, dass sie auf 0
+    steht, obwohl mehrere Wohnungen eingetragen sind — und genau so war es
+    gebaut: gezählt wurde, wie jemand seine Meilensteine BESCHRIFTET, angezeigt
+    als Tatsache über sein Leben.
+
+    Der Test dreht die Beweislast um. Die beiden Meilensteine unten treffen die
+    alte Textregel (einer im Titel, einer in der Beschreibung) und dürfen die
+    Zahl nicht mehr bewegen; die eine Wohnort-Zeile ohne jedes Stichwort muss
+    sie tragen.
+    """
+    _event(db, user, "Umzug nach Kiel", category="milestone",
+           when=datetime(2009, 6, 1))
     _event(db, user, "Erste Wohnung", category="milestone",
            when=datetime(2011, 9, 1), description="Endlich eingezogen.")
+    loc = _loc(db, user, "Kaiserstraße 5")
+    db.add(BaselineLocation(user_id=user.id, location_id=loc.id,
+                            date_start=date_type(2011, 9, 1)))
+    db.commit()
 
-    assert compute_overview(db, user.id)["counts"]["moves"] == 1
+    assert compute_overview(db, user.id)["counts"]["residences"] == 1
 
 
 def test_overview_weather_counts_days_not_entries(db, user):

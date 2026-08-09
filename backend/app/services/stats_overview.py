@@ -26,18 +26,32 @@ from sqlalchemy import and_, exists, func, or_
 from sqlalchemy.orm import Session, aliased
 
 from app.sqlutil import day_number
-from app.models import (ConfirmState, DatePrecision, DayMetric, Entity, Event,
-                        EventEntityLink, Location, Metric, Source)
+from app.models import (BaselineLocation, ConfirmState, DatePrecision,
+                        DayMetric, Entity, Event, EventEntityLink, Location,
+                        Metric, Source)
 from app.services import baseline, weather_day
 
 # Dieselben Muster wie im Frontend (dort als RegExp über „Titel + Beschreibung")
-_MOVE_RE = re.compile(r"umzug|umgezogen|eingezogen", re.I)
+#
+# Anmerkung 216: `_MOVE_RE`/`_MOVE_WORDS` sind weg. Sie waren die einzige
+# Textregel, die eine ZAHL trug (die Kachel „Umzüge"), und genau daran ist sie
+# gescheitert — die Wohnorte stehen seit F20 als Tatsache in der Datenbank.
+# Was bleibt, ist die Geburt: dort ist der Text wirklich die einzige Quelle.
 _BIRTH_RE = re.compile(r"geburt|geboren|\bbirth\b", re.I)
-_MOVE_WORDS = ("umzug", "umgezogen", "eingezogen")
 _BIRTH_WORDS = ("geburt", "geboren", "birth")
 
 # Nur diese Wetterwerte gehen in Kacheln und Diagramme ein. Die Metrik-Abfrage
 # auf sie einzuschränken halbiert die Zeilen (16 Schlüssel je Ereignis).
+#
+# **Anmerkung 216: `rain_h` und `daylight_h` stehen nicht mehr darin.** Sie
+# werden weiter geholt und stehen weiter am einzelnen Ereignis — nur fasst sie
+# keine Auskunft mehr zusammen, seit ihre Kacheln weg sind. Ein Schlüssel in
+# dieser Liste kostet eine Zeile je Ereignis UND je Wohnort-Tag; er gehört
+# hier nur hin, solange ihn jemand liest.
+#
+# `sunshine_h` bleibt, obwohl „Sonnigster Tag" mit weg ist: die Jahresbilanz
+# („Sonnenstunden", `weather_day.year_totals`) zählt darüber, und `_WX_KEYS`
+# ist ihr Schlüsselsatz.
 _WX_KEYS = ("temperature_c", "temp_max_c", "temp_min_c", "sunshine_h",
             "rain_mm", "wind_max_kmh", "snow_cm",
             # Anmerkung 114: F12 holt diese Werte seit 0.22 bei JEDER
@@ -46,24 +60,36 @@ _WX_KEYS = ("temperature_c", "temp_max_c", "temp_min_c", "sunshine_h",
             # Ereignisses. Gespeicherte Daten, die nirgends zusammengefasst
             # werden, sind Ballast; ein Rekord ist der Sinn eines Extremwerts.
             "uv_max", "gust_max_kmh", "apparent_temp_max_c",
-            "apparent_temp_min_c", "daylight_h",
-            # Anmerkung 189: Regenstunden. Seit F12 geholt und bis hierher in
-            # keiner Zusammenfassung — genau der Ballast, den der Absatz
-            # darüber beschreibt. „Nassester Tag" misst Millimeter; wie LANGE
-            # es geregnet hat, ist eine andere Frage, und ERA5 beantwortet sie
-            # (geprüft: 18 h am 21.06.2024 in Hamburg, gegen 0 h zwei Tage
-            # später).
-            "rain_h")
+            "apparent_temp_min_c")
 
 # Extremwert-Kacheln: Name -> (Metrik-Schlüssel …, Richtung, nur echte Werte?)
 # „nur echte Werte" heißt: 0 zählt nicht als Rekord. Bei Regen und Schnee ist
-# das richtig (der trockenste Tag ist kein „nassester Tag"), bei Tageslicht
-# wäre es falsch — die Polarnacht mit 0 h IST der kürzeste Tag, und zwar der
-# interessanteste Wert der ganzen Kachel.
+# das richtig (der trockenste Tag ist kein „nassester Tag").
+#
+# ---------------------------------------------------------------------------
+# **Anmerkung 216 — ein Rekord, den jeder Sommer einstellt, ist keiner.**
+# ---------------------------------------------------------------------------
+# Vier Kacheln sind hier gestrichen, und zwar aus EINEM Grund, den die
+# Rangliste darunter sichtbar gemacht hat: ihr Wert ist nach oben gedeckelt,
+# also stehen auf allen zehn Plätzen dieselbe Zahl.
+#
+#   * „Sonnigster Tag" (`sunshine_h`) — Sonnenschein kann die Tageslänge nicht
+#     überschreiten. Jeder wolkenlose Tag um die Sonnenwende trifft denselben
+#     Deckel; gemeldet wurde „top 10 haben alle 16,4 h".
+#   * „Längster Regen" (`rain_h`) — ein Tag hat 24 Stunden. Ein durchregneter
+#     Tag ist keine Seltenheit, also stehen dort zehnmal 24 h.
+#   * „Längster Tag" / „Kürzester Tag" (`daylight_h`) — die Tageslänge ist eine
+#     Eigenschaft des Kalenders und des Breitengrads, keine des Lebens. Sie
+#     nennt die Sonnenwende, egal was an dem Tag passiert ist.
+#
+# Der gemeinsame Nenner: **die Zahl beschreibt nicht den Tag, sondern seine
+# Obergrenze.** Ein Extremwert ist nur dann eine Auskunft, wenn er zwischen
+# zwei Tagen unterscheiden kann. Deshalb sind sie ganz weg (Kachel UND
+# Rangliste, Entscheidung des Users 2026-08-09) und nicht bloß entschärft —
+# eine Kachel ohne Liste wäre derselbe Wert mit weniger Belegen.
 _EXTREMES: tuple[tuple[str, tuple[str, ...], str, bool], ...] = (
     ("hot", ("temp_max_c", "temperature_c"), "max", False),
     ("cold", ("temp_min_c", "temperature_c"), "min", False),
-    ("sunny", ("sunshine_h",), "max", True),
     ("rainy", ("rain_mm",), "max", True),
     ("windy", ("wind_max_kmh",), "max", True),
     ("snowy", ("snow_cm",), "max", True),
@@ -72,18 +98,10 @@ _EXTREMES: tuple[tuple[str, tuple[str, ...], str, bool], ...] = (
     # Archiv (ERA5) liefert `uv_index_max` für historische Tage grundsätzlich
     # `null` (live geprüft) — die Kachel konnte nie füllen. UV gibt es nur über
     # die historical-forecast-API und nur ab ~2022; das wäre ein zweiter
-    # Endpunkt mit eigenen Fehlerpfaden, kein Kachelwert. "Sonnigster Tag"
-    # (Sonnenstunden, oben) deckt "Sonne" ab und steht IM Archiv.
-    # Anmerkung 189: „am längsten geregnet" — eine andere Frage als „am
-    # meisten geregnet" (`rainy`, Millimeter). Ein Landregen über 18 Stunden
-    # und ein Wolkenbruch von zwanzig Minuten können dieselbe Menge bringen.
-    # `positive_only`, weil 0 h kein Rekord ist, sondern ein trockener Tag.
-    ("rain_long", ("rain_h",), "max", True),
+    # Endpunkt mit eigenen Fehlerpfaden, kein Kachelwert.
     ("gust", ("gust_max_kmh",), "max", True),
     ("felt_hot", ("apparent_temp_max_c",), "max", False),
     ("felt_cold", ("apparent_temp_min_c",), "min", False),
-    ("longest_day", ("daylight_h",), "max", True),
-    ("shortest_day", ("daylight_h",), "min", False),
 )
 
 TOP_N = 8
@@ -249,7 +267,15 @@ def compute_overview(db: Session, user_id: str, *, today: datetime | None = None
     top_cities = sorted(per_city.items(), key=_by_count)[:TOP_N]
 
     # ---------------- Textregeln: SQL grenzt ein, Python entscheidet ---------
-    moves = len(_milestone_matches(db, user_id, _MOVE_WORDS, _MOVE_RE))
+    # **Anmerkung 216: „Umzüge" gibt es nicht mehr.** Die Kachel zählte
+    # Meilensteine, deren TEXT „Umzug"/„umgezogen"/„eingezogen" enthält — und
+    # stand deshalb auf 0, während unter „Meine Daten" fünf Wohnorte mit
+    # Zeitraum eingetragen waren. Das ist die Falle „eine Zahl wird zur Aussage
+    # über die ZUFUHR": gezählt wurde, wie jemand seine Meilensteine
+    # BESCHRIFTET, angezeigt wurde es als Tatsache über sein Leben. Seit F20
+    # gibt es die Tatsache wirklich, als Zeile mit Gültigkeitszeitraum — also
+    # zählt die Kachel jetzt sie. Sie heißt auch danach: „Wohnorte", nicht
+    # „Umzüge", denn eine Zeile ist ein Wohnort und kein Ortswechsel.
     birth = find_birth(db, user_id)
     age = _age_years(birth["date_start"], today or datetime.now()) if birth else None
 
@@ -278,7 +304,13 @@ def compute_overview(db: Session, user_id: str, *, today: datetime | None = None
             "concerts": per_cat.get("concert", 0),
             "milestones": per_cat.get("milestone", 0),
             "meals": per_cat.get("meal", 0),
-            "moves": moves,
+            # Anmerkung 216 — die Zeilen selbst, nicht ihre abgeleiteten Tage.
+            # `baseline.day_counts` steht ein paar Zeilen weiter oben und wäre
+            # die Antwort auf eine andere Frage („wie lange?"), diese hier ist
+            # „wie viele?".
+            "residences": (db.query(func.count(BaselineLocation.id))
+                           .filter(BaselineLocation.user_id == user_id)
+                           .scalar() or 0),
         },
         "birth": birth,
         "age": age,
@@ -320,8 +352,8 @@ def _extreme_tops(src: WeatherSource, n: int) -> dict[str, list[dict]]:
     (Anmerkung 156) die ganze Liste. Beide lesen dieselben Regeln: welcher
     Metrik-Schlüssel gilt, in welche Richtung verglichen wird und ob eine Null
     ein Rekord sein kann (`positive_only`). Die letzte ist der Grund, warum das
-    hier nicht zweimal stehen darf — bei Regen ist 0 kein Rekord, beim
-    Tageslicht ist die Polarnacht mit 0 h der interessanteste Wert überhaupt.
+    hier nicht zweimal stehen darf — beim Regen ist 0 mm kein Rekord, sondern
+    ein trockener Tag, bei der gefühlten Kälte ist 0 °C schlicht ein Messwert.
 
     **Anmerkung 161: ein Tag steht genau einmal in der Liste.** Bis hierher war
     die Rangfolge eine über EREIGNISSE, und das war schon immer eine Antwort auf
