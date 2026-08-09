@@ -25,6 +25,7 @@ node tools/check-a42-city-page.js   # a city opens a page, not an exit — A42, 
 node tools/check-a46-visit-split.js # cutting confirmed visits needs a preview first — A46, note 116
 node tools/check-photo-layer.js     # the photo layer says what it hides, and doubles nothing — A45
 node tools/check-tl-granularity.js  # the condensation level goes to the server — A47
+node tools/check-job-refresh.js    # a finished server run refreshes the open view — note 212
 node tools/check-foreground.js      # every browser-paced run uses one progress panel — note 172
 node tools/check-wipe-word.js       # both delete buttons ask the same word, and the server accepts it — note 169
 ```

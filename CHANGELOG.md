@@ -849,6 +849,18 @@ any `MINOR`.
   unchanged — without that number a second run over the same year reads like a
   failed first one.
 
+### Fixed
+- **When a background run finishes, the page updates by itself.** Adding
+  weather, resolving place names, linking Immich photos, recalculating
+  proposals — all of that happened on the server, and nothing you had open took
+  notice, so the change appeared only after a reload. Now a finished run says so
+  wherever you are in the app, with its result, and rebuilds the view you are
+  looking at. Runs you started and watched yourself are not announced twice.
+- **A run you walk away from still updates its own row.** The jobs table only
+  refreshed while you were looking at that exact tab; start something, switch to
+  the timeline, and it stayed at “running” forever — including after it had
+  long finished.
+
 ### Security
 - **The container no longer runs as root.** It starts as root only long enough
   to hand your `data` and `media` folders to an unprivileged user, then drops

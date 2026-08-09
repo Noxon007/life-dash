@@ -1584,6 +1584,20 @@ not a post-1.0 feature.
 
     Forks stay welcome and the file says so: AGPL-3.0-or-later, take it anywhere, serve the source. The last section is for whoever does — the two test commands, and the one rule worth carrying out of this repository: **run every new check once against the broken state**, or it proves that a function exists rather than that anyone calls it.
 
+212. ✅ **“Some changes only show up after a hard reload.”** Reported as a feeling, and the feeling was precise — including the word *some*.
+
+    **It was not the cache, and checking that first mattered.** The service worker fetches network-first; an ordinary reload always got the current page. Had this been chased as a caching problem, the actual defect would have survived the fix.
+
+    **`refreshAll()` only ever ran on a USER action** — confirm, edit, import. A run on the *server* — weather, recompute, place names, Immich, photo events — changed the corpus, and no open view learned of it. That is also where *some* comes from: statistics and the map carry the corpus stamp from `/api/events/index` and heal themselves the next time they are opened; the timeline carries no stamp and does not. So the app was right about half the time, which is the hardest kind of wrong to report.
+
+    **And the polling was tied to a tab.** The jobs table asked every four seconds — but only while it was the visible tab (`adminTab === 'jobs'`). Start a run, walk away, and you did not even see its own row finish. Two defects, one cause: the only thing in the app that knew whether something was running was a table.
+
+    **One watcher for both, and the table is now a spectator.** It draws when it is visible and asks nothing itself. Two pollers side by side would be two answers to *“is anything running?”* — the doubled rule this project pays for most, and it would have drifted the first time either one changed its interval.
+
+    Three decisions are worth stating. Only the **open** view is rebuilt: the others fetch their state on the way in anyway, and reloading seven views on spec is exactly the work A37 removed from this application. A run **this browser drives in the foreground** — backup and timeline import, the batched admin runs — is watched but never announced: the user has just watched its progress bar and got its message, and a second notice is noise, not service. And the watcher **looks once at startup**, because a run outlives the page: the nightly schedule starts one at three in the morning, and a run you did not start yourself is precisely the one whose ending you miss.
+
+    Guard: `tools/check-job-refresh.js`, thirteen cases over the whole chain — running → finished → corpus forgotten → the open view's loader called. Run against the pre-change behaviour: two go red. The counter-directions are half the file, and they are the half that would otherwise bite: while a run is **still going**, nothing may be rebuilt (or the view redraws every four seconds), the same finished run must not refresh twice, and an own foreground run must produce no second message. It also asserts that the jobs table no longer holds a timer of its own — without that line, someone re-adds the second poller and every other check stays green.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

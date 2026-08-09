@@ -3919,6 +3919,9 @@ const I18N_EN = {
   // Anmerkung 120 — laufende Läufe, Vorschauen, „Alle Jahre"
   'jobs.active': "Running now ({n})",
   'jobs.past': "History",
+  // Anmerkung 212 — a run that finishes says so, wherever you are
+  'jobs.ended.ok': "finished",
+  'jobs.ended.err': "ended with an error",
   'jobs.justnow': "just now",
   'jobs.since': "for {n} min",
   'adm.jobstarted.here': "✓ Started — progress and stop are at the top of this page. The run continues in the background, even if you close the page.",
@@ -11452,7 +11455,7 @@ async function loadAdminTab(tab, op) {
   if (op) op.note(t('fg.admin.tab', 'Der Reiter wird geladen …'));
   if (tab === 'moderation') await Promise.all([loadModQueue(), loadFuzzyDates()]);
   if (tab === 'daten') await Promise.all([loadPlaceFormat(), pollDataJobs(), loadBaselines()]);
-  if (tab === 'jobs') { await loadJobs(); renderSchedule(); }
+  if (tab === 'jobs') { await jobWatchTick(); renderSchedule(); }
   if (tab === 'nutzer') await loadUsers();
   if (tab === 'db') await loadDbTables();
   // `followLogs` startet eine Dauerbeobachtung — auf die wartet niemand.
@@ -11850,6 +11853,9 @@ async function loadJobs() {
   if (!tbl) return;
   let jobs;
   try { jobs = await api('/api/jobs?limit=12'); } catch { tbl.innerHTML = ''; return; }
+  renderJobsTable(tbl, jobs);
+}
+function renderJobsTable(tbl, jobs) {
   // Zeiten sind UTC gespeichert -> lokal anzeigen
   const fmt = iso => iso ? new Date(iso.endsWith('Z') ? iso : iso + 'Z')
     .toLocaleString(LOC(), { dateStyle: 'short', timeStyle: 'short' }) : '—';
@@ -11892,16 +11898,119 @@ async function loadJobs() {
     btn.disabled = true;
     try { await api(`/api/jobs/${btn.dataset.jobStop}/stop`, { method: 'POST' }); toast(t('toast.stopreq', 'Stopp angefordert — der Lauf endet nach dem aktuellen Batch.'), 'warn'); }
     catch (err) { toast(err.message, 'error'); }
-    loadJobs();
+    jobWatchTick();
   }));
-  // A22: solange etwas läuft und der Jobs-Reiter offen ist, alle 4 s aktualisieren
-  clearTimeout(jobsTimer);
-  const active = document.getElementById('view-admin').classList.contains('active') && adminTab === 'jobs';
-  if (active && jobs.some(j => j.status === 'running' || j.status === 'stopping')) {
-    jobsTimer = setTimeout(loadJobs, 4000);
+}
+document.getElementById('jobs-refresh').addEventListener('click', () => jobWatchTick());
+
+// --------------------------------------------------------------------------- //
+//  Anmerkung 212: Ein Lauf, der fertig wird, aktualisiert die Ansicht
+// --------------------------------------------------------------------------- //
+// Gemeldet als „manche Änderungen sehe ich erst nach hartem Neuladen".
+//
+// **Der Befund war nicht der Cache.** Der Service Worker holt die Seite
+// netz-zuerst; ein Neuladen bekam sie immer frisch. Was fehlte, war etwas
+// anderes: `refreshAll()` lief ausschließlich auf NUTZERaktionen (Bestätigen,
+// Ändern, Import). Ein Lauf auf dem SERVER — Wetter, Neuberechnung,
+// Ortsnamen, Immich, Foto-Ereignisse — änderte den Bestand, und keine einzige
+// offene Ansicht erfuhr davon. Statistik und Karte heilten sich beim nächsten
+// Öffnen selbst (sie tragen den Bestandsstempel aus `/api/events/index`), der
+// Zeitstrahl nicht. Genau daher das Gefühl, es seien nur MANCHE Änderungen.
+//
+// **Und der Takt hing am Reiter.** Die Jobs-Tabelle fragte alle vier Sekunden
+// nach — aber nur, solange sie selbst offen war. Wer einen Lauf startete und
+// weiterarbeitete, sah nicht einmal dessen eigene Zeile fertig werden.
+//
+// EIN Wächter für beides. Die Tabelle ist ab hier ein ZUSCHAUER: sie zeichnet,
+// wenn sie sichtbar ist, und fragt nichts mehr selbst. Zwei Poller nebeneinander
+// wären zwei Antworten auf „läuft noch was?" — die Doppelregel, die dieses
+// Projekt am teuersten bezahlt.
+const JOB_WATCH = { timer: null, live: new Map(), busy: false, mine: new Set() };
+const JOB_LIVE = j => j.status === 'running' || j.status === 'stopping';
+// 4 s, solange etwas läuft — das ist der Takt, den die Tabelle immer hatte.
+const JOB_TICK_MS = 4000;
+
+function jobWatchSchedule(ms) {
+  clearTimeout(JOB_WATCH.timer);
+  JOB_WATCH.timer = ms ? setTimeout(jobWatchTick, ms) : null;
+}
+
+async function jobWatchTick() {
+  if (JOB_WATCH.busy) return;
+  JOB_WATCH.busy = true;
+  try {
+    let jobs;
+    try { jobs = await api('/api/jobs?limit=12'); }
+    catch (_) {
+      // Kein Netz oder nicht angemeldet: nachsehen, solange wir etwas erwarten,
+      // sonst still aufhören. Ein Wächter, der im Offline-Fall im Sekundentakt
+      // gegen eine Wand läuft, ist schlimmer als keiner.
+      jobWatchSchedule(JOB_WATCH.live.size ? JOB_TICK_MS * 3 : 0);
+      return;
+    }
+    const tbl = document.getElementById('jobs-table');
+    if (tbl && document.getElementById('view-admin').classList.contains('active')
+        && adminTab === 'jobs') renderJobsTable(tbl, jobs);
+
+    const live = new Map(jobs.filter(JOB_LIVE).map(j => [j.id, j]));
+    // Fertig = war beim letzten Blick am Laufen und ist es jetzt nicht mehr.
+    // Der ENDSTAND kommt aus der aktuellen Liste, nicht aus der gemerkten
+    // Zeile: dort steht das Ergebnis, und ohne es könnte der Hinweis nur
+    // „fertig" sagen.
+    const done = [...JOB_WATCH.live.keys()]
+      .filter(id => !live.has(id))
+      .map(id => jobs.find(j => j.id === id) || JOB_WATCH.live.get(id));
+    JOB_WATCH.live = live;
+    // **Was dieser Browser selbst im Vordergrund fährt, meldet der Wächter
+    // nicht.** Backup- und Timeline-Import und die Batch-Läufe der Verwaltung
+    // sind registrierte Läufe (ARCHITECTURE 4.6) und stehen deshalb in dieser
+    // Liste — aber der Nutzer hat ihnen gerade beim Fortschritt zugesehen, hat
+    // ihre Meldung bekommen, und die Ansichten sind schon neu. Ein zweiter
+    // Hinweis für denselben Lauf ist kein Dienst, sondern Rauschen.
+    const foreign = done.filter(j => !JOB_WATCH.mine.has(j.id));
+    done.forEach(j => JOB_WATCH.mine.delete(j.id));
+    if (foreign.length) await afterJobsFinished(foreign);
+    jobWatchSchedule(live.size ? JOB_TICK_MS : 0);
+  } finally {
+    JOB_WATCH.busy = false;
   }
 }
-document.getElementById('jobs-refresh').addEventListener('click', loadJobs);
+
+// Von jeder Stelle aufzurufen, die einen Lauf ANSTÖSST. Der erste Blick kommt
+// sofort — sonst fehlte dem Wächter der Startzustand, und ein Lauf, der in
+// unter vier Sekunden durch ist, wäre nie als „lief mal" gesehen worden.
+function jobWatchPing() { jobWatchTick(); }
+
+async function afterJobsFinished(jobs) {
+  const names = jobs.map(j => t('job.' + j.type, JOB_LABELS[j.type] || j.type));
+  const failed = jobs.filter(j => j.status === 'error');
+  const result = jobs.length === 1 && jobs[0].result ? ` — ${jobs[0].result}` : '';
+  toast(`${failed.length ? '⚠️' : '✅'} ${names.join(', ')}: ${
+    failed.length ? t('jobs.ended.err', 'mit Fehler beendet')
+                  : t('jobs.ended.ok', 'fertig')}${result}`,
+    failed.length ? 'error' : 'ok');
+  await refreshCurrentView();
+}
+
+// Den Bestand vergessen und die Ansicht neu bauen, die gerade offen ist.
+// Nur die offene: die übrigen holen sich ihren Stand beim Wechsel ohnehin
+// über den Bestandsstempel, und sieben Ansichten auf Vorrat neu zu laden wäre
+// genau die Sorte Arbeit, die A37 aus dieser Anwendung entfernt hat.
+async function refreshCurrentView() {
+  invalidateEvents();
+  trackCache.clear();
+  const view = document.querySelector('.view.active');
+  const key = view ? view.id.replace(/^view-/, '') : null;
+  const load = key && VIEW_LOADERS[key];
+  // Der Zeitstrahl hängt an keinem Stempel und muss immer neu — auch dann,
+  // wenn er gerade nicht die offene Ansicht ist: die Warteschlange und die
+  // Zähler in der Leiste stehen sonst falsch da.
+  await Promise.all([
+    load ? Promise.resolve(load()).catch(err => console.warn('Auffrischen', key, err))
+         : Promise.resolve(),
+    key === 'timeline' ? Promise.resolve() : loadModQueue().catch(() => {}),
+  ]);
+}
 // A22: Nachtplan-Einstellungen (pro Nutzer)
 // `photo_points` steht bewusst NICHT hier: der Lauf braucht ein Jahr und eine
 // gesehene Vorschau. Ein nächtlicher Lauf würde beides überspringen und legte
@@ -11941,10 +12050,15 @@ function renderSchedule() {
 }
 // Helfer für Nicht-Batch-Läufe (Importe): Job starten/abschließen
 async function startJob(type, unit) {
-  return api('/api/jobs/start', {
+  const job = await api('/api/jobs/start', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ type, unit }),
   });
+  // Anmerkung 212: beobachtet — aber als EIGENER Vordergrund-Lauf, dessen
+  // Ende der Aufrufer selbst meldet.
+  if (job && job.id) JOB_WATCH.mine.add(job.id);
+  jobWatchPing();
+  return job;
 }
 function jobProgress(job, done, remaining) {
   if (!job) return;
@@ -11958,7 +12072,7 @@ function jobFinish(job, status, result) {
   api(`/api/jobs/${job.id}/finish`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status, result: result ? String(result).slice(0, 250) : null }),
-  }).catch(() => {}).then(() => loadJobs());
+  }).catch(() => {}).then(() => jobWatchTick());
 }
 
 // Admin-Aktionen (Neuberechnung / Enrichment)
@@ -13727,6 +13841,13 @@ function enterOfflineCapture() {
     await loadTimeline();
     await loadToday();      // F16: Startansicht ist „Heute"
     await loadModQueue();
+    // Anmerkung 212: Beim Start EINMAL nachsehen, ob etwas läuft. Nötig, weil
+    // ein Lauf diese Seite überdauert: der Nachtplan startet ihn um drei, ein
+    // anderes Gerät hat ihn angestoßen, oder derselbe Nutzer hat den Reiter
+    // geschlossen und kommt zurück. Ohne diesen Blick begänne die Beobachtung
+    // erst beim nächsten Klick — und ein Lauf, den man nicht selbst gestartet
+    // hat, ist genau der, dessen Ende man verpasst.
+    jobWatchTick();
   } catch (err) {
     // „Failed to fetch" heißt NICHT, dass das Backend kaputt ist — /health kam
     // ja durch. Es ist ein Netz-/Zeitüberschreitungsfehler; der Anlass war
