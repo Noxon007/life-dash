@@ -21,14 +21,14 @@ Zuletzt gemessen 2026-08-09 (SQLite, Windows) — der nächste Umbau wird daran
 gemessen und nicht an einem Gefühl:
 
                               Demo     Lastfall
-    /api/events/index          55 ms      92 ms
-    Zeitstrahl-Seite (300)     43 ms      11 ms
-    …mit Fotos + verdichtet    66 ms     168 ms
-    /api/days/weather (alles) 1708 ms     212 ms
-    /api/achievements          811 ms     203 ms
-    /api/stats/overview       2326 ms     543 ms
-    /api/stats/toplists       1081 ms     479 ms
-    /api/events/map            176 ms     138 ms
+    /api/events/index          53 ms      92 ms
+    Zeitstrahl-Seite (300)     41 ms      11 ms
+    …mit Fotos + verdichtet    62 ms     168 ms
+    /api/days/weather (alles) 1611 ms     212 ms
+    /api/achievements          772 ms     203 ms
+    /api/stats/overview       1710 ms     543 ms   (vor Anm. 204: 2326 ms)
+    /api/stats/toplists       1167 ms     479 ms
+    /api/events/map            178 ms     138 ms
 
 **Der Demo-Bestand ist auf den teuren Endpunkten VIERMAL so langsam wie der
 „Lastfall", obwohl er weniger als die Hälfte der Ereignisse hat.** Der Grund
@@ -37,6 +37,19 @@ Wohnort-Tag, die Anwendung schreibt SIEBZEHN. Ein Lastfall, der die teuerste
 Dimension um den Faktor sechs unterschätzt, beruhigt — er misst nicht.
 Deshalb steht der Demo-Bestand jetzt daneben: er ist das, was ausgeliefert
 wird.
+
+**Was der Lauf sonst noch beantwortet hat** (Anmerkung 204), damit es niemand
+noch einmal fragt: `_place_ranking` kostet 27 ms bei 3.673 Orten und 199 ms
+bei 28.673 — dem Fall, vor dem seine Kommentare warnen. `_farthest_from_home`
+33 ms bzw. 181 ms. Zu deckeln würde ändern, welche Antwort herauskommt, für
+zweihundert Millisekunden; die Frage aus Anmerkung 199 ist damit erledigt und
+nicht offen. `_day_weather_candidates` kostet 42 ms je Durchlauf — über 300
+Batches also 13 s in einem Lauf, der daneben Stunden auf Open-Meteo wartet.
+Ein voller Sicherung-und-Rücklauf über 288.428 Zeilen läuft durch (SQLite
+61 s, PostgreSQL 110 s), einschließlich einer `IN`-Liste mit 126.361
+Elementen: `psycopg2` bindet clientseitig, deshalb greift die
+65.535-Parameter-Grenze des Servers nicht. **Das hängt am Treiber** — mit
+`psycopg3` oder `asyncpg` wäre dieselbe Liste ein harter Fehler.
 """
 from __future__ import annotations
 

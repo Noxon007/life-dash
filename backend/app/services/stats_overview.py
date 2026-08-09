@@ -600,7 +600,27 @@ def _weather_stats(db: Session, user_id: str) -> dict:
     # drei Antworten auf eine Frage, und nur eine davon stand irgendwo
     # begründet. Jetzt gilt überall die Regel aus `weather_day`: je Schlüssel
     # der kleinste Wert des Tages, also der vorsichtige.
-    day_wx = weather_day.day_values(db, user_id, keys=_WX_KEYS)
+    # **Anmerkung 204: gezählt wird in SQL, nicht in Python.** Hier stand
+    # `day_values(..., keys=_WX_KEYS)` — eine Zeile je Tag und Schlüssel über
+    # den ganzen Bestand, am Demo-Leben 152.854 Stück, aus denen vier Zahlen
+    # und ein Balkendiagramm wurden. Die Zeilenzahl war nie eine Frage der
+    # Statistik: F20 gibt jedem Wohnort-Tag siebzehn Wetterwerte, also wuchs
+    # sie um eine Größenordnung, ohne dass sich die Frage geändert hätte.
+    #
+    # `year_totals` gruppiert in zwei Stufen und gibt eine Zeile JE JAHR
+    # zurück — dreiunddreißig statt hunderttausend. Die Regel „je Schlüssel
+    # der kleinste Wert des Tages" steht dabei weiterhin an genau einer
+    # Stelle (`weather_day._per_day_key`), die beide Auskünfte lesen.
+    years = weather_day.year_totals(db, user_id, keys=_WX_KEYS)
+    total_days = sum(n for _y, n, _r, _s in years)
+    rain_days = sum(r for _y, _n, r, _s in years)
+    sun_hours = round(sum(s for _y, _n, _r, s in years))
+    rain_per_year = {y: r for y, _n, r, _s in years}
+
+    # Für die wärmste Reise wird EIN Schlüssel gebraucht und nicht dreizehn.
+    # Diese Auskunft bleibt eine Tageskarte, weil sie je Reisetag nachschlägt
+    # statt zu summieren — sie kostet aber nur noch ein Dreizehntel.
+    day_wx = weather_day.day_values(db, user_id, keys=("temperature_c",))
     dval = lambda day, key: (day_wx.get(day) or {}).get(key)  # noqa: E731
 
     # **Anmerkung 194: gezählt wird über `day_wx`, nicht über eine aus den
@@ -613,15 +633,6 @@ def _weather_stats(db: Session, user_id: str) -> dict:
     # Vorher waren es zwei Mengen, die auseinanderlaufen konnten, ohne dass es
     # jemandem auffällt — die Bezugsgröße von „x % deiner Tage" stammte aus der
     # einen, der Zähler aus der anderen.
-    rain_days = sum(1 for v in day_wx.values() if (v.get("rain_mm") or 0) >= 1)
-    sun_hours = round(sum(v.get("sunshine_h") or 0 for v in day_wx.values()))
-    rain_per_year: dict[int, int] = {}
-    for day, v in day_wx.items():
-        y = int(day[:4])
-        rain_per_year.setdefault(y, 0)
-        if (v.get("rain_mm") or 0) >= 1:
-            rain_per_year[y] += 1
-
     # **Die wärmste Reise bleibt eine Frage über EINTRÄGE** (welche Reise?), und
     # deshalb bleibt hier die Tagesliste aus den Ereignissen stehen. Ein
     # Wohnort-Tag gehört zu keiner Reise; ihn mitzuzählen hieße, dieselbe Regel
@@ -659,10 +670,10 @@ def _weather_stats(db: Session, user_id: str) -> dict:
     return {
         "extremes": extremes,
         "weather": {
-            "days": len(day_wx),
+            "days": total_days,
             "sun_hours": sun_hours,
             "rain_days": rain_days,
-            "rain_share": round(rain_days / len(day_wx) * 100) if day_wx else 0,
+            "rain_share": round(rain_days / total_days * 100) if total_days else 0,
             "warmest_trip": warmest,
             "rain_days_per_year": [[y, n] for y, n in sorted(rain_per_year.items())],
         },

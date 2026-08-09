@@ -231,9 +231,23 @@ def export_data(
     day_metrics = _loaded("Tageswerte", db.query(DayMetric)
                           .filter(DayMetric.user_id == user.id).all())
     event_ids = {e.id for e in events}
-    links = [
-        l for l in db.query(EventEntityLink).all() if l.event_id in event_ids
-    ]
+    # **Anmerkung 204 — wer sichert, liest nur sein eigenes Konto.**
+    # `metrics` und `event_entity_links` tragen kein `user_id`; ihr Besitzer ist
+    # das Ereignis, an dem sie hängen. Hier stand deshalb `query(...).all()` und
+    # danach ein Filter in Python — also: JEDE Zeile JEDES Kontos wurde geladen,
+    # um die eigenen herauszusuchen. Gemessen am Demo-Bestand kostete ein
+    # zweites Konto im System einem Nutzer **ein Drittel seiner Exportzeit**
+    # (4,8 s → 6,4 s), für Daten, von denen keine einzige Zeile in seine Datei
+    # kommt. Der Besitz steht im Join, und der Join gehört in die Abfrage.
+    #
+    # Der Filter über `event_ids` bleibt daneben stehen und ist keine
+    # Wiederholung: er beantwortet die ANDERE Frage — welche Quellen dieser
+    # Export bewusst weglässt (A21). Ohne ihn nähme die Datei Messwerte zu
+    # Ereignissen mit, die selbst nicht darin stehen.
+    links = [l for l in db.query(EventEntityLink)
+             .join(Event, EventEntityLink.event_id == Event.id)
+             .filter(Event.user_id == user.id).all()
+             if l.event_id in event_ids]
     # F18: Bilder gehören dem NUTZER, nicht zwingend einem Ereignis. Ein Filter
     # allein über `event_id` ließe alle Tages-Bilder aus dem Backup fallen —
     # lautlos, denn die Datei sähe vollständig aus. Bilder an Ereignissen, die
@@ -241,7 +255,9 @@ def export_data(
     media = _loaded("Bilder", [m for m in db.query(MediaRef)
                                .filter(MediaRef.user_id == user.id).all()
                                if m.event_id is None or m.event_id in event_ids])
-    metrics = _loaded("Messwerte", [m for m in db.query(Metric).all()
+    metrics = _loaded("Messwerte", [m for m in db.query(Metric)
+                                    .join(Event, Metric.event_id == Event.id)
+                                    .filter(Event.user_id == user.id).all()
                                     if m.event_id in event_ids])
     # Anmerkung 139: Die Fotopunkte hatten hier bis 0.39 einen eigenen Block —
     # sie hingen an keinem Ereignis und wären sonst still aus dem Backup

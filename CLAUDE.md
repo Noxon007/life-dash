@@ -326,22 +326,35 @@ statt `spreadPick` + `mpEvenSpread` (die dritte Fassung war `sqlutil.even_spread
 und die Fotoleisten wichen als einzige ab), `immich._km` heißt `rough_km` und
 ist öffentlich, `district_index` prüft beide Koordinaten, die Asymmetrie
 `/stop` (Starter ODER Admin) gegen `/finish` (nur Starter) steht jetzt im
-Docstring. **Offen und ausdrücklich als Messfrage stehen gelassen** — erst
-`tools/_measure_api.py`, dann umbauen: der Export lädt `metrics` und
-`event_entity_links` über ALLE Konten und filtert in Python; drei `IN (…)`-Listen
-sind ungeblockt, wo dieselbe Datei anderswo mit Begründung auf 500 blockt
-(`on_this_day`, `_OwnRows._promise`, `photo_points.remove_slots`); und
-`_day_weather_candidates` fährt den vollen Kalenderdurchlauf JE BATCH von 25.
+Docstring. **Die drei Messfragen daraus sind mit Anmerkung 204 beantwortet.**
 
 **Code-Durchsicht 2026-08-06 (Anmerkung 199) ist erledigt** — Backup trägt
 `day_metrics`, wärmste Reise heißt wie die Reise, Stichentscheid im Überblick,
-`skipped_invalid` und `discard_weather`. Offen blieb daraus bewusst **eines**:
-**`_place_ranking` holt den ganzen Ortsbestand ohne `LIMIT`**, und
-`_farthest_from_home` fährt einen vollen Scan je Wohnort-Zeitraum. Die
-Kommentare dort sagen „Hunderte Orte" — seit Anmerkung 139 legt der Foto-Lauf
-mit `PLACE_ROUND = 5` (≈ 1 m) rund EINEN Ort je Foto an, bei zwanzigtausend
-Bildern also zehntausende. Zu deckeln würde ändern, welche Antwort herauskommt;
-das ist eine Entscheidung des Users und keine Reparatur.
+`skipped_invalid` und `discard_weather`. Die Messfrage daraus
+(`_place_ranking` ohne `LIMIT`) ist mit Anmerkung 204 geschlossen.
+
+**Gemessen 2026-08-09 (Anmerkung 204) — vier Fragen erledigt, eine repariert,
+eine neue gefunden.** `DEMO=1 <python> tools/_measure_api.py` misst gegen den
+ausgelieferten Demo-Bestand; die Zahlen stehen im Kopf der Datei. **Nicht mehr
+aufmachen:** `_place_ranking` 27 ms bei 3.673 Orten / 199 ms bei 28.673,
+`_farthest_from_home` 33/181 ms — deckeln würde die Antwort ändern, für 200 ms.
+`_day_weather_candidates` 42 ms je Durchlauf, gegen Stunden Open-Meteo im
+selben Lauf. Sicherung und Rücklauf über 288.428 Zeilen laufen durch, auch mit
+einer `IN`-Liste von 126.361 — **das hängt aber an `psycopg2`** (bindet
+clientseitig); mit `psycopg3`/`asyncpg` wäre es ein harter Fehler.
+- **Repariert:** der Export las `metrics` und `event_entity_links` über ALLE
+  Konten (ein zweites Konto kostete ein Drittel der Exportzeit). Besitz steht
+  jetzt im Join.
+- **Neu gefunden und halb repariert:** die Statistik verbrachte 94 % ihrer
+  Zeit im Wetter. `weather_day.year_totals` zählt die Bilanz jetzt in SQL
+  (2.326 → 1.710 ms). **Zwei Stufen sind Pflicht** — erst je (Tag, Schlüssel)
+  das Minimum (`_per_day_key`, dieselbe Funktion, die `day_values` liest),
+  dann die Summe: direkt über die Rohzeilen zählt ein importierter Tag mit
+  dreißig Besuchen dreißigmal. **Offen bleibt die Ereignis-Seite**
+  (`weather_values` + `_extreme_tops`, ~1,1 s) — die entscheidet, welche Zeile
+  in zwölf Ranglisten gewinnt, und gehört in eine eigene Runde.
+- **`day_values` ist die teure Auskunft** (eine Zeile je Tag UND Schlüssel).
+  Für Zahlen, die man nur summiert oder zählt, ist sie die falsche.
 
 **Doku-Umbau 2026-08-04.** `KONZEPT.md` ist aufgelöst: was das System IST steht
 in `ARCHITECTURE.md`, was OFFEN ist in `ROADMAP.md`, die geschlossenen Kapitel

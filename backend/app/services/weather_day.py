@@ -43,7 +43,7 @@ from __future__ import annotations
 from datetime import date as date_type
 from datetime import datetime, time
 
-from sqlalchemy import and_, func
+from sqlalchemy import and_, case, func
 from sqlalchemy.orm import Session
 
 from app.models import ConfirmState, DayMetric, Event, Location, Metric, Source
@@ -193,30 +193,114 @@ def _rows(db: Session, user_id: str, *, confirmed_only: bool,
             .subquery())
 
 
+def _per_day_key(db: Session, user_id: str, *, keys: tuple[str, ...] | None,
+                 start, end, confirmed_only: bool):
+    """EINE Zeile je (Tag, Schlüssel) — hier gilt die Regel, und nur hier.
+
+    Das Minimum bei Zahlen (Anmerkung 119: der vorsichtige Wert) und die
+    Einigkeit bei Texten (`min == max`). **Beide Leser fragen diese Funktion**
+    — `day_values` für die Werte selbst, `year_totals` für die Bilanz darüber.
+    Die Gruppierung dort ein zweites Mal hinzuschreiben wäre die doppelte
+    Regel, an der dieses Projekt schon dreimal hing: sie liefen genau dann
+    auseinander, wenn jemand das Minimum durch etwas anderes ersetzt, und die
+    Kachel „Regentage" widerspräche der Tageszeile, die man daraufhin öffnet.
+    """
+    sub = _rows(db, user_id, confirmed_only=confirmed_only, keys=keys,
+                start=start, end=end)
+    return (db.query(sub.c.y.label("y"), sub.c.m.label("m"), sub.c.d.label("d"),
+                     sub.c.key.label("key"),
+                     func.min(sub.c.value).label("value"),
+                     func.min(sub.c.text).label("text_lo"),
+                     func.max(sub.c.text).label("text_hi"))
+            .group_by(sub.c.y, sub.c.m, sub.c.d, sub.c.key))
+
+
 def day_values(db: Session, user_id: str, *, keys: tuple[str, ...] | None = None,
                start=None, end=None, confirmed_only: bool = False,
                ) -> dict[str, dict[str, float | str]]:
     """{"2026-07-23": {"temp_max_c": 24.1, "weather": "bewölkt"}} — die Regel oben.
 
-    EINE Abfrage für Zahlen und Texte: gruppiert wird nach (Tag, Schlüssel),
-    und `min(value_text) == max(value_text)` beantwortet die Einigkeitsfrage,
-    ohne die Zeilen einzeln zu holen.
+    **Diese Auskunft ist teuer, und zwar der Länge nach.** Sie liefert eine
+    Zeile je Tag und Schlüssel; über ein ganzes Leben mit Wohnort sind das
+    hunderttausend Zeilen, die einzeln nach Python wandern. Sie ist die
+    richtige Antwort für alles, was die WERTE zeigt (die Tageszeile im
+    Zeitstrahl, ein Fenster von einem Monat) — und die falsche für jede Zahl,
+    die man daraus nur summiert oder zählt. Dafür gibt es `year_totals`
+    (Anmerkung 204).
+
+    Wer sie über den ganzen Bestand ruft, schränkt mindestens auf die
+    Schlüssel ein, die er wirklich liest: jeder weggelassene Schlüssel ist ein
+    Elftausendstel weniger Zeilen je Lebensjahr.
     """
-    sub = _rows(db, user_id, confirmed_only=confirmed_only, keys=keys,
-                start=start, end=end)
-    q = (db.query(sub.c.y, sub.c.m, sub.c.d, sub.c.key,
-                  func.min(sub.c.value).label("value"),
-                  func.min(sub.c.text).label("text_lo"),
-                  func.max(sub.c.text).label("text_hi"))
-         .group_by(sub.c.y, sub.c.m, sub.c.d, sub.c.key))
     out: dict[str, dict[str, float | str]] = {}
-    for row in q.all():
+    for row in _per_day_key(db, user_id, keys=keys, start=start, end=end,
+                            confirmed_only=confirmed_only).all():
         day = _iso(row.y, row.m, row.d)
         if row.value is not None:
             out.setdefault(day, {})[row.key] = row.value
         elif row.text_lo is not None and row.text_lo == row.text_hi:
             out.setdefault(day, {})[row.key] = row.text_lo
     return out
+
+
+# Ab wie viel Millimeter gilt ein Tag als Regentag. Eine Konstante und kein
+# Parameter: „Regentage" ist eine Kachel, eine Rangliste und ein Erfolg, und
+# drei Antworten auf die Frage „ab wann regnet es" wären drei Zahlen, die
+# nebeneinander stehen und sich widersprechen.
+RAIN_DAY_MM = 1.0
+
+
+def year_totals(db: Session, user_id: str, *, keys: tuple[str, ...] | None = None,
+                confirmed_only: bool = False) -> list[tuple[int, int, int, float]]:
+    """Je Jahr: (Jahr, Tage mit Wetter, Regentage, Sonnenstunden).
+
+    **Anmerkung 204 — die Bilanz wird gezählt, nicht ausgeliefert.** Der
+    Statistik-Überblick holte sich dafür `day_values` über den GANZEN Bestand
+    und reduzierte in Python: gemessen am Demo-Bestand 1,3 s für 152.854
+    Zeilen, aus denen am Ende vier Zahlen und ein Balkendiagramm wurden. Die
+    Zeilen entstehen nicht, weil jemand sie sehen will, sondern weil F20 jedem
+    Wohnort-Tag siebzehn Wetterwerte gibt — die Zahl der Zeilen wuchs also um
+    eine Größenordnung, ohne dass die Frage sich geändert hätte.
+
+    Gruppiert wird in ZWEI Stufen, und die erste ist `_per_day_key`: erst der
+    Tageswert je Schlüssel (die Regel), dann die Summe darüber. Andersherum —
+    direkt über die Rohzeilen — zählte ein importierter Tag mit dreißig
+    Besuchen dreißigmal, und genau dafür gibt es die erste Stufe (A31).
+
+    Jahre OHNE Regen kommen mit `0` vor, nicht gar nicht: der Balken fehlte
+    sonst, und ein fehlender Balken liest sich wie ein fehlendes Jahr.
+
+    **`keys` entscheidet, was „ein Tag mit Wetter" IST**, und gehört deshalb
+    dem Aufrufer. Es liegt nahe, hier auf `rain_mm` und `sunshine_h` zu
+    verengen — gebraucht werden ja nur die zwei. Damit zählte die Kachel „Tage
+    mit Wetter" aber plötzlich Tage MIT REGENWERT, und ein Tag, der nur eine
+    Temperatur trägt, fiele heraus. Die Zahl sähe weiterhin richtig aus, wäre
+    nur kleiner — die Sorte Änderung, die niemand bemerkt und niemand mehr
+    erklären kann.
+    """
+    per_key = _per_day_key(db, user_id, keys=keys, start=None, end=None,
+                           confirmed_only=confirmed_only).subquery()
+    # Nach der ersten Stufe gibt es je (Tag, Schlüssel) genau eine Zeile —
+    # `max(case …)` holt also den Wert und mittelt nichts.
+    per_day = (db.query(per_key.c.y.label("y"),
+                        func.max(case((per_key.c.key == "rain_mm", per_key.c.value)))
+                        .label("rain"),
+                        func.max(case((per_key.c.key == "sunshine_h", per_key.c.value)))
+                        .label("sun"))
+               .group_by(per_key.c.y, per_key.c.m, per_key.c.d)
+               .subquery())
+    rows = (db.query(per_day.c.y,
+                     func.count().label("days"),
+                     func.sum(case((per_day.c.rain >= RAIN_DAY_MM, 1), else_=0))
+                     .label("rain_days"),
+                     func.sum(func.coalesce(per_day.c.sun, 0.0)).label("sun_h"))
+            .group_by(per_day.c.y)
+            .order_by(per_day.c.y)
+            .all())
+    # `extract` liefert auf PostgreSQL Fließkomma, auf SQLite ganze Zahlen —
+    # die Umwandlung gehört hierher und nicht zu jedem Aufrufer.
+    return [(int(y), int(days), int(rain or 0), float(sun or 0.0))
+            for y, days, rain, sun in rows]
 
 
 def day_regions(db: Session, user_id: str, *, start=None, end=None,

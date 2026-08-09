@@ -246,6 +246,17 @@ any `MINOR`.
   your own network.
 
 ### Fixed
+- **The statistics tab opens noticeably faster.** The weather balance — days
+  with weather, hours of sunshine, rainy days, the bar chart per year — was
+  worked out by pulling every weather value of every day of your life into
+  memory and counting there. On a thirty-year record that is a hundred and
+  fifty thousand values for four numbers and a chart. The database does the
+  counting now. Every figure is unchanged, to the last decimal.
+- **Exporting your data no longer waits on other accounts.** On an instance
+  with more than one person, your backup read everyone's weather values and
+  links in order to pick out your own — measured at a third of the export time
+  for data that never reaches your file. Nothing about the file changes; it is
+  simply your data that gets read.
 - **The *World* tab is no longer German-only.** With the interface in English
   it still said “Nordamerika” and listed “Deutschland”, “Frankreich”,
   “Vereinigte Staaten” — the one tab whose names come from a reference table
