@@ -299,21 +299,43 @@ können nicht in `I18N_EN`. Zwei Regeln dazu, beide teuer erkauft:
 - **Die Sprache gehört in jede Merkzelle**, die eine solche Antwort behält
   (`statsTopsFor`). Ein Sprachwechsel ändert den Bestandsstempel nicht.
 
-**Sicherheits-Durchsicht 2026-08-07 (Anmerkung 200): drei Reparaturen drin,
-zehn Punkte bewusst offen.** Repariert: Anmelde-Cookies über EINE Stelle
-(`auth.set_auth_cookie` — der OIDC-Rückweg setzte kein `Secure`), der Import
-prüft **jeden Fremdschlüssel** gegen den Besitz statt nur `user_id`
-umzuschreiben, und der Immich-Verbindungstest prüft das Schema der Adresse.
-Offen und in Anmerkung 200 aufgeschrieben — **das sind Entscheidungen des
-Users, keine Reparaturen**: Bearer-Token ohne Audience-Prüfung
-(`verify_aud=False`, relevant sobald eine zweite App am selben Issuer hängt),
-Login-Sperre nur je E-Mail (als DoS gegen ein Konto benutzbar, Tabelle
-unbegrenzt), Sitzungen nicht widerrufbar (30 Tage, Passwortwechsel beendet
-nichts), Admin-Rohansicht liefert `password_hash` und den Immich-Schlüssel aus,
-**vier Kartenbibliotheken von unpkg ohne SRI und ohne CSP** (kostet auch die
-Offline-Karte), Container als root + `--forwarded-allow-ips "*"`, keine
-Security-Header, `esc()` ohne `'`, offene Erstregistrierung (gehört nach
-DEPLOY), `raw_text` ohne Längengrenze.
+**Runde 2026-08-09, zweiter Satz (Anmerkungen 206-213) — R1(d) und R1(e) sind
+gebaut, R1(f) ist gestrichen.** Ansage des Users: Vektorkarte raus, getesteter
+Upgrade-Pfad raus, Haertung und Projektoberflaeche bauen, alle Anmerkungen
+schliessen, die kein Feature nach 1.0 sind.
+
+- **206** Vektorkarte (A48) zurueckgezogen — mit ihr MapLibre, Anmerkung 171
+  und die offene LCP-Frage. Nicht behoben, sondern entfernt.
+- **207** Leaflet + markercluster liegen in `frontend/vendor/`. Kein CDN mehr,
+  und **die Offline-Karte war vorher keine**: der Worker durfte ein fremdes
+  Skript nicht cachen. Waechter `check-no-cdn.js` haelt `index.html` und
+  `sw.js` zusammen — wer eine Datei aus `SHELL` vergisst, wird rot.
+- **208** Haertung: `AUTH_MODE=dev` und das Standard-Secret brechen den START
+  ab (`app/startup_checks.py`, Ausnahme `DEV_AUTH_ALLOW_PUBLIC`).
+  Sicherheits-Kopfzeilen und CSP in `app/security.py` — **script-src mit
+  HASHES**, gerechnet aus der ausgelieferten Datei, mit der
+  Zeilenenden-Normalisierung des HTML-Parsers. Ohne die waere die Seite auf
+  Windows (CRLF) tot und im Container (LF) heil. Log-Schwaerzung an den
+  HANDLERN, nicht am Logger: Python wendet die Filter der Vorfahren bei der
+  Weitergabe nicht an. Rohansicht schwaerzt UND verweigert Geheimnisse.
+- **209** Sitzungen widerrufbar ueber EINEN Zeitstempel je Nutzer
+  (`users.sessions_valid_from`), Sperrtabelle gedeckelt, Bearer-Audience
+  geprueft (`OIDC_AUDIENCE`).
+- **210** Container gibt seine Rechte ab (`docker-entrypoint.sh`, uid 10001),
+  Basis-Image am Digest, Dependabot, `SECURITY.md`. **Nicht gebaut** — hier
+  laeuft kein Docker; der erste `docker compose build` ist die Probe.
+- **211** `CONTRIBUTING.md` (keine Pull Requests), Issue-Vorlagen, „was dieses
+  Projekt bewusst nicht tut".
+- **212** Ein Serverlauf, der fertig wird, aktualisiert die offene Ansicht.
+  EIN Waechter statt der reiter-gebundenen Jobs-Tabelle; eigene
+  Vordergrund-Laeufe melden sich nicht doppelt.
+- **213** Wetter-Ereignisseite gemessen: 1710 -> 1611 ms. **Der Umbau der
+  zwoelf Ranglisten nach SQL bleibt offen** — vier Regeln auf einmal in die
+  Abfrage, und eine falsche Rangliste ist schlimmer als eine langsame.
+
+**Damit sind die zehn offenen Punkte aus Anmerkung 200 geschlossen.** Offen
+bleiben aus R1 nur noch **b** (Screenshots/GIF, braucht den User), **c**
+(versionierte ghcr-Images) und **g** (Spendenlink) sowie **R2**.
 
 **Code-Durchsicht 2026-08-07 (Anmerkung 201): fünf Reparaturen und vier
 Aufräumungen drin, drei Punkte bewusst offen — sie brauchen erst eine
