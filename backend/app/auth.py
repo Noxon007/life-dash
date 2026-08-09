@@ -17,10 +17,12 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import logging
 import secrets
 import time
 import urllib.parse
 import urllib.request
+from datetime import datetime, timedelta, timezone
 
 import jwt
 from fastapi import Depends, HTTPException, Request
@@ -31,6 +33,8 @@ from app.database import engine, get_db
 from app.migrate import adopt_orphan_rows
 from app.models import User, UserRole
 from app.version import APP_VERSION
+
+log = logging.getLogger("lifedash.auth")
 
 SESSION_COOKIE = "lifedash_session"
 STATE_COOKIE = "lifedash_oidc_state"
@@ -73,6 +77,24 @@ def _jwks() -> jwt.PyJWKClient:
     return _jwks_client
 
 
+def bearer_audience() -> str:
+    """Für WEN ein Bearer-Token ausgestellt sein muss.
+
+    Anmerkung 209 (offener Punkt aus Anmerkung 200): Der Bearer-Pfad nahm
+    bisher jedes Token an, das der Issuer signiert hatte — `verify_aud=False`.
+    Solange genau eine Anwendung am Identitätsanbieter hängt, fällt das nicht
+    auf; sobald eine zweite dazukommt, ist ein Token, das der Nutzer DIESER
+    zweiten Anwendung gegeben hat, hier ein gültiger Login. Das ist der ganze
+    Zweck des `aud`-Claims, und er war abgeschaltet.
+
+    Standard ist die eigene Client-ID. `OIDC_AUDIENCE` gibt es, weil manche
+    Provider Access-Token auf eine RESSOURCE ausstellen statt auf den Client —
+    dann steht dort deren Kennung, und ohne diesen Schalter bliebe nur, die
+    Prüfung wieder ganz abzuschalten.
+    """
+    return (settings.oidc_audience or settings.oidc_client_id).strip()
+
+
 def validate_oidc_token(token: str, *, verify_aud: bool = True) -> dict:
     """Validiert ein vom Provider signiertes JWT (ID- oder Access-Token)."""
     key = _jwks().get_signing_key_from_jwt(token).key
@@ -81,7 +103,7 @@ def validate_oidc_token(token: str, *, verify_aud: bool = True) -> dict:
         key,
         algorithms=["RS256", "ES256"],
         issuer=oidc_discovery()["issuer"],
-        audience=settings.oidc_client_id if verify_aud else None,
+        audience=bearer_audience() if verify_aud else None,
         options={"verify_aud": verify_aud},
     )
 
@@ -101,7 +123,11 @@ def make_pkce() -> tuple[str, str]:
 
 def sign_cookie(payload: dict, max_age_seconds: int) -> str:
     data = dict(payload)
-    data["exp"] = int(time.time()) + max_age_seconds
+    now = int(time.time())
+    data["exp"] = now + max_age_seconds
+    # Anmerkung 209: Ausstellungszeit. Ohne sie lässt sich eine Sitzung nicht
+    # widerrufen — ein Cookie ohne Alter kann man nur ablaufen lassen.
+    data.setdefault("iat", now)
     return jwt.encode(data, settings.session_secret, algorithm="HS256")
 
 
@@ -114,6 +140,66 @@ def read_cookie(token: str) -> dict | None:
 
 def session_max_age() -> int:
     return settings.session_max_age_days * 86400
+
+
+# --------------------------------------------------------------------------- #
+#  Anmerkung 209: Sitzungen widerrufen — ohne Sitzungstabelle
+# --------------------------------------------------------------------------- #
+# Der dritte offene Punkt aus Anmerkung 200: „Sitzungen nicht widerrufbar, 30
+# Tage, Passwortwechsel beendet nichts". Ein gestohlenes Cookie war damit einen
+# Monat lang gültig, und die eine Handlung, die ein Mensch in dieser Lage
+# ausführt — das Passwort ändern — half nicht.
+#
+# **Eine Sitzungstabelle wäre die naheliegende und die falsche Antwort.** Sie
+# beantwortet „welche Sitzungen gibt es?", und diese Frage stellt hier niemand;
+# gestellt wird „gilt diese noch?". Dafür genügt EIN Zeitstempel je Nutzer: das
+# Cookie trägt seine Ausstellungszeit, und alles, was älter ist als der Schnitt,
+# ist ungültig. Kein Schreibzugriff je Anfrage, keine Tabelle, die wächst, und
+# keine zweite Stelle, an der ein Nutzer gelöscht werden muss.
+#
+# Der Preis steht hier, damit er nicht später als Fehler gemeldet wird: EINZELNE
+# Sitzungen lassen sich damit nicht beenden, nur alle. Für ein System mit einem
+# Betreiber und ohne Geräteliste ist „überall abmelden" die Handlung, die es
+# tatsächlich gibt.
+def _naive_utc(epoch: float) -> datetime:
+    """Sekunden seit 1970 als NAIVES UTC — die Form, in der diese Spalte liegt.
+
+    `DateTime` ohne Zeitzone auf beiden Datenbanken; ein zeitzonenbehafteter
+    Wert auf der einen Seite des Vergleichs und ein nackter auf der anderen
+    ist ein `TypeError` in einer Anfrage, die nur beim Widerruf überhaupt
+    vorkommt — also der Fehler, den keine Testrunde von selbst sieht.
+    """
+    return datetime.fromtimestamp(epoch, timezone.utc).replace(tzinfo=None)
+
+
+def revoke_sessions(user: User) -> None:
+    """Beendet alle laufenden Sitzungen dieses Nutzers.
+
+    Eine Sekunde in die ZUKUNFT, und das ist kein Schmutz: Cookie-`iat` und
+    dieser Zeitstempel können in dieselbe Sekunde fallen (Anmelden und sofort
+    Passwort ändern), und `iat >= cutoff` ließe das gerade widerrufene Cookie
+    stehen. Lieber eine Sekunde zu streng — der Nutzer meldet sich ohnehin neu
+    an.
+    """
+    user.sessions_valid_from = _naive_utc(time.time()) + timedelta(seconds=1)
+
+
+def session_still_valid(user: User, claims: dict) -> bool:
+    cutoff = user.sessions_valid_from
+    if cutoff is None:            # nie widerrufen — der Normalfall
+        return True
+    iat = claims.get("iat")
+    # Ein Cookie ohne Ausstellungszeit stammt von vor dieser Änderung. Es gilt
+    # als widerrufen: die Alternative wäre, dass genau die alten Sitzungen,
+    # derentwegen jemand widerruft, als einzige überleben.
+    if not isinstance(iat, (int, float)):
+        return False
+    # Ein Wert aus der Datenbank kann zeitzonenbehaftet zurückkommen (PostgreSQL
+    # mit `timestamptz` in einer Altinstallation) — dann auf dieselbe Form
+    # bringen, statt am Vergleich zu scheitern.
+    if cutoff.tzinfo is not None:
+        cutoff = cutoff.astimezone(timezone.utc).replace(tzinfo=None)
+    return _naive_utc(iat) >= cutoff
 
 
 def cookie_secure() -> bool:
@@ -235,6 +321,12 @@ _LOCK_SECONDS = 900          # 15 Minuten
 # die eine würde beim Aufräumen vergessen — den Fall hatte diese Datei schon
 # (siehe `login_locked_for`).
 _fail_state: dict[str, tuple[int, float]] = {}
+# Anmerkung 209: Die Tabelle hat eine Grenze. Sie hatte keine — ein Eintrag je
+# probierter E-Mail, und probieren darf jeder, der die Anmeldeseite erreicht.
+# Ein Wörterbuch, das ein Fremder füllen kann, ist Speicher, den ein Fremder
+# vergibt. Die Zahl ist großzügig: 5.000 Einträge sind unter einem Megabyte,
+# und eine echte Instanz kommt nie in ihre Nähe.
+_FAIL_STATE_MAX = 5000
 
 
 def login_locked_for(email: str) -> int:
@@ -264,6 +356,28 @@ def login_locked_for(email: str) -> int:
     return int(until - time.time()) if count >= _FAIL_MAX else 0
 
 
+def _prune_fail_state() -> None:
+    """Abgelaufenes wegwerfen, und wenn das nicht reicht, das Älteste.
+
+    Zwei Schritte, weil der erste allein nicht genügt: wer im Sekundentakt
+    neue Adressen probiert, hat lauter FRISCHE Einträge, und ein Aufräumen nach
+    Ablauf findet nichts zum Wegwerfen. Der zweite Schritt ist deshalb kein
+    Schönheitsfehler, sondern die eigentliche Grenze.
+
+    Was dabei verloren geht, ist der Zähler eines Angreifers — nicht der eines
+    Nutzers: geräumt wird nach dem ÄLTESTEN Fenster, und ein laufender
+    Rateversuch schiebt seines mit jedem Versuch nach vorn.
+    """
+    now = time.time()
+    for key in [k for k, (_, until) in _fail_state.items() if until <= now]:
+        _fail_state.pop(key, None)
+    if len(_fail_state) <= _FAIL_STATE_MAX:
+        return
+    for key, _ in sorted(_fail_state.items(), key=lambda kv: kv[1][1]
+                         )[:len(_fail_state) - _FAIL_STATE_MAX]:
+        _fail_state.pop(key, None)
+
+
 def note_login_failure(email: str) -> None:
     key = email.lower()
     # Erst aufräumen: ist das Fenster durch, beginnt dieser Versuch eine neue
@@ -273,6 +387,12 @@ def note_login_failure(email: str) -> None:
     # Jeder Fehlversuch schiebt das Fenster — sowohl die Serie als auch eine
     # bereits stehende Sperre. Wer während der Sperre weiterrät, verlängert sie.
     _fail_state[key] = (count + 1, time.time() + _LOCK_SECONDS)
+    # Aufräumen NACH dem Eintragen, nicht davor. Davor wäre die Tabelle nach
+    # dem Eintrag wieder eins über der Grenze — und, was mehr wiegt: der
+    # gerade geschriebene Eintrag ist der jüngste und damit der letzte, den
+    # der Deckel wegwirft. Wer aktiv rät, verliert seine Sperre also nicht,
+    # indem er die Tabelle vollmacht.
+    _prune_fail_state()
 
 
 def clear_login_failures(email: str) -> None:
@@ -309,15 +429,22 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
         data = read_cookie(raw)
         if data and (uid := data.get("uid")):
             user = db.get(User, uid)
-            if user:
+            if user and session_still_valid(user, data):
                 return user
 
-    # 2) Bearer-Token (API-Clients): direkt vom Provider signiertes JWT
+    # 2) Bearer-Token (API-Clients): direkt vom Provider signiertes JWT.
+    # Anmerkung 209: MIT Audience-Prüfung — siehe `bearer_audience()`.
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         try:
-            claims = validate_oidc_token(auth_header[7:], verify_aud=False)
-        except Exception:  # jede Validierungspanne ist 401
+            claims = validate_oidc_token(auth_header[7:])
+        except Exception as exc:  # jede Validierungspanne ist 401
+            # Der Grund gehört ins Log, nicht in die Antwort: ein Angreifer
+            # soll nicht erfahren, WORAN sein Token gescheitert ist. Der
+            # Betreiber schon — sonst ist eine plötzlich abgewiesene
+            # Integration nicht zu erklären.
+            log.info("Bearer-Token abgewiesen (erwartete Audience %r): %s",
+                     bearer_audience(), exc)
             raise HTTPException(401, "Ungültiges Token")
         return get_or_create_user(
             db,

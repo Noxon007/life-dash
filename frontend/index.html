@@ -2675,7 +2675,27 @@
               <button class="btn secondary" id="btn-pw-change" style="text-align:left" data-i18n="pw.change">🔑 Passwort ändern</button>
             </div>
             <div class="action-desc"><span data-i18n="pw.desc">Ändert das Passwort deines lokalen Kontos.
-              Es wird sicher gehasht gespeichert (scrypt) — im Klartext liegt es nirgends.</span></div>
+              Es wird sicher gehasht gespeichert (scrypt) — im Klartext liegt es nirgends.
+              <b>Der Wechsel meldet alle anderen Geräte ab.</b></span></div>
+          </div>
+        </div>
+
+        <!-- Anmerkung 209: Sitzungen sind widerrufbar. Der Knopf steht NICHT
+             unter „local-only": das Sitzungs-Cookie stellt Life-Dash selbst
+             aus, auch nach einem OIDC-Login — es zu widerrufen ist deshalb in
+             jeder Betriebsart möglich und in jeder sinnvoll. -->
+        <div class="section-title eff-head"><span data-i18n="adm.sessions">Sitzungen</span><span class="eff layer" data-i18n="eff.account">Konto</span></div>
+        <div class="panel" style="padding:0">
+          <div class="action-row">
+            <div class="action-key">
+              <button class="btn secondary" id="btn-logout-all" style="width:100%; text-align:left"
+                      data-i18n="act.logoutall">🚪 Überall abmelden</button>
+            </div>
+            <div class="action-desc"><span data-i18n="act.logoutall.desc">Beendet alle laufenden Sitzungen
+              dieses Kontos — auf jedem Gerät und in jedem Browser, dieses hier eingeschlossen. Gedacht
+              für den Fall, dass ein Gerät verloren ging oder jemand mitgelesen haben könnte: eine
+              Anmeldung gilt sonst bis zu 30 Tage, auch ohne dass das Gerät je wieder gefragt wird.
+              Einzelne Geräte lassen sich nicht abmelden.</span></div>
           </div>
         </div>
 
@@ -3837,9 +3857,17 @@ const I18N_EN = {
   'pw.current': "Current password",
   'pw.new': "New password (min. 8)",
   'pw.change': "🔑 Change password",
-  'pw.desc': "Changes the password of your local account. It is stored securely hashed (scrypt) — the plain text is kept nowhere.",
-  'pw.done': "✓ Password changed.",
+  'pw.desc': "Changes the password of your local account. It is stored securely hashed (scrypt) — the plain text is kept nowhere. <b>Changing it signs out every other device.</b>",
+  'pw.done': "✓ Password changed — every other device is signed out.",
   'pw.err.short': "The new password needs at least 8 characters.",
+  // Anmerkung 209 — sessions
+  'adm.sessions': "Sessions",
+  'eff.account': "Account",
+  'act.logoutall': "🚪 Sign out everywhere",
+  'act.logoutall.desc': "Ends every running session of this account — on every device and in every browser, including this one. Meant for the case where a device was lost or someone may have been reading along: a sign-in otherwise lasts up to 30 days without the device ever being asked again. Individual devices cannot be signed out.",
+  'logoutall.text': "Every device will be signed out, including this one. You will have to sign in again.",
+  'logoutall.ok': "Sign out everywhere",
+  'logoutall.done': "✓ All sessions ended.",
   'adm.newuser': "Create account",
   'adm.newuser.btn': "➕ Create account",
   'adm.newuser.desc': "Creates another local account. That person can change their password afterwards.",
@@ -12972,7 +13000,22 @@ document.getElementById('btn-pw-change').addEventListener('click', async () => {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ current_password: cur.value, new_password: neu.value }) });
     cur.value = ''; neu.value = '';
-    toast(t('pw.done', '✓ Passwort geändert.'));
+    toast(t('pw.done', '✓ Passwort geändert — alle anderen Geräte sind abgemeldet.'));
+  } catch (err) { toast(err.message, 'error'); }
+});
+
+// Anmerkung 209: Überall abmelden. Danach ist auch DIESES Fenster nicht mehr
+// angemeldet — deshalb neu laden statt weiterzuarbeiten: die nächste Anfrage
+// bekäme sonst mitten im Klicken eine 401, und das sieht aus wie ein Ausfall.
+document.getElementById('btn-logout-all').addEventListener('click', async e => {
+  if (!(await uiConfirm(t('logoutall.text',
+      'Alle Geräte werden abgemeldet, dieses eingeschlossen. Du musst dich danach neu anmelden.'),
+    { title: `🚪 ${t('act.logoutall', 'Überall abmelden')}`,
+      okLabel: t('logoutall.ok', 'Überall abmelden') }))) return;
+  try {
+    await api('/api/auth/logout-all', { method: 'POST' });
+    toast(t('logoutall.done', '✓ Alle Sitzungen beendet.'));
+    setTimeout(() => location.reload(), 900);
   } catch (err) { toast(err.message, 'error'); }
 });
 

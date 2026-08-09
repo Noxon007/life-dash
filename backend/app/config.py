@@ -97,6 +97,11 @@ class Settings(BaseSettings):
     oidc_issuer: str = ""  # Basis-URL des Providers, z. B. https://id.example.com
     oidc_client_id: str = ""
     oidc_client_secret: str = ""  # leer bei Public Client (PKCE reicht)
+    # Anmerkung 209: Für WEN ein Bearer-Token ausgestellt sein muss (`aud`).
+    # Leer = die eigene Client-ID, und das ist der Normalfall. Nur setzen, wenn
+    # der Provider Access-Token auf eine Ressource statt auf den Client
+    # ausstellt — sonst lehnt der Bearer-Pfad jedes Token ab.
+    oidc_audience: str = ""
     # Basis-URL, unter der Life-Dash erreichbar ist (für die Redirect-URI)
     public_base_url: str = "http://127.0.0.1:8000"
     # Secret zum Signieren des Session-Cookies — in Produktion ÄNDERN!

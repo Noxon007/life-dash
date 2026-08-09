@@ -35,7 +35,11 @@ _MISSING_COLUMNS: dict[str, dict[str, str]] = {
     "entities": {"user_id": "VARCHAR(36)"},
     "jobs": {"params": "JSON"},
     # A35: Passwort-Hash für lokale Konten (NULL bei OIDC/dev)
-    "users": {"password_hash": "VARCHAR(255)"},
+    # Anmerkung 209: `sessions_valid_from` = der Schnitt, ab dem eine Sitzung
+    # noch gilt. NULL heißt „nie widerrufen"; Bestandszeilen bekommen genau
+    # das, und richtiger geht es nicht — vor dieser Spalte konnte niemand
+    # widerrufen.
+    "users": {"password_hash": "VARCHAR(255)", "sessions_valid_from": "TIMESTAMP"},
     # F15: hochgeladene Bilder. `user_id` schließt die Lücke aus Anmerkung 57.
     "media_refs": {"user_id": "VARCHAR(36)", "mime": "VARCHAR(64)",
                    "bytes": "INTEGER", "width": "INTEGER", "height": "INTEGER",

@@ -850,6 +850,19 @@ any `MINOR`.
   failed first one.
 
 ### Security
+- **You can sign out everywhere.** Settings → Sessions ends every running
+  session of your account, on every device, including the one you are looking
+  at. Until now a sign-in simply lasted up to 30 days and nothing could end it
+  early — if a phone was lost, the only real option was to change the signing
+  key and restart the server.
+- **Changing your password now signs out every other device.** That is what
+  people expect it to do, and it did not: the old sessions kept working for
+  another month. Your current window stays signed in.
+- **API tokens must say who they were issued for.** If you sign in via an
+  identity provider and a second application shares it, a token meant for that
+  other application was accepted here. It is now checked. If your provider
+  issues tokens for a resource rather than for the client, set `OIDC_AUDIENCE`;
+  the log says exactly what was expected when a token is refused.
 - **The app refuses to start with a login that is not a login.** `AUTH_MODE=dev`
   means *no* sign-in at all — every request is treated as the account that owns
   all the data. If your instance looks like it is meant to be reachable (a

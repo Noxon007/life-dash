@@ -99,6 +99,16 @@ class User(Base):
     # Pro-Nutzer-Einstellungen (später: Immich-API-Key, PSN-Token, ...)
     settings: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    # Anmerkung 209: Der Schnitt, ab dem eine Sitzung noch gilt. Jedes
+    # Sitzungs-Cookie trägt seinen Ausstellungszeitpunkt; ist der ÄLTER als
+    # dieser Wert, ist es abgelaufen — egal wie lange es sonst noch liefe.
+    # Damit sind Sitzungen widerrufbar, ohne eine Sitzungstabelle zu führen:
+    # EIN Zeitstempel je Nutzer beendet alle auf einmal.
+    #
+    # NULL heißt „nie widerrufen" und ist der Normalfall; Bestandszeilen
+    # bekommen genau das, und das ist richtig — vor dieser Änderung konnte
+    # niemand widerrufen, also ist auch nichts widerrufen worden.
+    sessions_valid_from: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 # --------------------------------------------------------------------------- #

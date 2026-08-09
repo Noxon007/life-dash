@@ -9,6 +9,7 @@ import urllib.parse
 import urllib.request
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import Response
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -48,12 +49,18 @@ def _require_local_mode() -> None:
         raise HTTPException(404, "Lokale Konten sind nicht aktiv (AUTH_MODE=local)")
 
 
+def _issue_session(response: Response, user: User) -> None:
+    """Setzt das Sitzungs-Cookie. EINE Stelle — Anmerkung 200 hat gezeigt, was
+    passiert, wenn zwei Aufrufer die Attribute je selbst aufzählen."""
+    auth.set_auth_cookie(response, auth.SESSION_COOKIE,
+                         auth.sign_cookie({"uid": user.id}, auth.session_max_age()),
+                         auth.session_max_age())
+
+
 def _session_response(user: User) -> JSONResponse:
     resp = JSONResponse({"id": user.id, "email": user.email,
                          "display_name": user.display_name, "role": user.role.value})
-    auth.set_auth_cookie(resp, auth.SESSION_COOKIE,
-                         auth.sign_cookie({"uid": user.id}, auth.session_max_age()),
-                         auth.session_max_age())
+    _issue_session(resp, user)
     return resp
 
 
@@ -97,8 +104,16 @@ def local_change_password(
     payload: PasswordChange,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-) -> dict:
-    """Ändert das eigene Passwort (nur für lokale Konten)."""
+) -> Response:
+    """Ändert das eigene Passwort (nur für lokale Konten).
+
+    Anmerkung 209: **Der Wechsel beendet alle Sitzungen.** Ein Passwort zu
+    ändern ist die Handlung, die ein Mensch ausführt, wenn er glaubt, dass
+    jemand anderes Zugang hat — und bis hierher hat sie an genau diesem Zugang
+    nichts geändert: das gestohlene Cookie galt weiter, bis zu dreißig Tage.
+    Die eigene Sitzung wird sofort neu ausgestellt, sonst wirft die Änderung
+    den Nutzer aus seiner eigenen Anwendung.
+    """
     _require_local_mode()
     from app.services import password as pw
 
@@ -106,9 +121,33 @@ def local_change_password(
                                                         user.password_hash):
         raise HTTPException(400, "Das aktuelle Passwort stimmt nicht")
     user.password_hash = pw.hash_password(payload.new_password)
+    auth.revoke_sessions(user)
     db.commit()
-    log.info("Passwort geändert: %s", user.email)
-    return {"changed": True}
+    log.info("Passwort geändert: %s — alle Sitzungen beendet", user.email)
+    response = JSONResponse({"changed": True, "sessions_revoked": True})
+    _issue_session(response, user)
+    return response
+
+
+@router.post("/logout-all")
+def logout_all(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> Response:
+    """Meldet dieses Konto auf ALLEN Geräten ab — auch auf diesem.
+
+    Gilt in jeder Betriebsart, nicht nur bei lokalen Konten: das Cookie, das
+    hier widerrufen wird, stellt Life-Dash selbst aus, auch nach einem
+    OIDC-Login. Einzelne Geräte lassen sich nicht abmelden — dafür gibt es
+    keine Geräteliste, und eine zu führen wäre mehr Datenhaltung für eine
+    Frage, die in einem Ein-Personen-System niemand stellt.
+    """
+    auth.revoke_sessions(user)
+    db.commit()
+    log.info("Alle Sitzungen beendet: %s", user.email)
+    response = JSONResponse({"revoked": True})
+    response.delete_cookie(auth.SESSION_COOKIE, path="/")
+    return response
 
 
 @router.get("/me", response_model=UserRead)
