@@ -8,6 +8,7 @@ Run them from the repository root (needs `npm i jsdom` once, anywhere on the
 module path):
 
 ```bash
+node tools/check-no-cdn.js          # nothing loads from a foreign host, and the libraries are in the shell cache — note 207
 node tools/check-load.js            # page loads without throwing (catches TDZ, see CLAUDE.md)
 node tools/check-shadowing.js       # nothing shadows the translation function t() — note 69
 node tools/check-weather-summary.js # the weather record counts days, not entries — note 64

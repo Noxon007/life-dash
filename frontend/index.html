@@ -17,9 +17,10 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<!-- Anmerkung 207: aus dem eigenen Haus, nicht vom CDN. Siehe vendor/README.md. -->
+<link rel="stylesheet" href="vendor/leaflet.css" />
+<link rel="stylesheet" href="vendor/MarkerCluster.css" />
+<link rel="stylesheet" href="vendor/MarkerCluster.Default.css" />
 <style>
   :root {
     --bg: #0f1420;
@@ -2882,8 +2883,8 @@
 <!-- F8: Inhalt der Druckseite (nur beim Drucken sichtbar) -->
 <div id="print-area" aria-hidden="true"></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="vendor/leaflet.js"></script>
+<script src="vendor/leaflet.markercluster.js"></script>
 <!-- Anmerkung 206: Die Vektorkarte (A48) ist ERSATZLOS weg — mit ihr MapLibre
      und die Leaflet-Brücke. Sie hat mehr Ärger gemacht als Nutzen gebracht
      (ein LCP über fünf Sekunden beim Moduswechsel, fehlende Sprite-Symbole,

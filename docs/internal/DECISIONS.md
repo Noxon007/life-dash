@@ -1510,6 +1510,22 @@ not a post-1.0 feature.
 
     **The LCP question closes with it.** It was open pending a measurement in the author's browser (which element does the Performance panel mark as LCP?), and that measurement will now never be made, because the element is gone. Recorded here so it is not reopened as an unexplained mystery: it was not solved, it was removed.
 
+207. ✅ **The map libraries come from this instance now, not from a CDN.** The fifth of note 200's ten open findings, and the one the other hardening leans on.
+
+    **What stood there.** `<script src="https://unpkg.com/leaflet@1.9.4/…">` and three more like it, versions pinned, no `integrity` attribute. Pinning answers *“can upstream change what this does?”*; it says nothing about the delivery path, and the page those scripts run in renders the entire life database. The reasoning at the time — “no worse than the tiles, which come from outside anyway” — mistook a **data** request for **code** execution.
+
+    **Removing A48 removed half the problem before this note started.** Four libraries became two: MapLibre and the Leaflet bridge left with the vector map. What remains is Leaflet 1.9.4 and Leaflet.markercluster 1.5.3, copied byte-for-byte into `frontend/vendor/` with their licences (BSD-2-Clause and MIT) and a README stating where they came from and how to update them.
+
+    **Three consequences, only one of which is the obvious one.**
+
+    - A CSP with `script-src 'self'` becomes possible. That header is the next note's work, and it could not have been written while the page needed a foreign origin for the thing it is most important to constrain.
+    - **Every start told a third party that this instance exists**, and roughly when it is used. For software whose entire premise is that the data stays home, that was the wrong first request of the session — and it was made before the login screen, so it did not even need a user.
+    - **The offline map was never offline.** This is the one worth writing down, because it had been shipped as a feature since P5.1. The service worker caches the shell so the app opens without a network; it cannot cache a cross-origin script it is not allowed to read. Without a network the map therefore failed at the *library*, not at the tiles — and the comment in `index.html` said the opposite in as many words (“an der Offline-Lage ändert das nichts, denn ohne Netz gibt es ohnehin keine Kacheln”). A grey rectangle and a missing `L` look identical from the outside. The five files are in `SHELL` now, along with the images Leaflet resolves *relative to its own stylesheet* — those appear in no `src` attribute, so nothing that reads the HTML would have found them.
+
+    Guard: `tools/check-no-cdn.js`, run in both directions. Putting one `unpkg` tag back turns it red; taking one file out of `SHELL` turns it red too, which is the case that matters — that is the rule living in **two** places (referenced in `index.html`, cached in `sw.js`), and the drift between them is invisible until someone is offline. It also asserts that it found any loaders at all, so a broken pattern cannot pass as a clean page.
+
+    **`CACHE` went to `v4`.** The shell cache is keyed by that name; without the bump an installed app would keep serving the old `index.html` — the one that asks unpkg for a script the new CSP forbids. A cache name that does not change is a deployment that does not arrive.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

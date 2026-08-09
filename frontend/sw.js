@@ -17,9 +17,22 @@
 // v3 (Anmerkung 180): das Zeichen ist neu. Ohne den Sprung behielte jeder,
 // der die App schon einmal geöffnet hat, das alte Symbol — der Shell-Cache
 // liefert es aus, und zwar so lange, bis dieser Name sich ändert.
-const CACHE = "lifedash-shell-v3";
+//
+// v4 (Anmerkung 207): Leaflet und markercluster kommen aus dem eigenen Haus
+// statt von unpkg — und stehen damit ZUM ERSTEN MAL in dieser Liste. Vorher
+// war die Offline-Karte keine: der Worker durfte ein fremdes Skript nicht
+// lesen, also fehlte ohne Netz nicht die Kachel, sondern die Bibliothek. Die
+// Bilder gehören dazu (Leaflet sucht sie relativ zu seinem CSS), sonst öffnet
+// die Karte offline ohne Marker.
+const CACHE = "lifedash-shell-v4";
 const SHELL = ["/", "/index.html", "/manifest.json", "/icon.svg", "/icon-maskable.svg",
-               "/icon-comb.svg"];
+               "/icon-comb.svg",
+               "/vendor/leaflet.js", "/vendor/leaflet.css",
+               "/vendor/leaflet.markercluster.js",
+               "/vendor/MarkerCluster.css", "/vendor/MarkerCluster.Default.css",
+               "/vendor/images/marker-icon.png", "/vendor/images/marker-icon-2x.png",
+               "/vendor/images/marker-shadow.png",
+               "/vendor/images/layers.png", "/vendor/images/layers-2x.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)));

@@ -849,6 +849,18 @@ any `MINOR`.
   unchanged — without that number a second run over the same year reads like a
   failed first one.
 
+### Security
+- **The map libraries are served by your own instance instead of a public CDN.**
+  Leaflet and its clustering plugin used to be fetched from `unpkg.com` on every
+  start, with no integrity check — meaning the page that shows your whole life
+  database executed code delivered by someone else, and told that someone else
+  each time you opened the app. Both libraries now ship with Life-Dash. Nothing
+  changes on screen; three things change behind it: no request leaves your
+  network before the login screen, the app can be locked down with a strict
+  content security policy, and **the offline map finally works** — without a
+  network the map used to fail at the library, not at the map tiles, so it never
+  drew anything at all.
+
 ### Removed
 - **The two clean-up runs for data from earlier versions:** “Advanced: cut older
   data into days” under Imports, and the Immich card “Remove old photo-day
