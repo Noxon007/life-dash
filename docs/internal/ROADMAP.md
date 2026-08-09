@@ -50,11 +50,10 @@ blocks another except where stated.
 
 ### R1 — ready for publication · L
 
-The gate before any promotion. Seven parts, in order:
+The gate before any promotion. **Part a is built** (note 203); six left, in order:
 
 | | Part | Why it is in the gate |
 |---|---|---|
-| **a** | **Demo mode** — a seeded, entirely fictional dataset behind one flag | Nobody evaluates a life database using their own life, and without it there are no screenshots. This is the part that unblocks all the others. |
 | **b** | **Screenshots and a short GIF in the README**, plus the “why not X” comparison | The one thing a stranger looks at before deciding to install. |
 | **c** | **A genuine one-command start** — `docker compose up` against versioned ghcr images instead of a local build | “Ten minutes from zero to a populated instance” is the 1.0 promise; a build step breaks it. |
 | **d** | **Hardening** — `AUTH_MODE=dev` impossible to start accidentally in a production-shaped environment · no secrets in logs · pinned base images · Dependabot · `SECURITY.md` | The dev mode is the sharpest edge currently shipped. |
@@ -196,7 +195,7 @@ rebuilt every release.
 
 | Version | Theme | Contains |
 |---|---|---|
-| **0.40.0** | **The last 0.x — whatever daily use turns up, plus the demo mode** | No planned feature content beyond the demo dataset (R1a): a plausible fictional life with trips, places across several continents, sightings, concerts, journal entries, weather and achievements, behind one flag. Everything else that has gathered on `main` since 0.39.0 rides along. This is the release that unblocks everything public — and the only 0.x a stranger will ever see. |
+| **0.40.0** | **The last 0.x — whatever daily use turns up, plus the demo mode** | **The demo dataset (R1a) is built** (note 203): thirty-two invented years — five places lived in, twenty-nine trips across six continents, concerts, sightings, journal entries, imported paths, weather for every day and a collection that is deliberately not maxed out, behind one flag and without a network call. No planned feature content beyond it. Everything else that has gathered on `main` since 0.39.0 rides along. This is the release that unblocks everything public — and the only 0.x a stranger will ever see. |
 | **1.0.0** | **Publication** — three stages on `main`, one tag | **(i) Hardening and operations** (R1c/d/f): `AUTH_MODE=dev` unstartable in a production-shaped environment · no secrets in logs · pinned base images · Dependabot · `SECURITY.md` · versioned ghcr images and a genuine `docker compose up` · the upgrade path from 0.40 tested end to end · backup and restore documented, media folder included. **(ii) Project surface** (R1b/e/g and R2): README with screenshots and a GIF · the documentation site · the comparison table · `CONTRIBUTING.md` · issue templates · “what this project deliberately does not do” · the donation link. **(iii) Freeze and fresh-install pass**: no new features — walk the stranger's path from an empty machine, fix what it turns up, verify every `.env.example` key is real and every documented command works. |
 
 None of the three 1.0 stages gets a version of its own: a user notices none of

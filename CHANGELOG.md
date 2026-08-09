@@ -190,6 +190,15 @@ any `MINOR`.
   and your longest recorded trip.
 
 ### Added
+- **A demo mode: an invented life, thirty-two years of it, behind one switch.**
+  `SEED_DEMO=true` fills a fresh instance with around 8,500 entries — five
+  places lived in, twenty-nine trips across six continents, concerts, meals,
+  animals seen, journal entries, imported paths, weather for every day and a
+  collection of achievements that is emphatically *not* maxed out. It takes a
+  few seconds and needs no internet connection at all: the weather is invented
+  too, plausible for the latitude and the season, and the same every time it is
+  built. Everything and everyone in it is fictional. It only happens on a fresh
+  instance in development mode, and never on top of data you already have.
 - **Kilometres from your imported paths — in a tab of their own.** *Statistics →
   Paths* adds up what the Google Timeline import brought: your total distance,
   split by mode of travel and by year, and the longest single paths. Those

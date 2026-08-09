@@ -230,9 +230,24 @@ Der wiederkehrende Defekt in diesem Projekt ist nicht Kaputtheit, sondern
 ## Stand
 **Auf `main`, `version.py` = 0.39.0, alles seither unter `[Unreleased]`.**
 Gruppe A (A1–A48) und Gruppe B bis F21 sind gebaut, ebenso P2.1 (alle drei
-Stufen), P3.1, P5.1 und F1. Offen bis 1.0 sind nur noch **R1** (Demo-Modus,
-Härtung, Projektoberfläche) und **R2** (Doku-Seite) — Einzelheiten in
-`ROADMAP.md`.
+Stufen), P3.1, P5.1 und F1. Offen bis 1.0 sind nur noch **R1** (Härtung,
+Projektoberfläche) und **R2** (Doku-Seite) — Einzelheiten in `ROADMAP.md`.
+
+**Der Demo-Bestand steht (R1a, Anmerkung 203).** `app/demo/` baut hinter
+`SEED_DEMO=true` (nur dev-Modus, nur wenn das Konto leer ist) ein erfundenes
+Leben von 32 Jahren: ~8.500 Ereignisse, 29 Reisen, 5 Wohnorte, ~4.100 Wege,
+Wetter für jeden Tag, in ~5 s und **ohne Netz**. Vier Regeln, die beim Ändern
+zählen:
+- **Gebaut, nicht durch die Pipeline gejagt** — sonst hinge der Bestand am
+  KI-Anbieter und jeder Screenshot wäre ein Einzelstück.
+- **Das Wetter ist erfunden** (`demo/weather.py`, Hash über Ort+Tag, nur die
+  Tageslänge echt gerechnet) und trägt **den Revisionsmarker**. Ohne ihn
+  startet der Wetter-Knopf elftausend Open-Meteo-Abrufe. Die Grenze „zu jung
+  für das Archiv" wird bei `enrichment._too_recent` GEFRAGT, nie abgeschrieben.
+- **`life.BLANK`** = 75 Tage ohne Wohnort und ohne Eintrag, damit der
+  Lückenbericht etwas zu sagen hat. EINE Definition, drei Leser.
+- **Nichts ist später als gestern** datiert, und der Bestand ist nicht überall
+  Platin (5 von 18) — beides bewusst, siehe Anmerkung 203.
 
 **Offen aus den Rückmeldungen vom 2026-08-04** (Anmerkungen 168–182 sind
 erledigt, die zweite Rückmeldung mit elf Punkten vollständig, aus der dritten

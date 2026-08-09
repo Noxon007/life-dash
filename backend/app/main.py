@@ -35,7 +35,7 @@ from app.routers import (
     weather,
     world,
 )
-from app.seed import seed_demo
+from app.demo import seed_demo
 from app.services.weather import WEATHER_MODEL
 from app.version import APP_VERSION, display_version, release_channel
 

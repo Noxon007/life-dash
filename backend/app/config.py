@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     # Mindest-Ähnlichkeit (Cosine) für semantische Treffer (kalibriert für bge-m3)
     semantic_min_similarity: float = 0.4
 
+    # R1a: Beim ersten Start ein erfundenes Leben anlegen (`app/demo/`) —
+    # dreißig Jahre mit Reisen, Wohnorten, Wetter und Erfolgen. Nur im
+    # dev-Modus und nur, solange das Konto noch keine Ereignisse hat.
     seed_demo: bool = True
     confidence_review_threshold: float = 0.75
 
