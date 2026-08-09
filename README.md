@@ -26,6 +26,9 @@ what has been gathered — never as a replacement for the bee.
 - **All settings:** [.env.example](.env.example)
 - **Changes per version:** [CHANGELOG.md](CHANGELOG.md)
 - **Backend notes:** [backend/README.md](backend/README.md)
+- **Reporting something / what this project deliberately does not do:**
+  [CONTRIBUTING.md](CONTRIBUTING.md) · security:
+  [SECURITY.md](SECURITY.md)
 - **Design documents** (working documents, not user documentation):
   [architecture](docs/internal/ARCHITECTURE.md) ·
   [roadmap](docs/internal/ROADMAP.md) ·

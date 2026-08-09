@@ -1574,6 +1574,16 @@ not a post-1.0 feature.
 
     **Untested, and stated as such:** the image is not built here — this machine has no Docker on purpose (`CLAUDE.md`), and `tools/pg-test.ps1` exists for exactly that reason. The Dockerfile and entry point are reviewed, not run. The first `docker compose build` is the test, and it is the author's.
 
+211. ✅ **R1(e), the project surface: saying no once, in writing.** The gate's own justification for this part was *“says no once instead of once per stranger”*, and it decides the shape: everything here is written to be read **before** somebody spends an evening.
+
+    **Pull requests are not accepted, and the reason is not modesty.** Every part of this codebase carries a written reason in this file — over two hundred numbered notes. Reviewing a change means checking it against that record, and doing it properly takes longer than writing the change did. A maintainer who merges faster than they can review produces a codebase they no longer understand. `CONTRIBUTING.md` says so plainly and redirects the energy where it is worth more: **a bug report beats a patch here**, especially the quiet kind, and the file says which kind that is — a count short by whole years, a run reporting success for work it skipped, a view that cannot show everything and does not say so. That paragraph is this project's own defect class, handed to the reader as a search pattern.
+
+    **“What this project deliberately does not do” is nine bullet points**, and each is a decision already in this file: no cloud service, no mobile app, no telemetry, no plugin API, no frontend build step, no AI that rewrites confirmed records, no competing with the dedicated location trackers. Written down, they stop being nine conversations.
+
+    **The issue list answers one question — “what is broken?”** Blank issues are off; ideas and questions go to Discussions, security to the private advisory form, setup to `DEPLOY.md`. Three contact links instead of three explanations. The bug form asks the five things that are always asked back — version, sign-in mode, database, path, context — and explicitly permits *“I am not sure, it just looked wrong”*, because that is how several of the notes here began.
+
+    Forks stay welcome and the file says so: AGPL-3.0-or-later, take it anywhere, serve the source. The last section is for whoever does — the two test commands, and the one rule worth carrying out of this repository: **run every new check once against the broken state**, or it proves that a function exists rather than that anyone calls it.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

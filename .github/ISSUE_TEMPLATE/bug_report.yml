@@ -1,0 +1,72 @@
+name: 🐞 Something is wrong
+description: A defect — including the quiet kind, where a number is simply not right.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **The most valuable reports here are the quiet ones.** The recurring
+        defect in this project is not breakage but silence: a count that is
+        short by whole years, a run that reports success for work it skipped, a
+        view that cannot show everything and does not say so. If something looks
+        slightly off and you cannot prove it — report it anyway. Several entries
+        in the decisions log started exactly that way.
+
+        **Not a defect?** Ideas and questions belong in
+        [Discussions](https://github.com/Noxon007/life-dash/discussions).
+        **A security problem?** Do not open an issue — see
+        [SECURITY.md](https://github.com/Noxon007/life-dash/blob/main/SECURITY.md).
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What did you see, and what did you expect instead?
+      placeholder: |
+        e.g. "The statistics say 412 rainy days, but the years before 2011 are
+        the ones I only have a residence for — I think they are missing."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How do you get there?
+      description: The shortest path you know. “I am not sure, it just appeared” is a valid answer.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Bottom of the Settings tab, or `/health` (`display_version`).
+      placeholder: "0.40.0 — or main, with the build date"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: auth
+    attributes:
+      label: Sign-in mode
+      options: ["local", "oidc", "dev"]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: db
+    attributes:
+      label: Database
+      options: ["PostgreSQL", "SQLite"]
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else that might matter
+      description: |
+        Browser and device if it is about the interface. Lines from the log if
+        it is about a run — Settings → System shows them, and secrets are
+        already masked there. Whether an import or a connector was involved.
+    validations:
+      required: false

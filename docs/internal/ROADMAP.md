@@ -50,14 +50,13 @@ blocks another except where stated.
 
 ### R1 — ready for publication · L
 
-The gate before any promotion. **Part a is built** (note 203); five left, in order:
+The gate before any promotion. **Parts a (note 203), d (notes 208–210) and e
+(note 211) are built**; three left, in order:
 
 | | Part | Why it is in the gate |
 |---|---|---|
 | **b** | **Screenshots and a short GIF in the README**, plus the “why not X” comparison | The one thing a stranger looks at before deciding to install. |
 | **c** | **A genuine one-command start** — `docker compose up` against versioned ghcr images instead of a local build | “Ten minutes from zero to a populated instance” is the 1.0 promise; a build step breaks it. |
-| **d** | **Hardening** — `AUTH_MODE=dev` impossible to start accidentally in a production-shaped environment · no secrets in logs · security headers and a CSP · pinned base images · Dependabot · `SECURITY.md` | The dev mode is the sharpest edge currently shipped. |
-| **e** | **Project files** — `CONTRIBUTING.md` stating this is a single-author project not currently accepting pull requests · issue templates · questions to Discussions · a short “what this project deliberately does not do” | Says no once, in writing, instead of once per stranger. |
 | **g** | A discreet **donation link** in the README — deliberately **not** in the app interface, and deliberately not before there is something worth funding | |
 
 > **Part f — a tested upgrade path from an older database — was struck on

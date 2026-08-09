@@ -1,0 +1,21 @@
+# Anmerkung 211: Die Issue-Liste beantwortet EINE Frage — „was ist kaputt?".
+# Ideen, Fragen und Sicherheitsmeldungen haben je einen eigenen Weg, und der
+# steht hier, statt einmal je Fremdem einzeln erklärt zu werden.
+blank_issues_enabled: false
+contact_links:
+  - name: 💡 Idee oder Frage
+    url: https://github.com/Noxon007/life-dash/discussions
+    about: >-
+      Wünsche, Fragen zur Einrichtung und alles, was kein Defekt ist, gehören in
+      die Discussions. Eine Idee ist kein Fehler, und beides in einer Liste macht
+      die Liste unlesbar.
+  - name: 🔒 Sicherheitslücke
+    url: https://github.com/Noxon007/life-dash/security/advisories/new
+    about: >-
+      NICHT als öffentliches Issue. Private Meldung über GitHub — die Regeln
+      stehen in SECURITY.md.
+  - name: 📘 Einrichtung und Betrieb
+    url: https://github.com/Noxon007/life-dash/blob/main/docs/DEPLOY.md
+    about: >-
+      Installation, Reverse Proxy, Datenbank, Sicherung — die häufigsten Fragen
+      sind dort schon beantwortet.
