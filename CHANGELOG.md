@@ -232,6 +232,21 @@ any `MINOR`.
   your own network.
 
 ### Fixed
+- **The *World* tab is no longer German-only.** With the interface in English
+  it still said “Nordamerika” and listed “Deutschland”, “Frankreich”,
+  “Vereinigte Staaten” — the one tab whose names come from a reference table
+  rather than from the interface, and the table was only ever asked for its
+  German side. Countries, continents and the checklist of places you have not
+  been are now in the language you have chosen, and the checklist is sorted by
+  the names you actually see. Names that could not be matched to any country
+  keep their spelling exactly as recorded: that list exists so you can correct
+  it in the collection.
+- **Switching language left the *World* tab and the *Rankings* in the old
+  one.** Both are named by the server, and it was still being told the previous
+  choice at the moment they were re-fetched — so half the screen switched and
+  half did not, until the next reload. The rankings had a second reason to get
+  stuck: they are remembered until your data changes, and switching language
+  does not change your data, so they counted as already loaded.
 - **Just after midnight, the journal opened yesterday.** The *Journal* button
   worked out “today” from the clock in Greenwich rather than from yours, so in
   Central European Time everything between midnight and 1 a.m. — 2 a.m. in

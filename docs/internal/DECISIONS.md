@@ -1335,7 +1335,7 @@ and no change, and one that turned out to be the same defect in two places.
 
     The language comes from the same setting the geocoder is asked with (`geocode.lang_for`), so a place and the ranking about it cannot answer in two languages.
 
-    **Still open, deliberately:** the *World* tab hard-codes `name_de` for countries and German labels for continents — it is German-only in both halves, and fixing one of them would leave a tab that is half translated. That is an F10 job of its own, not part of this note.
+    **Left open deliberately, closed by note 202:** the *World* tab hard-coded `name_de` for countries and German labels for continents — German-only in both halves, and fixing one of them would have left a tab that is half translated. That was an F10 job of its own, not part of this note.
 
     Guards: six cases, including the counter-direction (an unknown country keeps its name) and the residence half — residence days arrive with the raw name and would otherwise stand as a second row under the renamed one, the same defect one level down.
 
@@ -1390,6 +1390,29 @@ and no change, and one that turned out to be the same defect in two places.
     The lockout expiry is the one that had no test at all before, and the reason is worth writing down: asserting it means either sleeping fifteen minutes or reaching into `_fail_state` and ageing the window by hand. The second is what the tests do — the existing auth tests already touch that state (`.clear()`), so the technique is not new, only the question. **The remaining two repairs stay untested on purpose**: the dead branch in `_run_weather` and the `user_id` filter in `on_this_day` change no result, only a promise, so any test for them would assert the code rather than its behaviour — the shape note 108 keeps warning about.
 
     The new frontend guard asserts that neither `spreadPick` nor `mpEvenSpread` exists any more. Without it, someone can add a second spelling of the rule back and every other check stays green — which is exactly how it came to stand there three times.
+
+**Round of 2026-08-09 (note 202), on `main`, no version bump.** The first of the
+four steps agreed before the demo dataset: translate the *World* tab, then build
+the demo life, then measure against it, then decide the three findings note 201
+left as measurements. This one is first because the demo dataset **freezes what
+the features look like** — screenshots are taken from it, and a German continent
+list under an English interface is the first thing a stranger would see.
+
+202. ✅ **The *World* tab was wired to German, and fixing it turned up the same defect one layer up: the display was asking a setting that had not been written yet.** Left open by note 198 as a job of its own.
+
+    **Both halves, or neither.** `world.py` took `country.name_de`, and the continent labels came out of `data/countries.py` as German text with no catalogue entry in the frontend. Translating the countries alone would have produced “Germany” and “France” under a heading reading “Europa” — the state that does not look like a gap but like a fault (note 114). Country names cannot go into `I18N_EN`: there are two hundred of them and they are **master data**, not interface text. So the whole tab is named by the server, and the English continent names go into `countries.py` beside `name_de`/`name_en`, where the file already holds both languages. Putting one half in the backend and the other in the catalogue would have been two rules for one question, and the one nobody greps for would have stayed German.
+
+    **The sorting is part of the translation.** `by_continent()` ordered by `name_de`, so an English checklist would have listed “Germany” after “France” — alphabetical by an invisible key, which reads as no order at all. It sorts by the displayed name now.
+
+    **`unmatched` deliberately keeps its stored spelling.** It is the list of names the reference table could not resolve, shown so the user can correct them in the collection — and it is untranslatable by definition, because not being resolvable is exactly what put it there.
+
+    **The defect underneath: the display hung on a setting that arrives afterwards.** The language button switches the interface, calls `redrawForLang()`, and sends the new language to the account **after** that, on purpose and without `await` — if the PATCH fails the interface should still be switched. But `redrawForLang()` re-fetches the server-named views in the same breath, so a `lang_for(user)` read on the server answers with the language the account still had. The *World* tab and the top lists would have come back in the old language and stayed there until the next reload — a tab that is half switched, arrived at from the other direction.
+
+    This was **already true of the top lists** before this round: note 198 gave them `lang_for(user)` and the race came with it, invisible because nobody had switched languages on that tab. The rule is the one this file keeps restating in a new costume: **a condition that held when the row was written does not hold when it is read.** The asking side now names the language (`?lang=`), and `geocode.display_lang(requested, user)` holds the rule in one place: what the caller asks for, otherwise the account. Optional and not mandatory, because the background place-name run has no caller to ask — it keeps `lang_for` and must.
+
+    **And the memo cell had to learn the language too.** `loadStatsTops` remembers the top lists under the corpus revision, so that clicking back and forth does not re-ask the same answer. A language switch does not change the corpus: the lists counted as “already loaded” and stayed German even once the request was fixed. **What co-determines an answer belongs in the key you remember it under.**
+
+    Guards: twelve cases in `test_f10_world.py` and a new `check-world-lang.js`, both run against the pre-fix state — eleven of twelve go red, and the one that stays green is the right one (“stays German by default”, which is what the old behaviour was). The frontend guard walks the **chain** rather than the trigger: open the tab, switch, then check what is on the wire *and* what is in the page. Its HTTP double answers according to the `lang` it is asked with, exactly as the real server does — a double that answers every request identically could never have shown the race, and the account it stands for is deliberately set to German so that “did not ask” and “asked correctly” stay distinguishable. Two of its assertions were `every()` over a list that is empty in the broken state, i.e. vacuously true; they now require the list to be non-empty, which is the cheapest way this project has found to build a check that checks nothing.
 
 ## Appendix B — the concept document's closed chapters
 

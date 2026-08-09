@@ -30,6 +30,21 @@ CONTINENTS: dict[str, str] = {
     "AN": "Antarktis",
 }
 
+# F10: Die Kontinente hingen als einzige des Welt-Reiters an EINER Sprache.
+# Sie stehen hier und nicht im Frontend-Katalog, weil diese Datei ohnehin die
+# zweisprachigen Stammdaten hält (`name_de`/`name_en`): eine Hälfte des Reiters
+# im Backend zu übersetzen und die andere im Katalog wären zwei Regeln für
+# dieselbe Frage — und die eine, nach der niemand sucht, bliebe deutsch.
+CONTINENTS_EN: dict[str, str] = {
+    "EU": "Europe",
+    "AS": "Asia",
+    "AF": "Africa",
+    "NA": "North America",
+    "SA": "South America",
+    "OC": "Oceania",
+    "AN": "Antarctica",
+}
+
 # (ISO-3166-1 alpha-2, deutscher Name, englischer Name, Kontinent, lat, lng)
 _ROWS: tuple[tuple[str, str, str, str, float, float], ...] = (
     ("AD", "Andorra", "Andorra", "EU", 42.55, 1.60),
@@ -318,9 +333,8 @@ class Country:
     lat: float
     lng: float
 
-    @property
-    def continent_label(self) -> str:
-        return CONTINENTS[self.continent]
+    def continent_label(self, lang: str | None = None) -> str:
+        return continent_name(self.continent, lang)
 
 
 BY_ISO: dict[str, Country] = {
@@ -371,6 +385,20 @@ def name_in(country: Country, lang: str | None) -> str:
     return country.name_en if lang == "en" else country.name_de
 
 
+def continent_name(code: str, lang: str | None = None) -> str:
+    """Der Kontinentname in der Sprache der Oberfläche (F10).
+
+    Deutsch ist der Rückfall, nicht nur der Default: ein Code ohne englische
+    Entsprechung soll den deutschen Namen zeigen und nicht seinen Code — ein
+    Label, das plötzlich „SA" heißt, sieht nach Defekt aus, ein deutsches nach
+    einer Lücke im Katalog. Das ist dieselbe Regel wie im Frontend, wo ein
+    fehlender Schlüssel Deutsch zeigt und nie ein leeres Label.
+    """
+    if lang == "en" and code in CONTINENTS_EN:
+        return CONTINENTS_EN[code]
+    return CONTINENTS.get(code, code)
+
+
 def display(name: str | None, lang: str | None = None) -> str | None:
     """**Anmerkung 198 — EIN Land, EIN Name.**
 
@@ -395,11 +423,17 @@ def display(name: str | None, lang: str | None = None) -> str | None:
     return name_in(hit, lang) if hit else name
 
 
-def by_continent() -> dict[str, list[Country]]:
-    """Alle Länder je Kontinent, alphabetisch — Grundlage der Checklisten."""
+def by_continent(lang: str | None = None) -> dict[str, list[Country]]:
+    """Alle Länder je Kontinent, alphabetisch — Grundlage der Checklisten.
+
+    Sortiert wird nach dem ANGEZEIGTEN Namen: eine englische Checkliste, die
+    nach den deutschen Namen sortiert ist, steht scheinbar zufällig da
+    („Germany" zwischen „Denmark" und „Finland" wäre richtig, nach `name_de`
+    landet es hinter „France").
+    """
     out: dict[str, list[Country]] = {key: [] for key in CONTINENTS}
     for country in BY_ISO.values():
         out[country.continent].append(country)
     for items in out.values():
-        items.sort(key=lambda c: c.name_de)
+        items.sort(key=lambda c: name_in(c, lang))
     return out

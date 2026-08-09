@@ -7743,10 +7743,15 @@ async function loadStatsTops(force) {
   const box = document.getElementById('stats-tops');
   if (!box) return;
   let stamp = null;
-  try { stamp = (await fetchIndex(true)).revision || ''; } catch (_) {}
+  // F10: Die SPRACHE gehört in die Merkzelle. Die Ranglisten benennen Länder
+  // serverseitig (Anmerkung 198), und ein Sprachwechsel ändert den Bestand
+  // nicht — die Merkzelle hätte den Reiter also für „schon geladen" gehalten
+  // und ihn deutsch stehen lassen. Was die Antwort mitbestimmt, gehört in den
+  // Schlüssel, unter dem man sie sich merkt.
+  try { stamp = LANG + ':' + ((await fetchIndex(true)).revision || ''); } catch (_) {}
   if (!force && stamp && stamp === statsTopsFor && box.dataset.filled) return;
   let top;
-  try { top = await api('/api/stats/toplists'); }
+  try { top = await api('/api/stats/toplists?lang=' + encodeURIComponent(LANG)); }
   catch (err) {
     // **Ein Fehlschlag wird nicht gemerkt** — sonst gälte die leere Ansicht als
     // „für diesen Stand schon geladen" (dieselbe Umkehrung der Endlos-Falle wie
@@ -11286,7 +11291,11 @@ function worldShade(count) {
 async function loadWorld() {
   let data;
   try {
-    data = await api('/api/world');
+    // F10: Die Sprache geht ausdrücklich mit. Länder- und Kontinentnamen
+    // kommen aus den Stammdaten des Servers, und der Sprachknopf schickt die
+    // neue Sprache erst NACH dem Neuzeichnen ins Konto — ohne diese Angabe
+    // käme der Reiter in der alten Sprache zurück (`geocode.display_lang`).
+    data = await api('/api/world?lang=' + encodeURIComponent(LANG));
   } catch (e) { return; }
 
   const pct = data.countries_total ? Math.round(data.countries_visited / data.countries_total * 100) : 0;

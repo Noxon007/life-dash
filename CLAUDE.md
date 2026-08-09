@@ -263,12 +263,21 @@ die Punkte 1 und 2):
   mehr ist.
 
 **Rückmeldung 2026-08-05, zweiter Satz (Anmerkungen 195–198) ist erledigt** —
-Statistik-Layout, Fotos am Tag, Wohnort-Umkreis, EIN Name je Land. Offen blieb
-daraus bewusst **eine** Sache: der **Welt-Reiter ist deutsch verdrahtet**
-(`world.py` nimmt `name_de`, die Kontinent-Namen kommen als deutscher Text aus
-`data/countries.py` und haben im Frontend keinen Katalog-Eintrag). Beide
-Hälften gehören zusammen umgestellt; eine allein ergäbe einen halb übersetzten
-Reiter. Das ist F10-Arbeit, kein Rest von Anmerkung 198.
+Statistik-Layout, Fotos am Tag, Wohnort-Umkreis, EIN Name je Land. Der letzte
+Rest daraus, der **deutsch verdrahtete Welt-Reiter**, ist mit **Anmerkung 202**
+geschlossen.
+
+**Serverseitig benannte Ansichten (Anmerkung 202).** Welt-Reiter und
+Ranglisten heißen, wie der SERVER sie nennt — Länder- und Kontinentnamen sind
+Stammdaten (`data/countries.py`, `name_de`/`name_en`/`CONTINENTS_EN`) und
+können nicht in `I18N_EN`. Zwei Regeln dazu, beide teuer erkauft:
+- **Die Anfrage NENNT die Sprache** (`?lang=`), sie liest sie nicht aus dem
+  Konto. Der Sprachknopf zeichnet neu und schickt die Sprache erst DANACH ins
+  Konto — ein `lang_for(user)` auf der Leseseite antwortet mit der alten.
+  `geocode.display_lang(requested, user)` hält die Regel an EINER Stelle:
+  Wunsch, sonst Konto. Läufe ohne Aufrufer (Ortsnamen) bleiben bei `lang_for`.
+- **Die Sprache gehört in jede Merkzelle**, die eine solche Antwort behält
+  (`statsTopsFor`). Ein Sprachwechsel ändert den Bestandsstempel nicht.
 
 **Sicherheits-Durchsicht 2026-08-07 (Anmerkung 200): drei Reparaturen drin,
 zehn Punkte bewusst offen.** Repariert: Anmelde-Cookies über EINE Stelle

@@ -8,8 +8,9 @@ Schlüssel, den `frontend/world-countries.geojson` je Fläche trägt.
 from __future__ import annotations
 
 from datetime import datetime, time
+from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
@@ -17,13 +18,14 @@ from app.data import countries as ref
 from app.database import get_db
 from app.models import ConfirmState, Entity, Event, EventEntityLink, Metric, Source, User
 from app.schemas import ContinentProgress, VisitedCountry, WorldRead
-from app.services import baseline
+from app.services import baseline, geocode
 
 router = APIRouter(prefix="/api", tags=["Welt"])
 
 
 @router.get("/world", response_model=WorldRead)
 def world(
+    lang: Annotated[str | None, Query()] = None,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> WorldRead:
@@ -32,7 +34,14 @@ def world(
     Gezählt werden nur Länder aus der **Lebensdatenbank**: die country-Entity
     muss bestätigt sein oder an mindestens einem bestätigten Event hängen.
     Vorschläge färben die Weltkarte also nicht ein.
+
+    **Jeder Name in der Antwort ist Anzeige, nicht Bestand** (F10): Länder wie
+    Kontinente kommen aus den Stammdaten und tragen die Sprache der Oberfläche.
+    Nur `unmatched` behält, was gespeichert steht — das ist die Schreibweise,
+    die der Nutzer im Kompendium korrigieren soll, und übersetzen ließe sie
+    sich ohnehin nicht: sie ist ja gerade die, die niemand zuordnen konnte.
     """
+    lang = geocode.display_lang(lang, user)
     rows = (
         db.query(Entity, Event)
         .outerjoin(EventEntityLink, EventEntityLink.entity_id == Entity.id)
@@ -139,7 +148,7 @@ def world(
         temps = [t for eid in slot["event_ids"] if (t := temp_by_event.get(eid)) is not None]
         return VisitedCountry(
             iso=country.iso,
-            name=country.name_de,
+            name=ref.name_in(country, lang),
             continent=country.continent,
             event_count=slot["event_count"],
             day_count=len(slot["days"]),
@@ -149,19 +158,20 @@ def world(
         )
 
     visited = {iso: to_read(slot) for iso, slot in agg.items()}
-    per_continent = ref.by_continent()
+    per_continent = ref.by_continent(lang)
 
     continents: list[ContinentProgress] = []
-    for code, label in ref.CONTINENTS.items():
+    for code in ref.CONTINENTS:
         here = [visited[c.iso] for c in per_continent[code] if c.iso in visited]
         here.sort(key=lambda c: c.name)
         continents.append(ContinentProgress(
             code=code,
-            label=label,
+            label=ref.continent_name(code, lang),
             total=len(per_continent[code]),
             visited=len(here),
             countries=here,
-            missing=[c.name_de for c in per_continent[code] if c.iso not in visited],
+            missing=[ref.name_in(c, lang)
+                     for c in per_continent[code] if c.iso not in visited],
         ))
 
     # „Zuletzt neu besucht": nach dem ERSTEN Besuch sortiert — ein Land, das man

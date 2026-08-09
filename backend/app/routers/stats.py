@@ -1,7 +1,9 @@
 """P3.1 — Statistik-Widgets (deklarativ aus den Modul-YAMLs)."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
@@ -28,7 +30,8 @@ def overview(db: Session = Depends(get_db),
 
 
 @router.get("/toplists")
-def toplists(db: Session = Depends(get_db),
+def toplists(lang: Annotated[str | None, Query()] = None,
+             db: Session = Depends(get_db),
              user: User = Depends(get_current_user)) -> dict:
     """Anmerkung 156: die Ranglisten der dritten Statistik-Ansicht.
 
@@ -39,9 +42,10 @@ def toplists(db: Session = Depends(get_db),
 
     Die Sprache geht mit (Anmerkung 198): sie entscheidet, wie ein Land HEISST
     — dieselbe Angabe, mit der auch das Geocoding fragt, damit ein Ort und die
-    Rangliste über ihn nicht in zwei Sprachen antworten.
+    Rangliste über ihn nicht in zwei Sprachen antworten. Der Aufrufer darf sie
+    ausdrücklich nennen; warum das nötig ist, steht in `geocode.display_lang`.
     """
-    return compute_toplists(db, user.id, lang=geocode.lang_for(user))
+    return compute_toplists(db, user.id, lang=geocode.display_lang(lang, user))
 
 
 @router.get("/tracks")

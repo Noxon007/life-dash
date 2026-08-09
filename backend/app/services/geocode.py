@@ -49,6 +49,28 @@ def lang_for(user) -> str:
     return lang if lang in ACCEPT_LANGUAGE_BY_LANG else DEFAULT_LANG
 
 
+def display_lang(requested: str | None, user) -> str:
+    """Die Sprache der ANZEIGE: was der Aufrufer verlangt, sonst das Konto.
+
+    **Warum die Anzeige nicht am gespeicherten Konto hängen darf.** Der
+    Sprachknopf schaltet die Oberfläche sofort um und schickt die neue Sprache
+    ERST DANACH ins Konto (`PATCH /auth/me/settings`, absichtlich ohne
+    `await` — scheitert er, soll die Oberfläche trotzdem umgeschaltet sein).
+    `redrawForLang()` holt die serverseitig benannten Ansichten aber im selben
+    Atemzug neu, also bevor der PATCH ankommt: Welt-Reiter und Ranglisten kämen
+    in der ALTEN Sprache zurück und blieben bis zum nächsten Neuladen so
+    stehen. Ein halb umgeschalteter Reiter sieht nicht wie eine Lücke aus,
+    sondern wie ein Fehler (Anmerkung 114).
+
+    Der Lauf im Hintergrund (Ortsnamen auflösen) hat keinen Aufrufer, der
+    fragen könnte, und bleibt bei `lang_for` — deshalb ist der Wunsch optional
+    und nicht Pflicht.
+    """
+    if requested in ACCEPT_LANGUAGE_BY_LANG:
+        return requested
+    return lang_for(user)
+
+
 def _name_keys(lang: str | None = None) -> tuple[str, ...]:
     """Reihenfolge der namedetails-Schlüssel für die gewünschte Sprache."""
     primary = lang if lang in ACCEPT_LANGUAGE_BY_LANG else DEFAULT_LANG
