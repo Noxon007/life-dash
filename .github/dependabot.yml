@@ -1,0 +1,49 @@
+# Anmerkung 210 (R1d): Aktualisierungen kommen als Pull Request herein, nicht
+# als Erinnerung, die niemand hat.
+#
+# **Warum wöchentlich und nicht täglich.** Dies ist ein Projekt mit einem
+# Autor. Ein tägliches Bündel offener Pull Requests wird nach zwei Wochen nicht
+# mehr gelesen, und ein Wächter, den niemand liest, ist keiner — dieselbe
+# Begründung, aus der die Warnungen in dieser Runde zu Abbrüchen geworden sind.
+#
+# **Warum gruppiert.** Fünf einzelne Pull Requests für fünf Python-Pakete sind
+# fünfmal dieselbe Entscheidung. Was getrennt bleibt, sind die
+# Sicherheitsaktualisierungen: die will man einzeln sehen und sofort.
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      python-minor:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  # Das Basis-Image steht am Digest (siehe Dockerfile). Ohne diesen Eintrag
+  # wäre der Digest eine Konserve: festgenagelt und nie wieder angehoben, also
+  # schlechter als der wandernde Tag, den er ersetzt hat.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "chore(deps)"
+
+  # Die Actions in .github/workflows sind auch Fremdcode, und sie laufen mit
+  # Schreibrechten auf die Container-Registry.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(deps)"

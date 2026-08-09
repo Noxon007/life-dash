@@ -850,6 +850,21 @@ any `MINOR`.
   failed first one.
 
 ### Security
+- **The container no longer runs as root.** It starts as root only long enough
+  to hand your `data` and `media` folders to an unprivileged user, then drops
+  to it before the application starts. Existing installations need nothing;
+  your backup now has to be read as root, because the files belong to user
+  10001. If your data sits on a network share where that handover cannot work,
+  the log says so and names the one command to run.
+- **The base image is pinned to an exact build**, not to a tag that quietly
+  points somewhere new each week, and a weekly dependency check now opens pull
+  requests instead of relying on someone remembering.
+- **`FORWARDED_ALLOW_IPS` can be set** to name your reverse proxy instead of
+  believing forwarded headers from anyone. The default is unchanged, because a
+  wrong value here makes the app think it is running unencrypted — the reasons
+  for and against are in `docs/DEPLOY.md`.
+- **`SECURITY.md`** says how to report a vulnerability privately, and lists what
+  is known and deliberate so nobody spends an evening on it.
 - **You can sign out everywhere.** Settings → Sessions ends every running
   session of your account, on every device, including the one you are looking
   at. Until now a sign-in simply lasted up to 30 days and nothing could end it

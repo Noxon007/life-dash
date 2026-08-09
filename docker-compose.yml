@@ -84,6 +84,13 @@ services:
       # --- DB: PostgreSQL (Default) — SQLite via DATABASE_URL-Override ---
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://lifedash:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD in .env setzen}@db:5432/lifedash}
       SEED_DEMO: ${SEED_DEMO:-false}
+      # Anmerkung 209: Für WEN ein Bearer-Token gelten muss. Leer = die eigene
+      # Client-ID; nur bei Providern nötig, die auf eine Ressource ausstellen.
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:-}
+      # Anmerkung 210: Von welchen Absendern X-Forwarded-* geglaubt wird.
+      # Vorgabe `*` — die Adresse des Proxys ist im Docker-Netz nicht fest.
+      # Wer sie kennt, trägt sie ein; siehe docs/DEPLOY.md, Kap. 4.
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
     depends_on:
       db:
         condition: service_healthy

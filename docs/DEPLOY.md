@@ -194,6 +194,21 @@ SESSION_SECRET=<python -c "import secrets; print(secrets.token_urlsafe(48))">
 POSTGRES_PASSWORD=<your own DB password — PostgreSQL is the default>
 ```
 
+> **The container does not run as root** (since 2026-08-09). It starts as root
+> just long enough to hand `./data` and `./media` to user **10001**, then drops
+> to that user before the application starts. Two consequences:
+>
+> * **Existing installations:** nothing to do — the handover happens on every
+>   start. If your data lives on a network share where `chown` does not work,
+>   the log says so and you have to do it on the host once:
+>   `chown -R 10001:10001 ./data ./media`.
+> * **Backups:** the files now belong to 10001, so read them as root
+>   (`sudo tar …`), the same way the PostgreSQL directory already had to be
+>   read.
+>
+> Setting `user:` in `docker-compose.yml` yourself skips the handover entirely
+> — an explicit choice by the operator wins over the convenience.
+
 That is enough to run the app — the AI stays in `mock` mode (rule-based, no key
 needed). For real AI analysis, add an OpenAI-compatible endpoint, for example:
 
@@ -229,6 +244,17 @@ whatever you run. All it needs is:
 - **HTTPS** for the public domain.
 - **Forwarded proxy headers** (`X-Forwarded-Proto`, `X-Forwarded-For`):
   uvicorn runs with `--proxy-headers` so scheme and client IP are correct.
+
+> **`FORWARDED_ALLOW_IPS` — worth two minutes.** By default Life-Dash believes
+> `X-Forwarded-*` from **any** sender, because a proxy in a Docker network has
+> no fixed address and a wrong value shows up as an app that thinks it is
+> running unencrypted — a silent failure, which is the worse one. The cost of
+> the default: anyone who can reach the app port directly can claim any client
+> IP, which is what the failed-login lockout counts against and what your logs
+> record. If your proxy has a stable address, name it:
+> `FORWARDED_ALLOW_IPS=172.18.0.5` (or the network, `172.18.0.0/16`). Publish
+> the port only to the proxy — `LIFEDASH_PORT` bound to `127.0.0.1` or an
+> internal Docker network — and this stops mattering either way.
 
 Two pitfalls:
 
