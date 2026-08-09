@@ -50,16 +50,26 @@ blocks another except where stated.
 
 ### R1 — ready for publication · L
 
-The gate before any promotion. **Part a is built** (note 203); six left, in order:
+The gate before any promotion. **Part a is built** (note 203); five left, in order:
 
 | | Part | Why it is in the gate |
 |---|---|---|
 | **b** | **Screenshots and a short GIF in the README**, plus the “why not X” comparison | The one thing a stranger looks at before deciding to install. |
 | **c** | **A genuine one-command start** — `docker compose up` against versioned ghcr images instead of a local build | “Ten minutes from zero to a populated instance” is the 1.0 promise; a build step breaks it. |
-| **d** | **Hardening** — `AUTH_MODE=dev` impossible to start accidentally in a production-shaped environment · no secrets in logs · pinned base images · Dependabot · `SECURITY.md` | The dev mode is the sharpest edge currently shipped. |
+| **d** | **Hardening** — `AUTH_MODE=dev` impossible to start accidentally in a production-shaped environment · no secrets in logs · security headers and a CSP · pinned base images · Dependabot · `SECURITY.md` | The dev mode is the sharpest edge currently shipped. |
 | **e** | **Project files** — `CONTRIBUTING.md` stating this is a single-author project not currently accepting pull requests · issue templates · questions to Discussions · a short “what this project deliberately does not do” | Says no once, in writing, instead of once per stranger. |
-| **f** | **A tested upgrade path** from an older database | Migrations become promises the moment strangers run this. Until then they are only convenient. |
 | **g** | A discreet **donation link** in the README — deliberately **not** in the app interface, and deliberately not before there is something worth funding | |
+
+> **Part f — a tested upgrade path from an older database — was struck on
+> 2026-08-09**, by the one person it protected. There is exactly one instance
+> in the world, its owner treats the whole 0.x line as a test phase, and he
+> will start from empty rather than carry anything across. The gate kept a
+> promise nobody had made: after 1.0 semantic versioning applies and migrations
+> become promises to strangers, but **the first stranger installs 1.0 and has
+> nothing to upgrade from**. Testing a path from a database that will not exist
+> is work whose result cannot be observed. `migrate.py` keeps doing what it
+> does; what is gone is the obligation to prove it against a 0.x dump before
+> publication.
 
 ### R2 — a documentation site · M
 
@@ -182,9 +192,10 @@ render it.
 ## 5. Release plan
 
 **What 1.0 means here.** Not “feature complete” — a *promise*: the data model
-is stable, the upgrade path from an older database is tested, semantic
-versioning applies from then on, and a stranger goes from zero to a populated,
-working instance in ten minutes. 1.0 is therefore the **publication version**;
+is stable, semantic versioning applies **from then on**, and a stranger goes
+from zero to a populated, working instance in ten minutes. The promise starts
+at 1.0 and points forward: nothing is promised about upgrading *into* it, which
+is why the tested 0.x upgrade path was struck (see R1 above). 1.0 is therefore the **publication version**;
 everything that does not serve that promise is pushed to 1.x on purpose.
 
 **Ordering principle:** features first, while the data model is still cheap to
@@ -196,7 +207,7 @@ rebuilt every release.
 | Version | Theme | Contains |
 |---|---|---|
 | **0.40.0** | **The last 0.x — whatever daily use turns up, plus the demo mode** | **The demo dataset (R1a) is built** (note 203): thirty-two invented years — five places lived in, twenty-nine trips across six continents, concerts, sightings, journal entries, imported paths, weather for every day and a collection that is deliberately not maxed out, behind one flag and without a network call. No planned feature content beyond it. Everything else that has gathered on `main` since 0.39.0 rides along. This is the release that unblocks everything public — and the only 0.x a stranger will ever see. |
-| **1.0.0** | **Publication** — three stages on `main`, one tag | **(i) Hardening and operations** (R1c/d/f): `AUTH_MODE=dev` unstartable in a production-shaped environment · no secrets in logs · pinned base images · Dependabot · `SECURITY.md` · versioned ghcr images and a genuine `docker compose up` · the upgrade path from 0.40 tested end to end · backup and restore documented, media folder included. **(ii) Project surface** (R1b/e/g and R2): README with screenshots and a GIF · the documentation site · the comparison table · `CONTRIBUTING.md` · issue templates · “what this project deliberately does not do” · the donation link. **(iii) Freeze and fresh-install pass**: no new features — walk the stranger's path from an empty machine, fix what it turns up, verify every `.env.example` key is real and every documented command works. |
+| **1.0.0** | **Publication** — three stages on `main`, one tag | **(i) Hardening and operations** (R1c/d): `AUTH_MODE=dev` unstartable in a production-shaped environment · no secrets in logs · security headers and a CSP, with the map libraries served by this instance rather than a CDN · pinned base images · Dependabot · `SECURITY.md` · versioned ghcr images and a genuine `docker compose up` · backup and restore documented, media folder included. **(ii) Project surface** (R1b/e/g and R2): README with screenshots and a GIF · the documentation site · the comparison table · `CONTRIBUTING.md` · issue templates · “what this project deliberately does not do” · the donation link. **(iii) Freeze and fresh-install pass**: no new features — walk the stranger's path from an empty machine, fix what it turns up, verify every `.env.example` key is real and every documented command works. |
 
 None of the three 1.0 stages gets a version of its own: a user notices none of
 them on upgrade. Then promotion, in order: selfh.st → r/selfhosted →
@@ -211,8 +222,10 @@ Forty-nine tags exist across 154 commits, starting at `v0.1` — the result of
 building before the two-track model existed, when a SemVer tag was the only way
 to get an image onto one's own server. **Before the repository is published,
 the old tags, GitHub releases and ghcr image versions are deleted.** None of
-them is installable: the tested upgrade path is R1(f) and does not exist yet,
-so an old image leads to a database that goes nowhere.
+them is installable: no upgrade path out of a 0.x database was ever tested, and
+since R1(f) was struck none ever will be, so an old image leads to a database
+that goes nowhere. **Striking R1(f) makes deleting the tags more necessary, not
+less** — an image nobody can leave is one nobody should be able to enter.
 
 What survives the cut is the record, which was never the tags: the reasoning in
 [`DECISIONS.md`](DECISIONS.md), the release-by-release account in its

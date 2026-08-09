@@ -863,6 +863,16 @@ any `MINOR`.
   gone (see above), it had nothing left to do.
 - **The “Go to the timeline” tile on the Today page.** It was a navigation
   shortcut dressed up as a statistic; the bottom navigation already goes there.
+- **The “🧭 Vector map” background map, and its settings block.** It was the one
+  map option that did nothing until you had first copied a style URL out of
+  another program's admin settings, and it brought its own troubles: a slow
+  first paint when the map switched to week or month, missing icons in
+  third-party styles, and a dependency on WebGL that older devices do not
+  offer. The three built-in maps — OpenStreetMap, topography, satellite — and
+  **🔧 Custom map** for your own tile server are unchanged. If you had chosen
+  the vector map, your maps quietly fall back to the standard one; the style
+  URL was only ever stored on your device and needs no cleaning up. Two of the
+  four map libraries the page loads disappear with it.
 
 ## [0.39.0] – 2026-07-23
 

@@ -258,11 +258,11 @@ Regeln, die beim Ändern zählen:
 erledigt, die zweite Rückmeldung mit elf Punkten vollständig, aus der dritten
 die Punkte 1 und 2):
 
-- Der **LCP-Wert der Vektorkarte** (>4,9 s beim Wechsel auf Woche/Monat) ist
-  NICHT behoben — nur der `styleimagemissing`-Fehler daneben. Der Moduswechsel
-  baut die Basisebene nicht neu, eine offensichtliche Ursache steht nicht im
-  Code; es fehlt eine Messung im Browser des Users (welches Element markiert das
-  Performance-Panel als LCP?).
+- Der **LCP-Wert der Vektorkarte** ist mit der Vektorkarte selbst erledigt:
+  **A48 ist zurückgezogen** (Anmerkung 206, Ansage des Users „macht zu viel
+  Ärger"). Weg sind MapLibre, die Leaflet-Brücke, der Einstellungsblock, zwölf
+  Katalogschlüssel und `check-vector-basemap.js`. Nicht behoben, sondern
+  entfernt — die Frage wird nicht wieder aufgemacht.
 - **Zeitstrahl im Tages-Zoom**: jede nachgeladene Seite baut die GANZE Liste neu
   — gemessen 26 ms bei 300 Karten, 172 ms bei 1.800, also mit jeder Seite mehr
   (`node tools/measure-timeline.js`). Anmerkung 179 hat den gemeldeten Fall

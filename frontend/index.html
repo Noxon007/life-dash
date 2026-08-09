@@ -20,7 +20,6 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
-<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" />
 <style>
   :root {
     --bg: #0f1420;
@@ -2648,35 +2647,6 @@
               <div style="margin-top:8px"><button class="btn small secondary" id="tile-save" data-i18n="adm.basemap.save">Speichern</button></div>
             </div>
           </div>
-          <!-- A48: Vektorkarte. Eigene Zeile, weil es etwas anderes ist als
-               eine Kachel-URL: kein Bildraster, sondern ein Stil, den der
-               Browser selbst zeichnet. -->
-          <div class="action-row">
-            <div class="action-key"><b style="font-size:13px" data-i18n="adm.vector.own">🧭 Vektorkarte</b></div>
-            <div class="action-desc">
-              <span data-i18n="adm.vector.desc">Moderne Kartendienste liefern keine Bildkacheln mehr, sondern einen
-              <b>Stil</b> (MapLibre/Mapbox, Spezifikation Version 8) — der Browser zeichnet die Karte selbst, sie
-              bleibt bei jeder Zoomstufe scharf und die Beschriftungen sind lesbar. Trag eine Stil-URL ein, dann
-              erscheint „🧭 Vektorkarte" auf jeder Karte.</span><br>
-              <input type="text" id="vector-url" class="mf-select" style="width:100%; max-width:520px; margin:8px 0 6px"
-                     placeholder="https://example.org/style.json"><br>
-              <input type="text" id="vector-attr" class="mf-select" style="width:100%; max-width:520px"
-                     data-i18n-ph="adm.basemap.attr.ph" placeholder="Attribution, z. B. © Mein Kartenanbieter"><br>
-              <span class="hint" style="display:block; margin-top:8px" data-i18n="adm.vector.note"><b>Wo finde ich eine Stil-URL?</b>
-              Immich nutzt eine — sie steht in Immich unter <i>Administration → Einstellungen → Karte &amp; GPS</i>
-              (Felder „Light Style" / „Dark Style"); dort lässt sie sich kopieren. Ebenso funktionieren eigene
-              Kachelserver und Anbieter mit Schlüssel. Es steht hier bewusst kein Anbieter voreingestellt:
-              welche Karte deine Daten sieht, entscheidest du.<br>
-              Die Attribution verlangt fast jede Quelle in ihren Nutzungsbedingungen. Beide Angaben bleiben
-              auf diesem Gerät.</span>
-              <div id="vector-state" class="hint" style="display:none; margin-top:8px"></div>
-              <!-- Anmerkung 149: Welche Symbole der Stil verlangt, ohne sie
-                   mitzubringen. Steht hier und nicht nur in der Konsole — wer
-                   diese Instanz betreibt, sieht die Konsole nie. -->
-              <div id="vec-missing" class="hint" style="display:none; margin-top:6px"></div>
-              <div style="margin-top:8px"><button class="btn small secondary" id="vector-save" data-i18n="adm.basemap.save">Speichern</button></div>
-            </div>
-          </div>
           <!-- A40 (Anm. 92): Aus der Kartenansicht in die Einstellungen — es
                ist ein Schutzwert, keine Vorliebe. Anmerkung 115: und zwar zu
                den KARTEN-Einstellungen; unter „Ortsnamen" stand er nur, weil
@@ -2914,19 +2884,12 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-<!-- A48: Vektorkarten. Immich und die meisten modernen Kartendienste liefern
-     keine Bildkacheln mehr, sondern einen MapLibre-Stil (Spezifikation
-     Version 8) — Leaflet allein kann den nicht zeichnen. Die Brücke macht
-     daraus eine gewöhnliche Leaflet-Ebene, alle Marker- und Linien-Ebenen
-     darüber bleiben unberührt.
-
-     Vom CDN wie Leaflet selbst und markercluster: an der Offline-Lage ändert
-     das nichts, denn ohne Netz gibt es ohnehin keine Kacheln. Versionen fest
-     angeheftet, aus demselben Grund wie dort. Die Brücke 0.1.3 nennt
-     maplibre-gl `^2 || ^3 || ^4 || ^5` als verträglich — deshalb 5.x und
-     nicht das neuere 6.x. -->
-<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
-<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.3/leaflet-maplibre-gl.js"></script>
+<!-- Anmerkung 206: Die Vektorkarte (A48) ist ERSATZLOS weg — mit ihr MapLibre
+     und die Leaflet-Brücke. Sie hat mehr Ärger gemacht als Nutzen gebracht
+     (ein LCP über fünf Sekunden beim Moduswechsel, fehlende Sprite-Symbole,
+     WebGL-Abhängigkeit), und sie war die einzige Kartenwahl, die ohne
+     Zutun des Betreibers gar nicht erst funktionierte. Die drei Kachelkarten
+     und „🔧 Eigene Karte" bleiben. -->
 <script>
 // ========================================================================
 //  Life-Dash Frontend — responsive PWA, same-origin an das Backend gebunden
@@ -3829,18 +3792,7 @@ const I18N_EN = {
   'adm.basemap.attr.ph': "Attribution, e.g. © My map provider",
   'adm.basemap.note': "The attribution is not decoration: nearly every tile source requires it in its terms of use. Both entries stay on this device.",
   'adm.basemap.save': "Save",
-  // A48 — vector map
-  'bm.vector': "🧭 Vector map",
-  'adm.vector.own': "🧭 Vector map",
-  'adm.vector.desc': "Modern map services no longer serve image tiles but a <b>style</b> (MapLibre/Mapbox, specification version 8) — the browser draws the map itself, it stays sharp at every zoom level and the labels remain readable. Enter a style URL and “🧭 Vector map” appears on every map.",
-  'adm.vector.note': "<b>Where do I find a style URL?</b> Immich uses one — it sits in Immich under <i>Administration → Settings → Map &amp; GPS</i> (the “Light Style” / “Dark Style” fields) and can be copied from there. Your own tile servers and providers with a key work just as well. Deliberately no provider is preset here: which map gets to see your data is your decision.<br>Nearly every source requires the attribution in its terms of use. Both entries stay on this device.",
-  'adm.vector.ok': "Style stored — “🧭 Vector map” is available in the top right of every map.",
-  'bm.vector.nostyle': "No style URL is stored for “Vector map”.",
-  'bm.vector.nogl': "Vector maps need WebGL — this browser or device does not offer it.",
   'bm.custom.nourl': "No tile URL is stored for “Custom map”.",
-  'toast.vectorbad': "The style URL has to start with http:// or https://.",
-  'toast.vectorsaved': "✓ Vector map saved — selectable in the top right of the map.",
-  'toast.vectorcleared': "✓ Vector map removed.",
   'toast.tilebad': "The tile URL needs the placeholders {z}, {x} and {y}.",
   'toast.tilesaved': "✓ Custom map saved — selectable in the top right of any map.",
   'toast.tilecleared': "✓ Custom map removed.",
@@ -4315,7 +4267,6 @@ const I18N_EN = {
   'tlimp.unnamed': "{n} places still have no real name — run „Resolve place names“ below.",
   'tlimp.resolved': "{n} place names resolved directly.",
   // Anmerkung 148 — die offenen Orte
-  'bm.vector.noimg': "Note: this style asks for icons its sprite does not contain ({n}). The map works; only the icon is missing in those spots.",
   'op.show': "📋 Show open places", 'op.show.n': "{n} open places",
   'op.desc': "<b>What the run could not name</b> — with coordinates and reason. Not every point on earth is in OpenStreetMap: a forest hut, a field track, a plot without an address stay open no matter how often you ask. You can set the name <b>by hand</b> here; such a name is never overwritten by a run.",
   'op.r.nohit': "OpenStreetMap has nothing here",
@@ -4498,37 +4449,7 @@ const BASEMAPS = {
     attribution: () => localStorage.getItem('lifedash_tileattr') || '',
     maxZoom: 19,
   },
-  // A48: eine VEKTORkarte. Sie hat keine Kachel-URL, sondern einen Stil —
-  // deshalb `style` statt `url`, und deshalb ein eigener Zeichenweg in
-  // `makeBaseLayer()`. Kein Anbieter steht hier (A27): wer Immichs Stil will,
-  // trägt ihn ein, wer einen eigenen Kachelserver hat, ebenso.
-  vector: {
-    de: '🧭 Vektorkarte', key: 'bm.vector', vector: true,
-    style: () => localStorage.getItem('lifedash_vectorstyle') || '',
-    // `url` gibt es trotzdem — jeder Aufrufer, der eine Kachel-URL erwartet,
-    // bekäme sonst `undefined()` an den Kopf. Leer heißt „diese Ebene fragt
-    // nicht nach Kacheln".
-    url: () => '',
-    attribution: () => localStorage.getItem('lifedash_vectorattr') || '',
-    maxZoom: 20,
-  },
 };
-// A48: Kann dieser Browser überhaupt Vektorkarten? Zwei Bedingungen, und
-// beide können fehlen, ohne dass etwas kaputt AUSSIEHT: die Bibliothek kommt
-// vom CDN (offline nicht da), und WebGL ist auf älteren Geräten und in
-// abgesicherten Umgebungen abgeschaltet. Ohne diese Prüfung bliebe die Karte
-// einfach grau — genau die Stille, die dieses Projekt jagt.
-let _webglOk = null;
-function vectorSupported() {
-  if (typeof L === 'undefined' || typeof L.maplibreGL !== 'function') return false;
-  if (_webglOk === null) {
-    try {
-      const c = document.createElement('canvas');
-      _webglOk = !!(c.getContext('webgl2') || c.getContext('webgl'));
-    } catch (_) { _webglOk = false; }
-  }
-  return _webglOk;
-}
 // Warum die gewählte Karte gerade NICHT geht — als Satz, nicht als Boolean.
 // Die Einstellungsseite zeigt ihn an; ein stiller Rückfall dort, wo jemand
 // gerade eine Wahl trifft, wäre der Defekt aus A40 in neuer Gestalt.
@@ -4537,10 +4458,6 @@ function basemapProblem(key) {
   if (!b) return null;
   if (key === 'custom' && !b.url())
     return t('bm.custom.nourl', 'Für „Eigene Karte" ist keine Kachel-URL hinterlegt.');
-  if (key === 'vector' && !b.style())
-    return t('bm.vector.nostyle', 'Für „Vektorkarte" ist keine Stil-URL hinterlegt.');
-  if (key === 'vector' && !vectorSupported())
-    return t('bm.vector.nogl', 'Vektorkarten brauchen WebGL — dieser Browser oder dieses Gerät bietet es nicht an.');
   return null;
 }
 function basemapSetting() {
@@ -4557,68 +4474,12 @@ function tileUrl() { return currentBasemap().url(); }
 // A48: Die EINE Stelle, an der eine Hintergrund-Ebene entsteht. Vorher gab es
 // den Aufruf zweimal (`addTiles` und `applyBasemap`) mit identischen
 // Argumenten — mit einem zweiten Zeichenweg wären daraus zwei Regeln geworden,
-// und die laufen still auseinander (Anmerkung 106).
+// und die laufen still auseinander (Anmerkung 106). Anmerkung 206: der zweite
+// Zeichenweg (MapLibre) ist wieder weg, die eine Stelle bleibt.
 function makeBaseLayer(cap) {
   const bm = currentBasemap();
-  const maxZoom = Math.min(bm.maxZoom, cap);
-  if (bm.vector) {
-    const layer = L.maplibreGL({ style: bm.style(), attribution: bm.attribution(),
-                                 maxZoom });
-    vectorWatchMissingImages(layer);
-    return layer;
-  }
-  return L.tileLayer(tileUrl(), { attribution: bm.attribution(), maxZoom });
-}
-
-// Anmerkung 149: Ein fremder Stil verlangt Symbole, die sein Sprite nicht
-// mitbringt — typisch `arrow` für Einbahnstraßen. MapLibre meldet das je
-// FEHLENDEM SYMBOL UND JE KACHEL: „Image "arrow" could not be loaded". Beim
-// Herumfahren werden daraus schnell hunderte Zeilen, die alle dasselbe sagen
-// und dabei jede echte Meldung aus der Konsole schieben.
-//
-// Die Antwort darauf ist nicht, den Fehler zu unterdrücken — sondern ihn
-// EINMAL zu sagen und dann zu beheben. Ein durchsichtiges 1×1-Bild an der
-// Stelle des fehlenden Symbols ist genau die Behebung, die MapLibre selbst
-// vorschlägt (`styleimagemissing`): die Ebene zeichnet sich fertig, nur ohne
-// das Pfeilchen. Der Stil ist unvollständig, nicht die Karte kaputt — und
-// welcher Stil welches Symbol vermisst, steht danach in EINER Zeile.
-const VECTOR_MISSING_IMAGES = new Set();
-function vectorWatchMissingImages(layer) {
-  // `getMaplibreMap()` gibt es erst, wenn die Ebene an einer Karte hängt —
-  // deshalb am Leaflet-Ereignis und nicht sofort.
-  layer.once('add', () => {
-    const gl = typeof layer.getMaplibreMap === 'function' ? layer.getMaplibreMap() : null;
-    if (!gl || typeof gl.on !== 'function') return;
-    gl.on('styleimagemissing', ev => {
-      const id = ev && ev.id;
-      if (!id || VECTOR_MISSING_IMAGES.has(id)) return;
-      VECTOR_MISSING_IMAGES.add(id);
-      console.warn(`Vektorkarte: Der Stil verlangt das Symbol „${id}", sein Sprite `
-        + 'enthält es nicht. Die Karte zeichnet an dieser Stelle nichts.');
-      vectorMissingNote();
-      try {
-        // 1×1 durchsichtig. `addImage` braucht rohe RGBA-Bytes — ein Bild zu
-        // laden wäre hier ein Netzabruf für ein Pixel, das niemand sieht.
-        if (!gl.hasImage(id)) {
-          gl.addImage(id, { width: 1, height: 1, data: new Uint8Array(4) });
-        }
-      } catch (err) { console.warn('Vektorkarte: Platzhalter abgelehnt', err); }
-    });
-  });
-}
-// Und dort sagen, wo jemand die Wahl trifft: die Stil-URL steht in den
-// Einstellungen, also gehört der Hinweis daneben. Ein Fehler, der nur in der
-// Entwicklerkonsole steht, ist für den Betreiber dieser Instanz kein Fehler,
-// den er je zu sehen bekommt.
-function vectorMissingNote() {
-  const el = document.getElementById('vec-missing');
-  if (!el) return;
-  const names = [...VECTOR_MISSING_IMAGES];
-  el.style.display = names.length ? '' : 'none';
-  el.textContent = t('bm.vector.noimg',
-    'Hinweis: Dieser Stil verlangt Symbole, die sein Sprite nicht enthält ({n}). '
-    + 'Die Karte funktioniert, an diesen Stellen fehlt nur das Symbol.')
-    .replace('{n}', names.join(', '));
+  return L.tileLayer(tileUrl(), { attribution: bm.attribution(),
+                                  maxZoom: Math.min(bm.maxZoom, cap) });
 }
 
 // Registrierte Karten: {map, cap} — `cap` deckelt den Zoom dort, wo die Karte
@@ -4637,10 +4498,7 @@ function applyBasemap() {
   MAP_TILES.forEach(e => {
     e.map.removeLayer(e.layer);
     e.layer = makeBaseLayer(e.cap).addTo(e.map);
-    // Eine Vektor-Ebene ist eine Leinwand, kein Kachelraster — `bringToBack`
-    // gibt es dort nicht, und ein Fehler hier ließe die Karte halb gezeichnet
-    // stehen.
-    if (typeof e.layer.bringToBack === 'function') e.layer.bringToBack();
+    e.layer.bringToBack();
   });
   document.querySelectorAll('.basemap-pick').forEach(s => s.value = basemapSetting());
 }
@@ -4653,7 +4511,7 @@ function addBasemapControl(map) {
     Object.entries(BASEMAPS).forEach(([k, b]) => {
       // Was gerade nicht gehen kann, steht nicht zur Wahl — die Begründung
       // steht in den Einstellungen, wo man sie beheben kann (A48).
-      if ((k === 'custom' || k === 'vector') && basemapProblem(k)) return;
+      if (k === 'custom' && basemapProblem(k)) return;
       const o = L.DomUtil.create('option', '', sel);
       o.value = k;
       o.textContent = t(b.key, b.de);
@@ -12962,7 +12820,6 @@ async function loadPlaceFormat() {
   // keiner Antwort, und die Kartenquelle liegt ohnehin nur lokal.
   step('Immich-Jahre', imsDefaultYears);
   loadTileSettings();
-  loadVectorSettings();   // A48
   loadOpenPlaces();       // Anmerkung 148
 }
 
@@ -13613,55 +13470,6 @@ document.getElementById('tile-save').addEventListener('click', () => {
   applyBasemap();
   toast(url ? t('toast.tilesaved', '✓ Eigene Karte gespeichert — oben rechts auf der Karte wählbar.')
             : t('toast.tilecleared', '✓ Eigene Karte entfernt.'));
-});
-// A48: Vektorkarte — dieselbe Bauart wie die Kachel-URL darüber, aber mit
-// einer zusätzlichen Auskunft: die Ebene kann auch dann nicht gehen, wenn die
-// URL stimmt (keine Bibliothek, kein WebGL). Wer hier eine Adresse einträgt
-// und auf der Karte nichts findet, soll den Grund HIER lesen — nicht raten.
-function loadVectorSettings() {
-  const url = document.getElementById('vector-url');
-  const attr = document.getElementById('vector-attr');
-  if (!url || !attr) return;
-  url.value = localStorage.getItem('lifedash_vectorstyle') || '';
-  attr.value = localStorage.getItem('lifedash_vectorattr') || '';
-  vectorState();
-}
-function vectorState() {
-  const box = document.getElementById('vector-state');
-  if (!box) return;
-  const style = localStorage.getItem('lifedash_vectorstyle') || '';
-  if (!style) { box.style.display = 'none'; box.textContent = ''; return; }
-  box.style.display = '';
-  box.textContent = vectorSupported()
-    ? '✓ ' + t('adm.vector.ok', 'Stil hinterlegt — „🧭 Vektorkarte" steht oben rechts auf jeder Karte zur Wahl.')
-    : '⚠️ ' + t('bm.vector.nogl', 'Vektorkarten brauchen WebGL — dieser Browser oder dieses Gerät bietet es nicht an.');
-  vectorMissingNote();   // Anmerkung 149
-}
-document.getElementById('vector-save')?.addEventListener('click', () => {
-  const url = document.getElementById('vector-url').value.trim();
-  const attr = document.getElementById('vector-attr').value.trim();
-  // Ein Stil ist ein JSON-Dokument, kein Kachelmuster — die Platzhalter-Prüfung
-  // von oben wäre hier schlicht falsch. Geprüft wird, was sich prüfen lässt:
-  // dass es überhaupt eine Adresse ist.
-  if (url && !/^https?:\/\//i.test(url)) {
-    toast(t('toast.vectorbad', 'Die Stil-URL muss mit http:// oder https:// beginnen.'), 'error');
-    return;
-  }
-  localStorage.setItem('lifedash_vectorstyle', url);
-  localStorage.setItem('lifedash_vectorattr', attr);
-  // Anmerkung 149: Ein anderer Stil hat andere Lücken. Die alte Liste stehen
-  // zu lassen hieße, dem neuen Stil einen Mangel anzuhängen, den er
-  // vielleicht gar nicht hat.
-  VECTOR_MISSING_IMAGES.clear();
-  MAP_TILES.forEach(e => {
-    const old = e.map.getContainer().querySelector('.basemap-ctl');
-    if (old) old.closest('.leaflet-control').remove();
-    addBasemapControl(e.map);
-  });
-  applyBasemap();
-  vectorState();
-  toast(url ? t('toast.vectorsaved', '✓ Vektorkarte gespeichert — oben rechts auf der Karte wählbar.')
-            : t('toast.vectorcleared', '✓ Vektorkarte entfernt.'));
 });
 // Onboarding-Modal (A15): Auswahl speichern
 document.getElementById('track-save').addEventListener('click', async () => {
