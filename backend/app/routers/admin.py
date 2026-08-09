@@ -63,6 +63,84 @@ def _clean(v: Any) -> Any:
     return str(v)
 
 
+# --------------------------------------------------------------------------- #
+#  Anmerkung 208: Geheimnisse in der Rohansicht
+# --------------------------------------------------------------------------- #
+# Der vierte offene Punkt aus Anmerkung 200: die Rohansicht gab
+# `users.password_hash` und den Immich-Schlüssel heraus — denselben Wert, den
+# `_settings_view` mit einer ausdrücklichen Begründung NICHT zurückgibt („ein
+# Schlüssel, der bei jedem Laden der Einstellungsseite durchs Netz geht, ist
+# einer, den man auch weglassen könnte"). Eine Regel, die an einer Stelle gilt
+# und an ihrer Zwillingsstelle nicht — das Muster, das die Anmerkungen 199, 200
+# und 201 alle drei gefunden haben.
+#
+# EINE Liste, von beiden Richtungen gelesen: das LESEN schwärzt, das SCHREIBEN
+# lehnt ab. Nur zu schwärzen wäre die halbe Antwort — wer einen Passwort-Hash
+# nicht sehen, ihn aber SETZEN darf, übernimmt jedes Konto der Instanz mit
+# einem Hash, den er selbst kennt.
+#
+# Die Liste nennt zwei Sorten, weil es zwei gibt: ganze Spalten, und Schlüssel
+# INNERHALB einer JSON-Spalte. Der Immich-Schlüssel ist die zweite Sorte — er
+# steht in `users.settings`, und eine Prüfung auf Spaltennamen hätte ihn nie
+# gefunden.
+SECRET_COLUMNS: dict[str, set[str]] = {
+    "users": {"password_hash"},
+}
+# (Tabelle, Spalte) -> Pfade in das JSON, deren Wert nicht herausgeht.
+SECRET_JSON_PATHS: dict[tuple[str, str], list[tuple[str, ...]]] = {
+    ("users", "settings"): [("immich", "api_key")],
+}
+REDACTED = "***"
+
+
+def _redact_json(value: Any, paths: list[tuple[str, ...]]) -> Any:
+    """Kopiert das JSON und ersetzt die genannten Pfade — ohne das Original
+    anzufassen: es hängt an einem lebenden ORM-Objekt."""
+    if not isinstance(value, dict):
+        return value
+    out = json.loads(json.dumps(value, ensure_ascii=False, default=str))
+    for path in paths:
+        node = out
+        for key in path[:-1]:
+            node = node.get(key) if isinstance(node, dict) else None
+            if node is None:
+                break
+        if isinstance(node, dict) and node.get(path[-1]) not in (None, ""):
+            node[path[-1]] = REDACTED
+    return out
+
+
+def redact_row(table: str, row: dict[str, Any]) -> dict[str, Any]:
+    """Die Leseseite der Liste."""
+    secret_cols = SECRET_COLUMNS.get(table, set())
+    out: dict[str, Any] = {}
+    for col, value in row.items():
+        if col in secret_cols:
+            out[col] = REDACTED if value not in (None, "") else value
+        elif (table, col) in SECRET_JSON_PATHS:
+            out[col] = _clean(_redact_json(value, SECRET_JSON_PATHS[(table, col)]))
+        else:
+            out[col] = _clean(value)
+    return out
+
+
+def reject_secret_writes(table: str, columns: set[str]) -> None:
+    """Die Schreibseite derselben Liste.
+
+    JSON-Spalten sind hier ganz gesperrt statt pfadgenau: wer `settings`
+    schreibt, schickt das ganze Dokument, und ein geschwärztes `***` würde als
+    neuer Schlüssel zurückgeschrieben. Der richtige Weg steht in der Meldung.
+    """
+    blocked = sorted((columns & SECRET_COLUMNS.get(table, set()))
+                     | {c for c in columns if (table, c) in SECRET_JSON_PATHS})
+    if blocked:
+        raise HTTPException(
+            400,
+            f"{', '.join(blocked)}: Geheimnisse werden über die Rohansicht weder "
+            "gelesen noch geschrieben. Passwörter ändert der Nutzer selbst "
+            "(Konto → Passwort), den Immich-Schlüssel die Einstellungsseite.")
+
+
 @router.get("/tables")
 def list_tables(db: Session = Depends(get_db)) -> list[dict]:
     """Alle Tabellen mit Zeilenanzahl."""
@@ -89,7 +167,7 @@ def read_table(
         "total": total,
         "limit": limit,
         "offset": offset,
-        "rows": [{k: _clean(v) for k, v in dict(r).items()} for r in rows],
+        "rows": [redact_row(name, dict(r)) for r in rows],
     }
 
 
@@ -169,6 +247,7 @@ def update_row(
     if "id" not in table.columns:
         raise HTTPException(status_code=400, detail="Tabelle hat keine id-Spalte")
 
+    reject_secret_writes(name, {c for c in values if c in table.columns})
     updates = {
         col: _coerce_value(name, table.columns[col], v)
         for col, v in values.items() if col in table.columns and col != "id"
@@ -192,7 +271,7 @@ def update_row(
     row = db.execute(select(table).where(table.c.id == row_id)).mappings().first()
     return {"updated": True,
             "side_effects": side_effects,
-            "row": {k: _clean(v) for k, v in dict(row).items()}}
+            "row": redact_row(name, dict(row))}
 
 
 # Lösch-Leitplanken (A4): Diese Tabellen sind über die Rohansicht gesperrt —

@@ -3033,6 +3033,14 @@ function showBanner(msg) {
     document.querySelector('.main').prepend(b);
   }
   b.innerHTML = msg;
+  // Anmerkung 208: Der Banner ist die EINZIGE Stelle, die einen Knopf im
+  // Meldungstext mitschickt. Als `onclick=""` im Markup wäre das ab jetzt ein
+  // toter Link: die CSP nennt Hashes für die beiden Skriptblöcke, und sobald
+  // ein Hash dasteht, verwirft der Browser JEDEN Inline-Handler. Ein Attribut,
+  // das der Browser stillschweigend ignoriert, ist genau die Sorte Defekt, die
+  // dieses Projekt teuer bezahlt — hier hängt der Handler am Element.
+  b.querySelectorAll('[data-reload]').forEach(a =>
+    a.addEventListener('click', ev => { ev.preventDefault(); location.reload(); }));
 }
 function clearBanner() {
   const b = document.getElementById('conn-banner');
@@ -11721,7 +11729,14 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && navSheet?.
 // Kompendium-Reiter werden dynamisch aus den Modulen gebaut (rebuildCompTabs, A7)
 
 // ---------- Sonstiges ----------
-function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+// Anmerkung 208: `'` ist seit dieser Runde dabei. Ohne es hielt die Funktion
+// nur, weil JEDES Attribut in dieser Datei zufällig doppelt gequotet ist —
+// eine Zusicherung, die von der Schreibgewohnheit von 363 Attributen abhängt,
+// ist keine. `&#39;` statt `&apos;`, weil letzteres in HTML4 nicht existiert.
+function esc(s) {
+  return String(s).replace(/[&<>"']/g,
+    c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 // F1: Mini-Markdown — sanitisiert per Konstruktion (bewusst ohne externe Lib):
 // erst wird ALLES escaped, danach erzeugen nur die eigenen Regeln sichere Tags.
 // Unterstützt: #/##/### Überschriften, **fett**, *kursiv*, `Code`,
@@ -13681,7 +13696,7 @@ function enterOfflineCapture() {
     if (offline) {
       showBanner(t('banner.timeout',
         '⚠ Die Daten kamen nicht rechtzeitig an (Netz oder große Datenmenge). '
-        + '<a href="#" onclick="location.reload();return false" style="color:var(--accent)">Erneut versuchen</a>'));
+        + '<a href="#" data-reload style="color:var(--accent)">Erneut versuchen</a>'));
     } else {
       showBanner(`⚠ ${t('banner.loaderr', 'Fehler beim Laden')}: ${esc(err.message)}`);
     }

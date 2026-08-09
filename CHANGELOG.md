@@ -850,6 +850,31 @@ any `MINOR`.
   failed first one.
 
 ### Security
+- **The app refuses to start with a login that is not a login.** `AUTH_MODE=dev`
+  means *no* sign-in at all — every request is treated as the account that owns
+  all the data. If your instance looks like it is meant to be reachable (a
+  `PUBLIC_BASE_URL` that is not this machine, or an OIDC provider already
+  configured), Life-Dash now stops with a message naming the three ways out
+  instead of coming up wide open. Set `DEV_AUTH_ALLOW_PUBLIC=true` if that is
+  deliberate — a public demo instance is exactly that case — and every start
+  will say so. The same now applies to `SESSION_SECRET`: with a real sign-in
+  the app will not start while it still carries the example value from
+  `.env.example`, which is public and signs your session cookies.
+- **Security headers, including a content security policy.** The page may only
+  load code from your own instance, may not be embedded in a foreign frame, may
+  not send data anywhere else, and passes no referrer to outside links. Over
+  HTTPS it also asks browsers to stay on HTTPS.
+- **The administration's raw table view no longer hands out secrets** — nor
+  accepts them. Password hashes and the stored Immich key are shown as `***`,
+  and writing either through that view is refused with a pointer to the right
+  place. Being unable to read a password hash while still being able to *set*
+  one would have been the more useful half for an attacker.
+- **Secrets can no longer end up in the log**, which matters because the log is
+  displayed in the administration. API keys and tokens are masked wherever they
+  appear — including the per-account Immich key, which the app cannot recognise
+  by name and catches by shape.
+- **Captured text has an upper limit** (20,000 characters, about ten dense
+  pages). It protects the AI request behind it, which is billed per call.
 - **The map libraries are served by your own instance instead of a public CDN.**
   Leaflet and its clustering plugin used to be fetched from `unpkg.com` on every
   start, with no integrity check — meaning the page that shows your whole life

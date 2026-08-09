@@ -128,8 +128,38 @@ must be reachable there), `OIDC_CLIENT_ID` the generated client ID. With
 `OIDC_PROVIDER_NAME` you can show the name of your sign-in service on the login
 screen; without it, a neutral SSO hint is displayed.
 
-No OIDC provider at hand? `AUTH_MODE=dev` starts without a login using a fixed
-admin user — for local tests only, **never run it publicly reachable**.
+### `AUTH_MODE=dev` — and why it will refuse to start
+
+No OIDC provider at hand? `AUTH_MODE=dev` starts **without any login**, as a
+fixed admin user. Not “a simpler login” — none: every request is treated as the
+account that owns all the data. That is right on a laptop and an open door
+anywhere else.
+
+Since 2026-08-09 the app therefore **refuses to start** in dev mode when the
+instance looks like it is meant to be reachable — that is, when
+`PUBLIC_BASE_URL` does not point at this machine, or an OIDC provider is
+configured while `AUTH_MODE` still says `dev` (the half-finished switch-over).
+The message names the three ways out. Set `DEV_AUTH_ALLOW_PUBLIC=true` if it is
+deliberate — a public **demo** instance with invented data (`SEED_DEMO=true`) is
+exactly that case — and every start will say so in the log.
+
+The same applies to `SESSION_SECRET`: with `local` or `oidc` the app will not
+start while it still carries the default from `.env.example`. That value is
+public, and it signs the session cookies.
+
+### Who may create the first account
+
+With `AUTH_MODE=local` the **registration form is open until the first account
+exists**, and that account becomes the administrator. After that, registration
+closes and only an admin can create accounts.
+
+This is deliberate — there is no other way to bootstrap an instance without a
+console — but it means the window between *“the container is running”* and
+*“you have signed up”* is a window in which **anyone who can reach the address
+becomes your administrator**. It is normally seconds long. Make sure it stays
+that way: put the reverse proxy in place first, then start the container, then
+sign up immediately. If your instance was reachable before you got to it, check
+Settings → Users for an account that is not yours before doing anything else.
 
 ## 2a. Note: ARM64 / single-board computers
 

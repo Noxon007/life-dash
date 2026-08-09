@@ -79,6 +79,18 @@ class Settings(BaseSettings):
     #                      erster registrierter Nutzer wird Admin
     # ------------------------------------------------------------------ #
     auth_mode: str = "dev"  # "dev" | "oidc" | "local"
+    # Anmerkung 208 (R1d): `AUTH_MODE=dev` heißt KEIN Login — wer die Adresse
+    # kennt, ist angemeldet, und zwar als der Nutzer, dem alles gehört. Das ist
+    # für die lokale Entwicklung richtig und in einer erreichbaren Instanz eine
+    # offene Tür. Der Start bricht deshalb ab, wenn die Instanz nach Produktion
+    # AUSSIEHT (siehe `app/startup_checks.py`).
+    #
+    # Diese Schalter ist die ausdrückliche Ausnahme, und sie hat einen echten
+    # Anwendungsfall: eine öffentliche DEMO-Instanz mit `SEED_DEMO=true`, in der
+    # ohne Login jeder das erfundene Leben ansehen soll. Sie heißt nach ihrer
+    # Wirkung, nicht nach ihrem Anlass — „für die Demo" wäre in einem Jahr die
+    # Begründung für etwas ganz anderes.
+    dev_auth_allow_public: bool = False
     # A27: Anzeigename des Providers für den Login-Screen (rein kosmetisch);
     # leer = neutraler SSO-Text, damit nichts Fremdes hart verdrahtet ist
     oidc_provider_name: str = ""

@@ -64,7 +64,15 @@ class AdminCreateUser(BaseModel):
 # Ingestion
 # --------------------------------------------------------------------------- #
 class FragmentCreate(BaseModel):
-    raw_text: str = Field(..., min_length=1, examples=["12.07.2026 war in Detmold und habe einen Adler gesehen"])
+    # Anmerkung 208: Die Obergrenze ist der zehnte offene Punkt aus Anmerkung
+    # 200. Sie schützt nicht die Datenbank — `Text` nimmt alles —, sondern die
+    # KI-Anfrage dahinter: `ingest_fragment` schickt den Text ungekürzt an den
+    # Anbieter, und dort kostet er Token und Zeit, je Anfrage und ohne Deckel.
+    # 20.000 Zeichen sind etwa zehn eng beschriebene Seiten; kein Mensch tippt
+    # das in ein Erfassungsfeld, und ein Tagebucheintrag von einem Tag bleibt
+    # eine Größenordnung darunter.
+    raw_text: str = Field(..., min_length=1, max_length=20_000,
+                          examples=["12.07.2026 war in Detmold und habe einen Adler gesehen"])
     source: Source = Source.manual
     # F2: optionaler Gerätestandort (nur per Knopf, nie automatisch);
     # der Text hat Vorrang, wenn er selbst einen Ort nennt

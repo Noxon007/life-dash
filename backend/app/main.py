@@ -36,6 +36,8 @@ from app.routers import (
     world,
 )
 from app.demo import seed_demo
+from app.security import RedactSecretsFilter, SecurityHeadersMiddleware
+from app.startup_checks import run_startup_checks
 from app.services.weather import WEATHER_MODEL
 from app.version import APP_VERSION, display_version, release_channel
 
@@ -54,21 +56,34 @@ from app.logbuffer import ring  # noqa: E402
 
 logging.getLogger("lifedash").addHandler(ring)
 
+# Anmerkung 208 (R1d, „keine Geheimnisse im Log"): Der Filter sitzt an den
+# HANDLERN, und das ist keine Geschmacksfrage. Ein Filter am Logger `lifedash`
+# hätte ausgesehen, als schütze er den ganzen Baum, und hätte fast nichts
+# getan: Python wendet bei der Weitergabe nach oben nur die Filter des
+# URSPRÜNGLICHEN Loggers an, nie die der Vorfahren (`Logger.callHandlers` ruft
+# Handler, nicht Filter). Alles aus `lifedash.admin`, `lifedash.immich`,
+# `lifedash.geocode` wäre ungefiltert durchgelaufen — ein Schutz, der genau
+# die Fälle verfehlt, für die es ihn gibt.
+#
+# Zwei Ausgänge, beide bedient: die Konsole (Handler am Wurzel-Logger, von
+# `basicConfig` gesetzt) und der Ringpuffer, den die Verwaltung anzeigt.
+_redact = RedactSecretsFilter()
+ring.addFilter(_redact)
+for _h in logging.getLogger().handlers:
+    _h.addFilter(_redact)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info("Life-Dash %s startet — auth=%s, ai=%s, db=%s, log_level=%s",
              APP_VERSION, settings.auth_mode, settings.ai_provider,
              settings.database_url.split("://")[0], settings.log_level.upper())
-    # A35: Bei echter Anmeldung (local/oidc) signiert das Standard-Secret die
-    # Session-Cookies — wer es kennt, fälscht eine fremde Sitzung. Laut,
-    # damit es niemand produktiv übersieht. (Die Härtung von dev-Modus in
-    # Produktion folgt mit R1.)
-    if (settings.auth_mode in ("local", "oidc")
-            and settings.session_secret == "dev-secret-change-me"):
-        log.warning("SESSION_SECRET ist noch der Standardwert — bei %s-Login "
-                    "UNBEDINGT setzen (python -c \"import secrets; "
-                    "print(secrets.token_urlsafe(48))\").", settings.auth_mode)
+    # A35 / Anmerkung 208 (R1d): Der dev-Modus in einer erreichbaren Umgebung
+    # und das öffentlich bekannte Standard-Secret bei echtem Login sind keine
+    # Warnungen mehr, sondern Abbrüche. Eine Warnung im Log ist in diesem
+    # Projekt die dokumentierte Art, einen Fehler zu verstecken. Begründung
+    # und die drei Auswege stehen in `startup_checks.py`.
+    run_startup_checks(settings)
     # Module aus YAML laden
     load_modules()
     # Bestehende Tabellen um neue Spalten ergänzen (user_id, embedding)
@@ -117,6 +132,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Anmerkung 208: Sicherheits-Kopfzeilen auf JEDER Antwort. NACH dem CORS-Eintrag
+# hinzugefügt und damit die ÄUSSERE der beiden — Starlette baut die Kette aus
+# `user_middleware` rückwärts auf, die zuletzt hinzugefügte liegt außen. Das ist
+# hier die Bedingung, nicht Geschmack: eine CORS-Vorabfrage wird von der
+# CORS-Middleware selbst beantwortet und käme an einer inneren Schicht nie
+# vorbei. Ein Kopfzeilen-Satz mit Lücken ist schwerer zu bemerken als keiner.
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.include_router(auth.router)
 app.include_router(ingest.router)
