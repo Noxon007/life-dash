@@ -146,6 +146,52 @@ setTimeout(() => {
      opened && opened.n === 12, JSON.stringify(opened));
   ok('…und beim angeklickten Bild', opened && opened.i === 5, JSON.stringify(opened));
 
+  // --- 6. Ein Tag, an dem NUR Fotos liegen (Anmerkung 206) --------------- //
+  // Der gemeldete Fehler: „warum gibt es am 08.08 keine Fotos dieses Tages?"
+  // Der Server hatte die Bilder längst verknüpft — die Anzeige zählte die
+  // Tagesmenge aber aus den EREIGNISSEN auf (`g.items`), also gab es für einen
+  // Tag ohne Eintrag keine Gruppe, keinen Tageskopf und damit keine Leiste.
+  // Dieselbe Falle wie Anmerkung 205, eine Etage höher.
+  //
+  // Geprüft wird der Zustand, den es GEBEN MUSS: ein Tag mit Bildern und ohne
+  // einen einzigen Eintrag steht im Zeitstrahl.
+  const onlyPhotos = zoom => {
+    w.eval(`
+      TL_DAY_MEDIA.clear();
+      TL_DAY_MEDIA.set('2024-05-06', ${JSON.stringify(media['2024-05-06'])});
+      TL_DAY_MEDIA.set('2024-05-08', ${JSON.stringify(media['2024-05-08'])});
+      tl.events = ${JSON.stringify([events[2]])};   // NUR der 08.05. hat einen Eintrag
+      tl.zoom = ${JSON.stringify(zoom)};
+      tl.catFilter = new Set(FILTER_CATS_BASE.concat(['event']));
+      tl.query = ''; tl.day = null; tl.city = null; tl.done = true;
+      renderTimelineList();`);
+    return d;
+  };
+  onlyPhotos('day');
+  const labels = [...d.querySelectorAll('.tl-year-label')].map(e => e.textContent);
+  ok('Ein Tag mit Bildern und ohne Eintrag bekommt seinen Tageskopf',
+     labels.some(l => /06\.05\.2024/.test(l)),
+     `Köpfe: ${JSON.stringify(labels)} — ohne Gruppe keine Leiste`);
+  ok('…und seine Fotoleiste',
+     d.querySelectorAll('[data-day-media]').length === 2,
+     `${d.querySelectorAll('[data-day-media]').length} Leisten für zwei Fototage`);
+  // Die Gegenprobe: der Marker ist KEINE Karte. Stünde er als Zeile da, wäre
+  // aus dem fehlenden Tag ein leerer Eintrag geworden — auch falsch, nur anders.
+  const cards = [...d.querySelectorAll('.tl-year > *')]
+    .filter(r => !r.classList.contains('tl-year-label')
+                 && !r.hasAttribute('data-day-media'));
+  ok('…ohne eine leere Karte daneben', cards.length === 1,
+     `${cards.length} Karten — erwartet: nur der eine echte Eintrag`);
+
+  // Bei GEWÄHLTEM Tag bleibt er draußen: das ist eine Auswahl über Einträge,
+  // und ein Tag, der nur Bilder trägt, ist keiner (dieselbe Grenze wie beim
+  // Wohnort). Sonst stünde ein leerer Kopf zwischen den Treffern.
+  w.eval(`tl.day = '2024-05-08'; renderTimelineList();`);
+  ok('Bei gewähltem Tag tritt er NICHT ein',
+     ![...d.querySelectorAll('.tl-year-label')].some(e => /06\.05\.2024/.test(e.textContent)),
+     'eine Auswahl über Einträge darf keine Tage erfinden');
+  w.eval(`tl.day = null;`);
+
   console.log(fail ? `\nFotoleisten: ${fail} Prüfung(en) fehlgeschlagen`
                    : '\nFotoleisten: alles grün');
   process.exit(fail ? 1 : 0);

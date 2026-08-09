@@ -399,6 +399,30 @@ Leiste** — ohne Rückfrage an den eigenen Bestand. Vier Sätze zum Weiterarbei
 - **`fill_day_strips` folgt derselben Regel** (jeder Tag mit Fotos) und filtert
   seitdem nach Besitz: seine Eingabe ist die ROHE Jahresliste.
 
+**Rückmeldung 2026-08-09, zweiter Satz (Anmerkung 206): EIN Immich-Lauf, und
+der Zeitstrahl sieht Tage ohne Eintrag.**
+- **`photo_points` gibt es als Job-Typ nicht mehr** — `_run_immich` macht
+  beides: Phase 1 die eigenen Ereignisse, Phase 2 die Bibliothek monatsweise
+  (`photo_points.scan_month`: ein Griff, daraus Ereignisse UND Tagesleisten).
+  Der Name bleibt in `JOB_TYPES`, damit die Job-Historie lesbar bleibt.
+- **Die Tagesregel steht nur noch in `photo_points.fill_day_strips`.**
+  `immich_link.link_month` ist weg; der Aufrufer holt den Monat und reicht die
+  Assets durch, `taken`/`seen` gehören ihm.
+- **Vorschau und Jahresauswahl sind weg** (`/api/immich/preview`, `/years`,
+  `scan_year`, `preview_summary`, `scanned_years`, `photo_years`). Entscheidung
+  des Users: „im doing schaue ich mir keine 8.000 Vorschläge an." An ihrer
+  Stelle steht der Rückweg; `check-p21-preview.js` → `check-immich-run.js`
+  bewacht jetzt genau den. **Der Lauf bleibt im Nachtplan** — eine Maschine
+  legt damit unbeaufsichtigt Bestätigtes an, ausdrücklich so gewollt.
+- **Ein Ereignis je FOTO bleibt.** Der Vorschlag „je Tag+Ort" wurde geprüft und
+  verworfen: `compressVisits` bündelt maschinelle Einträge eines Tages schon
+  nach TITEL, der Zeitstrahl zeigt also längst eine Zeile je Tag+Ort. Echte
+  Daten daraus zu machen hätte die Foto-Ebene der Karte gekostet (ein Punkt je
+  Foto, Popup über `immich:photo:<asset>`). Frage ist geschlossen.
+- **Im Browser dieselbe Falle wie 205:** die Tagesmenge kam aus `g.items`.
+  `tlPhotoDayRows()` schiebt Marker VOR dem Gruppieren ein (wie F20 beim
+  Wohnort) und entfernt sie nach dem Einsetzen der Leiste wieder.
+
 **Doku-Umbau 2026-08-04.** `KONZEPT.md` ist aufgelöst: was das System IST steht
 in `ARCHITECTURE.md`, was OFFEN ist in `ROADMAP.md`, die geschlossenen Kapitel
 (MVP-Definition, Release-Risiken, beantwortete Fragen) wörtlich in

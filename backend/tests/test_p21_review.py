@@ -28,8 +28,9 @@ from app.models import (ConfirmState, DatePrecision, Event, MediaRef, Source,
                         User, UserRole)
 from app.services import immich as api
 from app.services.immich_link import (MACHINE_SOURCES, candidates,
-                                      detach_machine_links, link_month,
-                                      open_months, targets)
+                                      detach_machine_links, open_months,
+                                      targets)
+from app.services.photo_points import fill_day_strips
 
 
 # --------------------------------------------------------------------------- #
@@ -132,17 +133,26 @@ def test_a_self_recorded_event_still_gets_its_photos(db, user):
     assert [e.title for e in candidates(db, user.id)] == ["Konzert"]
 
 
-def _month_assets(monkeypatch, assets):
-    """Ersetzt Immichs Monatsabfrage — `link_month` fragt über `api`."""
-    monkeypatch.setattr(api, "search_assets_paged",
-                        lambda *a, **k: list(assets))
-
-
 def _library_asset(aid: str, when: str, owner: str = "me") -> dict:
     return {"id": aid, "ownerId": owner, "localDateTime": when}
 
 
-def test_the_day_of_a_proposal_still_gets_its_photos(db, user, monkeypatch):
+def _strips(db, user, assets, my_id="me"):
+    """Die Tagesregel, nackt — **eine Fassung, ein Aufruf** (Anmerkung 206).
+
+    Bis hier gab es sie zweimal: `immich_link.link_month` holte den Monat
+    selbst, `photo_points.fill_day_strips` bekam die Assets aus dem
+    Jahresdurchlauf. Zwei Antworten auf „welcher Tag bekommt welche Bilder?",
+    und sie unterschieden sich bereits im Besitzfilter. Seit die beiden Läufe
+    einer sind, holt der Aufrufer den Monat und reicht die Assets durch.
+    """
+    taken: set = set()
+    n = fill_day_strips(db, user, assets, my_id, taken=taken, seen=set())
+    db.commit()
+    return n, taken
+
+
+def test_the_day_of_a_proposal_still_gets_its_photos(db, user):
     """Die Kehrseite, ohne die der Fix eine Verschlechterung wäre: Ein
     Vorschlag für ein Jahr ohne Timeline-Daten hätte sonst ÜBERHAUPT kein Bild
     neben sich — und beurteilen soll man ihn ja gerade an den Fotos.
@@ -150,35 +160,30 @@ def test_the_day_of_a_proposal_still_gets_its_photos(db, user, monkeypatch):
     Anmerkung 205 hat den WEG dorthin ersetzt (der Monat statt einer
     Tagesliste aus der Ereignis-Tabelle), nicht die Zusage."""
     _proposal(db, user)
-    _month_assets(monkeypatch, [_library_asset("x1", "2024-07-12T10:00:00.000Z")])
-    taken: set = set()
-    assert link_month(db, user, "2024-07", "u", "k", set(), "me", taken=taken) == 1
-    db.commit()
+    n, taken = _strips(db, user, [_library_asset("x1", "2024-07-12T10:00:00.000Z")])
+    assert n == 1
     assert taken == {(2024, 7, 12)}
 
 
-def test_a_day_without_any_event_gets_its_photos_too(db, user, monkeypatch):
+def test_a_day_without_any_event_gets_its_photos_too(db, user):
     """**Anmerkung 205, der gemeldete Kern.** Die alte Tagesliste kam aus der
     EREIGNIS-Tabelle; ein Tag, den nur der Wohnort deckt, hat dort keine Zeile
     und blieb deshalb lautlos ohne Bilder. Jetzt entscheidet Immich, welche
     Tage es gibt — dieser hier hat keinen einzigen Eintrag."""
-    _month_assets(monkeypatch, [_library_asset("x9", "2019-03-04T08:00:00.000Z")])
-    taken: set = set()
-    assert link_month(db, user, "2019-03", "u", "k", set(), "me", taken=taken) == 1
-    db.commit()
+    n, _ = _strips(db, user, [_library_asset("x9", "2019-03-04T08:00:00.000Z")])
+    assert n == 1
     assert db.query(MediaRef).filter(MediaRef.event_id.is_(None)).count() == 1
 
 
-def test_foreign_and_archived_photos_stay_out_of_the_strip(db, user, monkeypatch):
+def test_foreign_and_archived_photos_stay_out_of_the_strip(db, user):
     """Der Preis dafür, dass jeder Tag zählt: ohne Besitzfilter stünde der
     geteilte Urlaubsordner eines Bekannten in der eigenen Tagesleiste."""
-    _month_assets(monkeypatch, [
+    n, taken = _strips(db, user, [
         _library_asset("fremd", "2019-03-04T08:00:00.000Z", owner="wer-anders"),
         _library_asset("archiv", "2019-03-05T08:00:00.000Z") | {"visibility": "archive"},
         _library_asset("meins", "2019-03-06T08:00:00.000Z"),
     ])
-    taken: set = set()
-    assert link_month(db, user, "2019-03", "u", "k", set(), "me", taken=taken) == 1
+    assert n == 1
     assert taken == {(2019, 3, 6)}
 
 

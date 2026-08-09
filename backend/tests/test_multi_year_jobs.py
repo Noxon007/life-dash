@@ -1,12 +1,14 @@
-"""Läufe über mehrere Jahre und die Sichtbarkeit laufender Jobs (Anmerkung 120).
+"""Der Immich-Lauf über die ganze Bibliothek, und die Sichtbarkeit laufender Jobs.
 
 Zwei Beobachtungen aus der Nutzung, beide aus derselben Ecke:
 
-**(a)** Fotos verorten und Vorschläge anlegen gingen nur jahresweise. Bei zwanzig
-Jahren ist das zwanzigmal dieselbe Handbewegung — und weil jeder Start in den
-Jobs-Reiter sprang, zwanzigmal auch der Weg zurück. Die Aufteilung war richtig
-für eine ANFRAGE (Zeitbudget der Vorschau), nicht für einen Hintergrund-Lauf:
-der wartet auf niemanden, hakt jedes Jahr einzeln ab und ist stoppbar.
+**(a)** Fotos verorten ging nur jahresweise, mit Vorschau und Jahresauswahl.
+Anmerkung 120 hat daraus „alle Jahre in einem Lauf" gemacht, **Anmerkung 206**
+den Rest: es gibt nur noch EINEN Immich-Lauf, er geht über die ganze
+Bibliothek, und seine Einheit ist der MONAT. Die Zusagen aus Anmerkung 120
+gelten unverändert weiter — sie heißen jetzt nur Monat statt Jahr: jüngstes
+zuerst, jede Einheit einzeln abgehakt, jederzeit stoppbar, und **erst
+festschreiben, dann abhaken**.
 
 **(b)** Der Jobs-Reiter zeigte die letzten zwölf Jobs nach Startzeit. Ein Lauf,
 der eine Stunde arbeitet, steht damit nach zwölf kurzen Läufen unten und
@@ -21,52 +23,11 @@ from datetime import datetime, timedelta
 import pytest
 
 from app.models import Job, User
-from app.routers.jobs import (_job_years, _run_photo_points, _year_span,
-                              list_jobs)
+from app.routers.jobs import _run_immich, list_jobs
 
 
 # --------------------------------------------------------------------------- #
-# Die Jahre eines Laufs — eine Prüfung für beide Läufe
-# --------------------------------------------------------------------------- #
-def test_single_year_still_works():
-    assert _job_years(Job(type="photo_points", params={"year": 2024})) == ([2024], None)
-
-
-def test_many_years_come_back_newest_first():
-    job = Job(type="photo_points", params={"years": [2004, 2024, 2011]})
-    assert _job_years(job) == ([2024, 2011, 2004], None)
-
-
-def test_duplicates_collapse():
-    job = Job(type="photo_points", params={"years": [2024, 2024]})
-    assert _job_years(job) == ([2024], None)
-
-
-@pytest.mark.parametrize("params", [
-    {},                        # gar nichts
-    {"year": None},
-    {"years": []},
-    {"years": "2024"},         # kein Array
-    {"years": [2024, 99999]},  # ein fauler Eintrag verdirbt den Lauf
-    {"years": ["2024"]},       # Zeichenkette ist kein Jahr
-    # `bool` IST in Python ein `int`: ohne den Ausschluss wäre das Jahr 1, und
-    # `datetime(1, 1, 1)` beantwortet keine Frage, die jemand gestellt hat.
-    {"years": [True]},
-])
-def test_a_bad_year_is_refused_not_guessed(params):
-    years, bad = _job_years(Job(type="photo_points", params=params))
-    assert years == []
-    assert bad and "Jahr" in bad
-
-
-def test_the_span_is_the_headline():
-    assert _year_span([2024]) == "2024"
-    assert _year_span([2004, 2011, 2024]) == "2004–2024 (3 Jahre)"
-    assert _year_span([]) == "—"
-
-
-# --------------------------------------------------------------------------- #
-# Fotos verorten über mehrere Jahre
+# Der Lauf über die Bibliothek — Monat für Monat
 # --------------------------------------------------------------------------- #
 @pytest.fixture()
 def immich_cfg(user, db):
@@ -75,97 +36,94 @@ def immich_cfg(user, db):
     return user
 
 
-def _props(n: int):
-    """`n` Foto-Vorschläge — der Rückgabewert von `scan_year` seit Anm. 139."""
-    from datetime import datetime as _dt
+@pytest.fixture()
+def library(monkeypatch):
+    """Immichs Zeitachse als Attrappe — sonst greift der Lauf zur echten Adresse."""
+    state = {"months": {}, "my_id": "me"}
+    monkeypatch.setattr("app.services.immich.own_user_id",
+                        lambda url, key: state["my_id"])
+    monkeypatch.setattr("app.services.immich.timeline_buckets",
+                        lambda url, key, my_id, **kw: dict(state["months"]))
+    return state
 
-    from app.services.photo_points import PhotoProposal
-    return [PhotoProposal(slot=f"immich:photo:a{i}", asset_id=f"a{i}",
-                          taken_at=_dt(2024, 7, 12, 10, i % 60),
-                          lat=51.93, lng=8.87, place="Detmold", city="Detmold")
-            for i in range(n)]
 
-
-def test_photo_points_walks_every_year_and_sums_up(db, user, immich_cfg, monkeypatch):
+def _no_ticks(monkeypatch):
     from app.routers import jobs as jobs_mod
+    monkeypatch.setattr(jobs_mod, "_tick", lambda *a, **kw: True)
+
+
+def test_the_run_walks_every_month_newest_first(db, user, immich_cfg, library,
+                                                monkeypatch):
     from app.services import photo_points as pp
 
-    seen_years: list[int] = []
+    seen: list[str] = []
 
-    def fake_scan(db_, user_, year, url, key, heartbeat=None, report=None, **kw):
-        seen_years.append(year)
+    def fake_scan(db_, user_, month, url, key, my_id, *, report=None, **kw):
+        seen.append(month)
         if report is not None:
             report["seen"] = 10
             report["dropped"] = {"no_geo": 2}
-        return _props(3)
+        return 3, 5
 
-    monkeypatch.setattr(pp, "scan_year", fake_scan)
-    monkeypatch.setattr(pp, "create_photo_events",
-                        lambda db_, user_, block: len(block))
-    monkeypatch.setattr(jobs_mod, "_tick", lambda *a, **kw: True)
-    job = Job(user_id=user.id, type="photo_points", params={"years": [2011, 2024]})
+    monkeypatch.setattr(pp, "scan_month", fake_scan)
+    _no_ticks(monkeypatch)
+    library["months"] = {"2011-04": 7, "2024-09": 9}
+    job = Job(user_id=user.id, type="immich", status="running")
     db.add(job)
     db.commit()
 
-    state, msg = _run_photo_points(db, job)
+    state, msg = _run_immich(db, job)
 
     assert state == "done"
-    assert seen_years == [2024, 2011]              # jüngstes zuerst
-    assert "2011–2024 (2 Jahre)" in msg
-    # Summiert, nicht nur das letzte Jahr — und die Ausschlussgründe ebenso.
-    assert "20 Fotos gelesen" in msg and "6 Ereignisse angelegt" in msg
+    assert seen == ["2024-09", "2011-04"]           # jüngstes zuerst
+    # Summiert, nicht nur der letzte Monat — und die Ausschlussgründe ebenso.
+    assert "6 Ereignisse angelegt" in msg and "10 Fotos verknüpft" in msg
     assert "4 ohne Koordinaten" in msg
 
 
-def test_every_year_is_ticked_off_on_its_own(db, user, immich_cfg, monkeypatch):
-    """**Erst festschreiben, dann abhaken — und zwar je Jahr.**
+def test_every_month_is_ticked_off_on_its_own(db, user, immich_cfg, library,
+                                              monkeypatch):
+    """**Erst festschreiben, dann abhaken — und zwar je Monat.**
 
     Bräche der Lauf in 2011 ab und wären die Haken erst am Ende gesetzt, gälten
     2024 und 2018 wieder als „nie nachgesehen": die Arbeit ist getan, die
     Auskunft darüber weg. Dieselbe Falle wie beim F12-Wettermarker, nur in der
     Reihenfolge statt im Wert.
     """
-    from app.routers import jobs as jobs_mod
     from app.services import immich as immich_api
+    from app.services import immich_link as link
     from app.services import photo_points as pp
 
-    def fake_scan(db_, user_, year, url, key, heartbeat=None, report=None, **kw):
-        if year == 2011:
+    def fake_scan(db_, user_, month, url, key, my_id, *, report=None, **kw):
+        if month == "2011-04":
             raise immich_api.ImmichError("Immich weg")
-        if report is not None:
-            report["seen"] = 4
-        return _props(4)
+        return 4, 0
 
-    monkeypatch.setattr(pp, "scan_year", fake_scan)
-    monkeypatch.setattr(pp, "create_photo_events",
-                        lambda db_, user_, block: len(block))
-    monkeypatch.setattr(jobs_mod, "_tick", lambda *a, **kw: True)
-    job = Job(user_id=user.id, type="photo_points",
-              params={"years": [2011, 2018, 2024]})
+    monkeypatch.setattr(pp, "scan_month", fake_scan)
+    _no_ticks(monkeypatch)
+    library["months"] = {"2011-04": 1, "2018-05": 2, "2024-09": 3}
+    job = Job(user_id=user.id, type="immich", status="running")
     db.add(job)
     db.commit()
 
-    state, msg = _run_photo_points(db, job)
+    state, msg = _run_immich(db, job)
 
     assert state == "stopped"
     assert "Immich weg" in msg
     db.expire(user)
-    assert pp.scanned_years(user) == {2018, 2024}   # NICHT leer, NICHT 2011
+    # NICHT leer, und NICHT der Monat, in dem es schiefging.
+    assert set(link.scanned_months(user)) == {"2018-05", "2024-09"}
 
 
-def test_a_stop_between_years_keeps_what_is_done(db, user, immich_cfg, monkeypatch):
+def test_a_stop_between_months_keeps_what_is_done(db, user, immich_cfg, library,
+                                                  monkeypatch):
     from app.routers import jobs as jobs_mod
+    from app.services import immich_link as link
     from app.services import photo_points as pp
 
-    def fake_scan(db_, user_, year, url, key, heartbeat=None, report=None, **kw):
-        if report is not None:
-            report["seen"] = 4
-        return _props(4)
-
-    monkeypatch.setattr(pp, "scan_year", fake_scan)
-    monkeypatch.setattr(pp, "create_photo_events",
-                        lambda db_, user_, block: len(block))
-    # Der Stopp-Wunsch kommt nach dem ersten Jahr an.
+    monkeypatch.setattr(pp, "scan_month",
+                        lambda *a, **kw: (4, 0))
+    # Der Stopp-Wunsch kommt nach dem ersten Monat an.
     ticks = {"n": 0}
 
     def fake_tick(*a, **kw):
@@ -173,34 +131,70 @@ def test_a_stop_between_years_keeps_what_is_done(db, user, immich_cfg, monkeypat
         return ticks["n"] < 2
 
     monkeypatch.setattr(jobs_mod, "_tick", fake_tick)
-    job = Job(user_id=user.id, type="photo_points",
-              params={"years": [2011, 2018, 2024]})
+    library["months"] = {"2011-04": 1, "2018-05": 2, "2024-09": 3}
+    job = Job(user_id=user.id, type="immich", status="running")
     db.add(job)
     db.commit()
 
-    state, msg = _run_photo_points(db, job)
+    state, msg = _run_immich(db, job)
 
     assert state == "stopped"
-    assert "Gestoppt" in msg
-    # **Ein mittendrin gestopptes Jahr wird NICHT abgehakt** (Anmerkung 139).
-    # Vorher hakte der Lauf jedes Jahr ab, sobald er es angefasst hatte — bei
-    # einem Abbruch mitten im Jahr stand es damit als „nachgesehen" da, obwohl
-    # nur die Hälfte angelegt war. Solange dieser Lauf Kartenpunkte anlegte,
-    # war das ärgerlich; seit er Lebensdatenbank anlegt, fehlten Ereignisse
-    # ohne einen Weg, sie je wiederzufinden.
+    assert "gestoppt bei" in msg
+    # **Die FERTIGEN Monate bleiben abgehakt.** Der Stopp-Wunsch wird geprüft,
+    # nachdem ein Monat durch und festgeschrieben ist; ihn dann wieder zu
+    # vergessen hieße, die Arbeit beim nächsten Lauf noch einmal zu machen.
     db.expire(user)
-    assert pp.scanned_years(user) == {2024}
-    assert "2024" in msg
+    assert set(link.scanned_months(user)) == {"2024-09", "2018-05"}
+    assert "2011-04" not in link.scanned_months(user)
 
 
-def test_photo_points_without_a_year_refuses(db, user, immich_cfg):
-    """Der Riegel gilt weiter: ohne Jahr kein Lauf (Anmerkung 120)."""
-    job = Job(user_id=user.id, type="photo_points", params={})
+def test_a_month_stopped_MIDWAY_is_not_ticked_off(db, user, immich_cfg, library,
+                                                  monkeypatch):
+    """Die andere Hälfte derselben Regel — und die teurere.
+
+    `scan_month` blättert; der Heartbeat darf mittendrin abbrechen
+    (`ScanAborted`). Dieser Monat ist dann HALB angelegt. Ihn trotzdem
+    abzuhaken wäre die F12-Falle in Reinform: die Fotozahl stimmt beim nächsten
+    Lauf wieder, der Monat gilt als nachgesehen, und die fehlende Hälfte findet
+    nie jemand wieder."""
+    from app.services import immich as immich_api
+    from app.services import immich_link as link
+    from app.services import photo_points as pp
+
+    def fake_scan(db_, user_, month, url, key, my_id, **kw):
+        if month == "2018-05":
+            raise immich_api.ScanAborted("Lauf gestoppt")
+        return 1, 1
+
+    monkeypatch.setattr(pp, "scan_month", fake_scan)
+    _no_ticks(monkeypatch)
+    library["months"] = {"2018-05": 2, "2024-09": 3}
+    job = Job(user_id=user.id, type="immich", status="running")
     db.add(job)
     db.commit()
-    state, msg = _run_photo_points(db, job)
-    assert state == "error"
-    assert "Jahr" in msg
+
+    state, _ = _run_immich(db, job)
+
+    assert state == "stopped"
+    db.expire(user)
+    assert set(link.scanned_months(user)) == {"2024-09"}
+
+
+def test_nothing_open_says_so(db, user, immich_cfg, library, monkeypatch):
+    """Kein Jahr-Riegel mehr (Anmerkung 120 „ohne Jahr kein Lauf"): der Lauf
+    braucht keine Auswahl, er geht über alles. Was er stattdessen sagen muss,
+    ist der Fall, in dem es nichts zu tun gibt — sonst sieht „fertig, 0" wie
+    ein Fehlschlag aus."""
+    _no_ticks(monkeypatch)
+    library["months"] = {}
+    job = Job(user_id=user.id, type="immich", status="running")
+    db.add(job)
+    db.commit()
+
+    state, msg = _run_immich(db, job)
+
+    assert state == "done"
+    assert "alles aktuell" in msg
 
 
 # --------------------------------------------------------------------------- #
@@ -217,7 +211,7 @@ def _job(db, user: User, status: str, minutes_ago: int, type_: str = "weather") 
 def test_a_running_job_survives_the_limit(db, user):
     """Der gemeldete Fehler: „viele abgeschlossene Jobs führen dazu, dass
     laufende nicht mehr gesehen werden."""
-    old_runner = _job(db, user, "running", minutes_ago=90, type_="photo_points")
+    old_runner = _job(db, user, "running", minutes_ago=90, type_="immich")
     for i in range(20):
         _job(db, user, "done", minutes_ago=i)
 

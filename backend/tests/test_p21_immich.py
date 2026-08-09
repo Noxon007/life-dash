@@ -421,7 +421,7 @@ def test_the_job_fills_days_that_have_no_entry_at_all(db, immich_user,
     refs = db.query(MediaRef).all()
     assert {r.external_id for r in refs} == {"m1", "m2"}
     assert all(r.event_id is None for r in refs), "am TAG, nicht an einem Eintrag"
-    assert "2 Fotos verknüpft, davon 2 an ihren Tagen" in msg
+    assert "2 Fotos verknüpft (davon 2 an ihren Tagen)" in msg
 
 
 def test_the_job_skips_a_month_whose_count_did_not_change(db, immich_user,
@@ -455,6 +455,41 @@ def test_a_month_with_new_uploads_is_scanned_again(db, immich_user, fake_search,
     assert {r.external_id for r in db.query(MediaRef).all()} == {"m1", "m2"}
 
 
+def test_one_grab_yields_both_halves(db, immich_user, fake_search, fake_paged,
+                                     fake_library):
+    """**Anmerkung 206, der Kern der Verschmelzung.**
+
+    Bis 0.39 waren das zwei Läufe: einer legte aus verorteten Fotos Ereignisse
+    an, der andere hängte Bilder an Tage. Beide fragten Immich dasselbe, und
+    welcher Tag am Ende Bilder hatte, hing davon ab, welcher von beiden zuletzt
+    und wie weit gelaufen war — der gemeldete Defekt war ein Tag mit vierzehn
+    Foto-Ereignissen und keiner Leiste darüber.
+
+    Geprüft wird deshalb beides zusammen UND die Zahl der Anfragen: **ein Griff
+    nach Immich je Monat.** Zwei wären wieder zwei Läufe, nur im selben Job.
+    """
+    fake_library["months"] = {"2019-03": 2}
+    fake_paged["assets"] = [
+        _asset("mit_gps", "2019-03-04T10:00:00", 51.94, 8.88),
+        _asset("ohne_gps", "2019-03-04T14:00:00"),
+    ]
+
+    status, msg = _run(db, immich_user)
+
+    assert status == "done"
+    # a) Das verortete Foto ist ein Ereignis geworden.
+    evs = db.query(Event).filter(Event.source == Source.immich).all()
+    assert [e.external_id for e in evs] == ["immich:photo:mit_gps"]
+    assert evs[0].confirmed == ConfirmState.confirmed, "sofort bestätigt, wie ein Google-Besuch"
+    # b) BEIDE Fotos hängen am Tag — auch das ohne Koordinaten, das nie ein
+    #    Ereignis werden konnte, und auch das, das gerade eins geworden ist.
+    strip = db.query(MediaRef).filter(MediaRef.event_id.is_(None)).all()
+    assert {m.external_id for m in strip} == {"mit_gps", "ohne_gps"}
+    # c) Und das alles aus EINER Anfrage.
+    assert len(fake_paged["calls"]) == 1, fake_paged["calls"]
+    assert "1 Ereignisse angelegt" in msg and "2 an ihren Tagen" in msg
+
+
 def test_an_empty_month_is_marked_too(db, immich_user, fake_search, fake_paged,
                                       fake_library):
     """Der Fehlversuch muss eine Marke hinterlassen — sonst fragt der Lauf
@@ -483,7 +518,7 @@ def test_the_job_says_when_it_could_not_read_the_timeline(db, immich_user,
 
     assert status == "done"
     assert db.query(MediaRef).count() == 1, "Phase 1 lief trotzdem"
-    assert "Tagesleisten übersprungen" in msg and "Verbindung abgelehnt" in msg
+    assert "Bibliothek übersprungen" in msg and "Verbindung abgelehnt" in msg
 
 
 def test_immich_job_reports_missing_config(db, user):
@@ -621,17 +656,22 @@ def test_importierte_besuche_sind_keine_ereignis_kandidaten(db, immich_user, bes
 
 
 def _link_may(db, user, seen=None):
-    """Der Monatslauf über den Mai 2024 — die Phase 2 des Jobs, nackt.
+    """Die Tagesregel über die Assets des Mai 2024 — Phase 2 des Jobs, nackt.
 
     `taken` kommt aus `days_with_media`, genau wie im Job; `seen` aus dem, was
-    schon hängt. Beides zusammen ist die Entduplizierung.
+    schon hängt. Beides zusammen ist die Entduplizierung. Die Assets kommen aus
+    derselben Attrappe, die auch der Lauf befragt — seit Anmerkung 206 holt der
+    AUFRUFER den Monat, und `fill_day_strips` ist die einzige Fassung der Regel.
     """
-    from app.services.immich_link import (days_with_media, link_month,
-                                          linked_asset_ids)
+    from app.services.immich_link import days_with_media, linked_asset_ids
+    from app.services.photo_points import fill_day_strips
 
-    return link_month(db, user, "2024-05", "u", "k",
-                      linked_asset_ids(db, user.id) if seen is None else seen,
-                      None, taken=days_with_media(db, user.id))
+    assets = api.search_assets_paged("u", "k", datetime(2024, 5, 1),
+                                     datetime(2024, 5, 31, 23, 59, 59))
+    return fill_day_strips(
+        db, user, assets, None,
+        taken=days_with_media(db, user.id),
+        seen=linked_asset_ids(db, user.id) if seen is None else seen)
 
 
 def test_der_tag_ist_das_ziel(db, immich_user, besuchstag, fake_paged):

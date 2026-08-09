@@ -245,7 +245,29 @@ any `MINOR`.
   address. Where your Immich lives is still entirely your choice, including on
   your own network.
 
+### Changed
+- **The two Immich runs are now one.** *Link photos* and *Create events from
+  photos* were separate buttons with a year picker and a mandatory preview
+  between them — and they asked Immich the same question, each answering half
+  of it, so whether a day ended up with pictures depended on which run had gone
+  last and how far. One button now walks your whole library: every photo of
+  yours with coordinates becomes an event, and **all** photos are attached to
+  their calendar day. The first run takes a while and keeps going in the
+  background; after that it only touches months whose photo count has changed.
+- **The preview before creating photo events is gone.** It asked you to look at
+  a year's worth of proposals before the run was allowed to start, which in
+  practice nobody does with thousands of them. Instead there is a way back:
+  *Discard photo events* removes everything the run created, and it asks with
+  the number first. Discarding the photo *links* is separate and stays
+  question-free — those are only references, and the next run rebuilds them.
+
 ### Fixed
+- **A day that has only photos now shows up in the timeline at all.** Days were
+  listed from your entries, so a day with pictures and nothing written down had
+  no heading and no photo strip — even though the photos had been linked. This
+  is why photos sometimes appeared only while the automatically recorded
+  entries were switched on: the strip was riding along on some other entry of
+  that day.
 - **Every day with photos now gets its photo strip, not just days that already
   had an entry.** *Link photos* used to build its list of days from your
   entries, so a day covered only by your residence — no trip, no imported

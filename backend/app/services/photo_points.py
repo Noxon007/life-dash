@@ -61,7 +61,7 @@ from app.models import (ConfirmState, DatePrecision, Event, EventEntityLink,
                         Fragment, FragmentStatus, Location, MediaRef, Metric,
                         Source, Track)
 from app.services import immich as api
-from app.services.immich_link import PROVIDER
+from app.services.immich_link import PROVIDER, month_window
 
 log = logging.getLogger("lifedash.immich")
 
@@ -324,48 +324,56 @@ def photo_proposals(assets: list[dict], my_id: str | None,
     return out
 
 
-def scan_year(db: Session, user, year: int, url: str, key: str,
-              heartbeat=None, budget_s: float | None = None,
-              report: dict | None = None,
-              keep_assets: bool = False) -> list[PhotoProposal]:
-    """Was dieses Jahr an Foto-Ereignissen ergäbe — **ohne etwas anzulegen**.
+def scan_month(db: Session, user, month: str, url: str, key: str,
+               my_id: str | None, *, known: set[str],
+               districts: list[tuple[float, float, str]],
+               seen: set[str], taken: set[tuple[int, int, int]],
+               heartbeat=None, report: dict | None = None) -> tuple[int, int]:
+    """**Ein Monat, EIN Griff nach Immich, beide Ergebnisse** (Anmerkung 206).
 
-    Genau dieselbe Funktion füttert die Vorschau und den Lauf. Zwei getrennte
-    Wege wären zwei Regeln, und die widersprechen sich still (Anmerkung 106).
+    Gibt `(angelegte Ereignisse, Bilder an Tagen)` zurück. Ohne Commit — der
+    Aufrufer schreibt fest und hakt den Monat danach ab.
 
-    Jahresweise, und der Grund ist derselbe wie bei P2.1: eine zwanzig Jahre
-    alte Bibliothek in einem Zug ist kein Lauf, sondern ein Zeitlimit.
+    Bis 0.39 waren das zwei Läufe mit zwei Einheiten: „Ereignisse aus Fotos
+    anlegen" ging JAHRESweise durch die Bibliothek, „Fotos verknüpfen" fragte
+    je Tag nach. Beide stellten Immich dieselbe Frage („was liegt in diesem
+    Zeitfenster?") und beantworteten je eine Hälfte — und **welcher Tag Bilder
+    hatte, hing davon ab, welcher Lauf zuletzt und wie weit durchgelaufen war.**
+    Genau das war der gemeldete Defekt: vierzehn Foto-Ereignisse an einem Tag,
+    und keine Leiste darüber, weil der andere Lauf dort abgebrochen war.
 
-    `keep_assets` legt die gelesenen Assets in den Bericht (Anmerkung 196) —
-    daraus baut der Lauf die Tagesleisten, ohne ein zweites Mal zu fragen. Die
-    VORSCHAU bekommt sie ausdrücklich nicht: sie legt nichts an, und
-    zwanzigtausend Asset-Wörterbücher in eine HTTP-Antwort zu hängen wäre eine
-    Datenmenge für eine Zahl.
+    Die Reihenfolge innerhalb des Monats ist Absicht: **erst die Ereignisse,
+    dann die Bilder.** Nicht wegen `seen` — ein Foto-Ereignis legt bewusst
+    KEINEN `MediaRef` an (siehe `create_photo_events`), die Bilder eines
+    verorteten Fotos stehen also weiterhin in der Tagesleiste und nirgends
+    doppelt. Sondern weil ein Abbruch dazwischen die teurere Hälfte gerettet
+    haben soll: Ereignisse sind Lebensdatenbank, Leisten sind Ableitung.
     """
     report = report if report is not None else {}
-    my_id = api.own_user_id(url, key)
     report["own_user_id"] = my_id
-    if not my_id:
-        # Ohne eigene Kennung ließe sich ein fremdes Foto nicht erkennen — und
-        # ein geteiltes Album schriebe Ereignisse in die Lebensdatenbank, an
-        # denen man nie war. Lieber nichts (dieselbe Strenge wie `is_own`).
-        log.warning("Immich nennt keine eigene Nutzerkennung — Foto-Ereignisse "
-                    "werden übersprungen")
-        report["seen"] = 0
-        return []
-    start = datetime(year, 1, 1)
-    end = datetime(year, 12, 31, 23, 59, 59)
+    start, end = month_window(month)
     assets = api.search_assets_paged(url, key, start, end, heartbeat=heartbeat,
-                                     budget_s=budget_s, report=report)
-    props = photo_proposals(assets, my_id, district_index(db, user.id),
-                            known_slots(db, user.id), report)
+                                     report=report)
     report["seen"] = len(assets)
-    if keep_assets:
-        report["assets"] = assets
-    log.info("Foto-Ereignisse %d: %d Fotos gelesen, %d neu — ohne Ereignis: %s",
-             year, len(assets), len(props),
+    if not assets:
+        return 0, 0
+
+    # a) Verortete Fotos werden Ereignisse. Ohne eigene Kennung wird hier
+    #    NICHTS angelegt — `photo_proposals` verwirft dann jedes Asset als
+    #    „fremd", und das ist die richtige Strenge: ein geteiltes Album
+    #    schriebe Ereignisse in die Lebensdatenbank, an denen man nie war.
+    props = photo_proposals(assets, my_id, districts, known, report)
+    created = create_photo_events(db, user, props)
+    known.update(p.slot for p in props)
+
+    # b) ALLE Fotos gehen an ihren Kalendertag — auch die ohne Koordinaten, und
+    #    auch an Tagen, an denen sonst nichts steht (Anmerkung 205).
+    added = fill_day_strips(db, user, assets, my_id, taken=taken, seen=seen)
+
+    log.info("Immich %s: %d Fotos gelesen, %d Ereignisse, %d Bilder an Tagen — "
+             "ohne Ereignis: %s", month, len(assets), created, added,
              "; ".join(drop_reasons(report)) or "keins")
-    return props
+    return created, added
 
 
 # --------------------------------------------------------------------------- #
@@ -425,7 +433,9 @@ def create_photo_events(db: Session, user, props: list[PhotoProposal]) -> int:
 
 
 def fill_day_strips(db: Session, user, assets: list[dict],
-                    my_id: str | None = None) -> int:
+                    my_id: str | None = None, *,
+                    taken: set[tuple[int, int, int]] | None = None,
+                    seen: set[str] | None = None) -> int:
     """**Anmerkung 196 — „Foto in Groningen" ohne ein einziges Foto daneben.**
 
     Gemeldet wurde genau das: Der Lauf legt tausende Foto-Ereignisse an, und im
@@ -458,14 +468,23 @@ def fill_day_strips(db: Session, user, assets: list[dict],
     archivierte Bilder erst danach aus. Solange nur Tage mit eigenem
     Foto-Ereignis gefüllt wurden, war das kaum zu sehen — jetzt wäre es der
     geteilte Urlaubsordner eines Bekannten in der eigenen Tagesleiste. `my_id`
-    ist `report["own_user_id"]`; fehlt sie, wird ungefiltert verknüpft, genau
-    wie in `immich_link.link_month`.
+    ist `report["own_user_id"]`; fehlt sie, wird ungefiltert verknüpft — eine
+    Leiste ist eine verwerfbare Ableitung (Anmerkung 57), und dafür ist „lieber
+    ein fremdes Bild zu viel" der billigere Fehler als „gar keine Fotos, ohne
+    zu sagen warum". Beim ANLEGEN von Ereignissen gilt das Gegenteil, deshalb
+    ist `photo_proposals` dort streng.
+
+    **`taken` und `seen` gehören dem Aufrufer** (Anmerkung 206). Beide sind
+    Abfragen über den ganzen Bestand; sie hier je Monat neu zu stellen wären
+    bei zwanzig Jahren Bibliothek fünfhundert Abfragen für dieselbe Antwort.
+    Wer sie nicht mitgibt (Einzelaufruf, Test), bekommt sie frisch.
     """
     from app.services import immich_link as link
 
     if not assets:
         return 0
-    taken = link.days_with_media(db, user.id)
+    if taken is None:
+        taken = link.days_with_media(db, user.id)
     by_day: dict[tuple[int, int, int], list[dict]] = defaultdict(list)
     for asset in assets:
         if my_id is not None and not api.is_own(asset, my_id):
@@ -480,11 +499,19 @@ def fill_day_strips(db: Session, user, assets: list[dict],
             by_day[key].append(asset)
     if not by_day:
         return 0
-    seen = link.linked_asset_ids(db, user.id)
+    if seen is None:
+        seen = link.linked_asset_ids(db, user.id)
     added = 0
-    for day_assets in by_day.values():
-        added += link.add_day_media(db, user, day_assets, seen)
-    log.info("Foto-Ereignisse: %d Bilder an %d Tage gehängt (user=%s)",
+    # Sortiert, damit ein abgebrochener Lauf denselben Monat beim nächsten Mal
+    # in derselben Reihenfolge weiterfüllt — und damit ein Test lesbar bleibt.
+    for day in sorted(by_day):
+        n = link.add_day_media(db, user, by_day[day], seen)
+        if n:
+            # **Die Marke wandert mit**, sonst bekäme derselbe Tag im nächsten
+            # Monatsdurchlauf (Jahreswechsel, zweiter Lauf) eine zweite Leiste.
+            taken.add(day)
+            added += n
+    log.info("Immich: %d Bilder an %d Tage gehängt (user=%s)",
              added, len(by_day), user.id)
     return added
 
@@ -558,34 +585,6 @@ def _location_for(db: Session, user, prop: PhotoProposal,
 # --------------------------------------------------------------------------- #
 # Merkliste der durchsuchten Jahre
 # --------------------------------------------------------------------------- #
-def scanned_years(user) -> set[int]:
-    """Jahre, die schon einmal durchsucht wurden.
-
-    **Der Unterschied zwischen „keine Fotos" und „nie nachgesehen".** Ohne
-    diese Liste zeigte die Oberfläche für 2004 dasselbe wie für ein Jahr ohne
-    Kamera: nichts, wortlos.
-
-    Kein Schema: die Liste ist eine Notiz über einen LAUF, kein Datum über das
-    Leben — sie gehört in die Einstellungen, nicht in die Lebensdatenbank.
-    """
-    raw = ((user.settings or {}).get("photo_points") or {}).get("years") or []
-    return {int(y) for y in raw if isinstance(y, int) or str(y).isdigit()}
-
-
-def mark_scanned(db: Session, user, year: int) -> None:
-    """Merkt sich, dass dieses Jahr durchsucht wurde.
-
-    `user.settings` ist eine JSON-Spalte: neu ZUWEISEN, nicht an Ort und Stelle
-    ändern — SQLAlchemy bemerkt eine Mutation im Dict sonst nicht und schreibt
-    nichts.
-    """
-    settings = dict(user.settings or {})
-    block = dict(settings.get("photo_points") or {})
-    block["years"] = sorted(scanned_years(user) | {int(year)})
-    settings["photo_points"] = block
-    user.settings = settings
-
-
 # --------------------------------------------------------------------------- #
 # Zurücknehmen
 # --------------------------------------------------------------------------- #
@@ -718,50 +717,3 @@ def remove_day_clusters(db: Session, user_id: str) -> int:
 # --------------------------------------------------------------------------- #
 # Jahresauswahl
 # --------------------------------------------------------------------------- #
-def years_with_photos(db: Session, user_id: str) -> list[int]:
-    """Jahre, die einen Lauf lohnen — der Notnagel für die Auswahl.
-
-    Bewusst aus den EIGENEN Daten (Ereignisse und Medien), nicht aus Immich:
-    die Frage „welche Jahre gibt es?" wäre dort ein Vollscan der Bibliothek,
-    nur um eine Auswahlliste zu füllen. Der reguläre Weg fragt Immichs
-    `/timeline/buckets` (siehe `routers/immich.py`); diese Liste greift nur,
-    wenn der Server das nicht kann — und sagt dann auch, dass sie es ist
-    (Anmerkung 113).
-    """
-    years: set[int] = set()
-    for (y,) in (db.query(func.extract("year", Event.date_start))
-                 .filter(Event.user_id == user_id, Event.date_start.isnot(None))
-                 .distinct().all()):
-        if y:
-            years.add(int(y))
-    for (y,) in (db.query(func.extract("year", MediaRef.captured_at))
-                 .filter(MediaRef.user_id == user_id,
-                         MediaRef.captured_at.isnot(None)).distinct().all()):
-        if y:
-            years.add(int(y))
-    years.add(date.today().year)
-    return sorted(years, reverse=True)
-
-
-def preview_summary(props: list[PhotoProposal], sample: int = 12) -> dict:
-    """Die Vorschau eines Jahres — verdichtet, nicht als Liste von 20.000.
-
-    Eine Vorschau muss NENNEN, was sie anlegt (A46, F7-Serie). Bei zwanzigtausend
-    Fotos ist die vollständige Liste aber selbst keine Entscheidungsgrundlage
-    mehr, sondern nur noch eine große Antwort. Genannt werden deshalb die ORTE
-    mit ihren Zahlen — das ist die Ebene, auf der man „ja, das war so" oder
-    „nein, das sind fremde Bilder" sagen kann — plus ein paar Beispiele.
-    """
-    by_place: dict[str, int] = defaultdict(int)
-    days: set[date] = set()
-    for p in props:
-        by_place[p.place or "ohne Ortsangabe"] += 1
-        days.add(p.taken_at.date())
-    places = sorted(by_place.items(), key=lambda kv: (-kv[1], kv[0]))
-    return {
-        "total": len(props),
-        "days": len(days),
-        "places": [{"place": name, "photos": n} for name, n in places[:40]],
-        "places_total": len(places),
-        "sample": [p.as_dict() for p in props[:sample]],
-    }

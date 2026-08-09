@@ -2374,12 +2374,22 @@
           </details>
         </div>
 
-        <!-- P2.1: Immich — nummerierter Ablauf (Variante B). Verbindung + drei
-             Schritte als eigene Karten; jede Karte sagt per Effekt-Badge im
-             Kopf, was der Lauf mit der Datenbank tut (A40). Nur EIN sichtbares
-             Jahr-Dropdown (Schritt B); das Verorten-Jahr steht auf „Alle Jahre"
-             und liegt unter „Erweitert". IDs, Listener und i18n-Schlüssel der
-             Läufe sind unverändert — nur die Anordnung ist neu. -->
+        <!-- P2.1: Immich. Verbindung + EIN Lauf.
+
+             **Anmerkung 206: aus „Schritt A / Schritt B" ist ein Knopf
+             geworden.** Bis 0.39 standen hier zwei Karten mit zwei Läufen, und
+             dazwischen eine Jahresauswahl mit Pflicht-Vorschau. Beide fragten
+             Immich dasselbe („was liegt in diesem Zeitfenster?") und
+             beantworteten je eine Hälfte — mit dem Ergebnis, dass ein Tag mit
+             vierzehn Foto-Ereignissen keine Bilder daneben hatte, weil der
+             andere Lauf dort nie angekommen war.
+
+             Die Vorschau ist mit derselben Anmerkung weggefallen, auf Ansage
+             des Users: „im doing schaue ich mir keine 8.000 Vorschläge an."
+             Eine Bremse, die niemand betätigt, bremst nichts. An ihrer Stelle
+             steht der Rückweg unter „Erweitert" — beide Sorten getrennt
+             verwerfbar, weil sie zwei verschiedene Dinge sind (Ableitung
+             gegen Lebensdatenbank), und das Effekt-Badge sagt es im Kopf. -->
         <div class="section-title" data-i18n="adm.immich">4 · Immich (Fotos)</div>
         <div class="im-flow">
 
@@ -2407,66 +2417,43 @@
             </div>
           </div>
 
-          <!-- Schritt A: an vorhandene Einträge hängen (verknüpfen). Ändert
-               nichts an der Lebensdatenbank, deshalb der ruhigste Schritt. -->
+          <!-- Der eine Lauf (Anmerkung 206). Er legt Bestätigtes an, also
+               trägt er das strengere der beiden Effekt-Badges. -->
           <div class="im-card">
             <div class="im-head">
-              <div><span class="im-step" data-i18n="im.step.a">Schritt A</span> <h4 data-i18n="im.a.title">An Einträge hängen</h4></div>
-              <span class="eff add" data-i18n="im.eff.add">hängt an</span>
+              <div><h4 data-i18n="im.a.title">Fotos aus Immich holen</h4></div>
+              <span class="eff write" data-i18n="eff.write">ändert Bestätigtes</span>
             </div>
             <div class="action-row">
               <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
-                <button class="btn" id="im-run" style="text-align:left" data-i18n="im.run">🖼️ Fotos verknüpfen</button>
+                <button class="btn" id="im-run" style="text-align:left" data-i18n="im.run">🖼️ Fotos aus Immich holen</button>
                 <details class="adv">
-                  <summary data-i18n="im.adv.reset">Erweitert: Verknüpfungen verwerfen</summary>
+                  <summary data-i18n="im.adv.reset">Erweitert: zurücknehmen</summary>
                   <div class="adv-body">
                     <button class="btn ghost" id="im-reset" style="text-align:left; width:100%" data-i18n="im.reset">↺ Verknüpfungen verwerfen</button>
                     <span class="hint" data-i18n="im.reset.hint">„Verknüpfungen verwerfen"
                     löscht nur die Zuordnungen — die Bilder in Immich und deine selbst hochgeladenen Fotos bleiben
                     unangetastet. Der nächste Lauf baut die Zuordnungen neu auf.</span>
+                    <button class="btn secondary" id="pp-reset" style="text-align:left; width:100%; margin-top:10px" data-i18n="pp.reset">🗑️ Foto-Ereignisse verwerfen</button>
+                    <span class="hint" data-i18n="pp.reset.hint">„Foto-Ereignisse verwerfen" ist der andere Fall:
+                    das sind <b>Einträge</b>, keine Zuordnungen. Sie kommen beim nächsten Lauf wieder — aber was du
+                    an einem von ihnen von Hand geändert hast, ist dann weg.</span>
                   </div>
                 </details>
               </div>
               <div class="action-desc">
-                <span data-i18n="im.desc"><b>Fotos bleiben in Immich</b> — Life-Dash merkt sich nur, welches Bild zu
-                welchem Ereignis gehört, und reicht die Vorschau durch. Kopiert wird nichts. Verknüpft wird nach
-                Aufnahmezeit und, wenn beide Seiten Koordinaten haben, nach Ort. Ereignisse mit vagem Datum
-                (Monat, Jahr) bleiben außen vor — dort wären die Treffer geraten.</span>
+                <span data-i18n="im.desc"><b>Ein Lauf über deine ganze Immich-Bibliothek.</b> Er tut zweierlei:
+                jedes eigene Foto <b>mit Koordinaten</b> wird ein Ereignis — auf der <b>Karte</b> ein Punkt mit
+                Vorschaubild, im <b>Zeitstrahl</b> eine Zeile ohne Bild („Foto in Detmold"). Und <b>alle</b> Fotos
+                landen als Bilderleiste an ihrem Kalendertag, auch die ohne Koordinaten und auch an Tagen, an
+                denen sonst nichts steht. Dazu bekommen deine eigenen Einträge passende Bilder angehängt (nach
+                Aufnahmezeit, und wenn beide Seiten Koordinaten haben, nach Ort). Archiviertes, Gesperrtes und
+                fremde Bilder aus geteilten Alben bleiben außen vor.</span>
+                <span class="hint" style="display:block; margin-top:8px" data-i18n="im.hint"><b>Fotos bleiben in
+                Immich</b>, kopiert wird nichts. Der erste Lauf geht durch jeden Monat, den Immich kennt, und darf
+                lange dauern; danach fasst er nur noch an, wo sich etwas geändert hat. Er läuft im Hintergrund
+                weiter, auch wenn du die Seite schließt.</span>
               </div>
-            </div>
-          </div>
-
-          <!-- Schritt B: Ereignisse aus Fotos anlegen (Anmerkung 139).
-               EIN Foto, EIN Ereignis — die Tagescluster aus Anmerkung 138 sind
-               abgelöst. Direkt bestätigt wie ein Google-Besuch, deshalb bleibt
-               die Pflicht-Vorschau die einzige Bremse und wird wichtiger, nicht
-               unwichtiger: hier entstehen zehntausende Zeilen, nicht hunderte. -->
-          <div class="im-card">
-            <div class="im-head">
-              <div><span class="im-step" data-i18n="im.step.b">Schritt B</span> <h4 data-i18n="im.b.title">Ereignisse aus Fotos anlegen</h4></div>
-              <span class="eff write" data-i18n="eff.write">ändert Bestätigtes</span>
-            </div>
-            <div class="action-row has-result">
-              <div class="action-key" style="display:flex; flex-direction:column; gap:8px">
-                <select id="ims-year" class="mf-select" data-i18n-title="ims.year.tip" title="Ein Jahr je Lauf — oder „Alle Jahre“: die Vorschau geht sie dann einzeln durch, damit jedes Jahr wirklich angesehen wird"></select>
-                <button class="btn secondary" id="ims-preview" style="text-align:left" data-i18n="ims.preview">🔍 Vorschau für dieses Jahr</button>
-                <button class="btn" id="ims-run" style="text-align:left" disabled data-i18n="ims.run">✚ Ereignisse anlegen</button>
-                <details class="adv">
-                  <summary data-i18n="pp.adv">Erweitert: alles zurücknehmen</summary>
-                  <div class="adv-body">
-                    <button class="btn secondary" id="pp-reset" style="text-align:left; width:100%" data-i18n="pp.reset">🗑️ Foto-Ereignisse verwerfen</button>
-                  </div>
-                </details>
-              </div>
-              <div class="action-desc">
-                <span data-i18n="ims.desc"><b>Jedes Foto mit Koordinaten wird ein Ereignis — direkt bestätigt, wie ein
-                importierter Google-Besuch.</b> Auf der <b>Karte</b> ein Punkt mit Vorschaubild, im <b>Zeitstrahl</b>
-                eine Zeile ohne Bild („Foto in Detmold"). Angelegt werden nur <b>eigene</b> Fotos <b>mit
-                Koordinaten</b> aus deinem Immich-Zeitstrahl; Archiviertes und Gesperrtes bleibt außen vor.</span>
-                <span class="hint" style="display:block; margin-top:8px" data-i18n="ims.hint">Erst die Vorschau, dann das
-                Anlegen — der Knopf bleibt bis dahin gesperrt. Ein Jahr kann zehntausend Ereignisse ergeben.</span>
-              </div>
-              <div id="ims-result" class="hint action-result" style="display:none"></div>
             </div>
           </div>
 
@@ -3666,35 +3653,25 @@ const I18N_EN = {
   'imp.thumbs': "previews rebuilt",
   'adm.immich': "4 · Immich (photos)",
   // P2.1 stage 2 (0.37.0) — Immich as an event source
-  'ims.desc': "<b>Every photo with coordinates becomes an event — confirmed straight away, like an imported Google visit.</b> On the <b>map</b> a dot with a thumbnail, in the <b>timeline</b> a line without a picture (“Photo in Detmold”). Only <b>your own</b> photos <b>with coordinates</b> from your Immich timeline are used; archived and locked ones stay out.",
   // A45 — locating photos
   'pp.reset': "🗑️ Discard photo events",
   'pp.have': "{n} photo events created",
-  'pp.years': "Searched: {y}",
-  'pp.none': "No year searched yet. Until then the photo layer on the map stays empty — that does not mean there are no photos.",
+  'pp.none': "Nothing fetched from Immich yet. Until then the photo layer on the map stays empty — that does not mean there are no photos.",
   'pp.reset.done': "✓ {n} photo events discarded.",
-  'pp.adv': "Advanced: take everything back",
   // Immich block, variant B — connection card, numbered steps, effect badges
   'im.conn': "Connection",
   'im.conn.desc': "<b>Server URL and API key.</b> Your photos stay in Immich — nothing is copied.",
-  'im.step.a': "Step A",
-  'im.step.b': "Step B",
-  'im.a.title': "Attach to entries",
-  'im.b.title': "Create events from photos",
-  'im.eff.add': "attaches",
+  'im.a.title': "Fetch photos from Immich",
   // Anmerkung 133: Effekt-Badges für die übrigen „Meine Daten"-Abschnitte
   'eff.setting': "setting", 'eff.propose': "creates proposals", 'eff.enrich': "enriches",
   'eff.write': "changes confirmed data", 'eff.read': "read only",
   'eff.restore': "writes", 'eff.delete': "deletes for good",
-  'im.adv.reset': "Advanced: discard links",
+  'im.adv.reset': "Advanced: undo",
   'map.photos': "📷 Photos",
   'map.photos.tip': "Every photo with coordinates becomes its own event — a dot with a thumbnail on the map, a line without a picture in the timeline.",
   'map.photos.none': "No photo has been turned into an event yet — the run is under “My data → Immich → Events from photos”.",
   'tl.photos.n2': "photos",
   'map.points.cap': "{s} of {n} points shown, spread evenly across the period — pick a smaller period for all of them.",
-  'ims.moreplaces': "more places",
-  'ims.skipped': "Without an event: {r}",
-  'ims.truncated': "The preview had to stop (time budget) — the run will create more than shown here. Pick a single year for the full preview.",
   'pp.reset.none': "There are no photo events to discard.",
   'pp.reset.ask': "{n} photo events will be deleted. A new run can create them again. Continue?",
   // Anmerkung 139 — Aufraeumen der alten Fototag-Sammeleintraege
@@ -3720,24 +3697,13 @@ const I18N_EN = {
   'tl.level.district': "District",
   'tl.level.point': "Exact point",
   'tl.level.thin': "No district is known for {n} of {t} places — they stay on their own. Catch up under “My data → Place names”.",
-  'ims.preview': "🔍 Preview this year",
-  'ims.run': "✚ Create events",
-  'ims.busy': "🔍 looking …",
-  'ims.year.tip': "One year per run — a whole library at once would mean hundreds of events",
-  'ims.hint': "Preview first, then create — the button stays locked until then. One year can yield ten thousand events.",
-  'ims.head': "{y}: {n} photo events on {d} days",
-  'ims.none': "nothing new to create.",
-  'ims.none.why': "Either there are no own photos with coordinates in that year, or everything has been created already — or deleted, and deleted ones do not come back.",
-  'ims.photos': "photos",
   'ims.more': "more",
-  'ims.years.fail': "The year list could not be fetched from Immich ({e}) — the picker shows the last few years. A run still works.",
-  'ims.failed': "Immich did not answer.",
-  'ims.years.own': "The years come from your own data, not from Immich ({e}). The years before the smartphone are missing from that list — a run still works for every year shown.",
-  'ims.needpreview': "Look at the preview first — then create.",
   'im.test': "🔌 Test connection",
-  'im.run': "🖼️ Link photos",
+  'im.run': "🖼️ Fetch photos from Immich",
   'im.reset': "↺ Discard links",
-  'im.desc': "<b>Photos stay in Immich</b> — Life-Dash only remembers which picture belongs to which entry and passes the preview through. Nothing is copied. Matching uses capture time and, when both sides have coordinates, place. Entries with a vague date (month, year) are left out — matches there would be guesswork.",
+  'im.desc': "<b>One run across your whole Immich library.</b> It does two things: every photo of yours <b>with coordinates</b> becomes an event — a dot with a thumbnail on the <b>map</b>, a line without a picture in the <b>timeline</b> (“Photo in Detmold”). And <b>all</b> photos are attached as a strip to their calendar day, including the ones without coordinates and including days with nothing else on them. On top of that your own entries get matching pictures attached (by capture time, and by place when both sides have coordinates). Archived and locked pictures, and other people's photos from shared albums, stay out.",
+  'im.hint': "<b>Photos stay in Immich</b>, nothing is copied. The first run walks every month Immich knows about and may take a while; after that it only touches what has changed. It keeps running in the background even if you close the page.",
+  'pp.reset.hint': "“Discard photo events” is the other case: those are <b>entries</b>, not links. A new run brings them back — but anything you changed by hand on one of them is gone.",
   'im.key.ph': "API key (Immich → Account → API Keys)",
   'im.state.none': "No key stored yet.",
   'im.state.set': "Key stored. Leave the field empty to keep it.",
@@ -3927,16 +3893,6 @@ const I18N_EN = {
   'adm.jobstarted.here': "✓ Started — progress and stop are at the top of this page. The run continues in the background, even if you close the page.",
   'prev.busy': "looking …",
   'prev.below': "the list is below the button.",
-  'year.all': "All years",
-  'year.n': "{n} years",
-  'pp.open': "{n} left",
-  'ims.busy.all': "Cancel — {y} ({i}/{n})",
-  'ims.running': "{i} of {n} years checked ({y})",
-  'ims.running.sum': "so far {n} events on {d} days",
-  'ims.seenonly': "Only {y} was checked — that is why “Create events” stays locked.",
-  'ims.stopped': "Preview cancelled.",
-  'ims.stopped.why': "{i} of {n} years had been checked ({y}) — a run needs a complete preview.",
-  'ims.head.short': "{y}: {n} events — the list is below the button.",
   'nodate': "no date",
   'track.walk': "🚶 Walking",
   'track.run': "🏃 Running",
@@ -5075,6 +5031,28 @@ function tlStripFor(day) {
   return TL_DAY_MEDIA.get(day);
 }
 
+// Anmerkung 206: Tage, an denen Bilder liegen und sonst nichts.
+//
+// `covered` sind die Zeilen, die es ohnehin schon gibt (Ereignisse und
+// Wohnort-Tage). Was in `TL_DAY_MEDIA` steht und dort NICHT vorkommt, bekommt
+// eine Marker-Zeile — sonst entstünde für diesen Tag keine Gruppe, und ohne
+// Gruppe gibt es weder Tageskopf noch Fotoleiste.
+//
+// **Kein Marker bei Suche, gewähltem Tag oder gewählter Stadt** — dieselbe
+// Grenze wie bei den Wohnort-Zeilen: das sind Auswahlen über EINTRÄGE, und ein
+// Tag, der nur Bilder trägt, ist keiner. Er stünde sonst als leerer Kopf
+// zwischen den Treffern.
+function tlPhotoDayRows(covered) {
+  if (tl.query || tl.day || tl.city || !TL_DAY_MEDIA.size) return [];
+  const have = new Set(covered.map(x => (x.date_start || '').slice(0, 10)));
+  const out = [];
+  TL_DAY_MEDIA.forEach((media, day) => {
+    if (!media || !media.length || have.has(day)) return;
+    out.push({ photoDay: true, day, date_start: `${day}T00:00:00` });
+  });
+  return out;
+}
+
 async function loadDayMedia(page) {
   const days = page.map(e => (e.date_start || '').slice(0, 10)).filter(Boolean);
   if (!days.length) return;
@@ -5743,6 +5721,19 @@ function renderTimelineList() {
   // sind Auswahlen über EINTRÄGE, und ein abgeleiteter Tag ist keiner.
   const blRows = (tl.query || tl.day || tl.city) ? [] : tlBaselineRows();
   filtered = filtered.concat(blRows);
+  // **Anmerkung 206 — ein Tag, an dem NUR Fotos liegen, war unsichtbar.**
+  // Dieselbe Falle wie Anmerkung 205, eine Etage höher: die Tagesmenge wurde
+  // aus den EREIGNISSEN aufgezählt (`g.items` unten), also gab es für einen
+  // Tag ohne Eintrag keine Gruppe, keinen Tageskopf und damit auch keine
+  // Leiste — obwohl der Server die Bilder längst verknüpft hatte. Genau das
+  // hat der Nutzer gemeldet („warum gibt es am 08.08 keine Fotos dieses
+  // Tages?").
+  //
+  // Der Marker tritt VOR dem Gruppieren ein, aus demselben Grund wie die
+  // Wohnort-Zeilen darüber (F20): nur so bekommt der Zeitraum überhaupt eine
+  // Gruppe. Er ist keine Karte — nach dem Einsetzen der Fotozeile wird er
+  // wieder entfernt; er ist nur der Grund, dass es diesen Tag gibt.
+  filtered = filtered.concat(tlPhotoDayRows(filtered));
   renderCityChip();
   renderDayChip();         // Anmerkung 142
   ensurePhotoIndex();      // A45: entscheidet, ob der Foto-Schalter etwas kann
@@ -5844,6 +5835,10 @@ function renderTimelineList() {
         });
       }
     }
+    // Anmerkung 206: Die Marker haben ihre Arbeit getan — sie standen nur
+    // dafür, dass es diesen Tag überhaupt gibt. Jetzt raus, sonst suchte
+    // `cardFor` nach einer Karte für etwas, das keine ist.
+    g.items = g.items.filter(x => !x.photoDay);
     // Innerhalb eines Tages: Fotos, dann Tagebuch, dann die Ereignisse. Die
     // Fotozeile ist oben schon an ihren Platz gesetzt; der Rang hält sie dort,
     // wenn ein Tagebuch-Eintrag denselben Tag beansprucht.
@@ -12974,9 +12969,7 @@ async function loadPlaceFormat() {
     });
     step('Immich', () => renderImmichState(s));   // P2.1
   }
-  // Läuft auch ohne Einstellungen: die Jahresauswahl von Stufe 2 hängt an
-  // keiner Antwort, und die Kartenquelle liegt ohnehin nur lokal.
-  step('Immich-Jahre', imsDefaultYears);
+  // Läuft auch ohne Einstellungen: die Kartenquelle liegt ohnehin nur lokal.
   loadTileSettings();
   loadOpenPlaces();       // Anmerkung 148
 }
@@ -13085,8 +13078,6 @@ function renderImmichState(s) {
   state.textContent = s.immich.has_key
     ? t('im.state.set', 'Schlüssel hinterlegt. Feld leer lassen, um ihn zu behalten.')
     : t('im.state.none', 'Noch kein Schlüssel hinterlegt.');
-  // Stufe 2: Jahresauswahl füllen, sobald klar ist, dass es Immich gibt.
-  loadImmichYears();
   ppLoadIndex();       // Stand der Foto-Ereignisse (ebenfalls eigene Daten)
 }
 async function saveImmich() {
@@ -13227,152 +13218,52 @@ document.getElementById('im-reset').addEventListener('click', async () => {
   } catch (err) { toast(err.message, 'error'); }
 });
 
-// ---------- P2.1 Stufe 2: Immich als Ereignis-Quelle ----------
-// Das P2.5-Muster, und zwar erzwungen statt empfohlen: „Vorschläge anlegen"
-// ist gesperrt, bis für GENAU DIESES Jahr eine Vorschau da war. Ein Lauf über
-// eine zwanzig Jahre alte Bibliothek füllt sonst eine Warteschlange, die für
-// Dutzende gebaut ist — und niemand hätte es vorher wissen können.
-let imsPreviewedYear = null;
-// Anmerkung 120: die Jahre, die die Vorschau WIRKLICH gesehen hat. Bei einem
-// Jahr ist das eine Wiederholung von `imsPreviewedYear`; bei „Alle Jahre" ist
-// es die einzige ehrliche Angabe, und der Lauf bekommt sie statt der Auswahl.
-let imsPreviewedYears = [];
-// Das Auswahlfeld hat IMMER etwas anzubieten — auch ohne Server, ohne Immich
-// und ohne dass vorher irgendetwas anderes geklappt hat.
+// ---------- P2.1: Immich als Ereignis-Quelle ----------
+// **Anmerkung 206: hier standen Vorschau und Jahresauswahl.**
 //
-// Anmerkung 112: Die Jahresliste kam ausschließlich vom Server, und der Aufruf
-// hing an `loadPlaceFormat()`, dessen ganzer Rumpf in einem `catch (_) {}`
-// steckt. Ein Fehler IRGENDWO davor — ein fehlendes Feld in den Einstellungen,
-// ein nicht erreichbares Immich — ließ das Feld leer zurück. Der Knopf sagte
-// dann „bitte zuerst ein Jahr wählen" über einer Liste ohne Jahre, schickte
-// nichts los, und im Server-Log stand folgerichtig nichts: eine Sackgasse aus
-// lauter verschluckten Fehlern.
+// Das P2.5-Muster („erst sehen, dann anlegen") war hier erzwungen statt
+// empfohlen: der Anlege-Knopf blieb gesperrt, bis für GENAU DIESES Jahr eine
+// Vorschau gelaufen war. Der Gedanke war richtig — dieser Lauf schreibt
+// bestätigte Lebensdatenbank, und die Moderation gibt es für diese Quelle seit
+// Anmerkung 138 nicht.
 //
-// Die Jahre aus Immich sind eine EMPFEHLUNG (welches Jahr lohnt sich?), keine
-// Voraussetzung. Also stehen sie hier zuerst ohne Server da.
-function imsDefaultYears() {
-  const sel = document.getElementById('ims-year');
-  if (!sel || sel.options.length) return;
-  const now = new Date().getFullYear();
-  sel.innerHTML = Array.from({ length: 6 }, (_, i) => now - i)
-    .map(y => `<option value="${y}">${y}</option>`).join('');
-  imsAddAllOption(sel);
-  sel.value = String(now);
-}
-
-// Anmerkung 120: „Alle Jahre" — aber als Eintrag der Liste, nicht als eigener
-// Knopf. Es ist dieselbe Frage („welcher Zeitraum?"), und zwei Bedienelemente
-// für eine Frage laufen auseinander (Anmerkung 106).
-const YEAR_ALL = 'all';
-function imsAddAllOption(sel) {
-  if (!sel || [...sel.options].some(o => o.value === YEAR_ALL)) return;
-  sel.insertAdjacentHTML('afterbegin',
-    `<option value="${YEAR_ALL}">${esc(t('year.all', 'Alle Jahre'))}</option>`);
-}
-// Die echten Jahre der Auswahl, jüngstes zuerst — ohne den Sammeleintrag.
-function yearsOf(sel) {
-  return [...(sel?.options || [])].map(o => o.value)
-    .filter(v => v !== YEAR_ALL).map(Number).filter(Number.isFinite)
-    .sort((a, b) => b - a);
-}
-
-async function loadImmichYears() {
-  const sel = document.getElementById('ims-year');
-  if (!sel) return;
-  imsDefaultYears();
-  try {
-    const r = await api('/api/immich/years');
-    // Die Fotozahl steht dabei: „2004 · 412 Fotos" macht aus einer Jahresliste
-    // eine Empfehlung — und die lohnendsten Jahre sind die alten, für die es
-    // sonst nichts gibt (Anmerkung 107).
-    sel.innerHTML = (r.years || []).map(y => {
-      const n = y.photos == null ? '' : ` · ${y.photos} ${t('ims.photos', 'Fotos')}`;
-      return `<option value="${y.year}">${y.year}${esc(n)}</option>`;
-    }).join('');
-    imsAddAllOption(sel);
-    const has = (r.years || []).some(y => y.year === r.current);
-    if (has) sel.value = String(r.current);
-    // Anmerkung 113: Der Server antwortet auch dann mit 200, wenn er die
-    // Jahre NICHT aus Immich hat — mit den eigenen als Notnagel. Ohne diesen
-    // Zweig sieht das aus wie eine Empfehlung, ist aber genau die Liste, die
-    // das Paket abschaffen sollte: die Jahre vor dem Smartphone fehlen darin
-    // immer. Der Grund steht jetzt daneben.
-    if (r.source === 'own') {
-      imsNote(t('ims.years.own', 'Die Jahre kommen aus deinem eigenen Bestand, nicht aus Immich ({e}). Gerade die Jahre vor dem Smartphone fehlen darin — ein Lauf geht trotzdem für jedes Jahr in der Liste.')
-        .replace('{e}', r.reason || '—'));
-    } else {
-      imsNote('');
-    }
-    imsMarkScanned(sel);
-  } catch (err) {
-    // Nicht mehr verschlucken: Die Auswahl steht (Standardjahre), aber der
-    // Nutzer soll wissen, dass die Empfehlung fehlt — sonst wundert er sich,
-    // warum keine Fotozahlen dabeistehen.
-    imsDefaultYears();
-    imsNote(t('ims.years.fail', 'Die Jahresliste konnte nicht aus Immich geholt werden ({e}) — die Auswahl zeigt die letzten Jahre. Ein Lauf geht trotzdem.')
-      .replace('{e}', err.message));
-    imsMarkScanned(sel);
-  }
-}
-
-// Was schon durchsucht wurde, steht an der Jahresauswahl — sonst weiß niemand,
-// welches Jahr noch offen ist, und der Lauf wird zum Ratespiel (A40).
+// Gekippt hat ihn der Nutzer, mit einem Grund, der stärker ist als die Regel:
+// „im doing schaue ich mir keine 8.000 Vorschläge an, und das monatsweise
+// Anschauen mache ich auch nicht." Eine Bremse, die niemand betätigt, bremst
+// nichts — sie kostet nur den Weg zum Ergebnis, und was sie an Sicherheit
+// versprach, hat sie in der Praxis nie geliefert.
 //
-// Bis 0.39 hatte der Verorten-Lauf dafür eine EIGENE Auswahl neben dieser hier
-// (`ppFillYears`). Zwei Listen für dieselbe Frage („welches Jahr lohnt sich?")
-// waren schon damals eine zu viel; seit die beiden Läufe einer sind, gibt es
-// die zweite nicht mehr.
-function imsMarkScanned(sel) {
-  if (!sel) return;
-  const done = new Set(mp.photoScanned || []);
-  if (!done.size) return;
-  [...sel.options].forEach(o => {
-    if (done.has(+o.value) && !o.textContent.endsWith(' ✓')) o.textContent += ' ✓';
-  });
-  const all = [...sel.options].find(o => o.value === YEAR_ALL);
-  if (all) {
-    const open = yearsOf(sel).filter(y => !done.has(y)).length;
-    all.textContent = t('year.all', 'Alle Jahre')
-      + (open ? ` (${t('pp.open', '{n} offen').replace('{n}', open)})` : ' ✓');
-  }
-}
+// An ihre Stelle tritt der RÜCKWEG, und zwar zweigeteilt, weil es zwei Sorten
+// sind: `im-reset` wirft die Verknüpfungen weg (Ableitung, folgenlos),
+// `pp-reset` die Foto-Ereignisse (Lebensdatenbank, fragt mit der Zahl nach).
 
 // --------------------------------------------------------------------------- //
 // Anmerkung 139 — Zustand und Rücknahme der Foto-Ereignisse
 // --------------------------------------------------------------------------- //
 // A45 hatte hier einen eigenen Lauf mit eigener Jahresauswahl („Schritt C"),
 // und er brauchte keine Vorschau: er legte verwerfbare Kartenpunkte an. Seit
-// Anmerkung 139 legt derselbe Lauf Lebensdatenbank an — er ist mit Schritt B
-// zusammengefallen und untersteht dessen Vorschau-Pflicht.
+// Anmerkung 139 legt derselbe Lauf Lebensdatenbank an; seit Anmerkung 206 ist
+// er mit dem Verknüpfungs-Lauf zu EINEM verschmolzen.
 //
-// Was hier bleibt: der ZUSTAND (wie viele Foto-Ereignisse gibt es, welche
-// Jahre wurden durchsucht) und die Rücknahme.
+// Was hier bleibt: der ZUSTAND (wie viele Foto-Ereignisse gibt es) und die
+// Rücknahme. **Die Liste der durchsuchten Jahre steht nicht mehr dabei** —
+// abgehakt werden jetzt Monate, und dreihundert Monatsnamen unter einem Knopf
+// sind keine Auskunft mehr, sondern eine Wand. Was jemand hier wissen will,
+// ist „hat der Lauf schon etwas getan?", und das sagt die Zahl.
 async function ppLoadIndex() {
   const box = document.getElementById('pp-result');
   try {
-    // Zwei Auskünfte aus zwei Quellen, und das ist hier richtig: die ZAHL ist
-    // eine Aussage über die Lebensdatenbank (Ereignis-Index), die durchsuchten
-    // JAHRE sind eine Notiz über einen Lauf und stehen in den Einstellungen.
     const idx = await fetchIndex(true);
     mp.photoTotal = idx.photo_events || 0;
     PHOTO_INDEX_DONE = true;
-    let scanned = [];
-    try {
-      const st = await api('/api/auth/me/settings');
-      scanned = ((st.photo_points || {}).years) || [];
-    } catch (_) { /* ohne Merkliste bleibt die Zahl trotzdem gültig */ }
-    mp.photoScanned = scanned;
     mpSyncPhotoChip();
     if (!box) return;
     box.style.display = '';
     box.innerHTML = mp.photoTotal
       ? `<b>${esc(t('pp.have', '{n} Foto-Ereignisse angelegt').replace('{n}', mp.photoTotal.toLocaleString(LOC())))}</b>`
-        + (scanned.length
-            ? `<div class="stat-label" style="margin-top:6px">${esc(t('pp.years', 'Durchsucht: {y}').replace('{y}', scanned.join(', ')))}</div>`
-            : '')
       // „nie nachgesehen" ist nicht „keine Fotos" — der Unterschied gehört
       // dorthin, wo jemand ihn braucht.
-      : esc(t('pp.none', 'Noch kein Jahr durchsucht. Bis dahin bleibt die Foto-Ebene auf der Karte leer — das heißt nicht, dass es keine Fotos gibt.'));
+      : esc(t('pp.none', 'Noch nichts aus Immich geholt. Bis dahin bleibt die Foto-Ebene auf der Karte leer — das heißt nicht, dass es keine Fotos gibt.'));
   } catch (_) { /* ohne Immich gibt es hier schlicht nichts zu zeigen */ }
 }
 document.getElementById('pp-reset')?.addEventListener('click', async ev => {
@@ -13393,224 +13284,6 @@ document.getElementById('pp-reset')?.addEventListener('click', async ev => {
     await ppLoadIndex();
   } catch (err) { toast(err.message, 'error', 8000); }
   finally { btn.disabled = false; }
-});
-
-function imsNote(text) {
-  const box = document.getElementById('ims-result');
-  if (!box || !text) { if (box && box.dataset.note) { box.style.display = 'none'; delete box.dataset.note; } return; }
-  box.style.display = '';
-  box.dataset.note = '1';
-  box.textContent = '⚠️ ' + text;
-}
-function imsLock() {
-  // Jahr gewechselt = die Vorschau gilt nicht mehr. Ein Knopf, der nach dem
-  // Umschalten noch offen steht, legt Ereignisse für ein Jahr an, das nie
-  // jemand gesehen hat.
-  const sel = document.getElementById('ims-year');
-  const run = document.getElementById('ims-run');
-  // `imsPreviewedYears` ist der eigentliche Riegel (Anmerkung 120): der Lauf
-  // bekommt GENAU die Jahre, die die Vorschau abgedeckt hat — nicht die, die
-  // gerade im Feld stehen. Die beiden waren dasselbe, solange es nur ein Jahr
-  // gab; bei „Alle Jahre" sind es zwei Angaben über dieselbe Sache, und die
-  // laufen auseinander (Anmerkung 106).
-  const stale = !imsPreviewedYear || !imsPreviewedYears.length
-    || String(imsPreviewedYear) !== sel.value;
-  run.disabled = stale;
-  if (stale) document.getElementById('ims-result').style.display = 'none';
-}
-document.getElementById('ims-year')?.addEventListener('change', imsLock);
-// --------------------------------------------------------------------------- //
-// Vorschau über EIN Jahr oder über ALLE (Anmerkung 120)
-// --------------------------------------------------------------------------- //
-// „Alle Jahre" ist EINE Vorschau aus VIELEN Anfragen — nicht eine Anfrage über
-// alles. Der Grund ist das Zeitbudget der Vorschau (`PREVIEW_BUDGET_S` = 25 s,
-// abgeleitet aus der Geduld umgekehrter Vertreter): über zwanzig Jahre wäre
-// jede Antwort ein Ausschnitt, und ein Ausschnitt hebt den Riegel nicht auf —
-// „erst sehen, dann anlegen" hieße dann „ein Zwanzigstel sehen, alles anlegen".
-// Jahr für Jahr bekommt dagegen JEDES Jahr das volle Budget, und was am Ende
-// dasteht, ist wirklich angesehen worden.
-let imsBusy = false, imsCancel = false;
-// Anmerkung 139: Die Vorschau zaehlt jetzt FOTOS (ein Foto = ein Ereignis) und
-// verdichtet auf ORTE. Eine Liste von zwanzigtausend Zeilen waere selbst keine
-// Entscheidungsgrundlage mehr - die Orte mit ihren Zahlen sind die Ebene, auf
-// der man "ja, das war so" oder "nein, das sind fremde Bilder" sagen kann.
-function imsBlank() {
-  return { total: 0, days: 0, seen: 0, places: new Map(), sample: [],
-           seconds: 0, truncated: false, skipped: [] };
-}
-function imsMerge(acc, r) {
-  acc.total += r.total || 0;
-  acc.days += r.days || 0;
-  acc.seen += r.seen || 0;
-  acc.seconds += r.seconds || 0;
-  acc.truncated = acc.truncated || !!r.truncated;
-  (r.places || []).forEach(x =>
-    acc.places.set(x.place, (acc.places.get(x.place) || 0) + x.photos));
-  if (acc.sample.length < 12) acc.sample.push(...(r.sample || []).slice(0, 4));
-  (r.skipped || []).forEach(x => { if (!acc.skipped.includes(x)) acc.skipped.push(x); });
-  return acc;
-}
-// „2024" bzw. „2003–2024 (14 Jahre)" — dieselbe Form wie `_year_span` im
-// Backend, damit Vorschau und Ergebnis dieselbe Überschrift tragen.
-function yearSpan(years) {
-  if (!years.length) return '—';
-  if (years.length === 1) return String(years[0]);
-  return `${Math.min(...years)}–${Math.max(...years)} (${
-    t('year.n', '{n} Jahre').replace('{n}', years.length)})`;
-}
-document.getElementById('ims-preview')?.addEventListener('click', async ev => {
-  const btn = ev.target, sel = document.getElementById('ims-year');
-  // Zweiter Klick während eines Laufs über alle Jahre = abbrechen. Ein Lauf,
-  // der zwanzig Minuten dauern kann, braucht einen Ausstieg, der nicht
-  // „Seite neu laden" heißt.
-  if (imsBusy) { imsCancel = true; return; }
-  // Sollte die Liste je leer sein, ist das ein Fehler DIESER Seite und keine
-  // Aufgabe für den Nutzer: „bitte zuerst ein Jahr wählen" über einem leeren
-  // Feld ist eine Sackgasse (Anmerkung 112). Also auffüllen und weitermachen.
-  if (!sel.options.length) imsDefaultYears();
-  const all = sel.value === YEAR_ALL;
-  const years = all ? yearsOf(sel)
-    : [parseInt(sel.value, 10) || new Date().getFullYear()];
-  const box = document.getElementById('ims-result');
-  imsBusy = true; imsCancel = false;
-  // Bei einem Jahr ist der Knopf gesperrt — es gibt nichts abzubrechen, die
-  // eine Anfrage läuft schon. Über alle Jahre IST er der Abbruch.
-  btn.disabled = !all;
-  // Anmerkung 113: Eine große Bibliothek braucht Minuten. Ein Knopf, auf dem
-  // unverändert „sehe nach …" steht, ist von einem hängenden Knopf nicht zu
-  // unterscheiden, und im Server-Log steht bis zur Antwort nichts. Also eine
-  // laufende Uhr: sie beantwortet die einzige Frage, die man in dieser
-  // Minute hat.
-  const began = Date.now();
-  const acc = imsBlank();
-  const seen = [];
-  let at = 0, failed = null;
-  const tick = () => {
-    const s = Math.round((Date.now() - began) / 1000);
-    btn.textContent = all
-      ? `⏹ ${t('ims.busy.all', 'Abbrechen — {y} ({i}/{n})')
-            .replace('{y}', years[Math.min(at, years.length - 1)])
-            .replace('{i}', at + 1).replace('{n}', years.length)}`
-      : t('ims.busy', '🔍 sehe nach …') + (s >= 3 ? ` (${s}s)` : '');
-  };
-  tick();
-  const timer = setInterval(tick, 1000);
-  try {
-    for (; at < years.length; at++) {
-      if (imsCancel) break;
-      const r = await api(`/api/immich/preview?year=${years[at]}`, { method: 'POST' });
-      // Anmerkung 113: Immich-Ausfälle kommen jetzt mit 200 und `error` im
-      // Rumpf. Ein 502 wäre unterwegs von Cloudflare durch eine HTML-Seite
-      // ersetzt worden — die Auskunft, warum es klemmt, kam nie an.
-      if (r.error) { failed = { year: years[at], error: r.error }; break; }
-      imsMerge(acc, r);
-      seen.push(years[at]);
-      // Ein Lauf über zwanzig Jahre, der erst am Ende etwas zeigt, ist
-      // zwanzig Minuten Stille. Der Zwischenstand steht deshalb sofort da.
-      if (all) {
-        box.style.display = '';
-        delete box.dataset.note;
-        box.innerHTML = `<b>🔍 ${esc(t('ims.running', '{i} von {n} Jahren angesehen ({y})')
-            .replace('{i}', seen.length).replace('{n}', years.length)
-            .replace('{y}', years[at]))}</b><br>`
-          + esc(t('ims.running.sum', 'bisher {n} Ereignisse an {d} Tagen')
-              .replace('{n}', acc.total.toLocaleString(LOC()))
-              .replace('{d}', acc.days.toLocaleString(LOC())));
-      }
-    }
-  } catch (err) {
-    failed = { year: years[Math.min(at, years.length - 1)], error: err.message };
-  } finally {
-    clearInterval(timer);
-    imsBusy = false;
-    btn.disabled = false;
-    btn.textContent = t('ims.preview', '🔍 Vorschau für dieses Jahr');
-  }
-  box.style.display = '';
-  // Der Kasten trägt sonst noch die Marke des Jahres-Hinweises — und ein
-  // späteres `imsNote('')` würde dann das Vorschau-Ergebnis ausblenden.
-  delete box.dataset.note;
-  if (failed) {
-    box.innerHTML = `<b>${esc(t('ims.failed', 'Immich hat nicht geantwortet.'))}</b><br>`
-      + `${esc(String(failed.year))}: ${esc(failed.error)}`
-      + (seen.length ? `<div class="stat-label" style="margin-top:8px">⏹ ${
-          esc(t('ims.seenonly', 'Angesehen wurden nur {y} — deshalb bleibt „Ereignisse anlegen" gesperrt.')
-            .replace('{y}', yearSpan(seen)))}</div>` : '');
-    imsPreviewedYear = null; imsPreviewedYears = [];
-    imsLock();
-    toast(t('ims.failed', 'Immich hat nicht geantwortet.'), 'error', 8000);
-    return;
-  }
-  // **Abgebrochen heißt nicht gesehen.** Die halbe Vorschau für die halben
-  // Jahre freizugeben wäre verlockend und falsch: im Feld stünde weiter „Alle
-  // Jahre", der Lauf nähme zehn von vierundzwanzig, und der Unterschied stünde
-  // in keiner Zeile, die jemand liest.
-  if (imsCancel) {
-    box.innerHTML = `<b>⏹ ${esc(t('ims.stopped', 'Vorschau abgebrochen.'))}</b><br>`
-      + esc(t('ims.stopped.why', '{i} von {n} Jahren waren angesehen ({y}) — für einen Lauf muss die Vorschau vollständig sein.')
-          .replace('{i}', seen.length).replace('{n}', years.length).replace('{y}', yearSpan(seen)));
-    imsPreviewedYear = null; imsPreviewedYears = [];
-    imsLock();
-    return;
-  }
-  const r = acc;
-  const label = yearSpan(seen);
-  imsPreviewedYear = all ? YEAR_ALL : seen[0];
-  imsPreviewedYears = seen;
-  {
-    if (!r.total) {
-      box.innerHTML = `<b>${esc(label)}: ${esc(t('ims.none', 'nichts Neues anzulegen.'))}</b><br>`
-        + esc(t('ims.none.why', 'Entweder gibt es keine eigenen Fotos mit Koordinaten in diesem Jahr, oder alles wurde schon angelegt oder gelöscht — Gelöschtes kommt nicht wieder.'));
-    } else {
-      // Die Vorschau NENNT, was entsteht. Eine Zahl allein ist keine
-      // Entscheidungsgrundlage (P2.5) — hier erst recht nicht, weil das
-      // Anlegen sofort bestätigt (Anmerkung 138) und weil es seit Anmerkung 139
-      // um zehntausende Zeilen geht statt um hunderte.
-      const places = [...r.places.entries()].sort((a, b) => b[1] - a[1]);
-      const rows = places.slice(0, 40).map(([name, n]) => `
-        <div style="padding:3px 0">
-          📍 <b>${esc(name)}</b>
-          <span class="stat-label">· ${esc(n.toLocaleString(LOC()))} ${esc(t('ims.photos', 'Fotos'))}</span>
-        </div>`).join('');
-      box.innerHTML = `<b>${esc(t('ims.head', '{y}: {n} Foto-Ereignisse an {d} Tagen')
-          .replace('{y}', label).replace('{n}', r.total.toLocaleString(LOC()))
-          .replace('{d}', r.days.toLocaleString(LOC())))}</b>
-        <div style="margin-top:6px">${rows}</div>
-        ${places.length > 40 ? `<div class="stat-label">… ${places.length - 40} ${esc(t('ims.moreplaces', 'weitere Orte'))}</div>` : ''}
-        ${r.skipped.length ? `<div class="stat-label" style="margin-top:8px">${
-            esc(t('ims.skipped', 'Ohne Ereignis: {r}').replace('{r}', r.skipped.join(', ')))}</div>` : ''}
-        ${r.truncated ? `<div class="stat-label" style="margin-top:8px">⚠️ ${
-            esc(t('ims.truncated', 'Die Vorschau musste abbrechen (Zeitbudget) — der Lauf legt mehr an, als hier steht. Ein einzelnes Jahr wählen für die vollständige Vorschau.'))}</div>` : ''}`;
-    }
-    imsLock();
-    // Anmerkung 120: Auch die Vorschau meldet sich unten rechts. Sie schreibt
-    // ihr Ergebnis zwar jetzt direkt unter den Knopf, aber wer während der
-    // Minuten weitergescrollt hat, sieht davon nichts — und ein Lauf ohne
-    // erkennbares Ende ist von einem hängenden nicht zu unterscheiden.
-    toast(r.total
-      ? `🔍 ${t('ims.head.short', '{y}: {n} Ereignisse — die Liste steht unter dem Knopf.')
-          .replace('{y}', label).replace('{n}', r.total)}`
-      : `🔍 ${label}: ${t('ims.none', 'nichts Neues anzulegen.')}`, 'ok', 7000);
-  }
-});
-document.getElementById('ims-run')?.addEventListener('click', ev => {
-  const chosen = document.getElementById('ims-year').value;
-  if (String(imsPreviewedYear) !== String(chosen) || !imsPreviewedYears.length) {
-    // Sollte der Knopf je offen stehen, ohne dass eine Vorschau lief, ist hier
-    // Schluss: die Sperre am Knopf ist die Bequemlichkeit, das hier die Regel.
-    toast(t('ims.needpreview', 'Erst die Vorschau ansehen — dann anlegen.'), 'warn');
-    return;
-  }
-  // Er bekommt die Jahre der VORSCHAU, nicht die der Auswahl (Anmerkung 120).
-  // Steht im Feld „Alle Jahre", während die Vorschau vier Jahre gesehen hat,
-  // sind vier Jahre die Wahrheit — die Sperre sorgt dafür, dass beides
-  // ohnehin zusammenpasst.
-  startServerJob(ev.target, 'photo_points', { years: imsPreviewedYears }, true);
-  // Die Vorschau ist verbraucht: nach dem Lauf ist der Bestand ein anderer,
-  // und der Knopf darf nicht offen stehen bleiben.
-  imsPreviewedYear = null;
-  imsPreviewedYears = [];
-  imsLock();
 });
 
 // F13: eigene Kachelquelle — bewusst nur lokal (kein Server-Setting), weil die

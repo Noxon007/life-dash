@@ -514,22 +514,6 @@ def timeline_buckets(url: str, key: str, my_id: str | None, *,
     raise last or ImmichError("Immich liefert keine Zeitachse")
 
 
-def photo_years(url: str, key: str, my_id: str | None) -> dict[int, int]:
-    """Jahr -> Anzahl eigener, georeferenzierter Fotos im Immich-Zeitstrahl.
-
-    Warum das nicht aus den eigenen Daten kommt, obwohl es billiger wäre:
-    Anmerkung 107 nennt ausgerechnet die Jahre **ohne** Timeline-Daten als die
-    wertvollsten („die Erinnerungen von vor dem Smartphone"). Eine Auswahlliste
-    aus den eigenen Ereignissen böte genau die nicht an — sie zeigte 2026 und
-    verstecke 2004.
-    """
-    years: dict[int, int] = {}
-    for month, count in timeline_buckets(url, key, my_id).items():
-        y = int(month[:4])
-        years[y] = years.get(y, 0) + count
-    return years
-
-
 # --------------------------------------------------------------------------- #
 # Zuordnung Asset -> Ereignis
 # --------------------------------------------------------------------------- #

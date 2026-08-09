@@ -248,50 +248,14 @@ def open_months(user, buckets: dict[str, int]) -> list[str]:
     return sorted((m for m, n in buckets.items() if done.get(m) != n), reverse=True)
 
 
-def link_month(db: Session, user, month: str, url: str, key: str,
-               seen: set[str], my_id: str | None, *,
-               taken: set[tuple[int, int, int]], heartbeat=None) -> int:
-    """Die Fotos EINES Monats an ihre Kalendertage hängen. Ohne Commit.
-
-    Kein Orts-Abgleich, anders als beim Ereignis: der Tag ist ein Behälter der
-    ZEITachse (Anmerkung 87), und ein Ortsfilter auf einen Behälter, der
-    ausdrücklich nicht vom Ort handelt, wäre in sich widersprüchlich. Wer
-    vormittags in Düsseldorf ist und abends in München fotografiert, hat ein
-    Foto von diesem Tag — und sonst hätte es gar keinen Platz.
-
-    `taken` sind die Tage, die schon eine Leiste tragen; die Menge wird
-    fortgeschrieben, damit der Aufrufer sie nicht je Monat neu abfragt.
-
-    **Fremde Bilder bleiben draußen** (`is_own`), und archivierte auch
-    (`is_in_timeline`) — beides dieselbe Strenge wie beim Foto-Ereignis-Lauf.
-    Ohne bekannte eigene Kennung wird allerdings NICHT geschwiegen, sondern
-    ungefiltert verknüpft: eine Leiste ist eine verwerfbare Ableitung
-    (Anmerkung 57), und dafür ist „lieber ein fremdes Bild zu viel" der
-    billigere Fehler als „gar keine Fotos, ohne zu sagen warum". Der Aufrufer
-    nennt es im Ergebnis.
-    """
-    start, end = month_window(month)
-    assets = api.search_assets_paged(url, key, start, end, heartbeat=heartbeat)
-    by_day: dict[tuple[int, int, int], list[dict]] = {}
-    for asset in assets:
-        if my_id is not None and not api.is_own(asset, my_id):
-            continue
-        if not api.is_in_timeline(asset):
-            continue
-        when = api.asset_time(asset)
-        if when is None:          # ohne Zeit kein Tag — der Behälter ist das Datum
-            continue
-        day = (when.year, when.month, when.day)
-        if day in taken:
-            continue
-        by_day.setdefault(day, []).append(asset)
-    added = 0
-    for day in sorted(by_day):
-        n = add_day_media(db, user, by_day[day], seen)
-        if n:
-            taken.add(day)
-            added += n
-    return added
+# Wo die Tagesregel steht: **`photo_points.fill_day_strips`**, und nur dort.
+#
+# Anmerkung 206: Hier stand eine zweite Fassung (`link_month`) — sie holte den
+# Monat selbst und gruppierte ihn selbst, während `fill_day_strips` dasselbe
+# aus dem Jahresdurchlauf des anderen Laufs tat. Zwei Antworten auf „welcher
+# Tag bekommt welche Bilder?", und sie unterschieden sich bereits: die eine
+# filterte nach Besitz, die andere nicht. Seit beide Läufe einer sind, holt der
+# Aufrufer den Monat EINMAL und reicht die Assets durch.
 
 
 def detach_machine_links(db: Session, user_id: str) -> int:

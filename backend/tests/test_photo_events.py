@@ -426,51 +426,18 @@ def test_the_cleanup_unhooks_children_instead_of_orphaning_them(db, user):
 
 
 # --------------------------------------------------------------------------- #
-# Die Merkliste der Jahre
+# Die Merkliste — Monate mit ihrer Fotozahl (Anmerkung 206)
 # --------------------------------------------------------------------------- #
-def test_never_looked_is_not_the_same_as_nothing_there(db, user):
-    assert pp.scanned_years(user) == set()
-    pp.mark_scanned(db, user, 2004)
-    db.commit()
-    db.expire(user)
-    assert pp.scanned_years(user) == {2004}
-
-
-def test_marking_a_year_keeps_the_others(db, user):
-    """`user.settings` ist eine JSON-Spalte: neu ZUWEISEN, nicht mutieren —
-    SQLAlchemy bemerkt eine Änderung im Dict sonst nicht."""
-    pp.mark_scanned(db, user, 2004)
-    db.commit()
-    pp.mark_scanned(db, user, 2011)
-    db.commit()
-    db.expire(user)
-    assert pp.scanned_years(user) == {2004, 2011}
-
-
-# --------------------------------------------------------------------------- #
-# Die Vorschau
-# --------------------------------------------------------------------------- #
-def test_the_preview_summarises_by_place(db, user):
-    """Zwanzigtausend Zeilen aufzuzählen ist keine Entscheidungsgrundlage.
-
-    Genannt wird die Ebene, auf der man „ja, das war so" oder „nein, das sind
-    fremde Bilder" sagen kann: der ORT mit seiner Zahl.
-    """
-    assets = ([_asset(i, minute=i) for i in range(1, 8)]
-              + [_asset(20 + i, minute=i, day=13, city="Bielefeld",
-                        lat=52.02, lng=8.53) for i in range(3)])
-    summary = pp.preview_summary(_props(assets, db, user))
-    assert summary["total"] == 10
-    assert summary["days"] == 2
-    assert summary["places"][0] == {"place": "Detmold", "photos": 7}
-    assert summary["places"][1] == {"place": "Bielefeld", "photos": 3}
-    assert summary["sample"], "die Vorschau NENNT, statt nur zu zählen"
-
-
-def test_the_preview_creates_nothing(db, user):
-    pp.preview_summary(_props([_asset(1)], db, user))
-    assert db.query(Event).count() == 0
-    assert db.query(Fragment).count() == 0
+# Hier standen zwei Merklisten: die JAHRE dieses Laufs (ein Häkchen) und die
+# MONATE des Verknüpfungs-Laufs (die Fotozahl). Seit beide Läufe einer sind,
+# gibt es nur die zweite — und sie ist die bessere von beiden: ein Häkchen kann
+# „nachgesehen, nichts gefunden" nicht von „nie nachgesehen" unterscheiden, und
+# eine Zahl macht den Monat von selbst wieder auf, sobald jemand nachlädt.
+# Geprüft wird sie in `test_p21_review.py`, wo sie zu Hause ist.
+#
+# Die VORSCHAU ist mit derselben Anmerkung weggefallen (Entscheidung des
+# Users): „im doing schaue ich mir keine 8.000 Vorschläge an." Was an ihre
+# Stelle tritt, ist der Rückweg — `reset()`, geprüft weiter oben.
 
 
 # --------------------------------------------------------------------------- #
