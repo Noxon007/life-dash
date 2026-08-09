@@ -262,6 +262,14 @@ any `MINOR`.
   question-free — those are only references, and the next run rebuilds them.
 
 ### Fixed
+- **The statistics tab loads again on larger collections.** On PostgreSQL the
+  weather statistics could stop finishing altogether — the database ran at full
+  CPU and the page eventually gave up with a gateway timeout, while the same
+  data on SQLite was merely slow. The query that fetches the events carrying
+  weather was written in a shape the PostgreSQL planner cannot turn into a
+  join, so past a certain collection size it started re-reading the whole
+  metrics table once per event. It asks the same question in two steps now, and
+  the answer is unchanged.
 - **A day that has only photos now shows up in the timeline at all.** Days were
   listed from your entries, so a day with pictures and nothing written down had
   no heading and no photo strip — even though the photos had been linked. This

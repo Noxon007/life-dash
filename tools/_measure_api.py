@@ -21,14 +21,31 @@ Zuletzt gemessen 2026-08-09 (SQLite, Windows) — der nächste Umbau wird daran
 gemessen und nicht an einem Gefühl:
 
                               Demo     Lastfall
-    /api/events/index          52 ms      92 ms
-    Zeitstrahl-Seite (300)     43 ms      11 ms
-    …mit Fotos + verdichtet    64 ms     168 ms
-    /api/days/weather (alles) 1610 ms     212 ms
-    /api/achievements          758 ms     203 ms
-    /api/stats/overview       1611 ms     543 ms   (2326 → 1710 → 1611)
-    /api/stats/toplists       1118 ms     479 ms
-    /api/events/map            161 ms     138 ms
+    /api/events/index          54 ms      92 ms
+    Zeitstrahl-Seite (300)     41 ms      11 ms
+    …mit Fotos + verdichtet    62 ms     168 ms
+    /api/days/weather (alles) 1648 ms     212 ms
+    /api/achievements          764 ms     203 ms
+    /api/stats/overview       1679 ms     543 ms   (2326 → 1710 → 1611 → 1679)
+    /api/stats/toplists       1190 ms     479 ms
+    /api/events/map            173 ms     138 ms
+
+**Und dieser Lauf ist als Nachweis NICHT ausreichend — Anmerkung 214.** Er
+misst SQLite, und die teuerste Fehlerklasse dieses Projekts ist auf SQLite
+unsichtbar: `weather_values` stand hier mit 1611 ms und lief auf dem
+betriebenen PostgreSQL nicht fertig (100 % CPU, Abbruch des Proxys nach 100 s).
+Ursache war ein `OR` zwischen zwei `IN`-Unterabfragen — PostgreSQL darf daraus
+keinen Semi-Join machen, und ob der verbleibende `SubPlan` EINMAL gehasht oder
+je Zeile neu durchlaufen wird, entscheidet die Schätzung gegen `work_mem`.
+SQLite baut stattdessen einen Ephemeral-Index und stellt die Frage nie.
+
+**Was den Befund gefunden hat, war nicht dieser Lauf, sondern ein grosser
+Bestand auf der echten Maschine.** Zum Nachstellen: Cluster wie in
+`tools/pg-test.ps1` hochfahren, den Demo-Bestand hineinbauen, die Ereignisse
+mit ihren Metriken per SQL vervielfachen (auf ~34.000 Ereignisse /
+575.000 Metriken kippt es), `ANALYZE` — und dann `EXPLAIN` lesen statt Zeiten.
+`pwsh tools/pg-test.ps1` allein genügt dafür NICHT: sein Bestand ist je Test
+angelegt und viel zu klein, um einen Planer die Seite wechseln zu lassen.
 
 **Die Aufteilung innerhalb von `/api/stats/overview`** (Anmerkung 213), weil
 die Gesamtzahl allein nicht sagt, wo der nächste Umbau ansetzen müsste:

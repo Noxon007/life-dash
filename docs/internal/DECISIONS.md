@@ -1630,6 +1630,64 @@ one of them cost a rule.
 
     Guards: `test_p21_immich.py` gains a case that one grab yields *both* halves and asserts **the number of requests** — two would be the two old runs again, just inside one job. `test_multi_year_jobs.py` was rewritten from years to months and keeps note 120's promises unchanged: newest first, each unit ticked off on its own, commit before tick, and a unit aborted *midway* is not ticked off. `check-photo-strips.js` grows the reported case plus its counter-check (the marker must not render as an empty card). Run against three deliberately broken versions: removing the marker injection turns two guard checks red, dropping the strip half of the merged run turns two tests red, restoring the old event-table day list turns five red.
 
+**Report of 2026-08-09, sixth pass (note 214), on `main`, no version bump.** The
+user: *“the statistics tab loads unnaturally long, or never finishes.”* Then, a
+minute later, the browser console — `GET /api/stats/overview 524` — and: *“100 %
+CPU on the pi where life-dash runs.”* Two facts that between them turned a vague
+complaint into a diagnosis, and one of them (524 is the **proxy's** timeout at
+100 s, not the browser's) ruled out the whole frontend before a line was read.
+
+214. ✅ **An `OR` between two `IN` subqueries, and the cliff underneath it.**
+
+    **The defect.** Note 213's restriction — load only events that *carry*
+    weather, plus their parents — was written as
+    `or_(Event.id.in_(has_weather), Event.id.in_(parents))`. Under an `OR`,
+    PostgreSQL may not rewrite either side into a join: both stay `SubPlan`s,
+    and whether a `SubPlan` is hashed **once** or re-run for **every row of the
+    outer table** is decided by one estimate against `work_mem` (default 4 MB).
+    The plan measured at 33,000 events: `SubPlan 2` hashed, `SubPlan 1` a
+    `Materialize` over 362,627 metric rows — once per event row. Estimated cost
+    **255,050,589**. That is the 100 % CPU, and it is a query that in practice
+    never returns.
+
+    **The lesson is the shape of the failure, not the failure.** With four
+    weather keys instead of thirteen the same planner estimates 112,375 rows,
+    hashes, and the same query costs **97 ms**. So this is a **cliff, not a
+    curve**: a collection growing past the edge does not get “a bit slower”, it
+    stops. That is exactly what the user saw — it worked until recently, and
+    then it did not. And SQLite cannot show it, because SQLite builds an
+    ephemeral index and never asks the question. **`pwsh tools/pg-test.ps1`
+    would not have caught it either** — its corpus is per-test and tiny. The
+    fixture that finds this class is a *large* corpus on the real engine.
+
+    **How it was found, including the wrong turn**, because the wrong turn is
+    the reusable part. The first PostgreSQL measurement of exactly this query
+    came back at **64 ms** and appeared to clear it. It was wrong twice over:
+    the tables had just been filled and never `ANALYZE`d, so the planner
+    estimated small and hashed; and the query had been retyped by hand with
+    four of the thirteen keys. **A reproduction that simplifies the input is a
+    different query**, the same way note 199's stand-in that omitted a field was
+    a different function. What settled it was not a better guess but
+    `pg_stat_activity` while the thing was running — the statement that had been
+    burning CPU for two minutes, in full, with its own key list.
+
+    **The repair: two queries instead of one.** No `OR`, so each side may be a
+    semi-join; the union is a `dict.update`. `EXISTS` rather than `IN`, because
+    it states the intent (*is there a weather row for this?*) and rides the
+    index on `metrics.event_id`. Both plans are now `Semi Join`, estimated
+    21,309 and 19,344 against the old 255,050,589 — a factor of twelve
+    thousand. Measured on the same corpus with the same `work_mem`: still
+    running after two minutes → **1,338 ms**, and the returned set is identical
+    to the intent computed in Python (33,824 of 33,864 rows, nothing missing,
+    nothing extra).
+
+    **The rule to carry:** *what a planner is allowed to rewrite matters more
+    than what the query says.* A condition that cannot become a join is not a
+    slower version of one — it is a different algorithm, chosen silently, on the
+    far side of an estimate nobody in this repository controls. Which is note
+    186's rule about foreign interfaces, pointed inward: **the planner decides
+    too, by criteria that are not in our code.**
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

@@ -198,6 +198,21 @@ Der wiederkehrende Defekt in diesem Projekt ist nicht Kaputtheit, sondern
   Deshalb ist die Löschreihenfolge in `app/wipe.py` eine Liste, und der Test
   prüft gegen `Base.metadata` statt gegen Beispiele — eine Tabelle, nach der
   niemand fragt, kann kein Test vermissen.
+- **Ein `OR` zwischen zwei `IN`-Unterabfragen verbietet PostgreSQL den
+  Semi-Join** (Anmerkung 214). Es bleiben zwei `SubPlan`, und ob so einer
+  EINMAL gehasht oder je Zeile der äußeren Tabelle neu durchlaufen wird,
+  entscheidet allein die Schätzung gegen `work_mem` (Vorgabe 4 MB). **Das ist
+  eine Klippe, keine Kurve:** dieselbe Abfrage kostet 97 ms oder läuft nie
+  fertig, je nachdem, auf welcher Seite der Kante der Bestand steht. Zwei
+  getrennte Abfragen haben kein `OR` — die Vereinigung macht das `dict`. Auf
+  SQLite ist nichts davon zu sehen (Ephemeral-Index), und die Testsuite auf
+  PostgreSQL auch nicht: ihr Bestand ist zu klein. **Wer einen Plan prüft,
+  prüft ihn mit dem ECHTEN Wertesatz** — mit vier statt dreizehn Schlüsseln
+  schätzt der Planer anders und antwortet auf eine andere Frage.
+- **Hängt etwas auf dem Server, ist `pg_stat_activity` die erste Frage**, nicht
+  die zweite: `SELECT now()-query_start, query FROM pg_stat_activity WHERE
+  state='active'` nennt die Anweisung im vollen Wortlaut, während sie läuft.
+  Eine Runde davon schlägt jede Stunde Plan-Raten.
 - **Dialektklasse SQLite ↔ PostgreSQL:** `round()` nur für `numeric`,
   `DISTINCT` nicht über JSON-Spalten, `concat` erst ab SQLite 3.44, `extract`
   liefert auf PG Fließkomma. Dafür ist `pwsh tools/pg-test.ps1` da.
@@ -332,6 +347,11 @@ schliessen, die kein Feature nach 1.0 sind.
 - **213** Wetter-Ereignisseite gemessen: 1710 -> 1611 ms. **Der Umbau der
   zwoelf Ranglisten nach SQL bleibt offen** — vier Regeln auf einmal in die
   Abfrage, und eine falsche Rangliste ist schlimmer als eine langsame.
+- **214** Die Einschraenkung aus 213 hat den Statistik-Reiter auf dem
+  betriebenen PostgreSQL zum Stillstand gebracht (100 % CPU, 524 vom Proxy).
+  Ursache war das `OR` zwischen zwei `IN`-Unterabfragen — siehe die neue Falle
+  unter „Last & Datenbank". Jetzt zwei Abfragen mit `EXISTS`, gleiche Menge,
+  geschaetzte Kosten 255.050.589 -> 21.309.
 
 **Damit sind die zehn offenen Punkte aus Anmerkung 200 geschlossen.** Offen
 bleiben aus R1 nur noch **b** (Screenshots/GIF, braucht den User), **c**

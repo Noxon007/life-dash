@@ -22,8 +22,8 @@ from datetime import date as date_type
 from datetime import datetime, time
 from typing import NamedTuple
 
-from sqlalchemy import func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy import and_, exists, func, or_
+from sqlalchemy.orm import Session, aliased
 
 from app.sqlutil import day_number
 from app.models import (ConfirmState, DatePrecision, DayMetric, Entity, Event,
@@ -432,19 +432,48 @@ def weather_values(db: Session, user_id: str):
     # still auf den Kindnamen zurückfallen lassen — gefunden vom Wächter aus
     # Anmerkung 199, und genau dafür steht er da. Eine Voraussetzung, die für
     # die eine Auswertung gilt, gilt für die andere nicht.
-    has_weather = (db.query(Metric.event_id)
-                   .filter(Metric.source == Source.weather,
-                           Metric.key.in_(_WX_KEYS), Metric.value.isnot(None)))
-    parents = (db.query(Event.parent_event_id)
-               .filter(Event.user_id == user_id,
-                       Event.parent_event_id.isnot(None),
-                       Event.id.in_(has_weather)))
-    base = (db.query(Event.id, Event.title, Event.date_start, Event.date_precision,
-                     Event.category, Event.parent_event_id, Location.name)
-            .outerjoin(Location, Event.location_id == Location.id)
-            .filter(Event.user_id == user_id, Event.date_start.isnot(None),
-                    or_(Event.id.in_(has_weather), Event.id.in_(parents))))
-    events = {r.id: r for r in base.all()}
+    #
+    # **Anmerkung 214: ZWEI Abfragen, weil ein `OR` zwischen zwei
+    # `IN`-Unterabfragen den Semi-Join verbietet.** Genau so stand es hier —
+    # `or_(Event.id.in_(has_weather), Event.id.in_(parents))` — und es hat den
+    # Statistik-Reiter auf dem betriebenen PostgreSQL zum Stillstand gebracht
+    # (100 % CPU, Abbruch des Proxys nach 100 s). Unter einem `OR` kann
+    # PostgreSQL keine der beiden Seiten in einen Join umschreiben; es bleiben
+    # zwei `SubPlan`, und ob so einer EINMAL gehasht oder für JEDE Zeile der
+    # äußeren Tabelle neu durchlaufen wird, entscheidet allein die Schätzung
+    # gegen `work_mem` (Vorgabe 4 MB). Gemessener Plan bei 33.000 Ereignissen:
+    # `SubPlan 2` gehasht, `SubPlan 1` als `Materialize` über 362.627
+    # Metrik-Zeilen — je Ereigniszeile einmal, geschätzte Kosten 255 Millionen.
+    #
+    # **Das ist eine Klippe, keine Kurve**, und darin liegt die Lehre: mit
+    # weniger Schlüsseln (vier statt dreizehn) schätzt derselbe Planer 112.375
+    # Zeilen, hasht, und dieselbe Abfrage kostet 97 ms. Ein Bestand, der über
+    # die Kante wächst, macht aus einer Sekunde kein „etwas mehr", sondern ein
+    # Nie-fertig — und auf SQLite ist beides nicht zu sehen, weil das einen
+    # Ephemeral-Index baut und die Frage gar nicht stellt.
+    #
+    # Zwei getrennte Abfragen haben kein `OR`, also darf jede ein Semi-Join
+    # werden; die Vereinigung macht das `dict`. `EXISTS` statt `IN`, weil es
+    # die Absicht („gibt es dazu eine Wetterzeile?") direkt hinschreibt und
+    # über den Index auf `metrics.event_id` läuft.
+    wx = (Metric.source == Source.weather,
+          Metric.key.in_(_WX_KEYS), Metric.value.isnot(None))
+    child = aliased(Event)
+
+    def _base():
+        return (db.query(Event.id, Event.title, Event.date_start,
+                         Event.date_precision, Event.category,
+                         Event.parent_event_id, Location.name)
+                .outerjoin(Location, Event.location_id == Location.id)
+                .filter(Event.user_id == user_id, Event.date_start.isnot(None)))
+
+    events = {r.id: r for r in _base().filter(
+        exists().where(and_(Metric.event_id == Event.id, *wx))).all()}
+    events.update({r.id: r for r in _base().filter(
+        exists().where(and_(child.parent_event_id == Event.id,
+                            child.user_id == user_id,
+                            exists().where(and_(Metric.event_id == child.id,
+                                                *wx))))).all()})
     values: dict[str, dict[str, float]] = {}
     if events:
         rows = (db.query(Metric.event_id, Metric.key, Metric.value)
