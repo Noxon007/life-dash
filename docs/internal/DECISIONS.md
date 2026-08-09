@@ -1598,6 +1598,18 @@ not a post-1.0 feature.
 
     Guard: `tools/check-job-refresh.js`, thirteen cases over the whole chain — running → finished → corpus forgotten → the open view's loader called. Run against the pre-change behaviour: two go red. The counter-directions are half the file, and they are the half that would otherwise bite: while a run is **still going**, nothing may be rebuilt (or the view redraws every four seconds), the same finished run must not refresh twice, and an own foreground run must produce no second message. It also asserts that the jobs table no longer holds a timer of its own — without that line, someone re-adds the second poller and every other check stays green.
 
+213. ⚠️ **The event side of the weather statistics: measured, one repair, and the big rewrite deliberately NOT done.** The half note 204 left open (`weather_values` + `_extreme_tops`, ~1.1 s), asked for as part of “close everything that is not a post-1.0 feature”.
+
+    **The repair.** `weather_values` loaded **every** event of the account with its title and place name — and not one row without a weather value was ever read: `_extreme_tops` asks `events` only for ids that appear in `values`, and `card` does the same. Work for no result. It is restricted to weather-carrying events now, as a subquery rather than an `IN (…)` of ids, because note 204 already recorded that a client-bound list of that size becomes a hard error under `psycopg3`.
+
+    **The first version of that restriction was wrong, and the guard from note 199 caught it.** The warmest *trip* groups by `parent_event_id` and takes the **parent's** title — and the parent carries no weather of its own. Restricting to weather-carrying rows made the tile fall back to the child's name (“Andalusien — Tag 1”), silently. Parents of weather-carrying events are now included. The lesson is one this file keeps writing down: **a precondition that holds for one evaluation does not hold for its neighbour**, and the only reason this did not ship was a test written for a different defect a week earlier.
+
+    **What it bought, measured rather than claimed: 99 ms.** `/api/stats/overview` 1710 → 1611 ms. The reason it is not more is worth more than the number: of ~8,500 events in the demo corpus, **8,456 carry weather**. Anyone treating that filter as the big lever had not looked at the corpus — it was correct, and it was small.
+
+    **Where the time actually goes** (in the header of `tools/_measure_api.py` now): `weather_values` 549 ms, `_extreme_tops` 230 ms, `_weather_stats` 1485 ms in total, `compute_overview` 1617 ms. So neither of the two functions note 204 named is the majority; roughly 700 ms sits in the rest of `_weather_stats`.
+
+    **The rewrite is not being attempted, and that is the decision.** Making the twelve rankings a SQL problem means moving four rules into the query at once — the key chain (`temp_max_c`, else `temperature_c`), the direction per extreme, `positive_only` (0 is no record for rain and the most interesting value there is for daylight), and the tie-break that keeps the list stable between two loads. Those rules are the reason `_extreme_tops` exists *once* instead of twice (notes 114, 156, 194). **A ranking that is wrong is worse than a ranking that is slow**, and 1.6 s on a click-through view, on a corpus larger than a real one, does not buy the risk of getting them subtly wrong under time pressure. It stays open, with a measurement attached this time instead of a feeling — which is what note 204 asked for.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

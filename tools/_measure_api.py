@@ -21,14 +21,27 @@ Zuletzt gemessen 2026-08-09 (SQLite, Windows) — der nächste Umbau wird daran
 gemessen und nicht an einem Gefühl:
 
                               Demo     Lastfall
-    /api/events/index          53 ms      92 ms
-    Zeitstrahl-Seite (300)     41 ms      11 ms
-    …mit Fotos + verdichtet    62 ms     168 ms
-    /api/days/weather (alles) 1611 ms     212 ms
-    /api/achievements          772 ms     203 ms
-    /api/stats/overview       1710 ms     543 ms   (vor Anm. 204: 2326 ms)
-    /api/stats/toplists       1167 ms     479 ms
-    /api/events/map            178 ms     138 ms
+    /api/events/index          52 ms      92 ms
+    Zeitstrahl-Seite (300)     43 ms      11 ms
+    …mit Fotos + verdichtet    64 ms     168 ms
+    /api/days/weather (alles) 1610 ms     212 ms
+    /api/achievements          758 ms     203 ms
+    /api/stats/overview       1611 ms     543 ms   (2326 → 1710 → 1611)
+    /api/stats/toplists       1118 ms     479 ms
+    /api/events/map            161 ms     138 ms
+
+**Die Aufteilung innerhalb von `/api/stats/overview`** (Anmerkung 213), weil
+die Gesamtzahl allein nicht sagt, wo der nächste Umbau ansetzen müsste:
+
+    weather_values             549 ms   (8.456 Ereignisse mit Wetter,
+                                          7.433 Wohnort-Tage)
+    _extreme_tops              230 ms   (zwölf Ranglisten über beide Mengen)
+    _weather_stats gesamt     1485 ms
+    compute_overview gesamt   1617 ms
+
+Von 8.500 Ereignissen tragen 8.456 Wetter. Wer hier eine Einschränkung auf
+„nur die mit Wetter" für den großen Hebel hält, hat den Bestand nicht
+angesehen — sie war richtig und hat 99 ms gebracht.
 
 **Der Demo-Bestand ist auf den teuren Endpunkten VIERMAL so langsam wie der
 „Lastfall", obwohl er weniger als die Hälfte der Ereignisse hat.** Der Grund

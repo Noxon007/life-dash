@@ -413,10 +413,37 @@ def weather_values(db: Session, user_id: str):
     die Rundung ein zweites Mal aufzuschreiben — und zwei Fassungen einer
     Rundungsregel laufen still auseinander.
     """
+    # **Anmerkung 213: nur Ereignisse, die Wetter TRAGEN.** Hier stand der ganze
+    # Bestand — am Demo-Leben 8.500 Zeilen mit Titel und Ortsnamen, von denen
+    # keine einzige ohne Wetterwert je gelesen wurde: `_extreme_tops` fragt
+    # `events` ausschließlich für Kennungen aus `values`, und `card` genauso.
+    # Es war also nicht zu viel Arbeit für ein Ergebnis, sondern Arbeit für
+    # gar keins.
+    #
+    # Die Bedingung steht als Unterabfrage und nicht als `IN (…)` mit
+    # eingesetzten Kennungen: eine Liste mit zehntausend Elementen bindet
+    # `psycopg2` clientseitig, und Anmerkung 204 hat schon festgehalten, dass
+    # genau das mit `psycopg3`/`asyncpg` ein harter Fehler wäre. Was die
+    # Datenbank entscheiden kann, entscheidet die Datenbank.
+    # **Und die ELTERN gehören dazu, obwohl sie selbst kein Wetter tragen.**
+    # Die wärmste Reise gruppiert über `parent_event_id` und nimmt den Titel
+    # der Elternzeile („Andalusien", nicht „Andalusien — Tag 1", Anmerkung 199).
+    # Die erste Fassung dieser Einschränkung hat das übersehen und die Kachel
+    # still auf den Kindnamen zurückfallen lassen — gefunden vom Wächter aus
+    # Anmerkung 199, und genau dafür steht er da. Eine Voraussetzung, die für
+    # die eine Auswertung gilt, gilt für die andere nicht.
+    has_weather = (db.query(Metric.event_id)
+                   .filter(Metric.source == Source.weather,
+                           Metric.key.in_(_WX_KEYS), Metric.value.isnot(None)))
+    parents = (db.query(Event.parent_event_id)
+               .filter(Event.user_id == user_id,
+                       Event.parent_event_id.isnot(None),
+                       Event.id.in_(has_weather)))
     base = (db.query(Event.id, Event.title, Event.date_start, Event.date_precision,
                      Event.category, Event.parent_event_id, Location.name)
             .outerjoin(Location, Event.location_id == Location.id)
-            .filter(Event.user_id == user_id, Event.date_start.isnot(None)))
+            .filter(Event.user_id == user_id, Event.date_start.isnot(None),
+                    or_(Event.id.in_(has_weather), Event.id.in_(parents))))
     events = {r.id: r for r in base.all()}
     values: dict[str, dict[str, float]] = {}
     if events:
