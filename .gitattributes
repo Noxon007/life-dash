@@ -1,0 +1,8 @@
+# Anmerkung 207: Die Bibliotheken in frontend/vendor/ sind Fremdcode und
+# stehen unverändert im Baum — genau so, wie die jeweilige Veröffentlichung sie
+# ausliefert. Ohne diese Zeile normalisiert Git ihre Zeilenenden beim Auschecken
+# (`core.autocrlf` ist auf dieser Maschine an), und dann stimmt die Zusage in
+# vendor/README.md nicht mehr: „byte-for-byte what the upstream release ships".
+# Das ist keine Kosmetik — es ist die einzige Aussage, an der sich eine Kopie
+# gegen das Original prüfen lässt.
+frontend/vendor/** -text
