@@ -34,7 +34,7 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
   der Server?) statt auf `pg_ctl` — das beendet sich auf Windows nicht
   verlässlich, und der gestartete Server erbt die Ausgabekanäle: hängt stdout an
   einer Pipe, bleibt der Lauf nach erfolgreichem Start stumm stehen.
-- Wächter: `cd tools` → `npm run check` (39 jsdom-Dateien)
+- Wächter: `cd tools` → `npm run check` (41 jsdom-Dateien)
 - **Smoke gegen ein HTTP-Doppel** (Immich): `<python> tools/immich_double.py &`
   dann `<python> tools/smoke_a45.py` — findet, was Unit-Tests prinzipiell nicht
   können (Blättern, Zeitzonen, echte DTOs). Immer aus dem Wurzelverzeichnis.
@@ -235,9 +235,37 @@ Der wiederkehrende Defekt in diesem Projekt ist nicht Kaputtheit, sondern
 - **`= Query(False)` als Default** kommt beim Direktaufruf als Query-OBJEKT an
   und ist damit wahr → `Annotated` benutzen.
 
+**Was mit der Maus tadellos ist** (Anmerkung 217)
+- **Ein Bedienelement, das nur auf `click` hört, ist ohne Maus NICHT VORHANDEN
+  — und das sieht man beim Benutzen nie.** Ein `<div>` mit Klick-Horcher hat
+  kein `tabindex` (Tab springt vorbei), keine Rolle (der Screenreader liest
+  Text) und kein Enter. Wer die Bauform nicht ändern kann, schreibt aus, was
+  ein `<button>` MITBRINGT — an der EINEN Stelle, an der gebunden wird.
+  `cloneNode` bringt Attribute mit und Horcher nicht: ein `tabindex` ohne
+  Handler ist die schlimmere Hälfte, ein Fokusrahmen, der nichts tut.
+- **Eine unbekannte CSS-Variable fällt nicht auf einen Standardwert, sie lässt
+  die Eigenschaft ERBEN.** `var(--tippfehler)` ist kein Fehler und keine
+  Warnung — nur ein Entwurf, der still nicht gilt.
+- **Ein Attribut kann aussehen wie eine Bindung und keine sein.** `data-i18n-…`
+  wirkt nur, wenn `applyLang` es liest; ein Knopf, dessen Beschriftung ein
+  Zeichen ist („‹", „⛶"), trägt seinen ganzen Namen im `aria-label`.
+- **Escape und Klick daneben sind EINE Regel für ALLE Dialoge**
+  (`MODAL_CLOSERS`) — sonst hängt es vom geöffneten Dialog ab, welche Geste
+  hilft. Jeder Eintrag nennt seine Schließfunktion, nicht `remove('show')`:
+  Dialoge räumen auf, und ein zweiter Ausgang, der das überspringt, lässt
+  Zustand stehen.
+- **Was am Schreibtisch unsichtbar ist:** Scroll-Verkettung
+  (`overscroll-behavior`), die SEITLICHEN Safe-Area-Ränder (die beißen nur
+  QUER), `prefers-reduced-motion` über ALLE Animationen, und `resize` auf dem
+  Handy als Dauerfeuer (Adressleiste beim Scrollen → `reSize` bündelt).
+
 **Prüfungen, die nichts prüfen** (die teuerste Klasse)
 - **Jede Prüfung einmal gegen den KAPUTTEN Stand fahren.** Sonst ist sie grün,
   weil es die Funktion GIBT — nicht, weil der Aufrufer sie BENUTZT.
+- **Ein `const` auf oberster Skriptebene ist KEINE Fenster-Eigenschaft**
+  (anders als eine `function`-Deklaration): `w.MODAL_CLOSERS` und `w.LANG` sind
+  stumm `undefined`, und die Prüfung wird eine über nichts. Aus dem Quelltext
+  lesen oder `w.eval()` — die App nicht für ihren Test global machen.
 - **Unter jsdom startet die Seite ENGLISCH**; `applyI18n` ersetzt das deutsche
   Markup. Wer nutzersichtbaren Text prüft, prüft **Anzeige, deutschen
   Quelltext UND englischen Katalog**.

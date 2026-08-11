@@ -300,6 +300,42 @@ any `MINOR`.
   it is working.
 
 ### Fixed
+- **The app can be used with a keyboard.** The nine entries in the navigation
+  could only be clicked: `Tab` skipped straight past them, and a screen reader
+  announced them as plain text rather than as something you can activate. They
+  are now reachable in order, respond to `Enter` and `Space`, show a clear
+  focus outline, and say which view is currently open. The same applies to the
+  entries behind *More* on a phone.
+- **`Esc` and a click beside the box now close every dialog.** Before, `Esc`
+  closed exactly one of the six and a click on the background closed three —
+  which gesture worked depended on which dialog was open. The welcome dialog
+  keeps its deliberate exception: it stays until you have chosen something.
+- **Several texts stayed German with the interface set to English.** The only
+  button in the welcome dialog, the first entry in the precision dropdown, the
+  sentence around the import threshold, and the labels that screen readers
+  read out for the arrow and fullscreen buttons on the map and in the photo
+  viewer. Jumping from the statistics to an entity also put a German heading
+  back on an English interface.
+- **Attaching a photo to a day now opens a calendar.** It used to ask you to
+  type a date as `YYYY-MM-DD` into a bare browser prompt — the last place in
+  the app that did, while every other date field opens a picker.
+- **Scrolling on a phone stays where you put it.** Wiping past the end of a
+  dialog or the stop list used to scroll the page behind it, which left the
+  dialog standing still while the background moved. Dialogs, the sheet and the
+  side lists now keep the scroll to themselves.
+- **In landscape, the interface no longer disappears under the camera notch.**
+  The bottom bar already allowed for it; the top bar and the content did not,
+  so on a phone with a notch the outermost navigation entry and part of the
+  header sat underneath it.
+- **The map no longer stutters while scrolling on a phone.** Every show and
+  hide of the browser's address bar made the map re-measure itself and reload
+  tiles; it now does that once, after the movement has settled.
+- **“Reduce motion” is now respected throughout.** The system setting only
+  reached two of the seven animations, and not the two that move the most: the
+  panel sliding up from the bottom and the transition on every view change.
+- **The day's weather in the timeline is quiet again.** It was meant to sit
+  beside the date in a muted tone and had been showing in the full heading
+  colour, competing with the heading it belongs to.
 - **The number of photo events is visible again.** It disappeared from the
   Immich settings when the preview was removed, so there was no way to see
   whether the run had created anything — the discard button now says how many

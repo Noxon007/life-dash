@@ -1868,6 +1868,132 @@ repair for each: delete it.
     place (`GONE`); two enumerations would drift, and the shorter one would stay
     green.
 
+217. ✅ **The whole main navigation could not be reached without a mouse — and nothing about that looked broken.**
+
+    A front-end pass over `index.html` (2026-08-11), asked for as “make it solid
+    in the browser and on mobile; check the buttons and the texts”. Nine
+    findings, and the largest one is the one nobody clicks into: the nine
+    navigation entries were `<div class="nav-item" data-view="…">` with a
+    `click` listener. With a mouse they are flawless. With a keyboard they do
+    not exist — no `tabindex`, so `Tab` skips them; no role, so a screen reader
+    announces nine pieces of text. **This is the project's recurring defect in
+    its purest form: not brokenness, but silence.** The app was unusable without
+    a pointing device and there was no symptom to notice, because the only way
+    to notice is to put the mouse down.
+
+    They stay `<div>` — every layout rule in the file hangs off `.nav-item`, and
+    swapping the element would be a rewrite of the sidebar, the bottom bar and
+    the sheet for a semantic. What a `<button>` *brings along* is written out
+    instead, at the one place they are bound (`bindNavItem`): `Enter` and
+    `Space`. **The sheet rows are bound through the same function**, because
+    `cloneNode` copies attributes but not listeners — a `tabindex` that came
+    along with the clone plus no handler is the worse half of the defect, a
+    focus ring that does nothing. `aria-current="page"` carries which view is
+    open; `.active` is a colour and says nothing out loud.
+
+    **Escape closed exactly one of six dialogs, backdrop-click three of six.**
+    Which gesture helped depended on which dialog you had open. Now one list,
+    `MODAL_CLOSERS`, read by both rules — a new dialog gets one line and is in
+    both. Each entry names its own close function rather than removing the
+    `show` class: the dialogs clean up after themselves (`editingEvent`,
+    `pickTarget`), and a second way out that skips that leaves state behind for
+    the next open. Two are deliberately outside the list and stand there by
+    name: `confirm-modal` brings its own `Escape` because closing it must
+    *resolve a promise*, and `track-modal` — the onboarding dialog — has no way
+    out on purpose, since the selection has to be made. Topmost wins, read from
+    the inline `z-index`, so `Escape` in the place picker (2500) does not close
+    the edit dialog (1500) underneath it.
+
+    **`data-i18n-label` looked like a translation binding and was none.** Used
+    once, read by nobody: `applyLang` knows `data-i18n`, `-title` and `-ph`.
+    Together with five hard-wired German `aria-label`s that meant the buttons
+    whose visible label is a glyph — `‹`, `›`, `⛶` — carried their *entire*
+    name in German, in an otherwise English UI. For a screen reader the
+    attribute is not a garnish, it is the whole announcement. A fourth
+    `swap('data-i18n-aria')` now exists, and `check-i18n-coverage.js` learnt the
+    variant. The new guard asserts **both directions** — every variant in the
+    markup has a `swap()`, and every `swap()` has a use — because the defect was
+    precisely a half-pair.
+
+    **`var(--muted)` was never defined.** One use, in `.tl-day-wx`. An unknown
+    custom property does not fall back to a default, it makes the property
+    *inherit* — so the day's weather stood in the full text colour of the day
+    heading it was designed to be quieter than. No error, no broken page: a
+    design that silently did not apply. The guard now compares used against
+    defined custom properties, which is a check the browser will never do.
+
+    **Three texts had no binding at all**: the precision dropdown's first option
+    (`Tag (genau)` between four translated siblings), the sentence wrapped
+    around the import threshold input, and — the one that stings — the only
+    button in the onboarding dialog, i.e. the first thing a new account sees.
+    A scan for visible text in `button/label/h*/summary/option` without a
+    `data-i18n` anywhere inside found them; the existing coverage guard cannot,
+    because it checks that *used keys exist*, not that *text has keys*.
+
+    **`jumpToEntity` was a second copy of `gotoView`'s view switch** — and the
+    copies had already drifted: it set the header from `titles[…]` instead of
+    through `t(…)`, so jumping from the statistics to an entity detail put a
+    German heading on an English UI. Extracted as `setActiveView`; the reason
+    the second copy existed (it must *not* trigger the loader, or
+    `loadCompendium` overwrites the detail page it just opened) survives as the
+    only difference.
+
+    **The last native `prompt()`.** A1 had replaced `alert`/`confirm`/`prompt`
+    with toasts and `uiDialog`; F18's “photo for a day” was built afterwards and
+    missed it. It asked for `YYYY-MM-DD` as *text*, while every other date in
+    this application opens a calendar — on a phone the OS one. `uiDialog` gained
+    `type`/`value` (set on every call, including back to `text`; a reused
+    component that keeps the previous call's type is the classic bug), and the
+    format check stays for browsers that fall back to a text field. Safari
+    suppresses `prompt()` after repeated use, which would have been a button
+    that does nothing, without a message — the silence again.
+
+    **Mobile**, four things, all of them invisible at a desk: scroll chaining
+    (`overscroll-behavior: contain` on the four scrolling containers — wiping
+    past the end of a dialog scrolled the page behind it while the dialog stayed
+    put); the side safe-area insets, which `viewport-fit=cover` makes this
+    page's problem and which only bite in *landscape*, where the notch is left
+    or right (`max(16px, env(…))`, never smaller than without a notch);
+    `prefers-reduced-motion` covering two of seven animations, missing the two
+    with the most movement (the sheet and every view change) — the setting is
+    made for a medical reason, so the list is now complete, with the spinner and
+    the AI pulse kept on purpose; and `invalidateSize()` on every `resize`,
+    which on a phone is continuous fire, since showing and hiding the address
+    bar fires it while scrolling and the `dvh` heights really do change. `reSize`
+    debounces per map (`WeakMap`, one timer each — a shared one would rob the
+    second map of its registration).
+
+    Smaller: `<main>` next to the existing `<nav>`, so there is something to
+    jump to; `role="dialog"`/`aria-modal`/`aria-labelledby` on all six dialogs;
+    `aria-labelledby` on the prompt input, whose label is the question;
+    `:focus-visible` outlines as one rule for everything operable — `.search`
+    and `textarea.input-area` switch the browser's own ring off (`outline:
+    none`) and replaced it with a 1 px border colour on a box that already has a
+    border, which is not a difference you find while tabbing.
+
+    Guard: `tools/check-keyboard-dialogs.js`, named after its **job** and not
+    its trigger — the next person looks for “dialog” or “keyboard”, not for the
+    date this came up. Run against the broken state as note 108 requires, one
+    defect at a time: `--muted` restored (1 red), `tabindex` removed (3 red),
+    **the keydown binding removed while `tabindex` stays** (3 red — the case
+    that matters, because attributes alone would pass a check that only reads
+    markup), a dialog dropped from `MODAL_CLOSERS` (1 red), the onboarding
+    dialog made dismissible (1 red), `swap('data-i18n-aria')` removed (3 red),
+    a German `aria-label` unbound (1 red). Two things it does *not* do: read
+    `MODAL_CLOSERS` off `window` — a top-level `const` lives in the script
+    scope, not on the window, so it is parsed from the source rather than
+    exporting the list just for its test — and drive the language by assigning
+    `LANG`, for the same reason; it clicks the actual button, and it compares
+    against the German **source** and the English **catalogue**, because under
+    jsdom the page starts in English and “the value changed” would be green in
+    both directions.
+
+    Not addressed, and deliberately: focus is not trapped inside an open dialog,
+    and it is not restored to the trigger on close. Both are real, both want a
+    single owner for “which element had focus before this opened”, and bolting
+    that onto six dialogs in the same pass as everything above is how the second
+    copy of a rule gets written.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

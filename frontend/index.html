@@ -186,7 +186,35 @@
     outline: none;
   }
   .search:focus { border-color: var(--accent); }
-  .content { flex: 1; overflow-y: auto; padding: 28px; -webkit-overflow-scrolling: touch; }
+  /* ---------- Sichtbarer Fokus ----------
+     Ohne diese Regel ist die Tastaturbedienung zwar möglich, aber blind: der
+     Standardrahmen des Browsers liegt auf `.btn` (eigener Hintergrund, kein
+     Rahmen) je nach Browser kaum sichtbar auf, und `.search` sowie
+     `textarea.input-area` schalten ihn ausdrücklich ab (`outline: none`) und
+     ersetzen ihn durch eine 1-px-Randfarbe — auf einem Kasten, der ohnehin
+     einen Rand hat, ist das kein Unterschied, den man beim Durchtabben findet.
+     `:focus-visible` und nicht `:focus`: ein angeklickter Knopf soll keinen
+     Rahmen bekommen, ein angetabbter schon. Das ist genau die Unterscheidung,
+     für die es die Pseudoklasse gibt.
+     Als EINE Regel für alles Bedienbare — eine Liste je Bauteil liefe
+     auseinander, sobald das nächste dazukommt. */
+  .btn:focus-visible, .nav-item:focus-visible, .zoom-btn:focus-visible,
+  .filter-chip:focus-visible, .example-chip:focus-visible, .comp-card:focus-visible,
+  .chip-bulk:focus-visible, .world-cont-head:focus-visible, .event-card:focus-visible,
+  input:focus-visible, select:focus-visible, textarea:focus-visible,
+  summary:focus-visible, a:focus-visible, [role="button"]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  /* `overscroll-behavior: contain` hält den Bildlauf im Kasten. Ohne das
+     KETTET der Browser weiter: wer im Dialog am Ende angekommen ist und
+     weiterwischt, scrollt die Seite dahinter — auf dem Handy die häufigste
+     Art, den Zusammenhang zu verlieren, weil der Dialog stehen bleibt und
+     sich nur der Untergrund bewegt. In iOS-Safari verhindert es zusätzlich
+     das Zurückziehen der ganzen Seite („rubber banding") unter einem offenen
+     Dialog. */
+  .content { flex: 1; overflow-y: auto; padding: 28px; -webkit-overflow-scrolling: touch;
+             overscroll-behavior: contain; }
   .view { display: none; }
   .view.active { display: block; animation: fade .25s; }
   @keyframes fade { from { opacity: 0; transform: translateY(6px);} to {opacity:1; transform:none;} }
@@ -210,7 +238,13 @@
   }
   /* Anmerkung 119: Das Wetter des TAGES am Tageskopf. Bewusst leise (klein,
      normalgewichtig) — es ist der Rahmen des Tages, nicht seine Überschrift. */
-  .tl-day-wx { font-size: 12px; font-weight: 400; color: var(--muted); margin-left: 8px; }
+  /* `--muted` gab es nie — die Variable war ein Tippfehler für `--text-dim`,
+     und eine unbekannte Custom Property fällt nicht auf einen Standardwert
+     zurück, sondern lässt die Eigenschaft ERBEN. Das Wetter stand deshalb in
+     der vollen Textfarbe des Tageskopfs, also genau so laut wie die
+     Überschrift, gegen die es sich absetzen sollte. Kein Fehler im Log, keine
+     kaputte Seite — nur ein Entwurf, der still nicht galt. */
+  .tl-day-wx { font-size: 12px; font-weight: 400; color: var(--text-dim); margin-left: 8px; }
   .tl-day-wx .wx-regions { color: var(--warn); }
   .event-card {
     position: relative; background: var(--bg-panel); border: 1px solid var(--border);
@@ -553,7 +587,8 @@
   .job-name { min-width: 230px; }
   .map-layout { display: flex; gap: 16px; align-items: flex-start; }
   .map-layout .map-wrap { flex: 1; min-width: 0; }
-  #mp-stops { width: 320px; flex-shrink: 0; max-height: max(420px, calc(100dvh - 330px)); overflow-y: auto; }
+  #mp-stops { width: 320px; flex-shrink: 0; max-height: max(420px, calc(100dvh - 330px)); overflow-y: auto;
+              overscroll-behavior: contain; }
   #map:fullscreen { border-radius: 0; border: none; height: 100%; }
   /* Eine Karte, die Punkte weglässt, muss das auf der Karte sagen. Ein
      Hinweis in der Liste daneben erreicht den nicht, der auf die Karte
@@ -785,6 +820,7 @@
   .modal-box {
     background: var(--bg-panel); border: 1px solid var(--border); border-radius: 16px;
     padding: 24px; width: min(560px, 100%); max-height: 90dvh; overflow-y: auto;
+    overscroll-behavior: contain;
     animation: fade .2s;
   }
   .modal-box h3 { margin: 0 0 6px; }
@@ -817,7 +853,7 @@
     margin: 10px auto 4px; flex-shrink: 0;
   }
   .sheet-head { padding: 6px 18px 10px; flex-shrink: 0; }
-  .sheet-body { overflow-y: auto; padding: 0 10px 10px; }
+  .sheet-body { overflow-y: auto; padding: 0 10px 10px; overscroll-behavior: contain; }
   .sheet-foot {
     display: flex; justify-content: space-between; align-items: center; gap: 12px;
     padding: 12px 18px; border-top: 1px solid var(--border); flex-shrink: 0;
@@ -912,8 +948,29 @@
     background: linear-gradient(90deg, var(--bg-elev) 25%, var(--border) 37%, var(--bg-elev) 63%);
     background-size: 400% 100%; animation: sk-shimmer 1.4s ease infinite; }
   @keyframes sk-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+  /* „Weniger Bewegung" ist eine Einstellung des Betriebssystems, die Nutzer
+     aus einem MEDIZINISCHEN Grund setzen (Migräne, Schwindel bei Vestibulär-
+     störungen) — nicht aus Geschmack. Bis hierher galt sie für zwei von sieben
+     Animationen; ausgerechnet die beiden bewegungsstärksten liefen weiter: das
+     Sheet, das über den halben Schirm nach oben fährt, und der Wechsel jeder
+     Ansicht, der bei jedem Klick schiebt.
+     Die Liste ist deshalb VOLLSTÄNDIG und nicht beispielhaft. Zwei Ausnahmen
+     mit Absicht:
+     • Der Kreisel dreht weiter — er ist keine Zierde, sondern die einzige
+       Auskunft „es läuft noch"; ohne Bewegung sähe ein laufender Vorgang wie
+       ein hängender aus. Drehung um die eigene Achse ist auch die Bewegung,
+       die am wenigsten auslöst (kein Ortswechsel im Blickfeld).
+     • Der Puls am KI-Kopf ist ein Schatten ohne Ortswechsel und bleibt. */
   @media (prefers-reduced-motion: reduce) {
     #net-bar::after, .skeleton .sk-line { animation: none; }
+    .view.active, .ai-preview.show, .modal-box, .sheet, .toast { animation: none; }
+    /* Übergänge sind dieselbe Frage in klein: `transform` auf einer Karte
+       verschiebt sie unter dem Zeiger weg. */
+    .event-card, .stat-card[data-go], .stat-card[data-event-slot],
+    .comp-card, .nav-item, .filter-chip, .ach-track > i, .mp-caret,
+    .seg-switch button { transition: none; }
+    .event-card:hover, .comp-card:hover,
+    .stat-card[data-go]:hover, .stat-card[data-event-slot]:hover { transform: none; }
   }
 
   /* ---------- Toasts (A1) — Ersatz für alert() ---------- */
@@ -984,7 +1041,11 @@
       flex-direction: row;
       justify-content: space-around;
       align-items: stretch;
-      padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+      /* Unten die Wischleiste, seitwärts die Kerbe im Querformat — beides
+         `env()`, beides mit `max()` gegen den Fall „kein Gerät mit Kerbe",
+         wo `env()` schlicht 0 ist. */
+      padding: 6px max(4px, env(safe-area-inset-right))
+               calc(6px + env(safe-area-inset-bottom)) max(4px, env(safe-area-inset-left));
       border-right: none;
       border-top: 1px solid var(--border);
       flex-shrink: 0;
@@ -1026,10 +1087,23 @@
     }
     .sheet .nav-item .lbl { white-space: normal; }
     .sheet .nav-badge { position: static; }
-    .topbar { padding: 10px 16px; }
+    /* `viewport-fit=cover` im Meta-Tag heißt: die Seite reicht bis unter die
+       Aussparung. Unten war das schon bedacht (die Leiste rechnet mit
+       `safe-area-inset-bottom`), seitwärts nicht — und QUER liegt die
+       Aussparung links oder rechts. Auf einem Gerät mit Kerbe stand die
+       Kopfzeile im Querformat also halb darunter, und in der unteren Leiste
+       verschwand das äußere der fünf Ziele.
+       `max()` statt einer Addition: im Hochformat ist der seitliche Wert 0,
+       und `16px + 0` wäre richtig, `env()` allein aber 0 — der Innenabstand
+       darf nie KLEINER werden, als er ohne Kerbe wäre. */
+    .topbar {
+      padding: 10px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+    }
     .topbar .sub { display: none; }
     .search { width: 100%; margin-left: 0; order: 3; }
-    .content { padding: 16px; }
+    .content {
+      padding: 16px max(16px, env(safe-area-inset-right)) 16px max(16px, env(safe-area-inset-left));
+    }
     .grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
     .grid.cols-3, .grid.cols-2 { grid-template-columns: 1fr; }
     .stages { grid-template-columns: 1fr; }
@@ -1226,10 +1300,13 @@
 
   <!-- Bestätigungs-Dialog (A1) — Ersatz für confirm()/prompt() -->
   <div class="modal-overlay" id="confirm-modal" style="z-index:2600">
-    <div class="modal-box" style="width:min(440px,100%)">
+    <div class="modal-box" style="width:min(440px,100%)" role="dialog" aria-modal="true" aria-labelledby="cf-title">
       <h3 id="cf-title" data-i18n="dialog.confirm.title">Bestätigen</h3>
       <div id="cf-text" style="color:var(--text-dim); font-size:13px; line-height:1.6; white-space:pre-line; margin-top:8px"></div>
-      <input id="cf-input" style="display:none; margin-top:14px; width:100%; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:8px 10px; color:var(--text); font-size:13px">
+      <!-- Das Feld hat keine eigene Beschriftung — die FRAGE ist seine
+           Beschriftung, und die steht in `#cf-text`. Ohne diesen Verweis
+           kündigt ein Screenreader ein namenloses Eingabefeld an. -->
+      <input id="cf-input" aria-labelledby="cf-text" style="display:none; margin-top:14px; width:100%; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:8px 10px; color:var(--text); font-size:13px">
       <div class="btn-row" style="margin-top:20px">
         <button class="btn" id="cf-ok">OK</button>
         <button class="btn secondary" id="cf-cancel" data-i18n="btn.cancel">Abbrechen</button>
@@ -1240,15 +1317,15 @@
   <!-- EVENT BEARBEITEN (Modal) -->
   <!-- F15: Bildbetrachter -->
   <div class="lightbox" id="lightbox">
-    <button class="lb-nav lb-prev" id="lb-prev" aria-label="zurück">‹</button>
+    <button class="lb-nav lb-prev" id="lb-prev" data-i18n-aria="lb.prev" aria-label="voriges Bild">‹</button>
     <img id="lb-img" alt="">
     <div class="lb-cap" id="lb-cap"></div>
-    <button class="lb-nav lb-next" id="lb-next" aria-label="weiter">›</button>
+    <button class="lb-nav lb-next" id="lb-next" data-i18n-aria="lb.next" aria-label="nächstes Bild">›</button>
   </div>
 
   <div class="modal-overlay" id="edit-modal">
-    <div class="modal-box">
-      <h3 data-i18n="edit.title">✏️ Eintrag bearbeiten</h3>
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="ed-modal-title">
+      <h3 id="ed-modal-title" data-i18n="edit.title">✏️ Eintrag bearbeiten</h3>
       <div class="stat-label" style="margin-bottom:14px" data-i18n="edit.hint">Geänderte Felder werden vor KI-Neuberechnungen geschützt. Speichern bestätigt den Eintrag.</div>
       <!-- Bestätigungs-Provenienz (P2.7): wann/wodurch wurde das zur Wahrheit? -->
       <div class="chip badge-confirmed" id="ed-provenance" style="display:none; margin-bottom:14px"></div>
@@ -1325,15 +1402,15 @@
        dort stehen weiterhin alle neun untereinander. -->
   <nav class="sidebar">
     <div class="logo"><svg class="mark" viewBox="0 0 128 128"><use href="#brand-bee"/></svg> Life-Dash</div>
-    <div class="nav-item nav-primary active" data-view="today"><span class="ico">🕰️</span> <span class="lbl" data-i18n="nav.today">Heute</span></div>
-    <div class="nav-item nav-primary" data-view="timeline"><span class="ico">📅</span> <span class="lbl" data-i18n="nav.timeline">Zeitstrahl</span></div>
-    <div class="nav-item nav-primary" data-view="map"><span class="ico">🗺️</span> <span class="lbl" data-i18n="nav.map">Karte</span></div>
-    <div class="nav-item nav-primary" data-view="input"><span class="ico">✍️</span> <span class="lbl" data-i18n="nav.input">Eingabe</span> <span class="nav-badge" id="nav-outbox-badge" style="display:none">0</span></div>
-    <div class="nav-item" data-view="stats"><span class="ico">📊</span> <span class="lbl" data-i18n="nav.stats">Statistik</span></div>
-    <div class="nav-item" data-view="compendium"><span class="ico">📚</span> <span class="lbl" data-i18n="nav.compendium">Kompendium</span></div>
-    <div class="nav-item" data-view="world"><span class="ico">🌍</span> <span class="lbl" data-i18n="nav.world">Welt</span></div>
-    <div class="nav-item" data-view="achievements"><span class="ico">🏆</span> <span class="lbl" data-i18n="nav.achievements">Erfolge</span></div>
-    <div class="nav-item" data-view="admin"><span class="ico">⚙️</span> <span class="lbl" data-i18n="nav.admin">Verwaltung</span> <span class="nav-badge" style="display:none">0</span></div>
+    <div class="nav-item nav-primary active" data-view="today" role="button" tabindex="0"><span class="ico">🕰️</span> <span class="lbl" data-i18n="nav.today">Heute</span></div>
+    <div class="nav-item nav-primary" data-view="timeline" role="button" tabindex="0"><span class="ico">📅</span> <span class="lbl" data-i18n="nav.timeline">Zeitstrahl</span></div>
+    <div class="nav-item nav-primary" data-view="map" role="button" tabindex="0"><span class="ico">🗺️</span> <span class="lbl" data-i18n="nav.map">Karte</span></div>
+    <div class="nav-item nav-primary" data-view="input" role="button" tabindex="0"><span class="ico">✍️</span> <span class="lbl" data-i18n="nav.input">Eingabe</span> <span class="nav-badge" id="nav-outbox-badge" style="display:none">0</span></div>
+    <div class="nav-item" data-view="stats" role="button" tabindex="0"><span class="ico">📊</span> <span class="lbl" data-i18n="nav.stats">Statistik</span></div>
+    <div class="nav-item" data-view="compendium" role="button" tabindex="0"><span class="ico">📚</span> <span class="lbl" data-i18n="nav.compendium">Kompendium</span></div>
+    <div class="nav-item" data-view="world" role="button" tabindex="0"><span class="ico">🌍</span> <span class="lbl" data-i18n="nav.world">Welt</span></div>
+    <div class="nav-item" data-view="achievements" role="button" tabindex="0"><span class="ico">🏆</span> <span class="lbl" data-i18n="nav.achievements">Erfolge</span></div>
+    <div class="nav-item" data-view="admin" role="button" tabindex="0"><span class="ico">⚙️</span> <span class="lbl" data-i18n="nav.admin">Verwaltung</span> <span class="nav-badge" style="display:none">0</span></div>
     <!-- Nur mobil sichtbar (CSS); öffnet die restlichen fünf als Sheet. -->
     <div class="nav-item nav-more" id="nav-more" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false">
       <span class="ico">☰</span> <span class="lbl" data-i18n="nav.more">Mehr</span>
@@ -1365,7 +1442,12 @@
   </div>
 
   <!-- MAIN -->
-  <div class="main">
+  <!-- `<main>` statt `<div>`: die Seitenleiste ist schon ein `<nav>`, und ohne
+       Gegenstück dazu hat ein Screenreader keinen Sprungpunkt zum Inhalt — er
+       muss sich bei jedem Ansichtswechsel durch die neun Navigationspunkte
+       hören. Ein Element, keine Regel: `.main` bleibt die Klasse, an der das
+       gesamte Layout hängt. -->
+  <main class="main">
     <div class="topbar">
       <div>
         <h1 id="view-title" data-i18n="view.timeline.title">Zeitstrahl</h1>
@@ -1581,12 +1663,12 @@
              und beide werden von `renderPeriod` außer Kraft gesetzt, wenn es
              nichts mehr zu springen gibt. -->
         <div class="mp-mobile-bar">
-          <button class="btn secondary mp-step" id="mp-prev-m" aria-label="zurück"
+          <button class="btn secondary mp-step" id="mp-prev-m" data-i18n-aria="map.prev.aria" aria-label="Einen Zeitraum zurück"
                   data-i18n-title="map.prev.tip" title="Einen Zeitraum zurück">‹</button>
           <button class="btn secondary" id="mp-filter-toggle" aria-expanded="false" aria-controls="mp-filters-box">
             <span id="mp-filter-toggle-label">–</span> <span class="mp-caret">▾</span>
           </button>
-          <button class="btn secondary mp-step" id="mp-next-m" aria-label="weiter"
+          <button class="btn secondary mp-step" id="mp-next-m" data-i18n-aria="map.next.aria" aria-label="Einen Zeitraum weiter"
                   data-i18n-title="map.next.tip" title="Einen Zeitraum weiter">›</button>
         </div>
         <div class="map-filters" id="mp-filters-box">
@@ -1686,7 +1768,7 @@
                    die Zoomstufe entschied. Der Deckel hängt seit Anmerkung 160
                    nicht mehr an diesem Schalter: er ist eine Eigenschaft der
                    Stufe „jeder Punkt“ und steht in ihrem Titel. -->
-              <div class="seg-switch" id="mp-density" role="group" data-i18n-label="map.density">
+              <div class="seg-switch" id="mp-density" role="group" data-i18n-aria="map.density" aria-label="Wie dicht">
                 <button type="button" data-level="point" data-i18n-title="map.dens.point.tip" title="Jeder Eintrag als eigener Punkt — alle, egal wie viele. Die Nummern erscheinen nur, wenn „Reihenfolge verbinden“ an ist." data-i18n="map.dens.point">Jeder Punkt</button>
                 <button type="button" data-level="near" data-i18n-title="map.dens.near.tip" title="Was dicht beieinander liegt, wird zu einer Blase — ihre Größe zeigt, wie viel darin steckt" data-i18n="map.dens.near">Nach Nähe</button>
                 <button type="button" data-level="place" data-i18n-title="map.dens.place.tip" title="Alles am selben Ort wird eine Blase („59× Zuhause“)" data-i18n="map.dens.place">Je Ort</button>
@@ -1708,7 +1790,7 @@
                  Karten-Werkzeug es hat. -->
             <button type="button" class="map-corner-btn" id="mp-fullscreen"
                     data-i18n-title="map.fs.tip" title="Karte im Vollbild (Esc beendet)"
-                    aria-label="Vollbild">⛶</button>
+                    data-i18n-aria="map.fs" aria-label="Vollbild">⛶</button>
             <!-- Wenn die Karte Punkte weglässt, sagt sie es HIER. Der Hinweis
                  stand bisher nur in der Stopp-Liste daneben — und wer auf die
                  Karte sieht, sieht die Liste nicht. -->
@@ -2105,7 +2187,7 @@
               <div class="field-val"><input id="mf-date-end" type="date" data-i18n-title="in.dateto.tip" title="leer = wie 'von'"></div></div>
             <div class="field-row"><div class="field-key" data-i18n="field.precision">Präzision</div>
               <div class="field-val"><select id="mf-precision" class="mf-select">
-                <option value="day" selected>Tag (genau)</option>
+                <option value="day" selected data-i18n="prec.day">Tag (genau)</option>
                 <option value="month" data-i18n="prec.month">Monat</option>
                 <option value="season" data-i18n="prec.season">Jahreszeit</option>
                 <option value="year" data-i18n="prec.year">Jahr</option>
@@ -2364,10 +2446,10 @@
                 <summary data-i18n="adm.adv.import">Erweiterte Import-Option</summary>
                 <div class="adv-body">
                   <label class="stat-label" style="display:inline-flex; align-items:center; gap:6px">
-                    Besuche mit Ortssicherheit unter
+                    <span data-i18n="adm.minprob.pre">Besuche mit Ortssicherheit unter</span>
                     <input id="tl-minprob" type="number" min="0" max="100" step="5" value="0"
                            style="width:60px; background:var(--bg-elev); border:1px solid var(--border); border-radius:6px; padding:4px 6px; color:var(--text)">
-                    % überspringen (0 = alle importieren — betrifft v. a. „Gesuchte Adresse")
+                    <span data-i18n="adm.minprob.post">% überspringen (0 = alle importieren — betrifft v. a. „Gesuchte Adresse")</span>
                   </label>
                 </div>
               </details></div>
@@ -2834,26 +2916,26 @@
       </div>
 
     </div>
-  </div>
+  </main>
 
 <!-- A15 — Onboarding: Tracking-Auswahl beim ersten Start -->
 <div class="modal-overlay" id="track-modal">
-  <div class="modal-box">
-    <h3 data-i18n="track.modal.title">🧩 Was möchtest du tracken?</h3>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="track-modal-title">
+    <h3 id="track-modal-title" data-i18n="track.modal.title">🧩 Was möchtest du tracken?</h3>
     <div class="hint" style="margin-top:4px" data-i18n="track.modal.hint">Wähle die Bereiche, die dich interessieren —
       sie bestimmen Kompendium, Statistik und was die KI erkennt. Jederzeit änderbar
       unter Verwaltung → Meine Daten.</div>
     <div id="track-options" style="columns:2; margin:14px 0"></div>
     <div style="display:flex; justify-content:flex-end; gap:10px">
-      <button class="btn" id="track-save">✓ Auswahl speichern</button>
+      <button class="btn" id="track-save" data-i18n="track.modal.save">✓ Auswahl speichern</button>
     </div>
   </div>
 </div>
 
 <!-- F1 — Tagebuch: EIN formatierter Eintrag pro Tag (Markdown, KI-frei) -->
 <div class="modal-overlay" id="journal-modal">
-  <div class="modal-box">
-    <h3 data-i18n="jr.title">📖 Tagebuch-Eintrag</h3>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="jr-modal-title">
+    <h3 id="jr-modal-title" data-i18n="jr.title">📖 Tagebuch-Eintrag</h3>
     <div class="stat-label" style="margin:6px 0 12px; line-height:1.5" data-i18n="jr.hint">Ein Eintrag pro Tag — erscheint im
       Zeitstrahl als Tageskopf über den Ereignissen des Tages. Formatierung mit Markdown:
       <code>**fett**</code>, <code>*kursiv*</code>, <code># Überschrift</code>, <code>- Liste</code>, <code>&gt; Zitat</code>.
@@ -2893,8 +2975,8 @@
 
 <!-- F8: Druck-Auswahldialog — Zeitraum und Umfang wählen -->
 <div class="modal-overlay" id="print-modal">
-  <div class="modal-box">
-    <h3 data-i18n="pr.title">🖨️ Drucken</h3>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="pr-modal-title">
+    <h3 id="pr-modal-title" data-i18n="pr.title">🖨️ Drucken</h3>
     <div class="stat-label" style="margin:6px 0 12px; line-height:1.5" data-i18n="pr.hint">
       Wähle den Zeitraum — gedruckt wird eine eigene, helle Seite mit allen
       Ereignissen darin, chronologisch nach Tagen. Eingeklappte Gruppen und
@@ -2936,8 +3018,8 @@
      der Aufrufer (`openPlacePicker`). Drei eigene Karten wären drei Stellen,
      an denen dieselbe Regel steht, und die laufen auseinander (Anm. 106). -->
 <div class="modal-overlay" id="pick-modal" style="z-index:2500">
-  <div class="modal-box" style="width:min(720px,100%)">
-    <h3 data-i18n="pick.title">📍 Ort auf der Karte wählen</h3>
+  <div class="modal-box" style="width:min(720px,100%)" role="dialog" aria-modal="true" aria-labelledby="pick-modal-title">
+    <h3 id="pick-modal-title" data-i18n="pick.title">📍 Ort auf der Karte wählen</h3>
     <div class="stat-label" style="margin:6px 0 12px; line-height:1.5" data-i18n="pick.hint">
       Klick auf die Karte setzt den Punkt — <b>genau dorthin</b>, nicht auf den
       Ortsmittelpunkt. Die Adresse dazu wird nachgeschlagen und ist nur die
@@ -3316,7 +3398,12 @@ function uiDialog(text, opts = {}) {
     document.getElementById('cf-text').textContent = text;
     const wantsInput = !!opts.input;
     input.style.display = wantsInput ? '' : 'none';
-    input.value = '';
+    // `type` und `value`: eine Frage nach einem DATUM soll einen Kalender
+    // aufmachen und keine Tipp-Aufgabe stellen. Der Typ wird jedes Mal gesetzt
+    // (auch auf 'text' zurück) — ein Dialog, der den Typ des vorigen behält,
+    // ist der klassische Fehler bei wiederverwendeten Bauteilen.
+    input.type = opts.type || 'text';
+    input.value = opts.value || '';
     input.placeholder = opts.placeholder || '';
     ok.textContent = opts.okLabel || 'OK';
     ok.className = 'btn' + (opts.danger ? ' danger' : '');
@@ -3429,6 +3516,10 @@ const I18N_EN = {
   // Anmerkung 192: dieselben zwei Sprünge, mobil neben dem Zeitraum-Knopf
   'map.prev.tip': "One period back",
   'map.next.tip': "One period forward",
+  // Diese beiden Knöpfe heißen „‹" und „›" — der Name steht nur im
+  // `aria-label`, für einen Screenreader ist er also die ganze Beschriftung.
+  'map.prev.aria': "One period back",
+  'map.next.aria': "One period forward",
   'map.pickday': "Pick a day from the calendar",
   'map.route': "🧭 Connect in order",
   'map.route.tip': "Joins this period's places in the order they happened — a drawn line, not a route you travelled. With points merged there is no order left to show.",
@@ -3474,6 +3565,9 @@ const I18N_EN = {
   'map.tracks.tip': "The paths you actually travelled, from the timeline import — real recordings, coloured by how you moved.",
   'map.tracks.blocked': "Only up to month view — a year of paths is tens of thousands of lines, and drawing them freezes the browser. Zoom in to see them.",
   'map.fs.tip': "Map in fullscreen (Esc exits)",
+  'map.fs': "Fullscreen",
+  'lb.prev': "Previous photo",
+  'lb.next': "Next photo",
   'tl.visits.chip': "🛰️ Auto-detected",
   'tl.visits.chip.short': "Auto-detected",
   'tl.visits.n': "auto-detected",
@@ -3531,7 +3625,11 @@ const I18N_EN = {
   'tl.dayphotos': "Photos from this day",
   'tl.dayphoto': "📷 Photo for a day",
   'tl.dayphoto.tip': "Attach a picture to a day without tying it to a single entry",
-  'tl.dayphoto.ask': "Which day is this picture from? (YYYY-MM-DD)",
+  // Ohne „(YYYY-MM-DD)": seit die Frage einen Kalender aufmacht, ist das
+  // Format nicht mehr die Sache des Nutzers.
+  'tl.dayphoto.ask': "Which day is this picture from?",
+  'tl.dayphoto.title': "Attach a photo to a day",
+  'tl.dayphoto.pick': "Choose picture …",
   'tl.dayphoto.baddate': "Please give a date as YYYY-MM-DD.",
   'tl.dayphoto.ok': "✓ Picture attached to the day.",
   'tl.dayphoto.fail': "Upload failed",
@@ -3928,6 +4026,12 @@ const I18N_EN = {
   'act.namerun': "📍 Resolve place names",
   'adm.format': "📐 Address display format",
   'adm.adv.import': "Advanced import option",
+  // Ein Satz, der um ein Eingabefeld herumläuft — deshalb zwei Schlüssel und
+  // nicht einer. Die Wortstellung darf sich zwischen den Sprachen ändern, die
+  // Reihenfolge der beiden Hälften nicht; wo sie es müsste, gehört der Satz
+  // umgebaut und nicht der Katalog gebogen.
+  'adm.minprob.pre': "Skip visits with a location confidence below",
+  'adm.minprob.post': "% (0 = import everything — mainly affects “searched address”)",
   'opt.allcats': "All categories",
   'opt.allsources': "All sources",
   'opt.src.ai': "AI extraction",
@@ -4063,6 +4167,9 @@ const I18N_EN = {
   'adm.track.desc': "<b>Choose modules for collection, statistics &amp; AI.</b><br>Deselected modules disappear from tabs, filters, forms and the AI prompt — existing data is kept and reappears immediately once you select them again.",
   'adm.fuzzy.hint': "Events with a vague date (month, season, year, decade or no date at all). Clicking one opens the quick editor — the more precise the dates, the better the timeline and map.",
   'track.modal.title': "🧩 What would you like to track?",
+  // Der einzige Knopf im Begrüßungsdialog — und bis hierher der einzige Text
+  // darin ohne Bindung. Ausgerechnet das Erste, was ein neues Konto sieht.
+  'track.modal.save': "✓ Save selection",
   'jr.title': "📖 Journal entry",
   'jr.hint': "One entry per day — appears in the timeline as a day header above that day’s events. Formatting with Markdown: <code>**bold**</code>, <code>*italic*</code>, <code># heading</code>, <code>- list</code>, <code>&gt; quote</code>. The AI never writes here itself — it can only offer a draft for you to take over.",
   'field.day': "Day",
@@ -4650,6 +4757,19 @@ function applyLang(initial = false) {
     read: el => el.getAttribute('placeholder') || '',
     write: (el, v) => el.setAttribute('placeholder', v),
   });
+  // Der vierte Weg. Er fehlte, und das war nicht folgenlos: ein Knopf, dessen
+  // Beschriftung ein Zeichen ist („‹", „›", „⛶"), trägt seinen Namen
+  // AUSSCHLIESSLICH im `aria-label` — für einen Screenreader ist das Attribut
+  // die ganze Auskunft, nicht eine Beigabe zum sichtbaren Text. Fünf davon
+  // standen deutsch da, auch wenn die Oberfläche englisch lief.
+  // Der Vorgänger dieses Blocks hieß `data-i18n-label` und wurde von niemandem
+  // gelesen — ein Attribut, das aussah wie eine Bindung und keine war (die
+  // Falle „Prüfungen, die nichts prüfen": im Markup vorhanden, im Katalog
+  // vorhanden, in der Anzeige wirkungslos).
+  swap('data-i18n-aria', {
+    read: el => el.getAttribute('aria-label') || '',
+    write: (el, v) => el.setAttribute('aria-label', v),
+  });
 
   document.getElementById('lang-btn').textContent = LANG === 'de' ? '🇬🇧 EN' : '🇩🇪 DE';
   document.getElementById('lang-btn').title = LANG === 'de'
@@ -5056,10 +5176,25 @@ function fetchEvents(params = {}) {
 // F18: „Foto zu einem Tag" — erst den Tag erfragen, dann die Datei. Der Tag
 // wird vorbelegt mit heute; ein Bild mit EXIF-Zeitpunkt behält seinen eigenen,
 // solange er auf diesen Tag fällt (der Server entscheidet das).
-document.getElementById('tl-dayphoto-btn')?.addEventListener('click', () => {
-  const today = todayLocal();
-  const day = prompt(t('tl.dayphoto.ask', 'An welchen Tag soll das Bild? (JJJJ-MM-TT)'), today);
+// Der letzte native `prompt()` der Anwendung — A1 hatte alle drei Browser-
+// Dialoge ersetzt, dieser hier war beim Bauen von F18 übersehen worden.
+// Drei Gründe, warum das keine Geschmacksfrage ist:
+//  • Ein natives Fenster sieht in keinem Theme wie die Anwendung aus, und es
+//    hält den gesamten Programmablauf an, statt nur die Seite zu sperren.
+//  • Es fragte nach „JJJJ-MM-TT" als TEXT. Überall sonst in dieser Anwendung
+//    öffnet ein Datum einen Kalender — auf dem Handy den des Betriebssystems.
+//    Ein Datum von Hand zu tippen ist dort die mühsamste Art, es einzugeben,
+//    und die Prüfung darunter war nur nötig, WEIL getippt wurde.
+//  • Safari blendet `prompt()` nach wiederholtem Gebrauch ganz aus. Dann
+//    passiert beim Klick nichts, und zwar ohne Meldung — die Stille wieder.
+document.getElementById('tl-dayphoto-btn')?.addEventListener('click', async () => {
+  const day = await uiPrompt(t('tl.dayphoto.ask', 'An welchen Tag soll das Bild?'),
+                             { type: 'date', value: todayLocal(),
+                               title: t('tl.dayphoto.title', 'Foto an einen Tag hängen'),
+                               okLabel: t('tl.dayphoto.pick', 'Bild wählen …') });
   if (!day) return;
+  // Der Kalender liefert immer JJJJ-MM-TT; die Prüfung bleibt trotzdem stehen,
+  // weil ein Browser ohne `type=date` auf ein Textfeld zurückfällt.
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
     toast(t('tl.dayphoto.baddate', 'Bitte ein Datum als JJJJ-MM-TT angeben.'), 'warn');
     return;
@@ -6956,9 +7091,8 @@ document.getElementById('pr-go').addEventListener('click', async () => {
 document.getElementById('jr-date').addEventListener('change', ev => jrLoad(ev.target.value));
 document.getElementById('jr-preview').addEventListener('click', () => jrPreview());
 document.getElementById('jr-cancel').addEventListener('click', closeJournal);
-document.getElementById('journal-modal').addEventListener('click', ev => {
-  if (ev.target === document.getElementById('journal-modal')) closeJournal();
-});
+// Klick auf den Hintergrund und Escape: siehe `MODAL_CLOSERS` weiter unten —
+// die Regel steht für alle Dialoge an einer Stelle.
 document.getElementById('jr-save').addEventListener('click', async ev => {
   const date = document.getElementById('jr-date').value;
   const text = document.getElementById('jr-text').value.trim();
@@ -7409,11 +7543,7 @@ function openCompendiumType(type) {
 function jumpToEntity(type, id, name) {
   document.querySelectorAll('#comp-tabs .zoom-btn').forEach(t =>
     t.classList.toggle('active', t.dataset.type === type));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === 'compendium'));
-  document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
-  document.getElementById('view-compendium').classList.add('active');
-  document.getElementById('view-title').textContent = titles['compendium'][0];
-  document.getElementById('view-sub').textContent = titles['compendium'][1];
+  setActiveView('compendium');
   openEntityDetail(type, id, name);
 }
 // data-go-Kacheln in Statistik UND Heute (F16). Vorher nur #view-stats —
@@ -8616,9 +8746,7 @@ function closePlacePicker() {
 document.querySelectorAll('[data-pick-for]').forEach(btn =>
   btn.addEventListener('click', () => openPlacePicker(btn.dataset.pickFor)));
 document.getElementById('pick-cancel').addEventListener('click', closePlacePicker);
-document.getElementById('pick-modal').addEventListener('click', ev => {
-  if (ev.target === document.getElementById('pick-modal')) closePlacePicker();
-});
+// Hintergrund-Klick und Escape kommen aus `MODAL_CLOSERS`.
 document.getElementById('pick-here').addEventListener('click', async ev => {
   const restore = btnBusy(ev.target, t('pick.locating', '… hole Standort'));
   try {
@@ -9298,9 +9426,7 @@ document.querySelector('.content').addEventListener('click', ev => {
   if (card && card.dataset.id) openEventEdit(card.dataset.id);
 });
 document.getElementById('ed-cancel').addEventListener('click', closeEventEdit);
-document.getElementById('edit-modal').addEventListener('click', ev => {
-  if (ev.target === document.getElementById('edit-modal')) closeEventEdit();
-});
+// Hintergrund-Klick und Escape kommen aus `MODAL_CLOSERS`.
 document.getElementById('ed-save').addEventListener('click', async () => {
   const e = editingEvent;
   if (!e) return;
@@ -9484,6 +9610,25 @@ function startVoice() {
 
 // ---------- KARTE ----------
 let mapObj = null, mapMarkers = null, mapCluster = null, mapRoute = null, mapTracks = null;
+/** Karte neu vermessen — aber gebündelt, EINMAL am Ende der Änderung.
+ *
+ *  `invalidateSize()` misst den Rahmen neu, verschiebt jede Kachel und stößt
+ *  das Nachladen fehlender an. Am Schreibtisch ist das ein Vorgang beim
+ *  Loslassen des Fensterrands; auf dem HANDY ist `resize` ein Dauerfeuer:
+ *  jedes Ein- und Ausblenden der Adressleiste beim Scrollen löst es aus, und
+ *  bei den `dvh`-Höhen dieser Ansicht ändert sich dabei wirklich die Größe.
+ *  Ungebremst hieß das dutzendfaches Neuvermessen je Wischbewegung — der
+ *  sichtbare Ruckler beim Scrollen auf der Kartenseite.
+ *
+ *  Beide Karten teilen sich die Funktion (`mapObj`, `worldMap`), aber jede
+ *  bekommt ihren eigenen Zeitgeber: ein gemeinsamer würde die zweite Karte um
+ *  die Anmeldung der ersten bringen. `WeakMap`, damit eine zerstörte Karte
+ *  hier nichts festhält. */
+const _reSizeTimers = new WeakMap();
+function reSize(map, ms = 150) {
+  clearTimeout(_reSizeTimers.get(map));
+  _reSizeTimers.set(map, setTimeout(() => map.invalidateSize(), ms));
+}
 // F20: eigene Ebene für den Wohnort. Erst beim Aufbau der Karte angelegt
 // wie die anderen — ein `L.layerGroup()` beim Laden des Skripts hinge an
 // keiner Karte und zeichnete nie.
@@ -10268,8 +10413,8 @@ async function openMapView(op) {
     // (Anmerkung 120) fällt bei jedem Neuzeichnen neu an, ein eigener
     // `zoomend`-Horcher dafür erübrigt sich.
     // Auf Mobil ändert sich die Höhe beim Drehen / Ein-/Ausblenden der Adressleiste
-    window.addEventListener('resize', () => mapObj && mapObj.invalidateSize());
-    window.addEventListener('orientationchange', () => mapObj && mapObj.invalidateSize());
+    window.addEventListener('resize', () => mapObj && reSize(mapObj));
+    window.addEventListener('orientationchange', () => mapObj && reSize(mapObj));
   }
   // Mehrfach neu vermessen: Mobil meldet direkt nach dem Einblenden oft noch 0.
   [60, 300, 700].forEach(t => setTimeout(() => mapObj.invalidateSize(), t));
@@ -11481,7 +11626,7 @@ async function renderWorldMap(data) {
   if (!worldMap) {
     worldMap = L.map('world-map', { worldCopyJump: true }).setView([25, 10], 2);
     addTiles(worldMap, 8);                  // F13: wählbare Hintergrundkarte
-    window.addEventListener('resize', () => worldMap && worldMap.invalidateSize());
+    window.addEventListener('resize', () => worldMap && reSize(worldMap));
   }
   [60, 300].forEach(t => setTimeout(() => worldMap.invalidateSize(), t));
 
@@ -11592,8 +11737,26 @@ const titles = {
   input: ["Eingabe","Fragment eingeben — die KI strukturiert"],
   admin: ["Verwaltung","Moderieren, Daten pflegen, Jobs — Systemthemen nur für Admins"],
 };
-function gotoView(v) {
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === v));
+/** Umschalten OHNE Nachladen: Leiste, sichtbare Ansicht, Kopfzeile.
+ *
+ *  Als eigene Funktion, weil es diesen Satz Anweisungen zweimal gab —
+ *  `gotoView` und `jumpToEntity`, das absichtlich nicht nachlädt (sonst
+ *  überdeckt `loadCompendium` die gerade geöffnete Detailseite). Zwei Kopien
+ *  einer Regel laufen auseinander, und diese hier WAREN schon auseinander: die
+ *  zweite setzte die Kopfzeile aus `titles[…]` statt über `t(…)` und schrieb
+ *  damit im englischen Betrieb „Kompendium / Menschen, Tiere, Orte …" — eine
+ *  deutsche Überschrift, die nur auftauchte, wenn man aus der Statistik heraus
+ *  auf ein Objekt sprang. */
+function setActiveView(v) {
+  // `.active` ist eine FARBE — sie sagt einem Screenreader nichts. Welcher
+  // Punkt gerade offen ist, steht deshalb zusätzlich in `aria-current`; das
+  // Attribut wird entfernt statt auf "false" gesetzt, weil jeder andere Wert
+  // als das Fehlen als „ja, dieser hier" gilt.
+  document.querySelectorAll('.nav-item').forEach(n => {
+    const on = n.dataset.view === v;
+    n.classList.toggle('active', on);
+    if (on) n.setAttribute('aria-current', 'page'); else n.removeAttribute('aria-current');
+  });
   // A38: Steckt die offene Ansicht hinter „Mehr“, wird „Mehr“ markiert —
   // sonst zeigt die untere Leiste gar keinen aktiven Punkt mehr.
   const more = document.getElementById('nav-more');
@@ -11603,6 +11766,9 @@ function gotoView(v) {
   document.getElementById('view-'+v).classList.add('active');
   document.getElementById('view-title').textContent = t(`view.${v}.title`, titles[v][0]);
   document.getElementById('view-sub').textContent = t(`view.${v}.sub`, titles[v][1]);
+}
+function gotoView(v) {
+  setActiveView(v);
   // F23: EINE Stelle, an der ein Ansichtswechsel nachlädt — und damit eine
   // Stelle, die den Fortschritt zeigt. Vorher stand hier siebenmal ein
   // Aufruf ohne `await`: jede Ansicht baute sich nach dem Wechsel still
@@ -11909,8 +12075,22 @@ function startDbEdit(tr) {
     refreshAll();
   });
 }
+// Die Navigationspunkte sind `<div>`, kein `<button>` — historisch, und ein
+// Umbau auf `<button>` würde jede CSS-Regel treffen, die auf `.nav-item`
+// steht. Was ein `<button>` von Haus aus mitbringt, muss deshalb HIER stehen:
+// erreichbar mit Tab (`tabindex` im Markup), auslösbar mit Enter und Leertaste.
+// Ohne das war die gesamte Hauptnavigation ohne Maus unbedienbar — ein Defekt,
+// den man mit der Maus nicht sehen kann, weil alles funktioniert.
+// `nav-more` bringt seinen eigenen Horcher mit und ist hier nicht dabei (kein
+// `data-view`) — sonst öffnete ein Tastendruck das Sheet zweimal.
+function bindNavItem(item, onGo) {
+  item.addEventListener('click', onGo);
+  item.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); onGo(); }
+  });
+}
 document.querySelectorAll('.sidebar > .nav-item[data-view]').forEach(item =>
-  item.addEventListener('click', () => gotoView(item.dataset.view)));
+  bindNavItem(item, () => gotoView(item.dataset.view)));
 
 // A38: Filter der Kartenansicht auf dem Handy ein-/ausklappen. Beim Aufklappen
 // wird Leaflet über die Größenänderung informiert — sonst bleiben graue Kacheln
@@ -11935,7 +12115,11 @@ function buildNavSheet() {
   document.querySelectorAll('.sidebar > .nav-item[data-view]:not(.nav-primary)').forEach(src => {
     const row = src.cloneNode(true);
     row.classList.remove('active');
-    row.addEventListener('click', () => { closeNavSheet(); gotoView(row.dataset.view); });
+    // Dieselbe Bindung wie in der Leiste, nicht eine zweite: `cloneNode` bringt
+    // Rolle und `tabindex` mit, aber KEINE Horcher. Wer hier nur `click`
+    // anhängte, hätte die Tastatur genau dort verloren, wo mobil die Hälfte
+    // aller Ziele liegt.
+    bindNavItem(row, () => { closeNavSheet(); gotoView(row.dataset.view); });
     box.appendChild(row);
   });
 }
@@ -11977,7 +12161,60 @@ document.getElementById('sheet-logout')?.addEventListener('click', e => {
   e.preventDefault();
   document.getElementById('logout-link')?.click();
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && navSheet?.classList.contains('show')) closeNavSheet(); });
+// ══════════════════════════════════════════════════════════════════════════
+//  Dialoge schließen — EINE Liste, von zwei Regeln gelesen
+// ══════════════════════════════════════════════════════════════════════════
+//  Vorgefunden: sechs `.modal-overlay` plus das Sheet, und jeder konnte etwas
+//  anderes. Escape schloss GENAU EINEN (den Bestätigungsdialog); Klick daneben
+//  schloss drei von sechs. Welche Taste einen Dialog schließt, hing also davon
+//  ab, welchen man offen hatte — und das merkt man erst, wenn man drückt und
+//  nichts passiert.
+//
+//  Die Liste ist der Grund, warum das nicht wieder auseinanderläuft: ein neuer
+//  Dialog bekommt hier eine Zeile und ist damit in BEIDEN Regeln enthalten.
+//  Jeder Eintrag nennt seine eigene Schließfunktion, nicht `remove('show')` —
+//  die Dialoge räumen beim Schließen auf (`editingEvent`, `pickTarget`), und
+//  ein zweiter Weg hinaus, der das überspringt, hinterlässt einen Zustand, der
+//  beim nächsten Öffnen noch da ist.
+//
+//  NICHT dabei:
+//  • `confirm-modal` — er bringt seinen eigenen Escape mit, weil sein
+//    Schließen ein Versprechen auflösen muss (`onCancel`), nicht nur eine
+//    Klasse entfernen. Zweimal schließen hieße hier: einmal ohne Antwort.
+//  • `track-modal` — der Begrüßungsdialog ist bewusst ohne Ausweg: er hat
+//    keinen Abbrechen-Knopf, weil die Auswahl getroffen werden MUSS. Ihn
+//    wegklickbar zu machen wäre keine Reparatur, sondern eine Änderung.
+const MODAL_CLOSERS = [
+  { id: 'edit-modal',    close: () => closeEventEdit() },
+  { id: 'journal-modal', close: () => closeJournal() },
+  { id: 'pick-modal',    close: () => closePlacePicker() },
+  { id: 'print-modal',   close: () => document.getElementById('print-modal').classList.remove('show') },
+];
+const modalOpen = m => document.getElementById(m.id)?.classList.contains('show');
+/** Der oberste offene Dialog. „Oben" heißt: größere z-Ebene gewinnt — der
+ *  Ortswähler (2500) öffnet ÜBER dem Bearbeiten-Dialog (1500), und Escape muss
+ *  dann ihn treffen und nicht den darunter. Die Grundebene steht im
+ *  Stylesheet, die Ausnahmen als Inline-Stil am Element; beides hier zu lesen
+ *  ist genauer als eine zweite Rangliste, die man pflegen müsste. */
+function topmostModal() {
+  return MODAL_CLOSERS.filter(modalOpen).sort((a, b) =>
+    (+document.getElementById(b.id).style.zIndex || 1500) -
+    (+document.getElementById(a.id).style.zIndex || 1500))[0];
+}
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  // Der Bestätigungsdialog liegt über allem und antwortet selbst.
+  if (document.getElementById('confirm-modal')?.classList.contains('show')) return;
+  if (navSheet?.classList.contains('show')) { closeNavSheet(); return; }
+  topmostModal()?.close();
+});
+// Klick auf den Hintergrund — dieselbe Liste. Am Overlay selbst und nicht am
+// Dokument: nur ein Treffer auf das Overlay IST der Hintergrund; ein Klick auf
+// den Kasten darin blubbert zwar hoch, hat aber `ev.target` = Kasten.
+MODAL_CLOSERS.forEach(m => {
+  const el = document.getElementById(m.id);
+  if (el) el.addEventListener('click', ev => { if (ev.target === el) m.close(); });
+});
 
 // Kompendium-Reiter werden dynamisch aus den Modulen gebaut (rebuildCompTabs, A7)
 

@@ -29,8 +29,12 @@ const add = (key, where) => { if (!used.has(key)) used.set(key, where); };
 
 // t('key', 'Deutsch') — auch über Zeilenumbrüche hinweg
 for (const m of html.matchAll(/\bt\(\s*['"]([\w.]+)['"]\s*,/g)) add(m[1], 't()');
-// data-i18n / -title / -ph
-for (const m of html.matchAll(/data-i18n(?:-title|-ph)?="([\w.]+)"/g)) add(m[1], 'data-i18n');
+// data-i18n / -title / -ph / -aria
+// `-aria` kam dazu, weil ein Knopf mit einem Zeichen als Beschriftung („‹",
+// „⛶") seinen Namen NUR im aria-label trägt. Wer diese Liste erweitert, ohne
+// `applyLang` zu erweitern, baut sich ein Attribut, das aussieht wie eine
+// Bindung und keine ist — genau der Fall, der `data-i18n-label` war.
+for (const m of html.matchAll(/data-i18n(?:-title|-ph|-aria)?="([\w.]+)"/g)) add(m[1], 'data-i18n');
 // Zusammengesetzte Schlüssel: t('job.' + type, …) — die Präfixe kennt nur der
 // Code, die Werte stehen in den Maps daneben. Deshalb werden sie aus dem
 // GELADENEN DOM geholt statt geraten (dieselbe Lehre wie check-a41-cities:
