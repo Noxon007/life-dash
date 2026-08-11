@@ -235,7 +235,7 @@ Der wiederkehrende Defekt in diesem Projekt ist nicht Kaputtheit, sondern
 - **`= Query(False)` als Default** kommt beim Direktaufruf als Query-OBJEKT an
   und ist damit wahr → `Annotated` benutzen.
 
-**Was mit der Maus tadellos ist** (Anmerkung 217)
+**Was mit der Maus tadellos ist** (Anmerkung 217/218)
 - **Ein Bedienelement, das nur auf `click` hört, ist ohne Maus NICHT VORHANDEN
   — und das sieht man beim Benutzen nie.** Ein `<div>` mit Klick-Horcher hat
   kein `tabindex` (Tab springt vorbei), keine Rolle (der Screenreader liest
@@ -249,11 +249,36 @@ Der wiederkehrende Defekt in diesem Projekt ist nicht Kaputtheit, sondern
 - **Ein Attribut kann aussehen wie eine Bindung und keine sein.** `data-i18n-…`
   wirkt nur, wenn `applyLang` es liest; ein Knopf, dessen Beschriftung ein
   Zeichen ist („‹", „⛶"), trägt seinen ganzen Namen im `aria-label`.
-- **Escape und Klick daneben sind EINE Regel für ALLE Dialoge**
-  (`MODAL_CLOSERS`) — sonst hängt es vom geöffneten Dialog ab, welche Geste
-  hilft. Jeder Eintrag nennt seine Schließfunktion, nicht `remove('show')`:
-  Dialoge räumen auf, und ein zweiter Ausgang, der das überspringt, lässt
-  Zustand stehen.
+- **Der CSP-Skript-Hash wird EINMAL beim Start gerechnet**
+  (`SecurityHeaders.__init__`, Anmerkung 208). Wer `index.html` unter einem
+  laufenden Smoke-Server ändert, bekommt eine Kopfzeile, die auf die alte Datei
+  zeigt — der Browser verwirft dann das GANZE Skript, und die Seite lädt und tut
+  nichts. **Nach jeder Frontend-Änderung neu starten**, und im Zweifel messen:
+  `curl -D- -o /dev/null http://…/` gegen den Hash der Datei.
+- **Escape, Klick daneben, Tab-Falle und Fokus-Rückweg sind EINE Regel für ALLE
+  Dialoge** (`OVERLAYS`, Anmerkung 218) — sonst hängt es vom geöffneten Dialog
+  ab, welche Geste hilft. Jeder Eintrag nennt seine Schließfunktion, nicht
+  `remove('show')`: Dialoge räumen auf, und ein zweiter Ausgang, der das
+  überspringt, lässt Zustand stehen. `close: null` heißt „mit Grund kein
+  Ausweg", nicht „vergessen" — für die Fokus-Regeln zählt der Eintrag trotzdem.
+  **`openOverlay`/`closeOverlay` sind der EINZIGE Weg**, an dem `.show` an einem
+  Overlay wandert; wer es selbst schreibt, bekommt Falle und Rückweg lautlos
+  nicht (der Wächter sucht danach).
+- **Ein Dialog, aus dem Tab hinausführt, ist mit der Tastatur keiner** — die
+  Verdunklung ist Farbe, der Tab-Ring läuft dahinter weiter, und man drückt
+  Knöpfe, die man nicht sieht. Was in einer Ansicht offen ist, entscheidet die
+  BAUFORM (`.modal-overlay, .sheet-overlay, .lightbox, .loading-overlay`) und
+  keine zweite Namensliste; so fällt der siebte Dialog auf, sobald er die
+  Klasse benutzt.
+- **`offsetParent` ist der naheliegende Sichtbarkeitstest und hier unbrauchbar**
+  — unter jsdom immer `null`, ein Wächter darauf prüft nichts. Der Weg über die
+  BERECHNETE Anzeige (`getComputedStyle`) gilt in beiden, auch für z-Ebenen.
+- **Eine Vorsichtsmaßnahme, die kein Test von ihrem Fehlen unterscheiden kann,
+  ist keine.** In 218 war das eine gemerkte Fokus-Spur gegen den Fall „Dialog
+  setzt den Fokus beim Öffnen selbst weiter" — den es nicht gibt, weil in einem
+  `display:none`-Teilbaum nichts den Fokus halten kann. Der Lauf gegen den
+  kaputten Stand ist nicht nur die Probe auf den Wächter, sondern auch die auf
+  den Code: bleibt er grün, ist eine Hälfte davon zu viel.
 - **Was am Schreibtisch unsichtbar ist:** Scroll-Verkettung
   (`overscroll-behavior`), die SEITLICHEN Safe-Area-Ränder (die beißen nur
   QUER), `prefers-reduced-motion` über ALLE Animationen, und `resize` auf dem
@@ -263,7 +288,7 @@ Der wiederkehrende Defekt in diesem Projekt ist nicht Kaputtheit, sondern
 - **Jede Prüfung einmal gegen den KAPUTTEN Stand fahren.** Sonst ist sie grün,
   weil es die Funktion GIBT — nicht, weil der Aufrufer sie BENUTZT.
 - **Ein `const` auf oberster Skriptebene ist KEINE Fenster-Eigenschaft**
-  (anders als eine `function`-Deklaration): `w.MODAL_CLOSERS` und `w.LANG` sind
+  (anders als eine `function`-Deklaration): `w.OVERLAYS` und `w.LANG` sind
   stumm `undefined`, und die Prüfung wird eine über nichts. Aus dem Quelltext
   lesen oder `w.eval()` — die App nicht für ihren Test global machen.
 - **Unter jsdom startet die Seite ENGLISCH**; `applyI18n` ersetzt das deutsche

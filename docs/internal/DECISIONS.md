@@ -1992,7 +1992,107 @@ repair for each: delete it.
     and it is not restored to the trigger on close. Both are real, both want a
     single owner for “which element had focus before this opened”, and bolting
     that onto six dialogs in the same pass as everything above is how the second
-    copy of a rule gets written.
+    copy of a rule gets written. → note 218.
+
+218. ✅ **A dialog the keyboard can walk out of is not a dialog.**
+
+    The round note 217 deferred, done as its own pass (2026-08-11). Two defects,
+    one shape: with a mouse both are flawless, and there is nothing to notice.
+
+    **`Tab` led out of the open dialog.** The overlay darkens the page, but
+    darkening is paint. The tab ring ran straight on into the sidebar, the
+    filter chips, the event cards behind it — you tab into buttons you cannot
+    see and press them. The loading overlay is the sharpest case, because its
+    own stylesheet comment *promises* the opposite: “as long as this stands, the
+    page beneath is not operable, and that should be visible.” It was true for
+    the mouse and false for `Tab`, and the comment had been standing there
+    through every review.
+
+    **On close the focus fell to the top of the document.** Nothing gives it
+    back to the button that opened the dialog. For a mouse that is unnoticeable;
+    without one, every single dialog costs the same trip back through half the
+    page afterwards. It is not a bug you find, it is a tax you pay.
+
+    **One owner, and it is not a second list.** `MODAL_CLOSERS` (four entries,
+    two documented exemptions standing beside it in prose) became `OVERLAYS`
+    (nine entries), read by four rules: `Escape` closes the topmost, backdrop
+    click does the same, `Tab` stays inside the topmost, focus moves in on open
+    and back on close. `close: null` is now a *value* rather than an absence —
+    “deliberately no way out”, with the reason on the line above — so the
+    exemptions are inside the list instead of next to it, and still count for
+    the two focus rules. A dialog without an exit is all the more one that `Tab`
+    must not leave. A seventh dialog gets one line and is in all four rules; the
+    alternative, teaching each dialog its own “who had focus before me”, is six
+    copies of one rule and the seventh is the one that gets forgotten.
+
+    `openOverlay`/`closeOverlay` are the only place `.show` moves on an overlay.
+    That is what makes the owner an owner rather than a convention, and the
+    guard checks it by scanning the source for a second way in — the same shape
+    as `check-no-cdn.js`. Without that check, the list would be a list of
+    dialogs that *happen* to be routed through it today.
+
+    **What counts as a dialog is decided by build, not by name.** The guard
+    collects `.modal-overlay, .sheet-overlay, .lightbox, .loading-overlay` from
+    the loaded DOM and demands a line for each — so a new dialog trips it by
+    using the class, not by someone remembering to extend a second list. That
+    caught two overlays that were never in `MODAL_CLOSERS` at all: the lightbox
+    (which had its own private `Escape`, now folded in, keeping only its arrow
+    keys and its wider “click anything but the photo” rule) and the loading
+    overlay.
+
+    **The loading overlay traps but does not receive.** It is `role="status"`
+    with `aria-live`: it exists to be *announced*, and pulling focus into a live
+    region interrupts the announcement it was built for. So `enter: false` —
+    the one flag in the list — while rule 3 still applies. With its cancel
+    button hidden there is nothing focusable inside, and then “nowhere” is the
+    correct answer to `Tab`, not “somewhere behind it”.
+
+    **Stacking order comes from the stylesheet now.** The old `topmostModal()`
+    read the inline `z-index` and defaulted to 1500 — a copy of the CSS that was
+    already wrong for the two overlays it did not know about (lightbox 3000,
+    loading overlay 2500). `getComputedStyle().zIndex` has the class rule and
+    the inline exception already resolved, and jsdom resolves it too, so the
+    guard sees what the browser sees.
+
+    **A mechanism built and then removed, which is the part worth writing
+    down.** The first version remembered a *trail* of the last six focused
+    elements, to survive a dialog that moves focus onward itself the moment it
+    opens (`uiDialog` into its input field) — in which case `activeElement` at
+    open time is already inside the dialog and the naive answer is wrong. Then
+    the broken-state run: mutating the trail down to a single
+    `document.activeElement` left the guard **green**. Not a gap in the tests —
+    the case cannot occur. Nothing inside a `display:none` subtree can hold
+    focus; the browser gives it up the moment an element is hidden, and
+    `focus()` on something invisible does nothing. At the instant of opening,
+    focus is always still outside. The trail defended against an impossibility,
+    and no test could tell it from four lines less code. It is gone, and the
+    reasoning stays in the source so it is not rebuilt.
+
+    What remains is a `Map` keyed by dialog id, not a stack: dialogs also close
+    in an order other than they opened, and each entry carrying its own answer
+    is what makes the place picker hand focus back to the button *inside* the
+    edit dialog rather than to the timeline behind both.
+
+    **`offsetParent` is the obvious visibility test and unusable here** — jsdom
+    returns `null` for everything, so a guard built on it tests nothing at all
+    (note 108's class of failure). `focusVisible` walks up through the computed
+    display instead, which both agree on, and which catches the way this file
+    actually hides things (`style.display = 'none'`). Without it the ring
+    contains `ed-days-btn` while its row is switched off: a focus ring on an
+    invisible button, which is note 217's own lesson coming back.
+
+    Run against the broken state, eight mutations, each one red: trap removed
+    (4), restore removed (4), focus-in removed (3), per-dialog memory made
+    global (1), `Escape` reaching through to the dialog below (1), visibility
+    check dropped from the ring (1), a second `classList.add('show')` (1), a
+    dialog dropped from the list (1). The ninth — the trail — is the one that
+    stayed green and therefore is not in the code.
+
+    Not done, and worth naming: the background is not `inert`. `Tab` is held,
+    but a screen reader's virtual cursor can still read the page behind an open
+    dialog. The fix is one attribute on the right container, and the dialogs in
+    this file are not all siblings of one — that is a markup question, not a
+    focus question, and it belongs to whoever moves them.
 
 ## Appendix B — the concept document's closed chapters
 

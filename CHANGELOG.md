@@ -310,6 +310,15 @@ any `MINOR`.
   closed exactly one of the six and a click on the background closed three —
   which gesture worked depended on which dialog was open. The welcome dialog
   keeps its deliberate exception: it stays until you have chosen something.
+- **An open dialog now keeps the keyboard.** `Tab` used to walk straight out of
+  it and on into the page behind the darkened background, where you could reach
+  and press buttons you could not see — including while a run was in progress,
+  behind an overlay that says the page is not usable right now. `Tab` and
+  `Shift+Tab` now cycle within the dialog on top, opening one moves the cursor
+  into it so a screen reader reads out what it is, and closing it puts the
+  cursor back on the button you opened it from instead of at the top of the
+  page. With a mouse none of this was noticeable; with a keyboard it was the
+  difference between usable and not.
 - **Several texts stayed German with the interface set to English.** The only
   button in the welcome dialog, the first entry in the precision dropdown, the
   sentence around the import threshold, and the labels that screen readers

@@ -1316,7 +1316,12 @@
 
   <!-- EVENT BEARBEITEN (Modal) -->
   <!-- F15: Bildbetrachter -->
-  <div class="lightbox" id="lightbox">
+  <!-- Der Bildbetrachter ist ein Dialog wie die anderen, auch wenn er nicht so
+       aussieht: er liegt über allem, und solange er offen ist, gehört ihm die
+       Tastatur. `role`/`aria-modal` stehen deshalb hier und nicht nur in der
+       Absicht — `OVERLAYS` sucht den Kasten daran (Anmerkung 218). -->
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true"
+       data-i18n-aria="lb.dialog" aria-label="Bildbetrachter">
     <button class="lb-nav lb-prev" id="lb-prev" data-i18n-aria="lb.prev" aria-label="voriges Bild">‹</button>
     <img id="lb-img" alt="">
     <div class="lb-cap" id="lb-cap"></div>
@@ -3273,7 +3278,7 @@ function fgRender(op) {
     ? t('fg.stopping', '… wird abgebrochen')
     : t('loading.cancel', 'Abbrechen');
   cancel.disabled = !!op.aborted;
-  ov.classList.add('show');
+  openOverlay('loading-overlay');
 }
 
 // Ein Abbruch ist kein Fehler. Eigene Klasse, damit ein `catch` ihn von einem
@@ -3360,8 +3365,7 @@ async function runForeground(title, fn, opts = {}) {
     clearTimeout(timer);
     if (cancelBtn) cancelBtn.removeEventListener('click', onCancel);
     fgOp = null;
-    const ov = fgEl('loading-overlay');
-    if (ov) ov.classList.remove('show');
+    closeOverlay('loading-overlay');
     if (cancelBtn) { cancelBtn.hidden = true; cancelBtn.disabled = false; }
     fgEl('loading-note').textContent = '';
     fgEl('loading-meta').textContent = '';
@@ -3407,7 +3411,7 @@ function uiDialog(text, opts = {}) {
     input.placeholder = opts.placeholder || '';
     ok.textContent = opts.okLabel || 'OK';
     ok.className = 'btn' + (opts.danger ? ' danger' : '');
-    const done = val => { modal.classList.remove('show'); cleanup(); resolve(val); };
+    const done = val => { closeOverlay('confirm-modal'); cleanup(); resolve(val); };
     const onOk = () => done(wantsInput ? input.value : true);
     const onCancel = () => done(wantsInput ? null : false);
     const onKey = ev => {
@@ -3425,7 +3429,11 @@ function uiDialog(text, opts = {}) {
     cancel.addEventListener('click', onCancel);
     modal.addEventListener('click', onBackdrop);
     document.addEventListener('keydown', onKey);
-    modal.classList.add('show');
+    // `openOverlay` setzt den Fokus auf den Kasten; die Frage nach einer
+    // EINGABE will ihn eine Stufe weiter, im Feld. Erst zeigen, dann
+    // fokussieren — andersherum wäre `focus()` auf ein `display:none`-Feld und
+    // täte nichts.
+    openOverlay('confirm-modal');
     if (wantsInput) input.focus();
   });
 }
@@ -3568,6 +3576,7 @@ const I18N_EN = {
   'map.fs': "Fullscreen",
   'lb.prev': "Previous photo",
   'lb.next': "Next photo",
+  'lb.dialog': "Photo viewer",
   'tl.visits.chip': "🛰️ Auto-detected",
   'tl.visits.chip.short': "Auto-detected",
   'tl.visits.n': "auto-detected",
@@ -6819,10 +6828,10 @@ function jrPreview(show) {
 function openJournal(dateStr) {
   const d = dateStr || todayLocal();
   document.getElementById('jr-date').value = d;
-  document.getElementById('journal-modal').classList.add('show');
+  openOverlay('journal-modal');
   jrLoad(d);
 }
-function closeJournal() { document.getElementById('journal-modal').classList.remove('show'); }
+function closeJournal() { closeOverlay('journal-modal'); }
 document.getElementById('tl-journal-btn').addEventListener('click', () => openJournal());
 
 // ---------- F1 (zweite Hälfte): KI-Vorschlag für den Tag ----------
@@ -7048,7 +7057,7 @@ document.getElementById('tl-print-btn').addEventListener('click', async () => {
     document.getElementById('pr-from').value = from;
     document.getElementById('pr-to').value = to;
   }
-  document.getElementById('print-modal').classList.add('show');
+  openOverlay('print-modal');
   prRefreshCount();
 });
 
@@ -7080,19 +7089,19 @@ document.querySelectorAll('#print-modal [data-print-preset]').forEach(chip => {
     .addEventListener('change', prRefreshCount));
 
 document.getElementById('pr-cancel').addEventListener('click',
-  () => document.getElementById('print-modal').classList.remove('show'));
+  () => closeOverlay('print-modal'));
 
 document.getElementById('pr-go').addEventListener('click', async () => {
   prBuildPage(await prSelected());
-  document.getElementById('print-modal').classList.remove('show');
+  closeOverlay('print-modal');
   // Kurz warten, damit das Layout des frisch gebauten Bereichs steht
   setTimeout(() => window.print(), 60);
 });
 document.getElementById('jr-date').addEventListener('change', ev => jrLoad(ev.target.value));
 document.getElementById('jr-preview').addEventListener('click', () => jrPreview());
 document.getElementById('jr-cancel').addEventListener('click', closeJournal);
-// Klick auf den Hintergrund und Escape: siehe `MODAL_CLOSERS` weiter unten —
-// die Regel steht für alle Dialoge an einer Stelle.
+// Klick auf den Hintergrund, Escape, Tab-Falle und Fokus-Rückweg: siehe
+// `OVERLAYS` weiter unten — die Regeln stehen für alle Dialoge an einer Stelle.
 document.getElementById('jr-save').addEventListener('click', async ev => {
   const date = document.getElementById('jr-date').value;
   const text = document.getElementById('jr-text').value.trim();
@@ -8714,7 +8723,7 @@ function openPlacePicker(inputId) {
   pickTarget = inputId;
   pickPt = null;
   if (pickMarker && pickMap) { pickMap.removeLayer(pickMarker); pickMarker = null; }
-  document.getElementById('pick-modal').classList.add('show');
+  openOverlay('pick-modal');
   if (!pickMap) {
     pickMap = L.map('pick-map');
     addTiles(pickMap, 19);
@@ -8740,13 +8749,13 @@ function openPlacePicker(inputId) {
   setTimeout(() => pickMap.invalidateSize(), 60);
 }
 function closePlacePicker() {
-  document.getElementById('pick-modal').classList.remove('show');
+  closeOverlay('pick-modal');
   pickTarget = null;
 }
 document.querySelectorAll('[data-pick-for]').forEach(btn =>
   btn.addEventListener('click', () => openPlacePicker(btn.dataset.pickFor)));
 document.getElementById('pick-cancel').addEventListener('click', closePlacePicker);
-// Hintergrund-Klick und Escape kommen aus `MODAL_CLOSERS`.
+// Hintergrund-Klick, Escape und der Fokus kommen aus `OVERLAYS`.
 document.getElementById('pick-here').addEventListener('click', async ev => {
   const restore = btnBusy(ev.target, t('pick.locating', '… hole Standort'));
   try {
@@ -9129,7 +9138,7 @@ let LB_SET = [], LB_AT = 0;
 function openLightbox(items, index) {
   LB_SET = items; LB_AT = index;
   showLightbox();
-  document.getElementById('lightbox').classList.add('show');
+  openOverlay('lightbox');
 }
 function showLightbox() {
   const it = LB_SET[LB_AT];
@@ -9146,14 +9155,18 @@ function stepLightbox(d) {
 }
 document.getElementById('lb-prev').addEventListener('click', ev => { ev.stopPropagation(); stepLightbox(-1); });
 document.getElementById('lb-next').addEventListener('click', ev => { ev.stopPropagation(); stepLightbox(1); });
+// Hier schließt mehr als der Hintergrund: alles außer dem Bild selbst. Das ist
+// die weitere Regel und bleibt — der Eintrag in `OVERLAYS` deckt zusätzlich den
+// Hintergrund ab, und zweimal schließen ist einmal schließen (`closeOverlay`
+// tut nichts an einem geschlossenen Dialog).
 document.getElementById('lightbox').addEventListener('click', ev => {
   if (ev.target.id === 'lb-img') return;
-  document.getElementById('lightbox').classList.remove('show');
+  closeOverlay('lightbox');
 });
+// Escape kommt aus `OVERLAYS` — der Betrachter liegt mit z-Ebene 3000 über
+// allem und ist damit von selbst der oberste. Hier bleiben die Pfeiltasten.
 document.addEventListener('keydown', ev => {
-  const lb = document.getElementById('lightbox');
-  if (!lb.classList.contains('show')) return;
-  if (ev.key === 'Escape') lb.classList.remove('show');
+  if (!overlayOpen('lightbox')) return;
   if (ev.key === 'ArrowLeft') stepLightbox(-1);
   if (ev.key === 'ArrowRight') stepLightbox(1);
 });
@@ -9314,7 +9327,7 @@ async function openEventEdit(id) {
       ? `📅 ${t('ed.days.fill', 'Fehlende Tage anlegen')}`
       : `📅 ${t('ed.days.create', 'Tages-Einträge anlegen')}`;
   } else daysRow.style.display = 'none';
-  document.getElementById('edit-modal').classList.add('show');
+  openOverlay('edit-modal');
 }
 // F7: Tages-Kinder anlegen — je Tag der Spanne ein Event („… — Tag 3") mit
 // Ort + Bestätigung vom Eltern-Event und eigenem Wetter pro Tag
@@ -9340,7 +9353,7 @@ document.getElementById('ed-days-btn').addEventListener('click', async ev => {
 document.getElementById('ed-ent-add').addEventListener('click', () =>
   document.getElementById('ed-entities').appendChild(edEntityRow('animal', '')));
 function closeEventEdit() {
-  document.getElementById('edit-modal').classList.remove('show');
+  closeOverlay('edit-modal');
   editingEvent = null;
 }
 // Klick-Delegation: jede Event-Karte (Timeline, Suche, Kompendium-Detail) öffnet den Dialog
@@ -9426,7 +9439,7 @@ document.querySelector('.content').addEventListener('click', ev => {
   if (card && card.dataset.id) openEventEdit(card.dataset.id);
 });
 document.getElementById('ed-cancel').addEventListener('click', closeEventEdit);
-// Hintergrund-Klick und Escape kommen aus `MODAL_CLOSERS`.
+// Hintergrund-Klick, Escape und der Fokus kommen aus `OVERLAYS`.
 document.getElementById('ed-save').addEventListener('click', async () => {
   const e = editingEvent;
   if (!e) return;
@@ -12140,18 +12153,18 @@ function openNavSheet() {
     sv.title = v.title;
     sv.classList.toggle('is-dev', v.classList.contains('is-dev'));
   }
-  navSheet.classList.add('show');
   navSheet.setAttribute('aria-hidden', 'false');
   document.getElementById('nav-more').setAttribute('aria-expanded', 'true');
+  openOverlay('nav-sheet');
 }
 function closeNavSheet() {
-  navSheet.classList.remove('show');
   navSheet.setAttribute('aria-hidden', 'true');
   document.getElementById('nav-more').setAttribute('aria-expanded', 'false');
+  closeOverlay('nav-sheet');
 }
 const navMore = document.getElementById('nav-more');
 if (navMore) {
-  navMore.addEventListener('click', () => navSheet.classList.contains('show') ? closeNavSheet() : openNavSheet());
+  navMore.addEventListener('click', () => overlayOpen('nav-sheet') ? closeNavSheet() : openNavSheet());
   navMore.addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openNavSheet(); }
   });
@@ -12162,58 +12175,184 @@ document.getElementById('sheet-logout')?.addEventListener('click', e => {
   document.getElementById('logout-link')?.click();
 });
 // ══════════════════════════════════════════════════════════════════════════
-//  Dialoge schließen — EINE Liste, von zwei Regeln gelesen
+//  Überlagerungen — EINE Liste, von vier Regeln gelesen
 // ══════════════════════════════════════════════════════════════════════════
-//  Vorgefunden: sechs `.modal-overlay` plus das Sheet, und jeder konnte etwas
-//  anderes. Escape schloss GENAU EINEN (den Bestätigungsdialog); Klick daneben
-//  schloss drei von sechs. Welche Taste einen Dialog schließt, hing also davon
-//  ab, welchen man offen hatte — und das merkt man erst, wenn man drückt und
-//  nichts passiert.
+//  Vorgefunden (Anmerkung 217): sechs `.modal-overlay` plus das Sheet, und
+//  jeder konnte etwas anderes. Escape schloss GENAU EINEN (den
+//  Bestätigungsdialog); Klick daneben schloss drei von sechs. Welche Taste
+//  einen Dialog schließt, hing also davon ab, welchen man offen hatte — und das
+//  merkt man erst, wenn man drückt und nichts passiert.
 //
-//  Die Liste ist der Grund, warum das nicht wieder auseinanderläuft: ein neuer
-//  Dialog bekommt hier eine Zeile und ist damit in BEIDEN Regeln enthalten.
+//  Nachgereicht (Anmerkung 218): der Fokus, zweimal derselbe blinde Fleck.
+//  • Tab führte aus dem offenen Dialog HINAUS. Damit ist er mit der Tastatur
+//    gar kein Dialog, sondern eine Schicht Farbe über einer weiter bedienbaren
+//    Seite: man tabbt in Knöpfe, die man nicht sieht, und drückt sie. Das
+//    Lade-Overlay sagt in seinem eigenen CSS-Kommentar zu, die Seite darunter
+//    sei „nicht bedienbar" — mit der Maus stimmte das, mit Tab nicht.
+//  • Beim Schließen fiel der Fokus auf den Anfang des Dokuments statt zurück
+//    auf den Knopf, der geöffnet hat. Mit der Maus fällt das nie auf; ohne
+//    Maus ist es nach JEDEM Dialog derselbe Weg durch die halbe Seite zurück.
+//
+//  Vier Regeln lesen diese eine Liste:
+//    1. Escape schließt den obersten          (Eintrag mit `close`)
+//    2. Klick auf den Hintergrund ebenso      (Eintrag mit `close`)
+//    3. Tab bleibt im obersten                (JEDER Eintrag)
+//    4. Fokus hinein und beim Schließen zurück (Eintrag mit `enter`)
+//  Ein neuer Dialog bekommt hier EINE Zeile und ist damit in allen vieren.
+//  Die Alternative wäre gewesen, jedem Dialog sein eigenes „wer war vorher
+//  dran" beizubringen — sechs Ausfertigungen derselben Regel, und die laufen
+//  auseinander, sobald die siebte fehlt.
+//
 //  Jeder Eintrag nennt seine eigene Schließfunktion, nicht `remove('show')` —
 //  die Dialoge räumen beim Schließen auf (`editingEvent`, `pickTarget`), und
 //  ein zweiter Weg hinaus, der das überspringt, hinterlässt einen Zustand, der
 //  beim nächsten Öffnen noch da ist.
 //
-//  NICHT dabei:
-//  • `confirm-modal` — er bringt seinen eigenen Escape mit, weil sein
-//    Schließen ein Versprechen auflösen muss (`onCancel`), nicht nur eine
-//    Klasse entfernen. Zweimal schließen hieße hier: einmal ohne Antwort.
-//  • `track-modal` — der Begrüßungsdialog ist bewusst ohne Ausweg: er hat
-//    keinen Abbrechen-Knopf, weil die Auswahl getroffen werden MUSS. Ihn
-//    wegklickbar zu machen wäre keine Reparatur, sondern eine Änderung.
-const MODAL_CLOSERS = [
+//  `close: null` heißt NICHT „vergessen", sondern „mit Grund nicht" — und der
+//  Grund steht daneben. Für Regel 3 und 4 zählen diese Einträge trotzdem mit:
+//  ein Dialog ohne Ausweg ist erst recht einer, aus dem Tab nicht hinausführt.
+const OVERLAYS = [
   { id: 'edit-modal',    close: () => closeEventEdit() },
   { id: 'journal-modal', close: () => closeJournal() },
+  { id: 'print-modal',   close: () => closeOverlay('print-modal') },
   { id: 'pick-modal',    close: () => closePlacePicker() },
-  { id: 'print-modal',   close: () => document.getElementById('print-modal').classList.remove('show') },
+  { id: 'nav-sheet',     close: () => closeNavSheet() },
+  { id: 'lightbox',      close: () => closeOverlay('lightbox') },
+  // Der Bestätigungsdialog bringt seinen eigenen Escape mit, weil sein
+  // Schließen ein Versprechen auflösen muss (`onCancel`), nicht nur eine
+  // Klasse entfernen. Zweimal schließen hieße hier: einmal ohne Antwort.
+  { id: 'confirm-modal', close: null },
+  // Der Begrüßungsdialog ist bewusst ohne Ausweg: er hat keinen
+  // Abbrechen-Knopf, weil die Auswahl getroffen werden MUSS. Ihn wegklickbar
+  // zu machen wäre keine Reparatur, sondern eine Änderung.
+  { id: 'track-modal',   close: null },
+  // Das Lade-Overlay ist `role="status"` mit `aria-live` — es wird ANGESAGT,
+  // nicht betreten. Der Fokus hineinzuziehen unterbräche genau die Ansage, für
+  // die es gebaut ist (`enter: false`, sonst ist `enter` an). Sperren muss es
+  // trotzdem: hinter ihm liegt eine Seite, die gerade nichts tun soll.
+  { id: 'loading-overlay', close: null, enter: false },
 ];
-const modalOpen = m => document.getElementById(m.id)?.classList.contains('show');
-/** Der oberste offene Dialog. „Oben" heißt: größere z-Ebene gewinnt — der
- *  Ortswähler (2500) öffnet ÜBER dem Bearbeiten-Dialog (1500), und Escape muss
- *  dann ihn treffen und nicht den darunter. Die Grundebene steht im
- *  Stylesheet, die Ausnahmen als Inline-Stil am Element; beides hier zu lesen
- *  ist genauer als eine zweite Rangliste, die man pflegen müsste. */
-function topmostModal() {
-  return MODAL_CLOSERS.filter(modalOpen).sort((a, b) =>
-    (+document.getElementById(b.id).style.zIndex || 1500) -
-    (+document.getElementById(a.id).style.zIndex || 1500))[0];
+const overlayEl = id => document.getElementById(id);
+const overlayOpen = id => !!overlayEl(id)?.classList.contains('show');
+/** Der Kasten im Overlay — der Teil mit Rolle und Überschrift. Beim
+ *  Bildbetrachter trägt das Overlay die Rolle selbst. */
+const overlayBox = el =>
+  el.matches('[role="dialog"]') ? el : (el.querySelector('[role="dialog"]') || el);
+/** Der oberste offene. „Oben" heißt: größere z-Ebene gewinnt — der Ortswähler
+ *  (2500) öffnet ÜBER dem Bearbeiten-Dialog (1500), und Escape muss dann ihn
+ *  treffen und nicht den darunter. Die Zahl kommt aus der BERECHNETEN Anzeige:
+ *  Klassenregel und Inline-Ausnahme sind darin schon verrechnet, und das
+ *  Stylesheet bleibt die einzige Quelle. Eine zweite Rangliste hier wäre die
+ *  Sorte Kopie, die still von der ersten abweicht. */
+function topOverlay() {
+  const z = id => +getComputedStyle(overlayEl(id)).zIndex || 0;
+  return OVERLAYS.filter(o => overlayOpen(o.id))
+                 .sort((a, b) => z(b.id) - z(a.id))[0];
 }
-document.addEventListener('keydown', e => {
-  if (e.key !== 'Escape') return;
-  // Der Bestätigungsdialog liegt über allem und antwortet selbst.
-  if (document.getElementById('confirm-modal')?.classList.contains('show')) return;
-  if (navSheet?.classList.contains('show')) { closeNavSheet(); return; }
-  topmostModal()?.close();
+
+// ---- Fokus: EINE Stelle weiß, wo er herkam ----------------------------------
+//  Gemerkt wird JE DIALOG, nicht global — ein Schlüssel im `Map`, kein Stapel.
+//  Der Ortswähler öffnet über dem Bearbeiten-Dialog und gibt den Fokus an den
+//  Knopf DARIN zurück, nicht an den Zeitstrahl hinter beiden; jeder Eintrag
+//  trägt seine eigene Antwort. Ein Stapel wäre die schlechtere Form derselben
+//  Sache: Dialoge schließen auch in anderer Reihenfolge, als sie aufgingen.
+//
+//  Und es ist ein einzelnes Element, keine Spur zurück. Die erste Fassung hier
+//  merkte sich die letzten sechs fokussierten Elemente, für den Fall, dass ein
+//  Dialog beim Öffnen den Fokus gleich selbst weitersetzt (`uiDialog` in sein
+//  Eingabefeld) und `activeElement` deshalb schon im Dialog steht. Diesen Fall
+//  gibt es nicht: solange das Overlay `display:none` ist, kann nichts darin den
+//  Fokus halten — der Browser gibt ihn ab, sobald etwas unsichtbar wird, und
+//  `focus()` auf Unsichtbares tut nichts. Im Moment des Öffnens steht der Fokus
+//  also immer noch draußen. Die Spur hat gegen nichts geschützt, und kein Test
+//  konnte sie von der einfachen Fassung unterscheiden.
+const FOCUS_BACK = new Map();
+/** Kann dieses Element den Fokus tragen? `offsetParent` beantwortet das im
+ *  Browser, unter jsdom aber IMMER mit `null` — ein Wächter, der darauf baut,
+ *  prüft dort nichts. Der Weg nach oben über die BERECHNETE Anzeige kennen
+ *  beide, und er erwischt auch das hier übliche `style.display = 'none'`
+ *  (`lb-prev` bei einem einzelnen Bild, `ed-days-row`, `.admin-only`). */
+function focusVisible(node, root) {
+  const stop = root.parentElement;
+  for (let n = node; n && n !== stop; n = n.parentElement) {
+    if (n.hidden) return false;
+    const st = getComputedStyle(n);
+    if (st.display === 'none' || st.visibility === 'hidden') return false;
+  }
+  return true;
+}
+const FOCUS_SEL = 'a[href], button, input, select, textarea, [tabindex]';
+function focusablesIn(root) {
+  return [...root.querySelectorAll(FOCUS_SEL)].filter(n =>
+    !n.disabled && n.getAttribute('tabindex') !== '-1' && focusVisible(n, root));
+}
+/** Öffnen. Der einzige Weg — wer `classList.add('show')` selbst schreibt,
+ *  bekommt Regel 3 und 4 nicht, und zwar lautlos (`check-keyboard-dialogs.js`
+ *  hält danach Ausschau). */
+function openOverlay(id) {
+  const el = overlayEl(id);
+  if (!el || el.classList.contains('show')) return;
+  const spec = OVERLAYS.find(o => o.id === id);
+  FOCUS_BACK.set(id, document.activeElement);
+  el.classList.add('show');
+  if (spec && spec.enter === false) return;
+  // Der Fokus wandert auf den KASTEN, nicht auf das erste Bedienelement: dort
+  // liest ein Screenreader Rolle und Überschrift vor (`role="dialog"` +
+  // `aria-labelledby`), das erste Feld überspringt beides. Das `tabindex`
+  // dafür steht hier und nicht im Markup — an der EINEN Stelle, an der
+  // gebunden wird, sonst fehlt es dem siebten Dialog.
+  const box = overlayBox(el);
+  if (box) {
+    box.setAttribute('tabindex', '-1');
+    box.focus();
+  }
+}
+/** Schließen. Gibt den Fokus zurück — aber nur, was auch weggenommen wurde:
+ *  steht er inzwischen woanders (ein Klick hat den Dialog geschlossen UND
+ *  etwas anderes fokussiert), wäre der Sprung zurück ein Eingriff. */
+function closeOverlay(id) {
+  const el = overlayEl(id);
+  if (!el || !el.classList.contains('show')) return;
+  el.classList.remove('show');
+  const back = FOCUS_BACK.get(id);
+  FOCUS_BACK.delete(id);
+  const cur = document.activeElement;
+  if (cur && cur !== document.body && !el.contains(cur)) return;
+  // Ein Ziel, das inzwischen weg, abgeschaltet oder unsichtbar ist, ist keins:
+  // `focus()` täte dann nichts, und der Fokus fiele still auf den Seitenanfang.
+  if (!back || back === document.body || !back.isConnected || back.disabled) return;
+  if (!focusVisible(back, document.body)) return;
+  back.focus();
+}
+document.addEventListener('keydown', ev => {
+  if (ev.key !== 'Escape') return;
+  const top = topOverlay();
+  // Kein Durchgriff nach unten: liegt oben einer ohne Ausweg, tut Escape
+  // nichts. Sonst schlösse die Taste einen Dialog, den man gar nicht sieht.
+  if (top && top.close) top.close();
+});
+// Regel 3. Tab ist die Probe darauf, ob ein Dialog wirklich einer ist.
+document.addEventListener('keydown', ev => {
+  if (ev.key !== 'Tab') return;
+  const top = topOverlay();
+  if (!top) return;
+  const el = overlayEl(top.id);
+  const ring = focusablesIn(el);
+  // Nichts zu fokussieren (das Lade-Overlay ohne Abbrechen-Knopf): dann ist
+  // „nirgendwohin" die richtige Antwort und nicht „irgendwohin dahinter".
+  if (!ring.length) { ev.preventDefault(); return; }
+  const first = ring[0], last = ring[ring.length - 1], cur = document.activeElement;
+  const out = !el.contains(cur);
+  const to = (ev.shiftKey && (out || cur === first)) ? last
+           : (!ev.shiftKey && (out || cur === last)) ? first : null;
+  if (to) { ev.preventDefault(); to.focus(); }
 });
 // Klick auf den Hintergrund — dieselbe Liste. Am Overlay selbst und nicht am
 // Dokument: nur ein Treffer auf das Overlay IST der Hintergrund; ein Klick auf
 // den Kasten darin blubbert zwar hoch, hat aber `ev.target` = Kasten.
-MODAL_CLOSERS.forEach(m => {
-  const el = document.getElementById(m.id);
-  if (el) el.addEventListener('click', ev => { if (ev.target === el) m.close(); });
+OVERLAYS.filter(o => o.close).forEach(o => {
+  const el = overlayEl(o.id);
+  if (el) el.addEventListener('click', ev => { if (ev.target === el) o.close(); });
 });
 
 // Kompendium-Reiter werden dynamisch aus den Modulen gebaut (rebuildCompTabs, A7)
@@ -13833,7 +13972,7 @@ document.getElementById('track-save').addEventListener('click', async () => {
   } catch (err) {
     toast(t('toast.savefail', 'Speichern fehlgeschlagen: ') + err.message, 'error');
   }
-  document.getElementById('track-modal').classList.remove('show');
+  closeOverlay('track-modal');
 });
 document.querySelectorAll('#fmt-parts [data-part]').forEach(cb =>
   cb.addEventListener('change', async () => {
@@ -13970,7 +14109,7 @@ function enterOfflineCapture() {
     // Erster Start (noch nie gewählt): Onboarding-Frage zeigen
     if (s.tracked_modules === null || s.tracked_modules === undefined) {
       document.getElementById('track-options').innerHTML = trackChooserHtml(null);
-      document.getElementById('track-modal').classList.add('show');
+      openOverlay('track-modal');
     }
   } catch (_) {}
 
