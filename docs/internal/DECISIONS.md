@@ -2094,6 +2094,104 @@ repair for each: delete it.
     this file are not all siblings of one — that is a markup question, not a
     focus question, and it belongs to whoever moves them.
 
+219. ✅ **A backend review: four defects, and three of them are one rule kept in
+    two places.**
+
+    Asked for as a review of the backend (2026-08-11), not prompted by a report.
+    The suite was green before and after — 844 tests then, 861 now — which is
+    the point: none of these four announce themselves.
+
+    **(a) The revocation beat the re-issue.** `revoke_sessions` set the cutoff
+    one second into the *future*, with fractions; `sign_cookie` wrote
+    `iat = int(time.time())`, truncated to the whole second and therefore never
+    greater than now. A cookie issued *after* a revocation was thus always older
+    than the cutoff. `local_change_password` issues one on purpose, to keep the
+    user signed in — its docstring promises exactly that — and it was dead
+    before it reached the browser; after “sign out everywhere” nobody could sign
+    in for one to two seconds, the rightful owner included.
+
+    The +1 second was the right observation and the wrong lever. Two cookies
+    from the same second carry the same number, so “issued just before” and
+    “issued just after” are **not decidable at that resolution** — and moving
+    the boundary instead of raising the resolution hits the wrong half. `iat`
+    now carries fractions (RFC 7519 allows non-integer `NumericDate`;
+    `time.time()` resolves to ~0.5 µs here), and the cutoff is simply *now*.
+
+    **The obvious repair is a trap, and this pass fell into it first**: pushing
+    `iat` past the cutoff. PyJWT rejects a future `iat` with
+    `ImmatureSignatureError`, `read_cookie` returns `None`, and “cookie is not
+    valid” becomes “cookie cannot be read” — the same outage one layer down. It
+    is a test of its own now, because it is the repair anyone would reach for.
+
+    `test_anm209_sessions.py` had checked both halves *separately* and never the
+    round trip. **Two correct functions, and the defect lives between them.**
+
+    **(b) The raw table view carried its own dependency list** — the third
+    answer in this project to “what hangs off an event?”, beside
+    `wipe.WIPE_ORDER` and `photo_points.delete_events`. The other two are
+    complete; this one missed `events.parent_event_id`, `tracks.event_id` and
+    `baseline_locations.location_id`. Measured against the running code:
+    `{'deleted': True, 'side_effects': []}` — “no consequences” reported while a
+    day child pointed at an event that no longer existed. Silent on SQLite, a
+    500 on PostgreSQL. `baseline_locations` is the row that slipped through for
+    the **second** time (note 168 was the first), which settles the question of
+    whether a hand-written list can be kept complete by care.
+
+    **Which columns exist is now asked of the schema** (`_dependents`, the same
+    technique as `data._user_scoped_refs`); a new table with a new reference is
+    covered by itself. **What happens to them the schema cannot know**, so
+    `ON_DELETE` says it in three words: `cascade` (a metric without its event is
+    not a saved half), `detach` (a track is its own recording — the wording is
+    `photo_points`', deliberately), and `refuse`. The residence gets `refuse`:
+    it is the life database, and that does not disappear as a *side effect* of
+    deleting a derivation — the symmetric counterpart of `delete_baseline`'s
+    “the place stays”. Nullability alone would not have done as a rule:
+    `media_refs.event_id` is nullable and still goes along, because `delete_row`
+    removes the **files** first and a detached reference would point at nothing.
+
+    **(c) `ux_metrics_weather` was missing on a fresh instance's first run.**
+    `ensure_schema` took its table list before `create_all` had run, so on an
+    empty database everything conditional on an existing table was skipped. The
+    index appeared from the second start on — which is why nobody ever missed
+    it, and also why it mattered: the first start is the one where `SEED_DEMO`
+    writes weather, and `enrich_weather` states in its own comment that it
+    relies on the index. `create_all` moved *into* `ensure_schema`: an order
+    that matters belongs inside the function, not at its call site.
+
+    **(d) One broken account ended the night for every account after it.** The
+    `try` in `run_due_schedules` wrapped the whole user loop. That is literally
+    the damage note 115 argues against twelve lines further down, arriving by a
+    different road. The catch now sits per pass; the outer one stays for what
+    can fail *before* the loop.
+
+    Smaller, same shape: `geocode` announced itself to Nominatim as
+    “life-dash/0.1” — a version that never existed — while `auth.HTTP_HEADERS`
+    built the right one from `APP_VERSION` right next to it; one string in
+    `version.py` now. `/api/auth/callback` did not check the auth mode although
+    `/login` does. `/health` is deliberately reachable without a login (the UI
+    calls it “the right target URL for an uptime monitor”) and named
+    `auth_mode` — “dev” says *this instance has no door*, to precisely the
+    stranger `startup_checks.py` exists to keep out. It and `database` had no
+    reader anywhere in `frontend/`, `tools/` or the tests, and are gone.
+
+    Run against the broken state first, as note 108 requires: 13 red, 3 green —
+    and the three green ones are the promises the rewrite was not allowed to
+    lose (metrics still cascade, events still detach from a deleted place,
+    `ensure_schema` stays idempotent). Two older tests were adjusted on purpose
+    and both are named in place: one asserted the *wording* of a side-effect
+    sentence, the other that `iat` is an `int`.
+
+    **Measured, not repaired — one open item.** `_weather_candidates` loads
+    every located event *with its metrics* before **every** batch of 25, so the
+    search grows with the stock already enriched: 396 ms at 2,000 events,
+    1,321 ms at 5,000, 2,979 ms at 10,000 (SQLite, desktop). A backlog run over
+    10,000 events is 400 batches, so the searching alone runs quadratically. The
+    answer is already written twelve lines below it: `_day_weather_candidates`
+    asks the `weather_rev` marker **in SQL**. The event half should do the same
+    (`NOT EXISTS`) — the same rule, with the better half on the day side. Left
+    open deliberately: it changes which rows a run picks up, and that wants its
+    own pass with its own guard.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

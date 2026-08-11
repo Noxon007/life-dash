@@ -88,8 +88,25 @@ def test_a_cookie_without_an_issue_time_counts_as_revoked():
 
 
 def test_signed_cookies_carry_an_issue_time():
-    token = auth.sign_cookie({"uid": "u1"}, 60)
-    assert isinstance(auth.read_cookie(token)["iat"], int)
+    """Anmerkung 219: eine ZAHL, und ausdrücklich nicht mehr nur eine ganze.
+
+    Hier stand `isinstance(…, int)`. Die ganze Sekunde war genau das Problem:
+    ein Cookie, das kurz VOR einem Widerruf ausgestellt wurde, und eines kurz
+    DANACH tragen dieselbe Zahl — damit war die eine Frage, die
+    `session_still_valid` stellt, an der Auflösung nicht zu entscheiden.
+    RFC 7519 lässt für `NumericDate` nicht-ganzzahlige Werte ausdrücklich zu.
+    """
+    iat = auth.read_cookie(auth.sign_cookie({"uid": "u1"}, 60))["iat"]
+    assert isinstance(iat, (int, float)) and not isinstance(iat, bool)
+    # **Und die Auflösung ist wirklich feiner als eine Sekunde.** Den Typ nur
+    # zu lockern wäre eine Prüfung, die nichts prüft: `int` ist auch ein
+    # `(int, float)`, ein zurückgedrehtes `int(time.time())` käme also durch.
+    # Fünf Ausstellungen, von denen KEINE eine Nachkommastelle trägt, gibt es
+    # bei ~0,5 µs Auflösung nicht — gegen den abgeschnittenen Stand ist das
+    # hier sicher rot.
+    stamps = [auth.read_cookie(auth.sign_cookie({"uid": "u1"}, 60))["iat"]
+              for _ in range(5)]
+    assert any(s != int(s) for s in stamps), stamps
 
 
 def test_an_aware_cutoff_from_the_database_still_compares():

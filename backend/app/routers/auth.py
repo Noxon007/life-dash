@@ -51,9 +51,16 @@ def _require_local_mode() -> None:
 
 def _issue_session(response: Response, user: User) -> None:
     """Setzt das Sitzungs-Cookie. EINE Stelle — Anmerkung 200 hat gezeigt, was
-    passiert, wenn zwei Aufrufer die Attribute je selbst aufzählen."""
+    passiert, wenn zwei Aufrufer die Attribute je selbst aufzählen.
+
+    Anmerkung 219: Der INHALT kommt jetzt aus `auth.session_cookie_for`. Hier
+    stand `sign_cookie` direkt, und der OIDC-Rückweg rief es noch einmal selbst
+    — dieselbe Verdopplung wie damals bei den Cookie-Merkmalen, nur eine Ebene
+    tiefer. Sie kostete: ein Cookie, das direkt nach einem Widerruf entsteht,
+    war ungültig.
+    """
     auth.set_auth_cookie(response, auth.SESSION_COOKIE,
-                         auth.sign_cookie({"uid": user.id}, auth.session_max_age()),
+                         auth.session_cookie_for(user),
                          auth.session_max_age())
 
 
@@ -359,7 +366,16 @@ def login() -> RedirectResponse:
 
 @router.get("/callback")
 def callback(request: Request, code: str, state: str, db: Session = Depends(get_db)) -> RedirectResponse:
-    """OIDC-Redirect zurück: Code gegen Token tauschen, Nutzer anlegen, Session setzen."""
+    """OIDC-Redirect zurück: Code gegen Token tauschen, Nutzer anlegen, Session setzen.
+
+    Anmerkung 219: Die Betriebsart wird hier geprüft wie in `/login`. Dieselbe
+    Frage an einer von zwei Stellen nicht zu stellen ist das Muster, das diese
+    Datei schon bei den Cookie-Merkmalen erwischt hat — hier antwortete der
+    Rückweg bisher mit einem 500er aus der Tiefe der Discovery, wo ein „gibt es
+    hier nicht" die richtige und verständliche Auskunft ist.
+    """
+    if settings.auth_mode != "oidc":
+        raise HTTPException(404, "OIDC ist nicht aktiv (AUTH_MODE=oidc)")
     raw = request.cookies.get(auth.STATE_COOKIE)
     data = auth.read_cookie(raw) if raw else None
     if not data or data.get("state") != state:
@@ -404,9 +420,7 @@ def callback(request: Request, code: str, state: str, db: Session = Depends(get_
 
     resp = RedirectResponse("/")
     resp.delete_cookie(auth.STATE_COOKIE)
-    auth.set_auth_cookie(resp, auth.SESSION_COOKIE,
-                         auth.sign_cookie({"uid": user.id}, auth.session_max_age()),
-                         auth.session_max_age())
+    _issue_session(resp, user)
     return resp
 
 

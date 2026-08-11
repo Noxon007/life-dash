@@ -18,19 +18,11 @@ from sqlalchemy.orm import Session
 from app import logbuffer
 from app.auth import require_admin
 from app.database import Base, SessionLocal, engine, get_db
-from app.models import (
-    Entity,
-    Event,
-    EventEntityLink,
-    Fragment,
-    Location,
-    MediaRef,
-    Metric,
-    Source,
-    Track,
-    User,
-    UserRole,
-)
+# Anmerkung 219: Die halbe Modell-Liste stand hier nur, weil `delete_row` seine
+# abhängigen Tabellen von Hand aufzählte. Seit sie aus `Base.metadata` kommen,
+# braucht diese Datei die Klassen nicht mehr — und der Import, der sie noch
+# nannte, hätte beim Lesen weiter behauptet, hier gäbe es eine solche Liste.
+from app.models import Event, Fragment, Source, User, UserRole
 from app.services.enrichment import auto_enrich_events, enrich_weather
 from app.schemas import AdminCreateUser
 from app.services.ingestion import reprocess_pending, reset_reprocess
@@ -284,6 +276,137 @@ _DELETE_BLOCKED = {
 }
 
 
+# --------------------------------------------------------------------------- #
+#  Anmerkung 219 — was an einer gelöschten Zeile hängt
+# --------------------------------------------------------------------------- #
+# Hier stand eine `if name == …`-Kette, und sie war die DRITTE Antwort im
+# Projekt auf „was hängt an einem Ereignis?" — neben `wipe.WIPE_ORDER` und
+# `photo_points.delete_events`. Die beiden anderen waren vollständig, diese
+# nicht: `events.parent_event_id`, `tracks.event_id` und
+# `baseline_locations.location_id` fehlten. Gemessen am laufenden Stand hieß das
+# `{'deleted': True, 'side_effects': []}` — und danach zeigte ein Tages-Kind auf
+# ein Ereignis, das es nicht mehr gab. Auf SQLite lautlos, auf PostgreSQL ein
+# Abbruch. Ein Protokoll, das einen Erfolg meldet, den es nicht gab, ist teurer
+# als keins (`wipe.py`, Kopf).
+#
+# **WELCHE Spalten es gibt, fragt jetzt das Schema** (`_dependents`) und nicht
+# mehr diese Datei. Eine neue Tabelle mit einem neuen Verweis ist damit von
+# selbst mitgeprüft — dieselbe Bauart wie `test_wipe_covers_every_user_table`:
+# eine Spalte, nach der niemand fragt, kann kein Test vermissen.
+#
+# **WAS mit ihnen geschieht, kann das Schema nicht wissen** und steht deshalb
+# hier. Drei Antworten, und die dritte ist eine Weigerung:
+#
+#   "cascade"  — die Zeile kann ohne ihr Ziel nicht existieren und geht mit
+#                (ein Messwert ohne Ereignis ist keine gerettete Hälfte)
+#   "detach"   — sie steht für sich; der Verweis wird auf NULL gesetzt. So
+#                entscheidet es der Lösch-Dialog für Tages-Kinder
+#                (`with_children=False`) und `photo_points` für Wege: „der Weg
+#                ist eine eigene Aufzeichnung und keine Ableitung dieses
+#                Ereignisses"
+#   "refuse"   — sie ist Lebensdatenbank und verschwindet nicht als
+#                NEBENWIRKUNG einer anderen Löschung
+#
+# Die Nullbarkeit allein hätte als Regel nicht gereicht: `media_refs.event_id`
+# ist nullable und wird trotzdem mitgelöscht, weil `delete_row` vorher die
+# DATEIEN entfernt — ein abgehängter Verweis zeigte danach auf nichts.
+ON_DELETE: dict[tuple[str, str], str] = {
+    # → events
+    ("metrics", "event_id"): "cascade",
+    ("event_entity_links", "event_id"): "cascade",
+    ("media_refs", "event_id"): "cascade",
+    ("events", "parent_event_id"): "detach",
+    ("tracks", "event_id"): "detach",
+    # → entities
+    ("event_entity_links", "entity_id"): "cascade",
+    # → locations
+    ("events", "location_id"): "detach",
+    ("baseline_locations", "location_id"): "refuse",
+}
+
+# Menschenlesbarer Name je Tabelle — für den Satz in `side_effects`. Die SPALTE
+# steht mit dabei, weil `events` auf zwei Weisen auf sich selbst und auf
+# `locations` zeigt: „2 Ereignisse abgehängt" ließe offen, welcher Verweis
+# gemeint ist, und dies ist die ROHANSICHT — hier liest jemand Spaltennamen.
+_TABLE_LABELS = {
+    "metrics": "Metriken", "media_refs": "Medien-Verweise",
+    "event_entity_links": "Objekt-Verknüpfungen", "events": "Ereignisse",
+    "tracks": "Wege", "baseline_locations": "Wohnorte",
+}
+
+# Wohin ein „refuse" verweist: WO die Zeile richtig bearbeitet wird.
+# Eine Weigerung ohne Weg ist eine Sackgasse.
+_REFUSE_HINT = {
+    "baseline_locations": "Dieser Ort ist als Wohnort eingetragen (F20). Ein "
+                          "Wohnort ist Lebensdatenbank und verschwindet nicht "
+                          "als Nebenwirkung — erst den Zeitraum unter "
+                          "„Wohnorte“ ändern oder entfernen, dann den Ort.",
+}
+
+
+def _dependents(table_name: str) -> list[tuple[str, str]]:
+    """(Tabelle, Spalte) jedes Fremdschlüssels, der auf DIESE Tabelle zeigt.
+
+    Aus `Base.metadata` gelesen, nicht aufgezählt — dieselbe Technik wie
+    `data._user_scoped_refs`. Selbstverweise (`events.parent_event_id`) sind
+    eingeschlossen und waren genau die Hälfte, die von Hand gefehlt hat.
+    """
+    out: list[tuple[str, str]] = []
+    for table in Base.metadata.sorted_tables:
+        for col in table.columns:
+            for fk in col.foreign_keys:
+                if fk.column.table.name == table_name:
+                    out.append((table.name, col.name))
+    return sorted(out)
+
+
+def all_dependent_columns() -> list[tuple[str, str]]:
+    """Jeder Verweis auf eine Tabelle, die über die Rohansicht LÖSCHBAR ist.
+
+    Die Grundlage des Wächters (`test_anm219_review.py`). Gesperrte Tabellen
+    bleiben draußen: auf sie zeigende Spalten kommen hier nie zur Sprache, und
+    für sie eine Antwort zu verlangen wäre eine Pflege ohne Anlass.
+    """
+    out: list[tuple[str, str]] = []
+    for table in Base.metadata.sorted_tables:
+        if table.name in _DELETE_BLOCKED:
+            continue
+        out += _dependents(table.name)
+    return sorted(set(out))
+
+
+def _clear_dependents(db: Session, table_name: str, row_id: str) -> list[str]:
+    """Räumt alles ab, was auf diese Zeile zeigt — und sagt, was es getan hat."""
+    notes: list[str] = []
+    for dep_table, column in _dependents(table_name):
+        action = ON_DELETE.get((dep_table, column))
+        if action is None:
+            # Kann nur passieren, wenn jemand eine Tabelle anlegt und den
+            # Wächter überspringt. Lieber ein klarer Abbruch als eine Waise.
+            raise HTTPException(
+                500, f"{dep_table}.{column} zeigt auf {table_name}, aber es ist "
+                     "nicht hinterlegt, was damit geschehen soll (ON_DELETE).")
+        dep = Base.metadata.tables[dep_table]
+        label = _TABLE_LABELS.get(dep_table, dep_table)
+        if action == "refuse":
+            n = db.execute(select(func.count()).select_from(dep)
+                           .where(dep.c[column] == row_id)).scalar() or 0
+            if n:
+                raise HTTPException(409, _REFUSE_HINT.get(
+                    dep_table, f"{n} Zeile(n) in {dep_table} zeigen hierher."))
+            continue
+        if action == "cascade":
+            n = db.execute(dep.delete().where(dep.c[column] == row_id)).rowcount or 0
+            if n:
+                notes.append(f"{n} {label} mitgelöscht ({column})")
+        else:                       # detach
+            n = db.execute(dep.update().where(dep.c[column] == row_id)
+                           .values(**{column: None})).rowcount or 0
+            if n:
+                notes.append(f"{n} {label} abgehängt ({column})")
+    return notes
+
+
 @router.delete("/tables/{name}/{row_id}")
 def delete_row(name: str, row_id: str, db: Session = Depends(get_db)) -> dict:
     """Löscht eine Zeile (per id) aus der Rohansicht — inklusive Aufräumen
@@ -296,25 +419,12 @@ def delete_row(name: str, row_id: str, db: Session = Depends(get_db)) -> dict:
 
     side_effects: list[str] = []
     if name == "events":
-        n_files = media_svc.purge_for_events(db, [row_id])   # F15: erst die Dateien
+        # F15: erst die DATEIEN, dann die Zeilen — nach dem Löschen der Zeilen
+        # ist nicht mehr feststellbar, welche gemeint waren (Anmerkung 59).
+        n_files = media_svc.purge_for_events(db, [row_id])
         if n_files:
             side_effects.append(f"{n_files} Bilddateien gelöscht")
-        for model, label in ((Metric, "Metriken"), (MediaRef, "Medien-Verweise"),
-                             (EventEntityLink, "Objekt-Verknüpfungen")):
-            n = (db.query(model).filter(model.event_id == row_id)
-                 .delete(synchronize_session=False))
-            if n:
-                side_effects.append(f"{n} {label} mitgelöscht")
-    elif name == "entities":
-        n = (db.query(EventEntityLink).filter(EventEntityLink.entity_id == row_id)
-             .delete(synchronize_session=False))
-        if n:
-            side_effects.append(f"{n} Event-Verknüpfungen mitgelöscht")
-    elif name == "locations":
-        n = (db.query(Event).filter(Event.location_id == row_id)
-             .update({Event.location_id: None}, synchronize_session=False))
-        if n:
-            side_effects.append(f"{n} Events sind jetzt ohne Ort")
+    side_effects += _clear_dependents(db, name, row_id)
 
     result = db.execute(table.delete().where(table.c.id == row_id))
     if result.rowcount == 0:

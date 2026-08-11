@@ -179,7 +179,29 @@ def _relax_not_null(engine: Engine, insp) -> list[str]:
 
 
 def ensure_schema(engine: Engine) -> list[str]:
-    """Fügt fehlende Spalten hinzu. Gibt die durchgeführten Änderungen zurück."""
+    """Bringt das Schema auf den Stand des Modells. Gibt die Änderungen zurück.
+
+    **Anmerkung 219 — `create_all` gehört hierher und nicht daneben.** Es stand
+    in `main.lifespan`, und zwar NACH diesem Aufruf. Die Folge war eine
+    Reihenfolge, die auf einer bestehenden Datenbank stimmte und auf einer
+    frischen nicht: `ensure_schema` erhob seine Tabellenliste, bevor es die
+    Tabellen gab, und übersprang deshalb alles, was eine bestehende Tabelle
+    voraussetzt — allen voran `ux_metrics_weather`, den Dublettenschutz aus
+    A11. Der erschien erst beim ZWEITEN Start.
+
+    Gesehen hat das niemand, weil der erste Start der einzige ist, bei dem es
+    darauf ankommt: `SEED_DEMO` schreibt dann Wetter, und `enrich_weather`
+    verlässt sich ausdrücklich auf den Index („der Unique-Index weist Dubletten
+    aus parallelen Läufen ab"). Ein Schutz, der ab dem zweiten Start greift,
+    ist genau die Sorte Stille, die dieses Projekt teuer bezahlt.
+
+    Tabellen anzulegen ist dabei ungefährlich für Bestandsdaten: `create_all`
+    legt nur an, was FEHLT, und fasst eine vorhandene Tabelle nie an — die
+    ALTER-Schritte darunter bleiben also für sie zuständig.
+    """
+    from app.models import Base
+
+    Base.metadata.create_all(bind=engine)
     insp = inspect(engine)
     applied: list[str] = []
     existing_tables = set(insp.get_table_names())

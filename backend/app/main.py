@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.auth import get_dev_user
 from app.config import settings
-from app.database import Base, SessionLocal, engine
+from app.database import SessionLocal, engine
 from app.migrate import ensure_schema
 from app.modules.registry import load_modules
 from app.routers import (
@@ -86,10 +86,13 @@ async def lifespan(app: FastAPI):
     run_startup_checks(settings)
     # Module aus YAML laden
     load_modules()
-    # Bestehende Tabellen um neue Spalten ergänzen (user_id, embedding)
+    # Schema herstellen: Tabellen anlegen, bestehende um neue Spalten ergänzen,
+    # Indizes nachziehen. Anmerkung 219: Das `create_all` stand bis 0.40 hier
+    # daneben und lief NACH `ensure_schema` — auf einer frischen Datenbank fiel
+    # damit alles aus, was eine bestehende Tabelle voraussetzt. Eine
+    # Reihenfolge, auf die es ankommt, gehört in die Funktion und nicht an ihre
+    # Aufrufstelle.
     ensure_schema(engine)
-    # Tabellen anlegen (MVP: create_all; später Alembic-Migrationen)
-    Base.metadata.create_all(bind=engine)
     # Demo-Daten — nur im Dev-Modus (im OIDC-Betrieb gehören Daten einem echten Nutzer)
     if settings.seed_demo and settings.auth_mode == "dev":
         db = SessionLocal()
@@ -164,6 +167,16 @@ app.include_router(admin.router)
 
 @app.get("/health", tags=["System"])
 def health() -> dict:
+    # **Dieser Endpunkt ist absichtlich ohne Anmeldung erreichbar** — die
+    # Oberfläche nennt ihn „die richtige Ziel-URL für einen Uptime-Monitor".
+    # Was hier steht, liest also auch jeder Fremde.
+    #
+    # Anmerkung 219: `auth_mode` und `database` sind deshalb raus. `auth_mode`
+    # war die unangenehmere Hälfte — „dev" heißt wörtlich „diese Instanz hat
+    # keine Tür", und das einem Unangemeldeten zu sagen, ist eine Einladung an
+    # genau den, den `startup_checks.py` fernhalten soll. Der Datenbanktyp ist
+    # eine Auskunft über innen. Beide hatte kein einziger Leser: gesucht wurde
+    # in `frontend/`, `tools/` und den Tests.
     out = {
         "status": "ok",
         # `version` bleibt reines SemVer (Skripte, Vergleiche); ob das der
@@ -172,9 +185,8 @@ def health() -> dict:
         "version": APP_VERSION,
         "channel": release_channel(),
         "display_version": display_version(),
+        # Bleibt: die Oberfläche zeigt den Anbieter als Chip an.
         "ai_provider": settings.ai_provider,
-        "auth_mode": settings.auth_mode,
-        "database": settings.database_url.split("://")[0],
         # Anmerkung 186: Welches Wettermodell die Werte erzeugt hat. Es steht
         # hier und nicht als Zeichenkette im Frontend, weil die Oberfläche
         # sonst einen Namen NENNT, den der Server längst gewechselt haben kann

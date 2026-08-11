@@ -667,42 +667,66 @@ def spawn_worker(job_id: str) -> None:
 # User.settings). Ein Ticker-Thread (main.py) ruft minütlich run_due_schedules.
 # --------------------------------------------------------------------------- #
 def run_due_schedules() -> None:
+    """Der Nachtplan-Durchgang — einmal je Minute vom Ticker in `main.py`.
+
+    **Anmerkung 219: Ein Konto darf die Runde nicht beenden.** Das `try` lag um
+    die GANZE Nutzerschleife. Ein Fehler beim dritten Konto — eine kaputte
+    Einstellung, ein Datenbank-Aussetzer — nahm allen folgenden ihren Termin,
+    still und Nacht für Nacht. Das ist wörtlich der Schaden, den Anmerkung 115
+    zwölf Zeilen tiefer verhindern wollte („sonst erledigt der erste Nutzer den
+    Termin für alle, und die Ereignisse aller anderen bleiben ohne Wetter,
+    Ortsnamen und Fotos"), nur über einen anderen Weg hereingekommen.
+
+    Der Auffang sitzt jetzt je Durchgang. Das äußere `try` bleibt daneben
+    stehen: es fängt, was VOR der Schleife schiefgehen kann (die Nutzerliste
+    selbst) — der Planer darf die App unter keinen Umständen stören.
+    """
     db = SessionLocal()
     try:
         now = datetime.now()  # lokale Serverzeit (TZ, z. B. Europe/Berlin)
         for user in db.query(User).all():
-            sched = (user.settings or {}).get("job_schedule") or {}
-            for jtype, cfg in sched.items():
-                if (jtype not in _RUNNERS or not cfg.get("enabled")
-                        or now.hour != int(cfg.get("hour", 3))):
-                    continue
-                # Läuft dieser Typ gerade (egal von wem)? Dann nicht daneben —
-                # die Sperre aus `start_job` gilt auch für den Planer.
-                if (db.query(Job)
-                        .filter(Job.type == jtype,
-                                Job.status.in_(("running", "stopping")))
-                        .first()):
-                    continue
-                # Heute schon gelaufen? Bei kontogebundenen Läufen zählt nur
-                # der EIGENE (Anmerkung 115): sonst erledigt der erste Nutzer
-                # den Termin für alle, und die Ereignisse aller anderen bleiben
-                # ohne Wetter, Ortsnamen und Fotos — still, Nacht für Nacht.
-                q = db.query(Job).filter(Job.type == jtype)
-                if jtype in USER_SCOPED_TYPES:
-                    q = q.filter(Job.user_id == user.id)
-                last = q.order_by(Job.started_at.desc()).first()
-                if last:
-                    started_local = (last.started_at.replace(tzinfo=timezone.utc)
-                                     .astimezone())
-                    if started_local.date() == now.date():
-                        continue
-                job = Job(user_id=user.id, type=jtype, unit="geplant", params=None)
-                db.add(job)
-                db.commit()
-                log.info("Nachtplan: Job %s für %s gestartet", jtype,
-                         user.display_name or user.email)
-                spawn_worker(job.id)
+            try:
+                _schedule_for(db, user, now)
+            except Exception:  # noqa: BLE001 — ein Konto, nicht die Runde
+                db.rollback()
+                log.exception("Nachtplan: Konto %s übersprungen",
+                              user.display_name or user.email or user.id)
     except Exception:  # noqa: BLE001 — Planer darf die App nie stören
         log.exception("Nachtplan-Fehler")
     finally:
         db.close()
+
+
+def _schedule_for(db: Session, user: User, now: datetime) -> None:
+    """Startet die für DIESES Konto fälligen Läufe."""
+    sched = (user.settings or {}).get("job_schedule") or {}
+    for jtype, cfg in sched.items():
+        if (jtype not in _RUNNERS or not cfg.get("enabled")
+                or now.hour != int(cfg.get("hour", 3))):
+            continue
+        # Läuft dieser Typ gerade (egal von wem)? Dann nicht daneben —
+        # die Sperre aus `start_job` gilt auch für den Planer.
+        if (db.query(Job)
+                .filter(Job.type == jtype,
+                        Job.status.in_(("running", "stopping")))
+                .first()):
+            continue
+        # Heute schon gelaufen? Bei kontogebundenen Läufen zählt nur
+        # der EIGENE (Anmerkung 115): sonst erledigt der erste Nutzer
+        # den Termin für alle, und die Ereignisse aller anderen bleiben
+        # ohne Wetter, Ortsnamen und Fotos — still, Nacht für Nacht.
+        q = db.query(Job).filter(Job.type == jtype)
+        if jtype in USER_SCOPED_TYPES:
+            q = q.filter(Job.user_id == user.id)
+        last = q.order_by(Job.started_at.desc()).first()
+        if last:
+            started_local = (last.started_at.replace(tzinfo=timezone.utc)
+                             .astimezone())
+            if started_local.date() == now.date():
+                continue
+        job = Job(user_id=user.id, type=jtype, unit="geplant", params=None)
+        db.add(job)
+        db.commit()
+        log.info("Nachtplan: Job %s für %s gestartet", jtype,
+                 user.display_name or user.email)
+        spawn_worker(job.id)

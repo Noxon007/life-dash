@@ -22,7 +22,7 @@ import secrets
 import time
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import jwt
 from fastapi import Depends, HTTPException, Request
@@ -32,7 +32,7 @@ from app.config import settings
 from app.database import engine, get_db
 from app.migrate import adopt_orphan_rows
 from app.models import User, UserRole
-from app.version import APP_VERSION
+from app.version import USER_AGENT
 
 log = logging.getLogger("lifedash.auth")
 
@@ -42,11 +42,10 @@ STATE_COOKIE = "lifedash_oidc_state"
 # Manche Reverse Proxies / Bot-Filter (Traefik, CrowdSec u. ä.)
 # blocken den Default-User-Agent von urllib ("Python-urllib/…") mit HTTP 403.
 # Darum bei allen Server-zu-Server-Aufrufen an den OIDC-Provider einen eigenen
-# User-Agent senden.
-# Der User-Agent nennt die Software (nicht die Instanz) — die Projekt-URL ist
-# hier die Identität von Life-Dash selbst und bleibt darum fest verdrahtet.
+# User-Agent senden. Die Zeichenkette steht seit Anmerkung 219 in `version.py`,
+# weil der Geocoder dieselbe braucht und eine eigene erfunden hatte.
 HTTP_HEADERS = {
-    "User-Agent": f"Life-Dash/{APP_VERSION} (+https://github.com/Noxon007/life-dash)",
+    "User-Agent": USER_AGENT,
     "Accept": "application/json",
 }
 
@@ -123,10 +122,26 @@ def make_pkce() -> tuple[str, str]:
 
 def sign_cookie(payload: dict, max_age_seconds: int) -> str:
     data = dict(payload)
-    now = int(time.time())
-    data["exp"] = now + max_age_seconds
+    now = time.time()
+    data["exp"] = int(now) + max_age_seconds
     # Anmerkung 209: Ausstellungszeit. Ohne sie lässt sich eine Sitzung nicht
     # widerrufen — ein Cookie ohne Alter kann man nur ablaufen lassen.
+    #
+    # **Anmerkung 219 — mit Nachkommastellen, und das ist der ganze Punkt.**
+    # Hier stand `int(time.time())`, also auf die Sekunde abgeschnitten. Damit
+    # war „kurz VOR dem Widerruf ausgestellt" von „kurz DANACH" nicht zu
+    # unterscheiden — zwei Cookies aus derselben Sekunde tragen dieselbe Zahl.
+    # `revoke_sessions` hat das mit einer Sekunde Vorlauf beantwortet und damit
+    # die falsche Hälfte getroffen: das gerade neu ausgestellte Cookie fiel
+    # ebenfalls darunter, und der Passwortwechsel warf den Nutzer hinaus.
+    #
+    # RFC 7519 erlaubt für `NumericDate` ausdrücklich nicht-ganzzahlige Werte.
+    # `time.time()` löst hier auf ~0,5 µs auf; damit ist die Reihenfolge zweier
+    # Vorgänge im selben Millisekundenbereich noch eindeutig.
+    #
+    # In die ZUKUNFT darf `iat` dabei nie zeigen: PyJWT weist ein solches Token
+    # mit `ImmatureSignatureError` ab — ein Cookie, das gar nicht erst gelesen
+    # werden kann, wäre der teurere Fehler gewesen.
     data.setdefault("iat", now)
     return jwt.encode(data, settings.session_secret, algorithm="HS256")
 
@@ -175,17 +190,55 @@ def _naive_utc(epoch: float) -> datetime:
 def revoke_sessions(user: User) -> None:
     """Beendet alle laufenden Sitzungen dieses Nutzers.
 
-    Eine Sekunde in die ZUKUNFT, und das ist kein Schmutz: Cookie-`iat` und
-    dieser Zeitstempel können in dieselbe Sekunde fallen (Anmelden und sofort
-    Passwort ändern), und `iat >= cutoff` ließe das gerade widerrufene Cookie
-    stehen. Lieber eine Sekunde zu streng — der Nutzer meldet sich ohnehin neu
-    an.
+    **Anmerkung 219 — die Sekunde Vorlauf ist weg, und ihr Zweck ist erfüllt.**
+    Hier stand `+ timedelta(seconds=1)`, mit der Begründung, Cookie-`iat` und
+    dieser Zeitstempel könnten in dieselbe Sekunde fallen (anmelden und sofort
+    das Passwort ändern). Die Beobachtung stimmte; die Antwort war der falsche
+    Hebel. Sie hat nicht die Auflösung erhöht, sondern die GRENZE verschoben —
+    und traf damit auch jedes Cookie, das nach dem Widerruf ausgestellt wurde.
+    `local_change_password` stellt genau dort eins aus, um den Nutzer
+    angemeldet zu lassen: es war ungültig, bevor es beim Browser ankam.
+
+    Seit `sign_cookie` Nachkommastellen schreibt, ist die Reihenfolge zweier
+    Vorgänge derselben Sekunde eindeutig, und der Schnitt darf genau JETZT
+    sein. Vorher ausgestellt heißt kleiner, nachher heißt größer — die Frage,
+    die diese Zeile stellt, ist damit die, die sie beantwortet.
     """
-    user.sessions_valid_from = _naive_utc(time.time()) + timedelta(seconds=1)
+    user.sessions_valid_from = _naive_utc(time.time())
+
+
+def _cutoff(user: User) -> datetime | None:
+    """Der Widerrufs-Schnitt dieses Kontos als NAIVES UTC — oder None.
+
+    Ein Wert aus der Datenbank kann zeitzonenbehaftet zurückkommen (PostgreSQL
+    mit `timestamptz` in einer Altinstallation). Die Umrechnung steht hier und
+    nicht bei den beiden Lesern: seit Anmerkung 219 gibt es zwei — die Prüfung
+    UND die Ausstellung —, und eine Normalisierung, die nur eine von beiden
+    macht, ist die Doppelregel im Kleinen.
+    """
+    cutoff = user.sessions_valid_from
+    if cutoff is None:            # nie widerrufen — der Normalfall
+        return None
+    if cutoff.tzinfo is not None:
+        return cutoff.astimezone(timezone.utc).replace(tzinfo=None)
+    return cutoff
+
+
+def session_cookie_for(user: User) -> str:
+    """Das Sitzungs-Cookie dieses Nutzers — die EINZIGE Stelle, die eins baut.
+
+    Anmerkung 219: Drei Wege stellen eine Sitzung aus (lokaler Login, OIDC-
+    Rückweg, Passwortwechsel), und sie schrieben `sign_cookie({"uid": …})`
+    jeder für sich hin. Dieselbe Verdopplung hatte Anmerkung 200 eine Ebene
+    höher schon einmal eingesammelt (`set_auth_cookie`) — dort war die Folge
+    ein Cookie ohne `secure`, hier eines, das den Widerrufs-Schnitt nicht
+    kennt. Wer einen vierten Anmeldeweg baut, ruft das hier.
+    """
+    return sign_cookie({"uid": user.id}, session_max_age())
 
 
 def session_still_valid(user: User, claims: dict) -> bool:
-    cutoff = user.sessions_valid_from
+    cutoff = _cutoff(user)
     if cutoff is None:            # nie widerrufen — der Normalfall
         return True
     iat = claims.get("iat")
@@ -194,11 +247,6 @@ def session_still_valid(user: User, claims: dict) -> bool:
     # derentwegen jemand widerruft, als einzige überleben.
     if not isinstance(iat, (int, float)):
         return False
-    # Ein Wert aus der Datenbank kann zeitzonenbehaftet zurückkommen (PostgreSQL
-    # mit `timestamptz` in einer Altinstallation) — dann auf dieselbe Form
-    # bringen, statt am Vergleich zu scheitern.
-    if cutoff.tzinfo is not None:
-        cutoff = cutoff.astimezone(timezone.utc).replace(tzinfo=None)
     return _naive_utc(iat) >= cutoff
 
 

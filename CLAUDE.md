@@ -165,6 +165,17 @@ Der wiederkehrende Defekt in diesem Projekt ist nicht Kaputtheit, sondern
   gesucht.
 - **Zwei Fragen mit zwei Deckelungen teilen sich keine Tabelle.**
 - Bei jeder Invarianten-Reparatur fragen: **wo gilt derselbe Satz noch?**
+- **Wo das SCHEMA die Frage beantworten kann, ist eine handgeschriebene Liste
+  die dritte Kopie** (Anmerkung 219). „Was hängt an einem Ereignis?" stand
+  dreimal da — zweimal vollständig, einmal nicht, und die unvollständige
+  meldete beim Löschen „keine Folgeänderungen". Die Zerlegung, die hält:
+  **WELCHE Spalten es gibt, fragt `Base.metadata`** (`_dependents`,
+  `_user_scoped_refs`), **WAS mit ihnen geschieht, steht von Hand da** — das
+  kann das Schema nicht wissen. Dann ist eine neue Tabelle von selbst mitgeprüft.
+- **Eine Reihenfolge, auf die es ankommt, gehört IN die Funktion, nicht an ihre
+  Aufrufstelle** (Anmerkung 219: `create_all` stand neben `ensure_schema` statt
+  darin — auf einer bestehenden Datenbank folgenlos, auf einer frischen fiel
+  jeder Schritt aus, der eine Tabelle voraussetzt).
 
 - **Eine fremde Schnittstelle ohne ausdrückliche Angabe ENTSCHEIDET selbst** —
   und ändert die Entscheidung nach Kriterien, die nicht in unserem Code stehen
@@ -287,6 +298,17 @@ Der wiederkehrende Defekt in diesem Projekt ist nicht Kaputtheit, sondern
 **Prüfungen, die nichts prüfen** (die teuerste Klasse)
 - **Jede Prüfung einmal gegen den KAPUTTEN Stand fahren.** Sonst ist sie grün,
   weil es die Funktion GIBT — nicht, weil der Aufrufer sie BENUTZT.
+- **Zwei Funktionen, jede für sich geprüft, und der Defekt liegt DAZWISCHEN**
+  (Anmerkung 219). Widerruf und Neuausstellung waren einzeln bewiesen; den
+  Rundlauf „widerrufen → sofort neu ausstellen → gilt es?" prüfte niemand, und
+  genau der war kaputt. Wo zwei Hälften eine Zusage tragen, ist die Prüfung der
+  ÜBERGANG, nicht die Summe der Hälften.
+- **Ein Auflösungsproblem mit einer verschobenen GRENZE zu beantworten trifft
+  die falsche Hälfte** (Anmerkung 219). Ganze Sekunden konnten „kurz davor"
+  und „kurz danach" nicht unterscheiden; die Sekunde Vorlauf traf deshalb auch
+  das gerade neu ausgestellte Cookie. Erst die Auflösung erhöhen, dann die
+  Grenze setzen. **Und `iat` nie in die Zukunft** — PyJWT weist so ein Token ab,
+  aus „gilt nicht" würde „unlesbar".
 - **Ein `const` auf oberster Skriptebene ist KEINE Fenster-Eigenschaft**
   (anders als eine `function`-Deklaration): `w.OVERLAYS` und `w.LANG` sind
   stumm `undefined`, und die Prüfung wird eine über nichts. Aus dem Quelltext
@@ -470,6 +492,23 @@ Vier Sätze zum Weiterarbeiten:
   „0 Monate geprüft" als Schlusszeile stehen — und das abschließende
   `_progress(total)` hätte `done` auf null zurückgezogen (`_tick` schreibt
   Differenzen fort).
+
+**Backend-Durchsicht 2026-08-11 (Anmerkung 219): vier Reparaturen, eine
+Messung offen.** Repariert: der Passwortwechsel warf den Nutzer aus der eigenen
+App (Widerruf gegen Neuausstellung, jetzt `auth.session_cookie_for` als EINE
+Stelle und `iat` mit Nachkommastellen), die Rohansicht fragt beim Löschen das
+Schema statt einer handgeschriebenen Kette (`admin.ON_DELETE` mit
+cascade/detach/**refuse** — ein Wohnort verschwindet nicht als Nebenwirkung),
+`create_all` ist in `ensure_schema` gewandert, und der Nachtplan überlebt ein
+kaputtes Konto. Dazu: EIN User-Agent in `version.py`, `/health` nennt
+`auth_mode` und `database` nicht mehr.
+**Offen und gemessen: `enrichment._weather_candidates` lädt vor JEDEM
+25er-Batch alle verorteten Ereignisse samt Metriken** — 396 ms bei 2.000,
+1.321 ms bei 5.000, 2.979 ms bei 10.000 fertigen Ereignissen, also quadratisch
+über einen Rückstandslauf. Die Antwort steht zwölf Zeilen tiefer schon da:
+`_day_weather_candidates` fragt die `weather_rev`-Marke in SQL; die
+Ereignis-Hälfte kann dasselbe als `NOT EXISTS`. Bewusst eigene Runde — es
+ändert, welche Zeilen ein Lauf aufgreift.
 
 **Code-Durchsicht 2026-08-07 (Anmerkung 201): fünf Reparaturen und vier
 Aufräumungen drin, drei Punkte bewusst offen — sie brauchen erst eine

@@ -7,6 +7,19 @@ import os
 
 APP_VERSION = "0.39.0"
 
+# Womit sich diese Software bei FREMDEN Diensten meldet (Anmerkung 219).
+#
+# Hier und nicht bei den Aufrufern, weil es zwei gibt und sie auseinanderliefen:
+# `auth.HTTP_HEADERS` baute die Zeichenkette aus `APP_VERSION`, `geocode`
+# verdrahtete „life-dash/0.1" — eine Version, die es nie gab. Ausgerechnet dort
+# wiegt es am schwersten: Nominatims Nutzungsbedingungen verlangen eine
+# identifizierende Angabe, und wer sie nicht liefert, wird gesperrt.
+#
+# Genannt wird die SOFTWARE, nicht die Instanz — die Projekt-URL ist die
+# Identität von Life-Dash selbst und steht deshalb fest, während die Adresse
+# einer Anlage niemanden etwas angeht.
+USER_AGENT = f"Life-Dash/{APP_VERSION} (+https://github.com/Noxon007/life-dash)"
+
 
 def release_channel() -> str:
     """„release" nur für ein CI-Image vom passenden SemVer-Tag, sonst „dev".

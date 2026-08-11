@@ -127,7 +127,15 @@ def test_delete_location_detaches_events(db, user):
     e = _event(db, user, location_id=loc.id)
 
     result = delete_row("locations", loc.id, db=db)
-    assert any("ohne Ort" in s for s in result["side_effects"])
+    # Anmerkung 219: Der Satz nennt jetzt die SPALTE („1 Ereignisse abgehängt
+    # (location_id)") statt „Events sind jetzt ohne Ort". Der Grund ist genau
+    # die Lücke, die diese Runde geschlossen hat: eine Tabelle kann auf zwei
+    # Weisen auf eine andere zeigen — `events` hängt über `location_id` an
+    # `locations` und über `parent_event_id` an sich selbst. Ein Satz, der die
+    # Spalte verschweigt, ist in der ROHANSICHT keine Auskunft. Geprüft wird
+    # unverändert das Verhalten, nicht die Formulierung.
+    assert any("abgehängt" in s and "location_id" in s
+               for s in result["side_effects"]), result["side_effects"]
     db.expire_all()
     assert db.get(Event, e.id).location_id is None
 

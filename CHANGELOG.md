@@ -300,6 +300,35 @@ any `MINOR`.
   it is working.
 
 ### Fixed
+- **Changing your password no longer signs you out of the app you are in.**
+  Changing it ends every other session, which is the whole point — but it was
+  also ending the one doing the changing, so the next click landed on the login
+  screen. For the same reason, signing in again within a second or two of
+  *sign out everywhere* was refused. Both worked exactly as intended
+  afterwards; the app just did not believe the freshly issued session was
+  newer than the cut-off.
+- **Deleting a place that is a residence is now refused instead of quietly
+  breaking it.** In the raw table view under *Administration*, deleting such a
+  place left the residence period pointing at nothing: its days kept counting
+  towards your totals but belonged to no city and no country any more, and the
+  page reported that nothing else had been affected. It now says which
+  residence is in the way and sends you there first. In the same view,
+  deleting an event now detaches its day entries and its recorded routes
+  instead of leaving them pointing at something that is gone — and the summary
+  afterwards names each thing it touched.
+- **The nightly schedule no longer stops at the first account that fails.**
+  With more than one account, an error on one of them cancelled the run for
+  every account after it — silently, and every night. Each account is now on
+  its own.
+- **A brand-new installation is protected against duplicate weather values from
+  its very first start**, rather than from the second one onwards.
+- **The app identifies itself correctly when looking up place names.**
+  It was announcing a version number that never existed, which is the kind of
+  thing the free OpenStreetMap service is entitled to turn away.
+- **The status page no longer tells anonymous visitors how the instance is
+  secured.** It is meant to be reachable without a login so an uptime monitor
+  can watch it; it does not need to say which login method is switched on or
+  which database is behind it.
 - **The app can be used with a keyboard.** The nine entries in the navigation
   could only be clicked: `Tab` skipped straight past them, and a screen reader
   announced them as plain text rather than as something you can activate. They

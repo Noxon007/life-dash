@@ -28,10 +28,16 @@ import urllib.request
 
 from app.config import settings
 from app.services.translit import romanize
+from app.version import USER_AGENT
 
 log = logging.getLogger("lifedash.geocode")
 
-USER_AGENT = "life-dash/0.1 (self-hosted life database)"
+# Anmerkung 219: Hier stand „life-dash/0.1 (self-hosted life database)" — eine
+# Version, die es nie gab, während `auth.HTTP_HEADERS` daneben die richtige aus
+# `APP_VERSION` baute. Nominatims Nutzungsbedingungen verlangen eine
+# identifizierende Angabe; ein falscher Name ist dort keine Kosmetik, sondern
+# der Grund, aus dem eine Instanz eines Tages 403 bekommt und niemand weiß,
+# warum. Die Zeichenkette steht jetzt in `version.py`, wo beide sie lesen.
 # Fallback-Ketten je UI-Sprache: Wunschsprache zuerst, die andere als Rückfall
 ACCEPT_LANGUAGE_BY_LANG = {"de": "de,en", "en": "en,de"}
 DEFAULT_LANG = "de"
