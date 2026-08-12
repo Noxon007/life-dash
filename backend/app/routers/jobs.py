@@ -70,6 +70,25 @@ SERVER_JOB_TYPES = ("weather", "embeddings", "resolve_names", "recompute",
 # bleibt trotzdem global — sie schützt nicht die Daten, sondern das Kontingent
 # bei Open-Meteo/Nominatim/Immich, und das hängt an der Instanz, nicht am Konto.
 USER_SCOPED_TYPES = ("weather", "resolve_names", "immich")
+# Was der NACHTPLAN anbieten darf (A22). Bewusst eine eigene Liste und nicht
+# „alles, was einen Runner hat": ein Lauf ist planbar, wenn er unbeaufsichtigt
+# etwas Nützliches tut.
+#
+# **`embeddings` steht deshalb nicht mehr darin** (Release-Durchsicht). Der Lauf
+# setzt JEDES Ereignis auf `embedding = NULL` und rechnet es neu — ein
+# API-Aufruf je Ereignis, bei einem gewachsenen Bestand also Zehntausende, Nacht
+# für Nacht. **Und es liest sie niemand:** die semantische Suche ist seit
+# Anmerkung 121 ausgebaut, den Handknopf hat Anmerkung 131 entfernt. Übrig blieb
+# ein Häkchen im Nachtplan als einziger Weg, einen Lauf zu starten, dessen
+# Ergebnis nichts verwendet — die Sorte Stille, gegen die dieses Projekt sonst
+# antritt, hier mit einer Rechnung beim KI-Anbieter.
+#
+# Der Runner bleibt (Anmerkung 131: für eine spätere pgvector-Suche). Wer die
+# Spalte füllen will, startet ihn über `POST /api/jobs`; geplant wird er nicht.
+# Der Nachtplan liest DIESE Liste, nicht die gespeicherte Einstellung: ein
+# Häkchen, das ein Nutzer vor der Durchsicht gesetzt hat, liegt weiter in
+# `User.settings` und darf nicht weiterlaufen, nur weil es niemand anfasst.
+SCHEDULABLE_TYPES = ("weather", "resolve_names", "recompute", "immich")
 # „Läuft gerade" — eine Liste statt derselben Aufzählung an vier Stellen.
 _ACTIVE_STATES = ("running", "stopping")
 # In Tests abgeschaltet (in-memory-DB verträgt keine fremden Threads)
@@ -701,7 +720,7 @@ def _schedule_for(db: Session, user: User, now: datetime) -> None:
     """Startet die für DIESES Konto fälligen Läufe."""
     sched = (user.settings or {}).get("job_schedule") or {}
     for jtype, cfg in sched.items():
-        if (jtype not in _RUNNERS or not cfg.get("enabled")
+        if (jtype not in SCHEDULABLE_TYPES or not cfg.get("enabled")
                 or now.hour != int(cfg.get("hour", 3))):
             continue
         # Läuft dieser Typ gerade (egal von wem)? Dann nicht daneben —

@@ -8,31 +8,26 @@ Run them from the repository root (needs `npm i jsdom` once, anywhere on the
 module path):
 
 ```bash
-node tools/check-no-cdn.js          # nothing loads from a foreign host, and the libraries are in the shell cache — note 207
-node tools/check-load.js            # page loads without throwing (catches TDZ, see CLAUDE.md)
-node tools/check-shadowing.js       # nothing shadows the translation function t() — note 69
-node tools/check-weather-summary.js # the weather record counts days, not entries — note 64
-node tools/check-jobs-table.js      # the jobs table renders rows — note 69
-node tools/check-basemaps.js        # background map selection and its guard rails — F13
-node tools/check-i18n-containers.js # no translation wipes out a control — note 71
-node tools/check-weather-line.js    # slim and full lists render the same weather — A36
-node tools/check-a37-window.js      # no view loads the whole database — A37, note 81
-node tools/check-a38-mobile.js      # no inline min-width, no max-height in vh — A38
-node tools/check-a39-condense.js    # the timeline condenses before it pages — A39
-node tools/check-a40-map-controls.js # no map control is silently inoperative — A40
-node tools/check-a41-cities.js      # every city number can be opened — A41, note 94
-node tools/check-a42-city-page.js   # a city opens a page, not an exit — A42, note 102
-node tools/check-a46-visit-split.js # cutting confirmed visits needs a preview first — A46, note 116
-node tools/check-photo-layer.js     # the photo layer says what it hides, and doubles nothing — A45
-node tools/check-tl-granularity.js  # the condensation level goes to the server — A47
-node tools/check-job-refresh.js    # a finished server run refreshes the open view — note 212
-node tools/check-foreground.js      # every browser-paced run uses one progress panel — note 172
-node tools/check-wipe-word.js       # both delete buttons ask the same word, and the server accepts it — note 169
+cd tools && npm run check     # all of them, in order
+node tools/check-load.js ../frontend/index.html   # or one on its own
 ```
 
-Each exits non-zero on failure, so they can be chained in CI later (package R1).
-`npm run check` runs all of them — including the last four, which until 0.35.0
-had to be remembered by hand and therefore were not run.
+**The list of guards lives in `package.json`, not here.** This page carried its
+own copy until the pre-release review, and by then it named two scripts that no
+longer existed (`check-a46-visit-split.js`, `check-photo-layer.js`) and left out
+half of the rest — a reader following it got *file not found* for the first and
+no hint at all about the other twenty. A second list of the same fact drifts
+silently, which is this project's recurring defect rather than brokenness.
+
+**What each guard protects is in its own header**, in the first paragraph, along
+with the note or package that paid for it — that is the one place that cannot
+fall out of step with the code it checks. `npm run check` is what CI runs, so a
+guard that is not in `package.json` is not run at all: adding a file is not
+enough, it has to go in that line.
+
+Each exits non-zero on failure. Every one of them was written against the broken
+state first — a guard that has never been red is a guard that proves the
+function *exists*, not that the caller *uses* it.
 
 **A guard checks a state; make sure it is one that occurs.** `check-a41-cities.js`
 asserted the cities tab existed in the markup and passed for a whole release
@@ -82,6 +77,13 @@ Rule for every future connector: **run one HTTP double that keeps to the real
 DTOs.** Twenty lines, and it reaches what a mock by construction cannot.
 
 ## Upgrading an existing database
+
+> **This one is on notice.** R1(f) — a tested upgrade path out of a 0.x database
+> — was struck on 2026-08-09, and the tags this script starts from are deleted
+> before publication (ROADMAP §5). It defaults to `v0.38.0`; once that tag is
+> gone it falls back to a hard-coded commit, and after the cut it needs a commit
+> hash passed by hand or it does nothing useful. Kept because `migrate.py` still
+> does what it does — but it is no longer part of any gate.
 
 `upgrade-check.sh` is the one check a fresh database cannot give you: it builds
 a database with the **previous** release's code, then opens the same file with

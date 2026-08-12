@@ -84,13 +84,19 @@ confirmed record — and it makes the imports below much easier to judge.
    scripts (e.g. Greek) are re-resolved to a Latin transliteration; and places
    whose name is fine but whose individual address parts were never stored are
    backfilled once, so the timeline can group them by district.
-4. **Connect Immich**, if you have it. Three things, in this order: *test the
-   connection*, then **create entries from photos** (one year at a time, with a
-   mandatory preview — every geotagged picture becomes a confirmed entry, the
-   same way an imported Google visit does; on the map it is a dot with a
+4. **Connect Immich**, if you have it. Two things: *test the connection*, then
+   **fetch photos from Immich** — one run across the whole library, which does
+   both halves at once. Every geotagged picture of yours becomes a confirmed
+   entry, the same way an imported Google visit does: on the map a dot with a
    thumbnail, in the timeline a line without one, with same-day-same-place rows
-   folded together), and finally **link photos**, which attaches pictures to
-   the entries you keep by hand. Photos stay in Immich;
+   folded together. And *all* photos — including the ones without coordinates,
+   and on days that hold nothing else — appear as a strip of pictures under
+   their calendar day, while your own entries get matching pictures attached to
+   them. The first run walks every month Immich knows about and may take a
+   while; after that it only touches what has changed, and it keeps going in
+   the background if you close the page. There is no preview to sit through:
+   the way back is *Advanced → take back*, which discards the links or the
+   photo entries again. Photos stay in Immich;
    Life-Dash stores references, and the API key it needs is read-only. It needs
    exactly four read-only permissions — `asset.read` (find photos by time),
    `asset.view` (fetch previews), `user.read` (tell your own photos from other
@@ -123,11 +129,13 @@ confirmed record — and it makes the imports below much easier to judge.
 Steps 3, 4 and 7 also run unattended: the **Jobs** tab has a nightly schedule
 per run type, which is the sensible setting once the first pass is done.
 
-Once there is something to look at, two switches are worth knowing. On the map
-and in the timeline, **📷 Photos** turns the located pictures on — off by
-default, because twenty years of library is tens of thousands of markers. And
-the timeline's **Condense by** picker decides how coarsely a day is summarised:
-country, city, district, or every entry on its own.
+Once there is something to look at, two controls are worth knowing. One row of
+chips — **What is on the map** / **What the timeline shows** — lists everything
+that can appear, each with the mark it carries, plus *all* and *none*. **📷
+Photos** is on by default on the map and off in the timeline: the map is where
+the picture belongs, the timeline gets the fact. And the timeline's **Condense
+by** picker decides how coarsely a day is summarised: country, city, district,
+or every entry on its own.
 
 And once a few residence periods are in, the statistics tab has a **Gaps** view:
 how much of your life is accounted for, a coverage bar per year, and the longest

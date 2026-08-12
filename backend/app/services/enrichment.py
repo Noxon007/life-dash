@@ -91,22 +91,56 @@ def _weather_candidates(db: Session, user_id: str | None = None) -> list[Event]:
     (`query(Event).all()`) und filterte in Python — samt Lazy-Load von
     `location` und `metrics` je Event. Bei 12 000 Ereignissen war das Suchen
     teurer als das Anreichern (Anmerkung 97). Jetzt entscheidet SQL alles, was
-    SQL entscheiden kann; in Python bleibt nur die Revisionsfrage, die aus den
-    Metriken kommt (Anmerkung 85: dieselbe Annahme „der Bestand passt in den
-    Speicher", die A37 im Frontend beseitigt hat).
+    SQL entscheiden kann (Anmerkung 85: dieselbe Annahme „der Bestand passt in
+    den Speicher", die A37 im Frontend beseitigt hat).
+
+    **Die Revisionsfrage gehört dazu (Release-Durchsicht).** Sie blieb bis
+    hierher in Python, und damit holte die Suche weiterhin JEDES verortete,
+    datierte Ereignis samt Metriken — auch die längst fertigen. Die Trefferzahl
+    schrumpfte mit jedem Stapel, die geholte Menge nicht: 396 ms bei 2.000
+    fertigen Ereignissen, 1.321 ms bei 5.000, 2.979 ms bei 10.000, und das VOR
+    JEDEM 25er-Stapel. Ein Rückstandslauf zahlte das quadratisch.
+
+    Die Antwort stand zwölf Zeilen tiefer schon da: `_day_weather_candidates`
+    fragt die Marke in SQL. Hier ist es dieselbe Frage als `NOT EXISTS` —
+    **und sie ist die Verneinung von `_needs_weather`, nicht eine zweite
+    Meinung darüber:**
+
+    | `_needs_weather`                  | SQL                        |
+    |-----------------------------------|----------------------------|
+    | keine Wetter-Metrik → ja          | kein Treffer → `NOT EXISTS`|
+    | Metriken, aber keine Marke → ja   | kein Treffer → `NOT EXISTS`|
+    | Marke < Revision → ja             | kein Treffer → `NOT EXISTS`|
+    | Marke ≥ Revision → nein           | Treffer → fällt weg        |
+
+    `_needs_weather` läuft trotzdem noch über das Ergebnis. Das ist keine
+    doppelte Regel, sondern die billige Richtung derselben: die Liste ist jetzt
+    so lang wie die OFFENEN Ereignisse, und wer die Zerlegung später anfasst,
+    bekommt eine abweichende Antwort als roten Test statt als stillen
+    Mehrabruf.
     """
     t0 = time.monotonic()
     # `date_start` ist naiv gespeichert (DateTime ohne Zeitzone) — der Vergleich
     # muss es auch sein, sonst vergleicht SQLite Zeichenketten mit und ohne
-    # Offset. Grenze ist Mitternacht NACH heute, weil `_needs_weather`
-    # tagesgenau urteilt („Zukunft hat noch kein Wetter").
-    tomorrow = datetime.combine(datetime.now(timezone.utc).date(), time_.min) \
-        + timedelta(days=1)
+    # Offset. Grenze ist Mitternacht nach dem JÜNGSTEN Tag, den das Archiv
+    # schon hat — dieselbe Auskunft wie `_too_recent`, nur als Datumsgrenze
+    # (Anmerkung 186: eine zweite Antwort auf „ist der Tag alt genug?" liefe
+    # still auseinander, deshalb wird dort gefragt und hier gerechnet).
+    cutoff = datetime.combine(
+        datetime.now(timezone.utc).date() - timedelta(days=ERA5_LAG_DAYS),
+        time_.min) + timedelta(days=1)
+    done = (db.query(Metric.id)
+            .filter(Metric.event_id == Event.id,
+                    Metric.source == Source.weather,
+                    Metric.key == _REVISION_KEY,
+                    Metric.value >= WEATHER_REVISION)
+            .exists())
     q = (db.query(Event)
          .join(Location, Event.location_id == Location.id)
          .filter(Location.lat.isnot(None),
                  Event.date_start.isnot(None),
-                 Event.date_start < tomorrow)
+                 Event.date_start < cutoff,
+                 ~done)
          .options(selectinload(Event.metrics),
                   joinedload(Event.location)))
     if user_id is not None:

@@ -4054,7 +4054,7 @@ const I18N_EN = {
   'job.weather': "🌤️ Add weather",
   'job.embeddings': "🧠 Embeddings",
   'job.resolve_names': "📍 Resolve/format place names",
-  'job.photo_points': "📍 Place photos on the map",
+  'job.photo_points': "📷 Create events from photos (old — now part of “Fetch photos from Immich”)",
   'job.photo_reset': "🗑️ Discard photo events",
   'job.timeline_import': "🛰️ Timeline import",
   'job.data_import': "📥 Data import",
@@ -12467,7 +12467,11 @@ document.querySelectorAll('.example-chip').forEach(c =>
 const JOB_LABELS = { recompute: '🔄 KI-Vorschläge neu berechnen', weather: '🌤️ Wetter ergänzen',
                      embeddings: '🧠 Embeddings', resolve_names: '📍 Ortsnamen auflösen/formatieren',
                      immich: '🖼️ Fotos aus Immich verknüpfen',
-                     photo_points: '📷 Ereignisse aus Fotos anlegen',
+                     // Anmerkung 206: den Lauf gibt es nicht mehr, den Namen
+                     // schon — in der Job-HISTORIE. Der Zusatz gehört dazu:
+                     // ohne ihn liest sich eine alte Zeile wie ein Lauf, den
+                     // man heute starten könnte, und man sucht den Knopf dazu.
+                     photo_points: '📷 Ereignisse aus Fotos anlegen (alt — jetzt Teil von „Fotos aus Immich“)',
                      photo_reset: '🗑️ Foto-Ereignisse verwerfen',
                      timeline_import: '🛰️ Timeline-Import', data_import: '📥 Daten-Import' };
 const JOB_STATUS_DE = { running: '⏳ läuft', done: '✅ fertig', stopped: '⏹ gestoppt', error: '⚠️ Fehler' };
@@ -12640,11 +12644,20 @@ async function refreshCurrentView() {
   ]);
 }
 // A22: Nachtplan-Einstellungen (pro Nutzer)
-// `photo_points` steht bewusst NICHT hier: der Lauf braucht ein Jahr und eine
-// gesehene Vorschau. Ein nächtlicher Lauf würde beides überspringen und legte
-// über Nacht zehntausende bestätigte Zeilen an — genau das, wogegen die
-// Vorschau-Pflicht gebaut ist (Anmerkung 107/139).
-const SCHED_TYPES = ['weather', 'embeddings', 'resolve_names', 'recompute', 'immich'];
+//
+// **Spiegel von `SCHEDULABLE_TYPES` in backend/app/routers/jobs.py** — dort
+// steht die Begründung je Typ, hier nur die Liste. Der Nachtplan-Ticker liest
+// die Liste des SERVERS; diese hier entscheidet nur, was angeboten wird.
+// `tools/check-job-labels.js` hält beide zusammen: eine Reihe, die man
+// ankreuzen kann und die niemand ausführt, wäre schlimmer als keine.
+//
+// Nicht dabei und warum:
+// - `photo_points` — den Job-Typ gibt es nicht mehr (Anmerkung 206), `immich`
+//   macht beides.
+// - `embeddings` — rechnet jedes Ereignis neu (ein API-Aufruf je Ereignis) und
+//   niemand liest das Ergebnis: die semantische Suche ist seit Anmerkung 121
+//   ausgebaut.
+const SCHED_TYPES = ['weather', 'resolve_names', 'recompute', 'immich'];
 function renderSchedule() {
   const panel = document.getElementById('sched-panel');
   if (!panel) return;

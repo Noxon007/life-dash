@@ -2561,6 +2561,115 @@ repair for each: delete it.
     one for the legacy rebuild, which is the only way to reach
     `_drop_dangling_refs` at all.
 
+224. ✅ **The last pass before the release path: a removed feature that four
+    files still promised, and a nightly job that billed for it.**
+
+    A read-through with one question — *does anything here describe a version
+    that no longer exists?* Notes 220–223 had gone through correctness,
+    performance, the demo stock and operations; what was left was the surface a
+    stranger reads, and it turned out to be where the drift had collected.
+
+    **(a) Semantic search was removed in note 121 and is still advertised in
+    four places.** `.env.example` headed its block *“Embeddings für die
+    semantische Suche”* and said *“Leer = keine Embeddings, die Suche fällt auf
+    Volltext zurück”* — which reads as *there is a semantic path and you are
+    opting out of it*. `DEPLOY.md` printed `# Optional: semantic search` in the
+    block a first-time operator copies, and told them to *“retune
+    `SEMANTIC_MIN_SIMILARITY` to your model”*. Compose passed the key through.
+    And `config.py` defined it.
+
+    **Nothing read it.** `semantic_min_similarity` had no consumer anywhere in
+    the codebase — a knob that documents a feature into existence. Meanwhile
+    `ARCHITECTURE.md` §7 said, correctly, *“No semantic search any more”*: the
+    project's own design document and its own setup reference disagreed, and
+    the setup reference is the one an installer reads.
+
+    **(b) And it was not only documentation — it had a running cost.** The
+    `embeddings` job was still in the nightly schedule. Note 131 had removed its
+    manual trigger, so **the schedule was the only way to start it**, and what
+    it does is set `embedding = NULL` on *every* event and recompute it: one
+    provider request per event, every night, for a column nothing reads. On a
+    twenty-thousand-entry instance that is twenty thousand requests a night.
+    The three symptoms of the same removal — a dead key, a lying block of
+    documentation, and a scheduled bill — sat in four files that nobody reads
+    together.
+
+    Fixed the way note 131 intended: the runner stays (a later search *inside*
+    the database, pgvector), the appointment goes. `SCHEDULABLE_TYPES` is now
+    its own list in `routers/jobs.py`, and **the ticker reads that list rather
+    than the stored setting** — otherwise a tick set before this change would
+    have kept firing, because the one person who set it is the one person who
+    would never look again. `check-job-labels.js` compares it against the
+    browser's `SCHED_TYPES` in both directions: a box you can tick that nothing
+    runs, and a nightly run with no box, are both silent.
+
+    > A test in `test_job_scope.py` used `embeddings` as its example of an
+    > instance-wide type. It would have stayed **green** after this change while
+    > proving nothing — with no appointment, no second job is created either.
+    > *An example that stops applying makes a check quiet rather than red.* It
+    > moved to `recompute`, which carries the property today, and asserts that
+    > it does.
+
+    **(c) `_weather_candidates` — the measurement note 219 left open, now
+    built.** It ran before every batch of twenty-five and fetched every located,
+    dated event *with its metrics*, then let Python decide which needed weather.
+    The hit count shrank with each batch; the fetched set did not. Measured
+    then: 396 ms at 2,000 finished events, 1,321 ms at 5,000, 2,979 ms at
+    10,000 — quadratic across a backlog run.
+
+    The revision question is `NOT EXISTS` in the query now, the same way
+    `_day_weather_candidates` twelve lines below has always asked it, and the
+    date bound is the ERA5 cutoff rather than “tomorrow”. Measured after:
+    **1.4 / 4.1 / 8.4 ms** at the same three sizes. `_needs_weather` still runs
+    over the result — not a second opinion but the cheap direction of the same
+    one, over a list that is now as long as the *open* events.
+
+    > **The first version of its test could not tell the two states apart.** It
+    > asserted the return value was empty on a finished stock — which was
+    > already true before, since Python filtered the finished ones out. The
+    > second version read the session's identity map, and that fails too: it
+    > holds weak references, and the rows are collected the moment the function
+    > returns. What distinguishes them is *what went to the database*: with no
+    > rows returned, `selectinload` never issues its follow-up query at all. The
+    > check matches statements beginning `select metrics.` — deliberately not
+    > `from metrics`, which the new `NOT EXISTS` sub-select also contains, and
+    > which is the very thing that made the follow-up unnecessary.
+
+    **(d) Descriptions that outlived their version.** The legacy job type
+    `photo_points` (note 206) carried three different names: the backend said
+    *“alt — jetzt Teil von ‚Fotos aus Immich'”*, the German interface dropped
+    the qualifier, and the English catalogue said *“Place photos on the map”* —
+    an even older name for a third thing. The interface never reads the
+    backend's label, so a user saw a run that looks startable and no button for
+    it. `check-job-labels.js` compared *keys*, and three keys agreeing is not
+    three labels agreeing.
+
+    The README still described Immich as *“three things… one year at a time,
+    with a mandatory preview”* — the shape note 206 removed — and explained the
+    photo layer as *“off by default, because twenty years of library is tens of
+    thousands of markers”*, a reason note 178 retired when the markers became
+    canvas circles, and wrong besides: it is **on** by default on the map.
+    `ARCHITECTURE.md` still listed *“Leaflet plus MapLibre for vector
+    basemaps”* twice, withdrawn with A48 in note 206.
+
+    **(e) `tools/README.md` was a second copy of the guard list**, and by now it
+    named two scripts that do not exist (`check-a46-visit-split.js`,
+    `check-photo-layer.js`) and omitted twenty of the forty-one. The list lives
+    in `package.json`, which is also what CI runs; the page now points at it and
+    keeps only what a list cannot carry — *why* a guard exists, and that each
+    one was written red first. Same rule as R2's: **move or generate, never
+    copy.**
+
+    **Left open on purpose, with numbers,** so it does not have to be
+    rediscovered: the demo stock's invented weather is systematically **5–7 K
+    too cold** (`annual_mean = 27.0 - 0.42 × |lat|` gives Athens 10.8 °C against
+    a real 17.7, Amsterdam 4.8 against 10.5, Bangkok 21.2 against 28.5). It is
+    the showcase a stranger judges the project by, and the World tab prints it
+    as a per-country average — Greece in April reads 8.4 °C. One constant fixes
+    the offset, but it shifts every derived value in the stock (snow days,
+    records, rankings) and needs a reseed, so it is a decision rather than a
+    repair.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

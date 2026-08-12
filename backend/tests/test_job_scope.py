@@ -159,18 +159,62 @@ def test_a_running_job_blocks_everyone(db, user, other, planner):
 
 
 def test_instance_wide_types_keep_one_slot_for_everyone(db, user, other, planner):
-    """`embeddings` rechnet über den ganzen Bestand — dort ist „einer für alle"
-    richtig, und diese Hälfte darf die Trennung nicht mitreißen."""
-    _schedule(db, user, "embeddings")
-    _schedule(db, other, "embeddings")
-    job = _ran_today(db, user, "embeddings")
+    """`recompute` rechnet über den ganzen Bestand — dort ist „einer für alle"
+    richtig, und diese Hälfte darf die Trennung nicht mitreißen.
+
+    Stand bis zur Release-Durchsicht auf `embeddings`. Der Typ ist seitdem
+    nicht mehr planbar, und der Test wäre grün geblieben, ohne noch etwas zu
+    zeigen: ohne Termin entsteht auch kein zweiter Job. **Ein Beispiel, das
+    aufhört zu gelten, macht die Prüfung still statt rot** — deshalb der
+    Umzug auf den Typ, der die Eigenschaft heute trägt.
+    """
+    assert "recompute" in jobs_mod.SCHEDULABLE_TYPES
+    assert "recompute" not in jobs_mod.USER_SCOPED_TYPES
+    _schedule(db, user, "recompute")
+    _schedule(db, other, "recompute")
+    job = _ran_today(db, user, "recompute")
     # gestern gestartet wäre wieder fällig; heute nicht
     assert job.started_at.date() == datetime.now(timezone.utc).date()
 
     jobs_mod.run_due_schedules()
 
-    assert db.query(Job).filter(Job.type == "embeddings").count() == 1
+    assert db.query(Job).filter(Job.type == "recompute").count() == 1
     assert planner == []
+
+
+def test_a_stored_embeddings_schedule_no_longer_runs(db, user, planner):
+    """Der Lauf ohne Verbraucher startet auch dann nicht, wenn das Häkchen
+    schon gesetzt ist.
+
+    `embeddings` setzt jedes Ereignis auf `embedding = NULL` und rechnet es neu
+    — ein API-Aufruf je Ereignis, Nacht für Nacht. Gelesen wird das Ergebnis
+    seit Anmerkung 121 von nichts, und einen Handknopf hat Anmerkung 131
+    entfernt; der Nachtplan war der letzte Weg hinein.
+
+    **Der Schalter aus der Oberfläche zu nehmen genügt dafür nicht.** Die
+    Einstellung liegt in `User.settings` und bleibt dort stehen, bis jemand die
+    Seite wieder anfasst — wer sie einmal gesetzt hat, merkt vom Ausbau nichts.
+    Deshalb entscheidet die Liste des Servers, nicht die gespeicherte Angabe.
+    """
+    _schedule(db, user, "embeddings")
+
+    jobs_mod.run_due_schedules()
+
+    assert db.query(Job).filter(Job.type == "embeddings").count() == 0
+    assert planner == []
+
+
+def test_the_embeddings_runner_is_still_reachable_by_hand(db):
+    """Und die Gegenrichtung: ausgebaut ist der TERMIN, nicht der Lauf.
+
+    Anmerkung 131 hat den Rechenweg bewusst stehen lassen (eine spätere Suche
+    IN der Datenbank, pgvector). Wer ihn über `POST /api/jobs` startet, soll
+    ihn bekommen — sonst wäre aus „nicht mehr geplant" unbemerkt „gibt es
+    nicht mehr" geworden, und der Job-Typ stünde ohne Runner in der Liste.
+    """
+    assert "embeddings" in jobs_mod.JOB_TYPES
+    assert "embeddings" in jobs_mod._RUNNERS
+    assert "embeddings" not in jobs_mod.SCHEDULABLE_TYPES
 
 
 def test_yesterdays_run_frees_the_slot_again(db, user, planner):

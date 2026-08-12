@@ -71,12 +71,15 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-}
       CONFIDENCE_REVIEW_THRESHOLD: ${CONFIDENCE_REVIEW_THRESHOLD:-0.75}
+      # Embeddings haben keinen Verbraucher: die Suche ist reiner Volltext
+      # (Anm. 121), die Spalte wartet auf pgvector. Durchgereicht, damit ein
+      # Bestand nicht auffaellt, wenn die Suche zurueckkommt.
+      # `SEMANTIC_MIN_SIMILARITY` stand hier und wurde von nichts gelesen.
       OPENAI_EMBED_MODEL: ${OPENAI_EMBED_MODEL:-}
       OPENAI_EMBED_BASE_URL: ${OPENAI_EMBED_BASE_URL:-}
       OPENAI_EMBED_API_KEY: ${OPENAI_EMBED_API_KEY:-}
       OPENAI_EMBED_QUERY_PREFIX: ${OPENAI_EMBED_QUERY_PREFIX:-}
       OPENAI_EMBED_DOC_PREFIX: ${OPENAI_EMBED_DOC_PREFIX:-}
-      SEMANTIC_MIN_SIMILARITY: ${SEMANTIC_MIN_SIMILARITY:-0.4}
       # --- Geocoding: Nominatim oder ein kompatibler Dienst ---
       GEOCODING_ENABLED: ${GEOCODING_ENABLED:-true}
       GEOCODER_BASE_URL: ${GEOCODER_BASE_URL:-https://nominatim.openstreetmap.org}

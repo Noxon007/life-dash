@@ -527,17 +527,18 @@ cascade/detach/**refuse** — ein Wohnort verschwindet nicht als Nebenwirkung),
 `create_all` ist in `ensure_schema` gewandert, und der Nachtplan überlebt ein
 kaputtes Konto. Dazu: EIN User-Agent in `version.py`, `/health` nennt
 `auth_mode` und `database` nicht mehr.
-**Offen und gemessen: `enrichment._weather_candidates` lädt vor JEDEM
-25er-Batch alle verorteten Ereignisse samt Metriken** — 396 ms bei 2.000,
-1.321 ms bei 5.000, 2.979 ms bei 10.000 fertigen Ereignissen, also quadratisch
-über einen Rückstandslauf. Die Antwort steht zwölf Zeilen tiefer schon da:
-`_day_weather_candidates` fragt die `weather_rev`-Marke in SQL; die
-Ereignis-Hälfte kann dasselbe als `NOT EXISTS`. Bewusst eigene Runde — es
-ändert, welche Zeilen ein Lauf aufgreift.
+**Erledigt mit Anmerkung 224: `enrichment._weather_candidates`.** Der Lauf lud
+vor JEDEM 25er-Batch alle verorteten Ereignisse samt Metriken — 396 ms bei
+2.000, 1.321 ms bei 5.000, 2.979 ms bei 10.000 fertigen Ereignissen, also
+quadratisch über einen Rückstandslauf. Die Revisionsfrage steht jetzt als
+`NOT EXISTS` in der Abfrage, genau wie sie `_day_weather_candidates` zwölf
+Zeilen tiefer immer schon gestellt hat: **1,4 / 4,1 / 8,4 ms** bei denselben
+drei Größen, gleiche Zeilenmenge (`test_weather_candidates.py` vergleicht
+Vorfilter und `_needs_weather` als MENGEN, nicht je Hälfte).
 
 **Vollständige Durchsicht vor dem Release 2026-08-12 — 30 Befunde, in vier
 Teile geschnitten. Teile 1–4 (Anmerkungen 220–223)
-sind gebaut.**
+sind gebaut, dazu ein fünfter Durchgang (Anmerkung 224).**
 Der Bericht liegt als Artefakt vor; die Aufteilung:
 - **Teil 1 ✅ Statistik-Reiter und die Prüfung, die ihn nicht gefangen hat.**
   29 s → 2,3 s, Antwort Byte für Byte identisch. Dazu `DB=`-Modus im
@@ -598,6 +599,43 @@ Der Bericht liegt als Artefakt vor; die Aufteilung:
     lautlos wirkungslos gewesen.
   - **`[Unreleased]` ist verdichtet**: 180 Punkte unter fünf kanonischen
     Überschriften statt dreizehn. Vor dem Tag muss der Block LEER sein.
+- **Teil 5 ✅ Die Oberfläche, die ein Fremder liest** (Anmerkung 224). Eine
+  Durchsicht mit einer Frage: *beschreibt hier etwas eine Version, die es nicht
+  mehr gibt?* Was dabei zu merken bleibt:
+  - **Ein ausgebautes Feature hinterlässt einen SCHALTER, und der Schalter ist
+    die Zusage.** Die semantische Suche ist seit Anmerkung 121 weg und stand in
+    VIER Dateien weiter da (`.env.example`, `DEPLOY.md`, Compose, `config.py`);
+    `SEMANTIC_MIN_SIMILARITY` las nichts mehr. `ARCHITECTURE.md` sagte
+    daneben korrekt „No semantic search any more" — **das Entwurfsdokument und
+    die Einrichtungs-Referenz widersprachen sich, und der Installierende liest
+    die Referenz.**
+  - **Und derselbe Ausbau hatte eine RECHNUNG.** `embeddings` stand noch im
+    Nachtplan, Anmerkung 131 hatte den Handknopf entfernt — der Termin war der
+    letzte Weg hinein, und der Lauf setzt jedes Ereignis auf `NULL` und rechnet
+    es neu: ein Anbieter-Aufruf je Ereignis, Nacht für Nacht, für eine Spalte,
+    die niemand liest. Der Runner bleibt (pgvector), der Termin geht.
+    **`SCHEDULABLE_TYPES` ist eine eigene Liste, und der Ticker liest SIE, nicht
+    die gespeicherte Einstellung** — ein Häkchen von vorher liefe sonst weiter,
+    und zwar bei genau dem Menschen, der nie wieder hinsieht.
+  - **Ein Beispiel, das aufhört zu gelten, macht eine Prüfung STILL statt rot.**
+    `test_job_scope` benutzte `embeddings` als Muster für „rechnet über den
+    ganzen Bestand" und wäre grün geblieben, ohne noch etwas zu zeigen: ohne
+    Termin entsteht auch kein zweiter Job. Umgezogen auf `recompute`, mit einer
+    Zusicherung auf die Eigenschaft selbst.
+  - **Drei Namen für einen Job-Typ** (`photo_points`): Backend mit „(alt …)",
+    deutsche Oberfläche ohne den Zusatz, englischer Katalog mit einem noch
+    älteren dritten Namen. `check-job-labels.js` verglich SCHLÜSSEL — drei
+    übereinstimmende Schlüssel sind keine drei übereinstimmenden Beschriftungen.
+  - **`tools/README.md` war die zweite Kopie der Wächterliste** und nannte zwei
+    Dateien, die es nicht gibt, bei zwanzig fehlenden. Die Liste steht in
+    `package.json`, weil die auch die CI fährt.
+  - **Offen gelassen, mit Zahlen:** das erfundene Demo-Wetter ist systematisch
+    **5–7 K zu kalt** (`27.0 - 0.42 × |lat|` → Athen 10,8 statt 17,7; Amsterdam
+    4,8 statt 10,5; Bangkok 21,2 statt 28,5). Der Welt-Reiter druckt das als
+    Landesmittel — Griechenland im April liest sich als 8,4 °C. Eine Konstante
+    behebt den Versatz, verschiebt aber jeden abgeleiteten Wert (Schneetage,
+    Rekorde, Ranglisten) und braucht einen Neuaufbau: Entscheidung, keine
+    Reparatur.
 
 **Code-Durchsicht 2026-08-07 (Anmerkung 201): fünf Reparaturen und vier
 Aufräumungen drin, drei Punkte bewusst offen — sie brauchen erst eine

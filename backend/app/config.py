@@ -21,8 +21,10 @@ class Settings(BaseSettings):
     openai_api_key: str = "not-needed"
     openai_model: str = "local-model"
 
-    # Embeddings für semantische Suche (nur mit OpenAI-kompatiblem Endpoint).
-    # Leer lassen -> keine Embeddings, Suche fällt auf Volltext zurück.
+    # Embeddings — **ohne Verbraucher.** Die Suche ist reiner Volltext, seit
+    # Anmerkung 121 die semantische ausgebaut hat; `events.embedding` und
+    # `_run_embeddings` stehen für eine spätere Suche IN der Datenbank
+    # (pgvector). Was hier entsteht, liest bis dahin nichts.
     openai_embed_model: str = ""
     # Eigener Endpoint für Embeddings (leer = openai_base_url). So können
     # Embeddings lokal laufen, während der Chat zu einem Cloud-Anbieter geht.
@@ -32,8 +34,12 @@ class Settings(BaseSettings):
     # nomic-embed-text braucht "search_query: " / "search_document: ".
     openai_embed_query_prefix: str = ""
     openai_embed_doc_prefix: str = ""
-    # Mindest-Ähnlichkeit (Cosine) für semantische Treffer (kalibriert für bge-m3)
-    semantic_min_similarity: float = 0.4
+    # `semantic_min_similarity` stand hier bis zur Release-Durchsicht: die
+    # Mindest-Ähnlichkeit der semantischen Suche, die es seit Anmerkung 121
+    # nicht mehr gibt. Gelesen hat sie danach nichts mehr — sie stand nur noch
+    # in `.env.example`, in der Compose und in DEPLOY.md und versprach dort
+    # eine Funktion. **Ein Schalter ohne Verbraucher ist eine Zusage**, und
+    # zwar die teuerste Sorte: er kostet nichts und wirkt trotzdem.
 
     # R1a: Beim ersten Start ein erfundenes Leben anlegen (`app/demo/`) —
     # dreißig Jahre mit Reisen, Wohnorten, Wetter und Erfolgen. Nur im

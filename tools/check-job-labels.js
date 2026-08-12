@@ -67,6 +67,30 @@ setTimeout(() => {
        'verwaistes Label — der Typ wurde umbenannt oder entfernt');
   }
 
+  // ---- Der Nachtplan: dieselbe Naht, eine Ebene tiefer -------------------
+  // `SCHED_TYPES` (Browser) sagt, was ANGEBOTEN wird; `SCHEDULABLE_TYPES`
+  // (Server) entscheidet, was tatsächlich LÄUFT. Laufen sie auseinander, ist
+  // genau eine der beiden Richtungen still: ein Häkchen, das nichts auslöst,
+  // oder ein nächtlicher Lauf ohne Schalter. Beides sieht im Betrieb aus wie
+  // „hat wohl nichts zu tun".
+  const schedBlock = py.match(/SCHEDULABLE_TYPES\s*=\s*\(([\s\S]*?)\)/);
+  const serverSched = schedBlock
+    ? [...schedBlock[1].matchAll(/"([a-z_]+)"/g)].map(m => m[1]) : [];
+  let uiSched = null;
+  try { uiSched = w.eval('SCHED_TYPES'); } catch (_) { /* siehe Prüfung */ }
+  ok('Der Server hat eine Nachtplan-Liste', serverSched.length > 0,
+     'SCHEDULABLE_TYPES in routers/jobs.py nicht gefunden');
+  ok('Die Oberfläche hat eine Nachtplan-Liste', Array.isArray(uiSched),
+     'SCHED_TYPES nicht erreichbar');
+  for (const tp of serverSched) {
+    ok(`Nachtplan „${tp}" wird auch angeboten`, (uiSched || []).includes(tp),
+       'der Server plant ihn, die Oberfläche zeigt keinen Schalter dafür');
+  }
+  for (const tp of uiSched || []) {
+    ok(`Nachtplan „${tp}" wird auch ausgeführt`, serverSched.includes(tp),
+       'ankreuzbar, aber der Ticker überspringt ihn — ein Häkchen ohne Wirkung');
+  }
+
   console.log(fail ? `\nJob-Namen: ${fail} Prüfung(en) fehlgeschlagen`
                    : '\nJob-Namen: alles grün');
   process.exit(fail ? 1 : 0);

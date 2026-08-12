@@ -217,14 +217,17 @@ AI_PROVIDER=openai
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_API_KEY=<your key>
 OPENAI_MODEL=gpt-4o-mini
-# Optional: semantic search
-OPENAI_EMBED_MODEL=text-embedding-3-small
 ```
 
 Other vendors (Gemini, local Ollama, LM Studio …) differ only in base URL and
-model name — examples are in [.env.example](../.env.example). If you use
-embeddings, retune `SEMANTIC_MIN_SIMILARITY` to your model; the default of 0.4
-is calibrated for bge-m3.
+model name — examples are in [.env.example](../.env.example).
+
+> **The `OPENAI_EMBED_*` keys have no consumer.** Search is full text only;
+> semantic search was removed because it loaded every embedded event into the
+> process and took the whole response down when the embedding service was
+> unavailable (decision note 121). The column and the job remain for a future
+> search *inside* the database (pgvector). Setting an embedding model today
+> costs one API call per event and changes nothing about search.
 
 Start:
 

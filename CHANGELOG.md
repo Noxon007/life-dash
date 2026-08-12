@@ -533,6 +533,18 @@
 
 ### Removed
 
+- **The nightly *Embeddings* run.** It could be ticked in the job schedule, and
+  every night it recomputed the search index for every single entry — one
+  request to your AI provider per entry, so a grown collection meant tens of
+  thousands of them. **Nothing read the result:** search has been plain full
+  text for several versions, and the button that used to start this run by hand
+  was taken out with it. What was left was a checkbox whose only effect was a
+  bill. The calculation itself stays in place for a future search that runs
+  inside the database; it is simply no longer scheduled. A tick you set earlier
+  stops working on its own — you do not have to find it.
+- **The `SEMANTIC_MIN_SIMILARITY` setting.** It belonged to the semantic search
+  that is gone, and nothing had read it since. The `OPENAI_EMBED_*` settings
+  stay, and the example file now says plainly that nothing consumes them yet.
 - **The two clean-up runs for data from earlier versions:** “Advanced: cut older
   data into days” under Imports, and the Immich card “Remove old photo-day
   summary entries”. New imports have cut visits into days by themselves for a
@@ -571,6 +583,19 @@
 
 ### Fixed
 
+- **Adding weather to a large backlog no longer slows down as it goes.** Before
+  each batch of twenty-five, the run looked through every located, dated entry
+  you have — including the ones it had already finished — to work out what was
+  left. The further a run got, the longer each step took: with ten thousand
+  finished entries the search alone cost three seconds, and it ran again for
+  every batch. It now asks the database for the unfinished ones directly, which
+  takes eight milliseconds at the same size. Which entries a run picks up is
+  unchanged.
+- **The job history no longer shows an old run as if you could start it.** The
+  entry left behind by the former *Create events from photos* run said just
+  that, in German, while the English interface called it something else again
+  (*Place photos on the map*). Both now name it the same way and say it is old
+  and part of *Fetch photos from Immich*.
 - **Restoring a backup no longer depends on the order inside the file.** A trip
   and the day entries under it could be written in either order; on a SQLite
   installation with strict database checks the day entry could arrive before

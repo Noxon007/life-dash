@@ -242,7 +242,8 @@ The central view. Vertical, zoomable from decade to day.
   years at one coordinate is one point with a weight, and the day count belongs
   in the popup. The timeline does the opposite, for the same reason — it is a
   list of *days*, the map a list of *places*.
-- Raster and vector basemaps, following the app theme.
+- Raster basemaps, following the app theme. Vector basemaps were withdrawn
+  along with MapLibre (note 206) — removed, not fixed.
 
 ### 4.3 Statistics
 
@@ -562,7 +563,7 @@ flowchart TB
 | **Background work** | a `Job` table plus a minute ticker in the app lifespan, one lock per job type and a heartbeat. **No Redis, no external queue** |
 | **AI** | any OpenAI-compatible endpoint behind a provider interface, plus a mock provider |
 | **Auth** | OIDC (any compliant provider), **local accounts**, or a dev mode that must never reach production |
-| **Frontend** | one `frontend/index.html` — CSS, HTML and JavaScript together, **no build step, no npm in the application**, served by the backend at `/`. Leaflet plus MapLibre for vector basemaps |
+| **Frontend** | one `frontend/index.html` — CSS, HTML and JavaScript together, **no build step, no npm in the application**, served by the backend at `/`. Leaflet, served from `frontend/vendor/` rather than a CDN |
 | **Deployment** | Docker Compose; Immich runs separately and needs only a URL and a key |
 
 **Two deliberate absences, because they are the ones a reader will look for.**

@@ -8,10 +8,12 @@
 # `main` ein `:main`-Image, und eine Versionsnummer entsteht nur noch, wenn ein
 # NUTZER einen Unterschied merkt.
 #
-# Keines der alten Images ist installierbar: der getestete Upgrade-Pfad ist
-# R1(f) und existiert noch nicht. Was ein Fremder bei 1.0 sieht, ist die
-# Releases-Seite und die ghcr-Paketliste — und die sollen nicht bei v0.1
-# anfangen.
+# Keines der alten Images ist installierbar: einen getesteten Upgrade-Pfad aus
+# einer 0.x-Datenbank gibt es nicht, und seit R1(f) am 2026-08-09 gestrichen
+# wurde, wird es ihn auch nicht geben. **Das macht das Löschen nötiger, nicht
+# weniger nötig** — ein Image, aus dem niemand herauskommt, soll niemand
+# betreten können. Was ein Fremder bei 1.0 sieht, ist die Releases-Seite und
+# die ghcr-Paketliste — und die sollen nicht bei v0.1 anfangen.
 #
 # NICHTS GEHT DABEI VERLOREN. Der Nachweis waren nie die Tags:
 #   - was gebaut wurde, in welcher Version  -> DECISIONS.md Anhang A
