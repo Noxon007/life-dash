@@ -144,8 +144,17 @@ deliberate — a public **demo** instance with invented data (`SEED_DEMO=true`) 
 exactly that case — and every start will say so in the log.
 
 The same applies to `SESSION_SECRET`: with `local` or `oidc` the app will not
-start while it still carries the default from `.env.example`. That value is
+start while it still carries the placeholder from `.env.example`. That value is
 public, and it signs the session cookies.
+
+**Nor will it start with a secret shorter than 32 bytes.** HS256 signs with
+SHA-256, and RFC 7518 §3.2 requires a key at least as long as the hash output;
+anything shorter is guessable in a way the algorithm does not intend. Generate
+one rather than inventing it:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
 
 ### Who may create the first account
 

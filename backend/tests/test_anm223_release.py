@@ -17,12 +17,15 @@ from __future__ import annotations
 
 import pathlib
 import re
+import secrets
 
 import pytest
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.pool import StaticPool
 
+from app.config import Settings
 from app.database import Base, attach_sqlite_pragmas, is_memory_url
+from app.startup_checks import InsecureStartup, check_session_secret
 from app.migrate import _adoptable_tables, adopt_orphan_rows, ensure_schema
 from app.models import Event, Location, MediaRef, Track, User, UserRole
 
@@ -309,6 +312,85 @@ def test_image_and_entrypoint_agree_on_the_media_path():
     compose = re.search(r"MEDIA_DIR: \$\{MEDIA_DIR:-([^}]+)\}",
                         _read("docker-compose.yml")).group(1)
     assert image == entry == compose, (image, entry, compose)
+
+
+def test_the_secret_from_the_example_file_does_not_start():
+    """Was `.env.example` ausliefert, muss der Start ABLEHNEN.
+
+    **Der teuerste Fund dieser Runde, und er lag zwischen zwei Dateien.**
+    `check_session_secret` (Anmerkung 208) kannte genau eine verbotene
+    Zeichenkette: `dev-secret-change-me`, den Vorgabewert aus `config.py`. In
+    `.env.example` stand `change-me`. Der Weg, den die README als ERSTEN
+    Schritt nennt — `cp .env.example .env` — führte also zu einem neun Byte
+    langen, öffentlich im Repository stehenden Signaturschlüssel, und die
+    Prüfung, die genau das verhindern sollte, sah an ihm vorbei.
+
+    Beide Hälften waren für sich geprüft: es gab einen Test, dass der
+    `config.py`-Vorgabewert abgewiesen wird, und `.env.example` war als
+    Einrichtungs-Referenz gepflegt. Der Defekt lag DAZWISCHEN.
+
+    Deshalb schreibt dieser Test den Wert nicht ab, sondern **liest ihn aus der
+    Datei**. Ein neuer Platzhalter, den jemand dort einträgt, ist damit von
+    selbst mitgeprüft — eine dritte Kopie kann gar nicht erst entstehen.
+    """
+    example = re.search(r"^SESSION_SECRET=(.*)$", _read(".env.example"), re.M)
+    assert example, ".env.example nennt kein SESSION_SECRET mehr"
+    for mode in ("local", "oidc"):
+        cfg = Settings(auth_mode=mode, session_secret=example.group(1).strip(),
+                       oidc_issuer="", oidc_client_id="")
+        with pytest.raises(InsecureStartup):
+            check_session_secret(cfg)
+
+
+def test_a_short_secret_does_not_start():
+    """Und die Regel dahinter: kurz genügt nicht, auch wenn er neu ist.
+
+    Die Liste bekannter schlechter Werte wäre immer unvollständig geblieben.
+    Ein selbst ausgedachtes `sommer2026` steht in keiner Liste und ist
+    trotzdem ratbar; HS256 verlangt ohnehin 32 Byte (RFC 7518 §3.2), und
+    PyJWT warnt seit 2.13 bei jedem kürzeren.
+    """
+    with pytest.raises(InsecureStartup):
+        check_session_secret(Settings(auth_mode="local", session_secret="sommer2026",
+                                      oidc_issuer="", oidc_client_id=""))
+    # Und die Gegenrichtung — ein tauglicher Wert kommt durch, sonst prüfte
+    # dieser Test nur, dass die Funktion überhaupt wirft.
+    check_session_secret(Settings(auth_mode="local", oidc_issuer="", oidc_client_id="",
+                                  session_secret=secrets.token_urlsafe(48)))
+
+
+def test_the_tested_python_is_the_shipped_python():
+    """Die Laufzeit-Version steht an zwei Orten — sie müssen dieselbe nennen.
+
+    **Gefunden an einem Dependabot-PR, der grün war und nichts bewies.** Der
+    Vorschlag hob das Basis-Image von `python:3.13-slim` auf `3.14-slim` und
+    fasste `tests.yml` nicht an. Zwei Dinge trafen dort zusammen:
+
+    - Die Version steht im `Dockerfile` (was AUSGELIEFERT wird) und in
+      `tests.yml` (was GEPRÜFT wird). Ein Werkzeug, das Abhängigkeiten
+      aktualisiert, kennt nur die erste.
+    - `docker-dev.yml` läuft nur auf `push` nach `main`, nicht auf Pull
+      Requests. Ein Vorschlag, der ausschließlich das `Dockerfile` anfasst,
+      wird also von keinem Lauf berührt, der ihn AUSFÜHRT — das grüne Häkchen
+      sagte „die Tests auf 3.13 sind bestanden", und die Änderung selbst hatte
+      niemand angefasst.
+
+    Zusammen wäre daraus die stillste Fassung des immer gleichen Defekts
+    geworden: **geprüft wird nicht, was ausgeliefert wird** — und weil hier
+    kein Docker läuft (Anmerkung 210), hätte es der erste Fremde gemerkt.
+
+    Der Wächter macht aus zwei Orten wieder einen: wer die Version anhebt,
+    hebt beide an oder wird rot.
+    """
+    image = re.search(r"^FROM python:(\d+\.\d+)-slim", _read("Dockerfile"), re.M)
+    assert image, "Das Dockerfile nennt keine Python-Version mehr"
+    ci = set(re.findall(r'python-version:\s*"(\d+\.\d+)"',
+                        _read(".github/workflows/tests.yml")))
+    assert ci, "tests.yml nennt keine Python-Version mehr"
+    assert ci == {image.group(1)}, (
+        f"Das Image liefert Python {image.group(1)} aus, die CI prüft "
+        f"{', '.join(sorted(ci))} — geprüft wäre dann nicht, was läuft. "
+        "Beide Stellen zusammen anheben (Dockerfile und tests.yml).")
 
 
 def test_nothing_is_installed_unpinned():

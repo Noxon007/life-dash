@@ -2670,6 +2670,61 @@ repair for each: delete it.
     records, rankings) and needs a reseed, so it is a decision rather than a
     repair.
 
+225. ✅ **The dependency updates, and the hole one of them uncovered.**
+
+    Five Dependabot pull requests, all red against a `main` that carried the
+    broken guards from note 220 — a rebase cleared four of them. What the
+    updates then turned up is the point of this entry.
+
+    **(a) `SESSION_SECRET=change-me` started the app.** `check_session_secret`
+    (note 208) exists to stop a publicly known key from signing session
+    cookies. It knew exactly one forbidden string: `dev-secret-change-me`, the
+    default in `config.py`. `.env.example` carries `change-me` — **and that is
+    the value a stranger actually gets**, because the first line of the README
+    is `cp .env.example .env`, and `AUTH_MODE` defaults to `local`. Nine bytes,
+    printed in the public repository, signing login cookies. The exact attack
+    the check was built against, through the door beside it.
+
+    Both halves were tested. There was a test that the `config.py` default is
+    refused, and `.env.example` was maintained as the setup reference. **The
+    defect was between them** — the same shape as note 219's revoke-then-reissue
+    round trip.
+
+    Adding a second forbidden string would have lengthened the trap rather than
+    closing it: *a list of known-bad values is always incomplete*, and it lives
+    somewhere other than the value it means. **The rule that needs no list is
+    the length.** Every public placeholder is short; a real random key never
+    is; and HS256 requires 32 bytes anyway (RFC 7518 §3.2). The guard reads the
+    value **out of `.env.example`**, so a new placeholder is checked by
+    construction and a third copy cannot arise.
+
+    > **PyJWT 2.13 is what made it visible.** The bump added
+    > `InsecureKeyLengthWarning`, thirty of them in one suite run — because the
+    > tests signed with the 20-byte default too. A test setup that the
+    > project's own hardening would reject is testing a situation that does not
+    > occur in operation; `conftest` now uses a key that would pass.
+
+    **(b) Python 3.14 was declined, and not because of 3.14.** The bump touched
+    `Dockerfile` and not `tests.yml`, where the version is stated a second
+    time — so CI would have gone on testing 3.13 while the image shipped 3.14.
+    Worse, `docker-dev.yml` runs only on `push` to `main`: **a pull request
+    that changes only the `Dockerfile` is touched by no job that executes it.**
+    The green tick said "the tests on 3.13 passed". With the image never built
+    here at all (note 210), the first person to find out would have been a
+    stranger. A test now holds the two statements of the version together, so
+    the jump is a one-place change again.
+
+    **(c) Merged and proven:** FastAPI 0.115.6 → 0.141.1, uvicorn 0.34 →
+    0.52.1, pydantic 2.10 → 2.13.4, SQLAlchemy 2.0.36 → 2.0.51, PyJWT 2.10 →
+    2.13, psycopg2 2.9.10 → 2.9.12, Pillow 11.3 → 12.3, pytest-cov 6 → 7, plus
+    the GitHub actions to v7. 936 tests on SQLite, 937 on PostgreSQL. The local
+    environment was moved to the same pins — measuring against different
+    versions than CI is the defect this whole review has been about.
+
+    Left for the next round: Starlette now deprecates `httpx` under
+    `TestClient` in favour of `httpx2`. One warning, no failure; recorded so it
+    is not rediscovered.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

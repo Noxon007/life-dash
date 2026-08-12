@@ -89,20 +89,49 @@ def check_auth_mode(s: Settings) -> None:
         "Siehe docs/DEPLOY.md.")
 
 
-def check_session_secret(s: Settings) -> None:
-    """Das Standard-Secret signiert keine echten Sitzungen.
+# HS256 signiert mit SHA-256, und RFC 7518 §3.2 verlangt einen Schlüssel, der
+# mindestens so lang ist wie die Ausgabe des Hashs. PyJWT 2.13 warnt seit dem
+# Abhängigkeits-Sprung bei jedem kürzeren (`InsecureKeyLengthWarning`) — die
+# Warnung hat diese Lücke überhaupt erst sichtbar gemacht.
+_MIN_SECRET_BYTES = 32
 
-    Wer es kennt — und es steht in `.env.example` — fälscht eine fremde Sitzung.
-    Anders als beim dev-Modus ist hier ein Abbruch die einzig richtige Antwort
-    und war es immer: es gibt keinen Anwendungsfall, in dem ein echter Login mit
-    einem öffentlich bekannten Signaturschlüssel gewollt ist.
+
+def check_session_secret(s: Settings) -> None:
+    """Der Signaturschlüssel muss geheim UND lang genug sein.
+
+    **Diese Prüfung zählte Literale auf, und das war ihr Fehler.** Sie kannte
+    genau eine verbotene Zeichenkette — `dev-secret-change-me`, den Vorgabewert
+    aus `config.py`. In `.env.example` stand aber `change-me`, und **das ist
+    der Wert, den ein Fremder tatsächlich bekommt**: die erste Zeile der
+    README lautet `cp .env.example .env`. Neun Byte, öffentlich im
+    Repository, `AUTH_MODE` steht per Vorgabe auf `local` — die App startete
+    und signierte damit Sitzungs-Cookies. Genau der Angriff, gegen den
+    Anmerkung 208 diese Funktion gebaut hat, nur durch die Tür daneben.
+
+    Eine zweite verbotene Zeichenkette einzutragen hätte die Falle
+    verlängert, nicht geschlossen: **eine Liste bekannter schlechter Werte ist
+    immer unvollständig**, und sie steht an einem anderen Ort als der Wert, den
+    sie meint. Die Länge ist die Regel, die keine Liste braucht — jeder
+    öffentlich bekannte Platzhalter ist kurz, und ein echter Zufallswert ist es
+    nie. Sie ist überdies die Regel, die ohnehin gilt (RFC 7518 §3.2).
+
+    Der Vorgabewert wird weiterhin eigens genannt, aber nur für die
+    BEGRÜNDUNG: „zu kurz" ist bei einem bekannten Platzhalter die schlechtere
+    Auskunft als „der steht im Repository".
     """
-    if s.auth_mode in ("local", "oidc") and s.session_secret == "dev-secret-change-me":
+    if s.auth_mode not in ("local", "oidc"):
+        return
+    secret = s.session_secret or ""
+    known = secret in ("dev-secret-change-me", "change-me", "")
+    if known or len(secret.encode()) < _MIN_SECRET_BYTES:
+        why = ("ist ein Platzhalter aus dem Repository und damit öffentlich "
+               "bekannt" if known else
+               f"ist mit {len(secret.encode())} Byte zu kurz — HS256 verlangt "
+               f"mindestens {_MIN_SECRET_BYTES} (RFC 7518 §3.2)")
         raise InsecureStartup(
-            "SESSION_SECRET ist noch der Standardwert aus .env.example, und der "
-            f"steht öffentlich im Repository. Bei AUTH_MODE={s.auth_mode} signiert "
-            "er die Sitzungs-Cookies — wer ihn kennt, meldet sich als beliebiger "
-            "Nutzer an. Einen eigenen erzeugen:\n"
+            f"SESSION_SECRET {why}. Bei AUTH_MODE={s.auth_mode} signiert er die "
+            "Sitzungs-Cookies — wer ihn erraten oder nachschlagen kann, meldet "
+            "sich als beliebiger Nutzer an. Einen eigenen erzeugen:\n"
             "  python -c \"import secrets; print(secrets.token_urlsafe(48))\"")
 
 

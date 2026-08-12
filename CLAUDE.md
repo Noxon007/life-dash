@@ -629,6 +629,20 @@ Der Bericht liegt als Artefakt vor; die Aufteilung:
   - **`tools/README.md` war die zweite Kopie der Wächterliste** und nannte zwei
     Dateien, die es nicht gibt, bei zwanzig fehlenden. Die Liste steht in
     `package.json`, weil die auch die CI fährt.
+  - **Anmerkung 225 (Abhängigkeiten): eine Liste verbotener Werte ist immer
+    unvollständig.** `.env.example` gab `SESSION_SECRET=change-me` aus, die
+    Startprüfung kannte `dev-secret-change-me` — und `cp .env.example .env` ist
+    die ERSTE Zeile der README. Neun Byte, öffentlich, signierten
+    Sitzungs-Cookies. Beide Hälften waren geprüft, der Defekt lag DAZWISCHEN.
+    Ersetzt durch die Regel ohne Liste: **mindestens 32 Byte** (RFC 7518 §3.2);
+    der Wächter liest den Wert AUS `.env.example`. Sichtbar wurde es durch
+    PyJWT 2.13 (`InsecureKeyLengthWarning`) — auch die Tests signierten mit dem
+    kurzen Vorgabewert, also mit einer Lage, die der Betrieb gar nicht zulässt.
+  - **Die Python-Version steht an zwei Orten** (`Dockerfile`, `tests.yml`), und
+    `docker-dev.yml` läuft NUR auf `push` nach `main`: ein PR, der nur das
+    Dockerfile anfasst, wird von keinem Lauf berührt, der ihn ausführt. Der
+    3.14-Vorschlag war deshalb grün und bewies nichts — abgelehnt, und ein Test
+    hält die beiden Angaben jetzt zusammen.
   - **Offen gelassen, mit Zahlen:** das erfundene Demo-Wetter ist systematisch
     **5–7 K zu kalt** (`27.0 - 0.42 × |lat|` → Athen 10,8 statt 17,7; Amsterdam
     4,8 statt 10,5; Bangkok 21,2 statt 28,5). Der Welt-Reiter druckt das als

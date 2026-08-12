@@ -51,6 +51,15 @@ def safe_settings(monkeypatch):
     monkeypatch.setattr(settings, "geocoding_enabled", False)
     monkeypatch.setattr(settings, "openai_embed_model", "")
     monkeypatch.setattr("app.routers.jobs.WORKERS_ENABLED", False)
+    # Und ein Signaturschlüssel, der die eigene Startprüfung bestehen WÜRDE.
+    # Der Vorgabewert aus `config.py` ist 20 Byte lang; damit signierte die
+    # Suite ihre Sitzungs-Cookies mit einem Schlüssel, den der Betrieb seit
+    # der Längenregel abweist — und PyJWT 2.13 legte je Aufruf eine
+    # `InsecureKeyLengthWarning` daneben, dreißig Stück am Ende des Laufs.
+    # **Ein Testaufbau, den die eigene Härtung nicht durchließe, prüft eine
+    # Lage, die es im Betrieb nicht gibt.** Fest verdrahtet und nicht zufällig:
+    # ein Lauf soll zweimal dasselbe tun.
+    monkeypatch.setattr(settings, "session_secret", "test-" + "s" * 40)
 
 
 @pytest.fixture(autouse=True)

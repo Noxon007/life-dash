@@ -1094,6 +1094,16 @@
 
 ### Security
 
+- **The example settings file no longer hands out a working sign-in key.**
+  `.env.example` shipped `SESSION_SECRET=change-me`, and copying that file is
+  the first step of the install instructions. The check that refuses to start
+  with a publicly known key was looking for a *different* placeholder, so this
+  one went through: a fresh instance signed its login cookies with a nine-
+  character string printed in the public repository, and anyone who read it
+  could sign in as anybody. The check no longer works from a list of bad
+  values — it requires a real key of **at least 32 bytes**, which every
+  placeholder fails by being short. If yours is too short the app now stops at
+  startup and prints the one command that makes a proper one.
 - **The login cookie is now marked HTTPS-only on every path into the app.**
   Signing in with e-mail and password already set it that way; signing in
   through an identity provider did not, so on a site served over HTTPS the
