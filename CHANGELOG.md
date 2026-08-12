@@ -287,6 +287,20 @@
   one of them grew to forty rows next to a neighbour that stopped at ten. *What
   is missing* also shows its share as a bar, so “7,298 of 12,437 days” can be
   read without doing the arithmetic.
+- **“Farthest from home” no longer scrolls inside itself.** It stands alone
+  across the full width, so there was never a neighbouring panel it could have
+  stretched — the scrollbar hid rows for no reason. It now uses that width:
+  each place you have lived is its own block, and the blocks stand side by side
+  as long as there is room and underneath each other when there is not. The
+  panels that share a row still cap at ten rows, because there the point is
+  that neither pulls the other out of shape.
+- **The statistics tab was made to fit a phone again.** Nothing scrolls inside
+  a panel any more — on a screen showing one panel at a time there is nothing
+  to line it up with, and a box that scrolls inside a scrolling page is easy to
+  get lost in. The panels have narrower margins and the figures are a size
+  smaller, so a tile has as much room for its label as it had before the panels
+  arrived. The age block finally fits as well: “1,135,849,203 seconds” used to
+  run out of its cell on every phone.
 - **A general polish of the interface.** Cards, panels and dialogs now sit on
   their background with a slight shadow rather than a single hairline — most
   noticeable in the light theme, where a white card on light grey used to be

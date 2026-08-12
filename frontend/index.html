@@ -472,6 +472,23 @@
      Gesamtzahl steht dafür in der Überschrift. */
   .panel-rows.capped { max-height: 340px; overflow-y: auto; padding-right: 4px;
                        overscroll-behavior: contain; }
+  /* **Der Deckel gleicht NACHBARN an — wo keiner steht, tut er nichts als
+     Zeilen hinter einen zweiten Bildlauf schieben** (Rückmeldung 2026-08-12).
+     Er ist aus Anmerkung 195 gewachsen: neben „Reichweite je Jahr" (vierzig
+     Zeilen) stand eine Tafel mit einer, und das Raster streckte sie mit. Diese
+     Begründung setzt eine Zeile mit zwei Tafeln voraus.
+
+     „Am weitesten von zu Hause" steht als einzige ALLEIN über die Breite
+     (Anmerkung 216, weil sie je Wohnort vier Zeilen trägt) — sie hat keinen
+     Nachbarn, den sie strecken könnte, und scrollte trotzdem in sich. Die
+     Bedingung steht hier als Ort im Baum und nicht als Merkmal am Aufruf: eine
+     Tafel, die unmittelbar in einer Ansicht liegt statt in einem Raster, HAT
+     keinen Nachbarn. Verschiebt sie jemand in ein Raster, gilt der Deckel von
+     selbst wieder. */
+  #stats-tops > .panel > .panel-rows.capped,
+  #stats-gaps > .panel > .panel-rows.capped,
+  #stats-tracks > .panel > .panel-rows.capped { max-height: none; overflow: visible;
+                                                padding-right: 0; }
   .panel-rows.capped .bar-row:last-child { margin-bottom: 0; }
   .panel-rows > .bar-row:last-child { margin-bottom: 0; }
   /* Die Zeile UNTER der Liste, die etwas ÜBER die Liste sagt („20 von 417
@@ -512,6 +529,18 @@
   .top-group { font-size: 13px; font-weight: 600; margin: 16px 0 8px;
                padding-top: 12px; border-top: 1px solid var(--border); }
   .panel-rows > .top-group:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+  /* Rückmeldung 2026-08-12 — „Am weitesten von zu Hause" als Blöcke statt als
+     eine Spalte. Die Tafel liegt allein über die volle Breite; sie hatte sie
+     bisher nur belegt und nicht benutzt, und ab vier Wohnorten scrollte sie
+     deshalb in sich. `auto-fit` mit `minmax` entscheidet nach dem PLATZ und
+     nicht nach einer Zahl von Spalten: am Schreibtisch stehen drei Wohnorte
+     nebeneinander, auf dem Handy einer. Die Trennlinie über jeder Gruppe fällt
+     dabei weg — nebeneinander trennt der Zwischenraum, und eine Linie über der
+     obersten Zeile jeder Spalte sähe aus wie ein zweiter Kopf der Tafel. */
+  .far-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+              gap: 20px 28px; }
+  .far-grid .top-group { margin: 0 0 8px; padding-top: 0; border-top: none; }
+  .far-grid .bar-row:last-child { margin-bottom: 0; }
   .top-row[data-top-day] { cursor: pointer; border-radius: 6px; padding: 2px 4px; margin: 0 -4px 8px; }
   .top-row[data-top-day]:hover { background: var(--bg-elev); }
   .action-row { display: flex; gap: 16px; padding: 16px 18px; border-bottom: 1px solid var(--border); align-items: flex-start; }
@@ -1270,6 +1299,35 @@
     .grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
     .grid.cols-3, .grid.cols-2 { grid-template-columns: 1fr; }
     .stages { grid-template-columns: 1fr; }
+    /* ---------- Statistik auf dem Handy (Rückmeldung 2026-08-12) ----------
+       Seit die Kachelraster in Tafeln stehen (Anmerkung 226), zahlt jede
+       Kachel den Innenabstand der Tafel mit. Am Schreibtisch sind das 44 px
+       von tausend; auf einem 360-px-Schirm sind es 44 von 328, und die gehen
+       von zwei Spalten ab: aus 116 px Inhalt je Kachel wurden 94, und
+       „🥶 Gefühlt kältester Tag" braucht darin fünf Zeilen. Die Tafel bleibt
+       (sie sagt, WAS die Kacheln sind), ihr Rand wird schmal. */
+    .panel { padding: 16px 14px; }
+    .panel h3 { margin-bottom: 12px; }
+    .grid { gap: 12px; }
+    .stat-card { padding: 14px 16px; }
+    /* Bei zwei Spalten bleiben rund 112 px Inhalt. „12.345" ist bei 32 px
+       breiter als das — die Zahl bliebe die Hauptsache und bräche trotzdem um.
+       26 px steht immer noch doppelt so groß da wie seine Beschriftung. */
+    .stat-num { font-size: 26px; letter-spacing: -.6px; }
+    /* Der Takt zwischen den Blöcken darf enger sein als am Schreibtisch — auf
+       einem Schirm, der nur einen Block auf einmal zeigt, ist ein großer
+       Zwischenraum nur Weg. */
+    :root { --stack: 16px; }
+    /* Dieselbe Regel wie oben, nur mit dem anderen Grund: bei EINER Spalte hat
+       keine Tafel einen Nachbarn, den sie strecken könnte. Ein Kasten, der in
+       sich scrollt, ist auf dem Handy dazu das Unangenehmste, was eine Seite
+       tun kann — man wischt und die Seite bleibt stehen. */
+    .panel-rows.capped { max-height: none; overflow: visible; padding-right: 0; }
+    /* „1.135.849.203" ist bei 22 px 150 px breit und die Zelle 112 — die Zahl
+       lief seit jeher aus ihrer Kachel heraus, was am Schreibtisch niemand
+       sieht. Sie ist die einzige im Programm, die zehn Stellen bekommt. */
+    .age-cell .stat-num { font-size: 17px; letter-spacing: -.3px; }
+    .age-cell { padding: 12px 12px; }
     .stage-arrow { display: none; }
     .timeline { padding-left: 22px; }
     .event-card::before { left: -20px; }
@@ -8385,21 +8443,36 @@ function renderStatsTops(top) {
   // eine andere Auskunft als die weiteste Reise von der heutigen Wohnung.
   // Der Zeitraum steht dabei, weil er die Zeile erst datiert; ein Wohnort ohne
   // Treffer sagt das ausdrücklich, statt einfach zu fehlen.
-  const farRows = [];
-  (top.farthest || []).forEach(g => {
-    farRows.push(`<div class="top-group">${esc(g.home || '')}<span class="stat-label"> · ${
-      esc(`${fmtDay(g.from)} – ${fmtDay(g.to)}`)}</span></div>`);
-    if (!g.tops.length) {
-      farRows.push(`<div class="stat-label" style="padding:6px 10px">${
-        esc(t('tops.far.empty', 'von hier aus nichts Verortetes erfasst'))}</div>`);
-      return;
-    }
-    g.tops.forEach((r, i) => farRows.push(topRow(
-      i, [r.place, r.city, r.country].filter(Boolean).join(' · '),
-      `${(r.km || 0).toLocaleString(LOC(), { maximumFractionDigits: 0 })} km`,
-      t('tops.far.sub', 'Luftlinie · zuerst {d}').replace('{d}', fmtDay(r.date)),
-      r.date ? ` data-top-day="${esc(r.date)}"` : '')));
-  });
+  // **Rückmeldung 2026-08-12 — je Wohnort ein BLOCK, nicht eine flache Liste.**
+  //
+  // Die Zeilen standen alle untereinander in einer Tafel über die volle Breite,
+  // und ab vier Wohnorten war das länger als der Deckel: die Tafel scrollte in
+  // sich, obwohl sie neben sich nichts hat, das sie strecken könnte. Der Deckel
+  // ist weg (siehe `.panel-rows.capped` im Stylesheet) — und damit die Tafel
+  // dadurch nicht einfach lang wird, nutzt sie jetzt die Breite, die sie
+  // ohnehin belegt: jeder Wohnort ist ein eigener Block, die Blöcke stehen
+  // nebeneinander, solange Platz ist, und untereinander, sobald keiner mehr da
+  // ist. **Ein Block bricht dabei nie um** — Überschrift und Ziele gehören
+  // zusammen, und ein Wohnortname allein am Spaltenende wäre eine Gruppe ohne
+  // Inhalt.
+  const farBlocks = (top.farthest || []).map(g => {
+    const rows = g.tops.length
+      ? g.tops.map((r, i) => topRow(
+          i, [r.place, r.city, r.country].filter(Boolean).join(' · '),
+          `${(r.km || 0).toLocaleString(LOC(), { maximumFractionDigits: 0 })} km`,
+          t('tops.far.sub', 'Luftlinie · zuerst {d}').replace('{d}', fmtDay(r.date)),
+          r.date ? ` data-top-day="${esc(r.date)}"` : '')).join('')
+      : `<div class="stat-label">${
+          esc(t('tops.far.empty', 'von hier aus nichts Verortetes erfasst'))}</div>`;
+    return `<div class="top-group-block">
+      <div class="top-group">${esc(g.home || '')}<span class="stat-label"> · ${
+        esc(`${fmtDay(g.from)} – ${fmtDay(g.to)}`)}</span></div>
+      ${rows}
+    </div>`;
+  }).join('');
+  // EIN Element als „Zeile" für `topPanel`: die Tafel deckelt nichts mehr, also
+  // gibt es auch keine Zeilenzahl mehr zu zählen.
+  const farRows = farBlocks ? [`<div class="far-grid">${farBlocks}</div>`] : [];
   // Reichweite je Jahr: nicht „wie viel", sondern „wie weit gestreut". Der
   // Wohnort zählt mit — ein Jahr ganz zu Hause stünde sonst bei „0 Länder".
   const reach = (top.reach || []).slice().reverse().map((y, i) =>
@@ -8423,8 +8496,7 @@ function renderStatsTops(top) {
     + photoPanel(top.photos || {})
     + `</div>`
     + topPanel(t('tops.far', '🧭 Am weitesten von zu Hause'), farRows,
-               t('tops.far.none', 'Trag einen Wohnort ein — ohne ihn gibt es kein „weit weg".'),
-               (top.farthest || []).length)
+               t('tops.far.none', 'Trag einen Wohnort ein — ohne ihn gibt es kein „weit weg".'))
     // Anmerkung 226: der Abstand zwischen den Rastern steht nicht mehr hier.
     // Er stand an EINEM der drei (`margin-top:16px`) und fehlte den anderen
     // beiden — `gap` wirkt nur innerhalb eines Rasters, nicht zwischen zweien.

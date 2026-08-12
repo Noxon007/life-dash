@@ -2785,6 +2785,42 @@ repair for each: delete it.
     against the demo stock). A layout pass that needs its own tests rewritten
     has changed more than layout.
 
+    **Feedback the same day, and it named the rule the cap was missing.**
+    *"Having to scroll inside the page again at 'Farthest from home' is
+    annoying — and on a phone this no longer looks good."*
+
+    **(e) A cap levels out NEIGHBOURS. Where there is none, it does nothing but
+    push rows behind a second scrollbar.** `panel-rows.capped` grew out of note
+    195: a one-line panel beside a forty-line one was stretched to its height by
+    the grid. That justification presupposes *a row with two panels in it.*
+    "Farthest from home" is the one panel that stands **alone across the full
+    width** (note 216, since it carries four lines per residence) — it has no
+    neighbour it could stretch, and it scrolled inside itself anyway. The
+    condition now sits in the stylesheet as a **position in the tree**
+    (`#stats-tops > .panel > .panel-rows.capped`) rather than as a flag at the
+    call site: a panel that lies directly in a view *has* no neighbour, and if
+    anyone moves it into a grid the cap applies again by itself. The same
+    sentence with the other reason retires the cap on phones: at one column per
+    row nothing has a neighbour either, and a box that scrolls inside a page
+    that also scrolls is the worst thing a phone layout can do.
+
+    Removing the cap would have made that panel simply *long*, so it now uses
+    the width it was already occupying: **one block per residence**, side by
+    side while there is room (`auto-fit`/`minmax`), stacked when there is not,
+    and a block never breaks — a residence name alone at the foot of a column
+    would be a group without content.
+
+    **(f) The panels around the tile grids cost mobile 19 % of every tile.**
+    Since (c) put the tile grids inside panels, every tile pays the panel's
+    padding. On a desktop that is 44 px out of a thousand; on a 360 px screen it
+    is 44 out of 328, taken off **two** columns — 116 px of content per tile
+    became 94, and "🥶 Coldest by feel" needs five lines in that. The panel
+    stays (it says *what* the tiles are), its padding gets narrow, and the tile
+    numbers step down from 32 px to 26. While measuring this, a defect that
+    predates the whole pass turned up: **the age cells overflow on a phone** —
+    "1,135,849,203" is 150 px wide at 22 px and the cell is 112. It is the only
+    ten-digit figure in the program, which is why nobody sees it at a desk.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into
