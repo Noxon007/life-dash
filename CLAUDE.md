@@ -672,9 +672,10 @@ clientseitig); mit `psycopg3`/`asyncpg` wäre es ein harter Fehler.
   (2.326 → 1.710 ms). **Zwei Stufen sind Pflicht** — erst je (Tag, Schlüssel)
   das Minimum (`_per_day_key`, dieselbe Funktion, die `day_values` liest),
   dann die Summe: direkt über die Rohzeilen zählt ein importierter Tag mit
-  dreißig Besuchen dreißigmal. **Offen bleibt die Ereignis-Seite**
-  (`weather_values` + `_extreme_tops`, ~1,1 s) — die entscheidet, welche Zeile
-  in zwölf Ranglisten gewinnt, und gehört in eine eigene Runde.
+  dreißig Besuchen dreißigmal. **Die Ereignis-Seite ist mit Anmerkung 220
+  erledigt** — `weather_values` fragte korreliert nach den ELTERN und kostete
+  auf dem Demo-Bestand 12,9 s für null Zeilen; als Semi-Join über die
+  Eltern-IDs sind es 0,005 s, der Reiter 29 s → 2,3 s. Nicht mehr aufmachen.
 - **`day_values` ist die teure Auskunft** (eine Zeile je Tag UND Schlüssel).
   Für Zahlen, die man nur summiert oder zählt, ist sie die falsche.
 
