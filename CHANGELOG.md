@@ -299,8 +299,7 @@
   to line it up with, and a box that scrolls inside a scrolling page is easy to
   get lost in. The panels have narrower margins and the figures are a size
   smaller, so a tile has as much room for its label as it had before the panels
-  arrived. The age block finally fits as well: “1,135,849,203 seconds” used to
-  run out of its cell on every phone.
+  arrived.
 - **A general polish of the interface.** Cards, panels and dialogs now sit on
   their background with a slight shadow rather than a single hairline — most
   noticeable in the light theme, where a white card on light grey used to be
@@ -618,6 +617,14 @@
 
 ### Fixed
 
+- **The page no longer scrolls sideways on a phone.** In the statistics tab the
+  whole page could be pushed left and right. The age block's largest figure —
+  “1,135,849,203 seconds”, one word the browser is not allowed to break — set a
+  minimum width for its column, and two columns of that are wider than a phone.
+  Every grid in the app shared the rule that caused it; all of them can now
+  become narrower than their contents, and the age block takes its size from
+  the width of your screen instead of a fixed number, so it does not have to
+  break at all.
 - **Adding weather to a large backlog no longer slows down as it goes.** Before
   each batch of twenty-five, the run looked through every located, dated entry
   you have — including the ones it had already finished — to work out what was

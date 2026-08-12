@@ -2821,6 +2821,47 @@ repair for each: delete it.
     "1,135,849,203" is 150 px wide at 22 px and the cell is 112. It is the only
     ten-digit figure in the program, which is why nobody sees it at a desk.
 
+    **(g) And that overflow had a second half, which is the actual finding:
+    `1fr` is not a share, it is `minmax(min-content, 1fr)`.** Reported as "on
+    mobile I still get a left-right scroll in Statistics, because not
+    everything fits". An `fr` track carries an **automatic minimum**, and that
+    minimum is the min-content width of its contents. With a word the browser
+    may not break — the ten-digit number is exactly that — the column *cannot*
+    become narrower than the word. Two such columns plus gaps are wider than a
+    phone, the grid grows out of its box, and because `.content` becomes a
+    horizontal scroll container as a side effect of `overflow-y: auto`, **the
+    whole page scrolls sideways.** Every grid in the file used bare `1fr`.
+
+    The fix is `minmax(0, 1fr)` everywhere, plus `overflow-wrap: anywhere` on
+    `.stat-num` — the two are halves of one repair, and either alone only moves
+    the problem: without the first the column cannot shrink, without the second
+    the number leaves its card instead. **`anywhere` and not `break-word`,**
+    because only `anywhere` also lowers the min-content width, which is the
+    quantity this whole entry is about. The age block additionally sizes itself
+    from the viewport (`clamp(12px, 4.4vw, 17px)`) so it never has to break at
+    all: a fixed size only ever fits the device it was measured on, and 320 to
+    430 px is a factor of 1.3.
+
+    **`tools/check-grid-shrink.js` states the rule rather than the case.** The
+    defect is invisible unless someone holds a narrow device, it arises from a
+    line that looks perfectly ordinary, and it moves — the number that grows
+    too long next time is in a different grid. The guard rejects any `fr` track
+    without a `minmax`, and any `minmax` whose lower bound is a fixed length
+    (`minmax(260px, 1fr)` is the same trap with a self-chosen number; the
+    shrinking form is `minmax(min(260px, 100%), 1fr)`). It was run against
+    three broken states before being believed.
+
+    **A note on the report, because it cost a round.** The screenshot showed
+    the panel still capped, still one column, still counting "(10)" in its
+    heading — a state the code at that moment could no longer produce. `sw.js`
+    is network-first, so it was not the service worker; `StaticFiles` reads from
+    disk per request, so it was not the server's copy either. It was note 208's
+    trap: **the CSP script hash is computed once at startup.** A server running
+    from before the change serves the new file under the old hash, the browser
+    discards the entire script, and the page renders its static markup and does
+    nothing — or, as here, the instance was simply still the older one. *After
+    every frontend change, restart.*
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

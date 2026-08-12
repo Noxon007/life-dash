@@ -354,10 +354,24 @@
   .cov-fill { height: 100%; background: var(--confirmed); }
   .cov-fill.derived { background: var(--text-dim); }
   /* ---------- Cards / grid ---------- */
+  /* **`1fr` heißt nicht „ein Anteil", sondern `minmax(min-content, 1fr)`**
+     (Rückmeldung 2026-08-12: „auf mobil ein links-rechts-Scrollen, weil nicht
+     alles passt"). Eine Spalte mit `1fr` kann nicht schmaler werden als ihr
+     längster nicht umbrechbarer Inhalt — und im Alters-Block steht
+     „1.135.849.203": ein Wort von 150 px, das der Browser nirgends teilen darf.
+     Zwei solche Spalten plus Abstände sind breiter als ein Telefon, das Raster
+     wächst über seinen Kasten hinaus, und weil `.content` wegen `overflow-y`
+     auch waagerecht zum Rollbereich wird, scrollt die ganze Seite seitwärts.
+
+     `minmax(0, 1fr)` nimmt das Minimum weg: die Spalte darf schmaler werden
+     als ihr Inhalt, und der Inhalt muss dann selbst sehen, wo er bleibt (siehe
+     `overflow-wrap` an `.stat-num`). Das gilt für JEDES Raster hier, nicht nur
+     für das eine, in dem es aufgefallen ist — die Zahl, die als nächstes zu
+     lang wird, steht woanders. */
   .grid { display: grid; gap: 16px; }
-  .grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
-  .grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
-  .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* Zwischen der Mobilgrenze und dem breiten Schirm gibt es einen Bereich, in
      dem vier Spalten rechnerisch passen und praktisch nicht: bei 1000 px
      Fensterbreite bleiben nach Leiste, Seitenrand und Tafelinnenrand rund
@@ -365,7 +379,7 @@
      Drei Spalten statt vier — die Kacheln stehen weiter in einem Raster, nur
      in einem, das ihre Beschriftung trägt. */
   @media (max-width: 1150px) and (min-width: 861px) {
-    .grid.cols-4 { grid-template-columns: repeat(3, 1fr); }
+    .grid.cols-4 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
   .stat-card {
     background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius);
@@ -386,8 +400,16 @@
   /* `tabular-nums` überall, nicht nur in den Alterszellen: eine Reihe von
      Kacheln, deren Ziffern verschieden breit sind, steht optisch schief,
      und eine Zahl, die sich sekündlich ändert, wackelt sichtbar. */
+  /* `overflow-wrap: anywhere` ist die zweite Hälfte von `minmax(0, 1fr)` oben:
+     die Spalte darf jetzt schmaler werden als die Zahl, also muss die Zahl
+     umbrechen dürfen, statt aus der Kachel zu laufen. **`anywhere` und nicht
+     `break-word`** — nur `anywhere` senkt auch die MIN-CONTENT-Breite, und
+     genau die ist es, die ein Raster aufschiebt. Ein Umbruch mitten in einer
+     Zahl ist hässlich; er ist der Notausgang, nicht der Plan (der Plan steht
+     im Mobilblock, wo der Alters-Block seine Größe nach der Fensterbreite
+     wählt und deshalb gar nicht erst umbrechen muss). */
   .stat-num { font-size: 32px; font-weight: 700; letter-spacing: -1px; line-height: 1.15;
-              font-variant-numeric: tabular-nums; }
+              font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
   /* Anmerkung 216 — die Zellen im Alters-Block. Eigene Größe, weil dort
      „1.135.849.203" steht und nicht „34": bei 34px bräche die Zahl um und die
      Kachel wäre zwei Zeilen hoch, während ihre Nachbarn eine sind.
@@ -537,8 +559,12 @@
      nebeneinander, auf dem Handy einer. Die Trennlinie über jeder Gruppe fällt
      dabei weg — nebeneinander trennt der Zwischenraum, und eine Linie über der
      obersten Zeile jeder Spalte sähe aus wie ein zweiter Kopf der Tafel. */
-  .far-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-              gap: 20px 28px; }
+  /* `min(260px, 100%)` und nicht `260px`: eine feste Untergrenze in `minmax`
+     ist dieselbe Falle wie `1fr` — auf einem Kasten von 250 px wäre die Spalte
+     260 px breit und schöbe die Seite auf. Die Grenze gilt also nur, solange
+     sie überhaupt hineinpasst. */
+  .far-grid { display: grid; gap: 20px 28px;
+              grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); }
   .far-grid .top-group { margin: 0 0 8px; padding-top: 0; border-top: none; }
   .far-grid .bar-row:last-child { margin-bottom: 0; }
   .top-row[data-top-day] { cursor: pointer; border-radius: 6px; padding: 2px 4px; margin: 0 -4px 8px; }
@@ -737,7 +763,8 @@
   }
   .mod-raw { background: var(--bg-elev); border-radius: 8px; padding: 12px; font-size: 13px; color: var(--text-dim); margin: 12px 0; font-style: italic; }
   .arrow { color: var(--accent); font-size: 18px; text-align: center; margin: 6px 0; }
-  .stages { display: grid; grid-template-columns: 1fr 40px 1fr 40px 1fr; gap: 10px; align-items: stretch; margin-bottom: 24px; }
+  .stages { display: grid; grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr) 40px minmax(0, 1fr);
+            gap: 10px; align-items: stretch; margin-bottom: 24px; }
   .stage {
     background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius);
     padding: 18px; box-shadow: var(--shadow-sm);
@@ -1296,9 +1323,9 @@
     .content {
       padding: 16px max(16px, env(safe-area-inset-right)) 16px max(16px, env(safe-area-inset-left));
     }
-    .grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
-    .grid.cols-3, .grid.cols-2 { grid-template-columns: 1fr; }
-    .stages { grid-template-columns: 1fr; }
+    .grid.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.cols-3, .grid.cols-2 { grid-template-columns: minmax(0, 1fr); }
+    .stages { grid-template-columns: minmax(0, 1fr); }
     /* ---------- Statistik auf dem Handy (Rückmeldung 2026-08-12) ----------
        Seit die Kachelraster in Tafeln stehen (Anmerkung 226), zahlt jede
        Kachel den Innenabstand der Tafel mit. Am Schreibtisch sind das 44 px
@@ -1323,10 +1350,16 @@
        sich scrollt, ist auf dem Handy dazu das Unangenehmste, was eine Seite
        tun kann — man wischt und die Seite bleibt stehen. */
     .panel-rows.capped { max-height: none; overflow: visible; padding-right: 0; }
-    /* „1.135.849.203" ist bei 22 px 150 px breit und die Zelle 112 — die Zahl
-       lief seit jeher aus ihrer Kachel heraus, was am Schreibtisch niemand
-       sieht. Sie ist die einzige im Programm, die zehn Stellen bekommt. */
-    .age-cell .stat-num { font-size: 17px; letter-spacing: -.3px; }
+    /* „1.135.849.203" ist die einzige zehnstellige Zahl im Programm, und sie
+       hat auf keinem Telefon je in ihre Kachel gepasst (bei 22 px ist sie
+       150 px breit, die Zelle 112) — am Schreibtisch sieht das niemand.
+       **Die Größe hängt hier an der FENSTERBREITE und nicht an einer festen
+       Zahl**: eine feste passt immer nur auf das Gerät, an dem gerechnet
+       wurde, und zwischen 320 und 430 px liegt der Faktor 1,3. `min()` deckelt
+       sie bei 17 px, damit sie auf dem großen Telefon nicht ins Alberne
+       wächst; darunter schrumpft sie mit. Gerechnet: 10 Ziffern + 3 Punkte
+       ≈ 6,8 × Schriftgröße, Zelle bei 320 px ≈ 100 px Inhalt. */
+    .age-cell .stat-num { font-size: clamp(12px, 4.4vw, 17px); letter-spacing: -.3px; }
     .age-cell { padding: 12px 12px; }
     .stage-arrow { display: none; }
     .timeline { padding-left: 22px; }
