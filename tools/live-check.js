@@ -50,6 +50,27 @@ const txt = id => ((d.getElementById(id) || {}).textContent || '').trim();
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const evCalls = () => requests.filter(u => u.startsWith('/api/events?'));
 
+// **Auf die BEDINGUNG warten, nicht auf eine Zeitspanne.** Hier standen feste
+// `sleep(600)` nach jedem Aufruf, und das ist auf dem eigenen Rechner immer
+// genug gewesen. In der CI war es das nicht: der Zeitstrahl hatte seine
+// Anfrage noch nicht abgeschickt, `evCalls()` war leer — und die beiden
+// Prüfungen daneben meldeten trotzdem „bestanden", weil `.every()` über eine
+// leere Liste wahr ist und „höchstens sechs Anfragen" bei null erst recht.
+// Von drei Prüfungen über denselben Vorgang schlug genau die eine an, die
+// `.some()` benutzt.
+//
+// Dieselbe Regel wie in `tools/pg-test.ps1`: es wird gewartet, bis die Lage
+// eingetreten ist, mit einer großzügigen Obergrenze — eine Wartezeit, die
+// knapp reicht, ist eine, die auf fremder Hardware nicht reicht.
+const until = async (cond, ms = 10000) => {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    if (cond()) return true;
+    await sleep(50);
+  }
+  return false;
+};
+
 (async () => {
   await sleep(2500);                       // Startskript durchlaufen lassen
   const idx = await fetch(ORIGIN + '/api/events/index').then(r => r.json());
@@ -57,26 +78,32 @@ const evCalls = () => requests.filter(u => u.startsWith('/api/events?'));
 
   requests.length = 0;
   await w.loadTimeline();
-  await sleep(600);
+  await until(() => evCalls().length > 0);
 
   // --- Die Zusage von A37: nie wieder alles auf einmal --------------------
+  // Zuerst, dass es überhaupt etwas zu beurteilen GIBT. Ohne diese Zeile sind
+  // die beiden `every`-Prüfungen darunter über einer leeren Liste wahr, und
+  // ein Zeitstrahl, der gar nichts lädt, käme als „alles bestanden" durch.
+  ok('der Zeitstrahl fragt den Server überhaupt', evCalls().length > 0,
+     requests.length + ' Anfragen insgesamt');
   ok('kein Abruf ohne Grenze (nie die ganze Geschichte)',
+     evCalls().length > 0 &&
      evCalls().every(u => /limit=\d+/.test(u) || /(vague|parent|category|from|to)=/.test(u)),
      evCalls().join(' '));
   ok('Besuche filtert der Server, nicht der Browser',
      evCalls().some(u => /visits=0/.test(u)));
   ok('höchstens eine Handvoll Anfragen für den ersten Bildschirm',
-     evCalls().length <= 6, evCalls().length + ' Anfragen');
+     evCalls().length > 0 && evCalls().length <= 6, evCalls().length + ' Anfragen');
 
   // --- Zahlen über den Gesamtbestand kommen aus dem Server ----------------
   await w.loadToday();
-  await sleep(600);
+  await until(() => /\d/.test(txt('today-events')));
   const shown = parseInt(txt('today-events').replace(/[^\d]/g, ''), 10) || 0;
   ok('„Heute" zeigt den Gesamtbestand, nicht das geladene Fenster',
      shown === idx.total, `${txt('today-events')} vs. Index ${idx.total}`);
 
   await w.loadStats();
-  await sleep(900);
+  await until(() => /\d/.test(txt('stat-events')));
   const statEvents = parseInt(txt('stat-events').replace(/[^\d]/g, ''), 10) || 0;
   ok('Statistik zählt den Gesamtbestand',
      statEvents === idx.total, `${txt('stat-events')} vs. ${idx.total}`);
@@ -114,7 +141,7 @@ const evCalls = () => requests.filter(u => u.startsWith('/api/events?'));
   // --- Die Karte hat ihren eigenen Endpunkt ------------------------------
   requests.length = 0;
   await w.openMapView();
-  await sleep(1200);
+  await until(() => requests.some(u => u.startsWith('/api/events/map')));
   ok('Karte nutzt /api/events/map', requests.some(u => u.startsWith('/api/events/map')));
   ok('Karten-Grundabruf ohne Wetter',
      requests.filter(u => u.startsWith('/api/events/map') && !/weather=1/.test(u)).length > 0);

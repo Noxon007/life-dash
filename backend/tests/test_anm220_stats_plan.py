@@ -25,10 +25,17 @@ nicht des Planers — und deshalb prüfbar, ohne eine Uhr zu befragen.
 prüfte `parents_with_weather()` direkt und blieb es auch, als `weather_values`
 testweise wieder das alte `EXISTS` schrieb: die Funktion gab es ja noch, nur
 rief sie niemand mehr (CLAUDE.md, „grün, weil es die Funktion GIBT — nicht,
-weil der Aufrufer sie BENUTZT"). Deshalb schreibt der Test jetzt an der
-VERBINDUNG mit und prüft die Anweisungen, die tatsächlich abgeschickt wurden.
-In dieser Fassung meldet SQLite auf dem kaputten Stand
-`CORRELATED SCALAR SUBQUERY`, und der Test wird rot.
+weil der Aufrufer sie BENUTZT"). Deshalb schreibt der Test an der VERBINDUNG
+mit und prüft die Anweisungen, die tatsächlich abgeschickt wurden.
+
+**Der zweite Entwurf war dann in der CI rot, und zwar zu Recht.** Er las
+`EXPLAIN QUERY PLAN` und verlangte, dass nirgends `CORRELATED` steht — das
+hielt auf SQLite 3.53 und fiel auf der älteren SQLite der CI sofort um, an
+einer völlig gesunden Abfrage: die reparierte Fassung trägt in ihrer
+eigenständigen Unterabfrage weiterhin ein `EXISTS` auf `metrics`. Ob ein
+Planer das so benennt oder wegoptimiert, ist eine Eigenschaft der VERSION —
+also derselbe Fehler wie beim Index, nur eine Ebene höher. Geprüft wird
+deshalb, was oben schon steht: die Form des abgeschickten SQL.
 """
 from __future__ import annotations
 
@@ -67,24 +74,13 @@ def _recording(db):
         event.remove(db.bind, "before_cursor_execute", _before)
 
 
-def _plan_lines(db, statement: str, parameters) -> list[str]:
-    """EXPLAIN QUERY PLAN für eine bereits abgeschickte Anweisung."""
-    raw = db.connection().connection
-    cur = raw.cursor()
-    try:
-        cur.execute("EXPLAIN QUERY PLAN " + statement, parameters or ())
-        return [row[-1] for row in cur.fetchall()]
-    finally:
-        cur.close()
-
-
 def _wx():
     return (Metric.source == Source.weather,
             Metric.key.in_(so._WX_KEYS), Metric.value.isnot(None))
 
 
-def test_plan_evaluates_the_parent_lookup_once(db, user):
-    """Der Plan wertet die Eltern-Suche EINMAL aus, nicht je äußerer Zeile.
+def test_the_parent_lookup_does_not_correlate_outwards(db, user):
+    """Die Eltern-Suche steht für sich, statt je äußerer Zeile neu zu laufen.
 
     **Warum hier nicht auf einen bestimmten Index geprüft wird.** Der erste
     Entwurf dieses Tests verlangte `ix_events_parent_event_id` im Plan — und
@@ -93,39 +89,52 @@ def test_plan_evaluates_the_parent_lookup_once(db, user):
     KAPUTTE Fassung den richtigen. Ein Wächter, dessen Aussage vom Zufall
     abhängt, ist keiner.
 
-    Was nicht vom Zufall abhängt, ist die Zeile daneben:
+    **Und warum inzwischen auch nicht mehr auf den PLAN.** Die zweite Fassung
+    verlangte, dass in `EXPLAIN QUERY PLAN` nirgends `CORRELATED` steht. Das
+    hat lokal (SQLite 3.53) gehalten und ist in der CI (ältere SQLite) sofort
+    rot geworden — an einer Abfrage, die völlig in Ordnung ist: die reparierte
+    Fassung trägt in ihrer eigenständigen Unterabfrage weiterhin ein `EXISTS`
+    auf `metrics`, korreliert auf das KIND, und das ist gewollt (es läuft über
+    `ix_metrics_event_id`). Ob ein Planer das `CORRELATED SCALAR SUBQUERY`
+    nennt oder wegoptimiert, ist eine Eigenschaft der Version — **derselbe
+    Fehler wie beim Index, eine Ebene höher.**
 
-        LIST SUBQUERY 2              ← einmal, Ergebnis gemerkt
-        CORRELATED SCALAR SUBQUERY 1 ← je Zeile der äußeren Tabelle neu
+    Der Docstring dieser Datei sagt es selbst: *„Was NICHT vom Zufall abhängt,
+    ist die Form der Abfrage… eine Eigenschaft des SQL, nicht des Planers."*
+    Also wird das SQL geprüft, und zwar an der einen Stelle, an der sich die
+    beiden Fassungen unterscheiden:
 
-    Das ist eine Eigenschaft des SQL und nicht der Schätzung. Sie unterscheidet
-    die beiden Fassungen in jedem Fall, auf jedem Bestand.
+        kaputt:     … EXISTS (SELECT … FROM events AS events_1
+                              WHERE events_1.parent_event_id = events.id …)
+        repariert:  … events.id IN (SELECT events_1.parent_event_id
+                              FROM events AS events_1 WHERE …)
+
+    Die kaputte Fassung NENNT die äußere Zeile in der Unterabfrage; die
+    reparierte nicht. Das steht im abgeschickten Text und gilt in jeder
+    SQLite-Version und auf PostgreSQL genauso — der Test läuft deshalb auch
+    nicht mehr nur auf einem Dialekt.
     """
-    if db.bind.dialect.name != "sqlite":
-        return                      # EXPLAIN QUERY PLAN gibt es nur hier
-
     with _recording(db) as seen:
         so.weather_values(db, user.id)
 
-    plans = [(sql, _plan_lines(db, sql, params))
-             for sql, params in seen if sql.lstrip().upper().startswith("SELECT")]
-    assert plans, "weather_values hat gar nichts abgefragt"
+    sent = [" ".join(sql.split())
+            for sql, _p in seen if sql.lstrip().upper().startswith("SELECT")]
+    assert sent, "weather_values hat gar nichts abgefragt"
 
-    guilty = [(sql, lines) for sql, lines in plans
-              if any("CORRELATED" in line for line in lines)]
+    # Die Korrelation nach außen: die Unterabfrage über die Kindzeilen nennt
+    # die Kennung der ÄUSSEREN Zeile. Genau das lief je äußerer Zeile einmal.
+    guilty = [s for s in sent if "events_1.parent_event_id = events.id" in s]
     assert not guilty, (
-        "weather_values schickt eine Abfrage mit korrelierter Unterabfrage — "
-        "die wird je Zeile der äußeren Tabelle neu ausgewertet, und genau das "
-        "hat den Statistik-Reiter fünfzehn Sekunden gekostet.\n\n"
-        + "\n\n".join(f"{sql}\n  " + "\n  ".join(lines) for sql, lines in guilty))
+        "Die Eltern-Suche korreliert wieder nach außen — sie wird damit je "
+        "Zeile der äußeren Tabelle neu ausgewertet, und genau das hat den "
+        "Statistik-Reiter fünfzehn Sekunden gekostet.\n\n" + "\n\n".join(guilty))
 
     # Die Gegenprobe: die Eltern-Suche muss überhaupt noch stattfinden. Ohne
     # sie wäre der Test auch dann grün, wenn jemand die zweite Abfrage einfach
     # entfernt — und die wärmste Reise hieße wieder wie ihr erstes Kind.
-    assert any(any("LIST SUBQUERY" in line for line in lines)
-               for _sql, lines in plans), (
-        "Keine eigenständige Unterabfrage im Plan — sucht weather_values die "
-        "Elternzeilen noch (Anmerkung 199)?")
+    assert any("in (select events_1.parent_event_id" in s.lower() for s in sent), (
+        "Keine eigenständige Unterabfrage über die Elternkennungen — sucht "
+        "weather_values die Elternzeilen noch (Anmerkung 199)?")
 
 
 def test_weather_values_still_finds_the_parent(db, user):
