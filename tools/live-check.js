@@ -71,10 +71,36 @@ const until = async (cond, ms = 10000) => {
   return false;
 };
 
+// **Läuft der Startaufbau noch?** `loadTimeline()` beginnt mit
+// `if (tl.loading) return;` — wer sie ruft, während der Aufbau der Seite noch
+// unterwegs ist, bekommt einen stillen Rückläufer und keine einzige Anfrage.
+//
+// Genau daran ist dieser Lauf in der CI hängengeblieben: das feste `sleep`
+// oben reichte auf dem eigenen Rechner, um den Startaufbau abzuwarten, und auf
+// dem Runner nicht. Der Wächter leerte dann die Anfrageliste (die Ereignis-
+// Anfrage des Starts war da schon draußen und wurde mit weggeworfen), rief
+// `loadTimeline()` ins Leere und sah nur noch die drei Nachlader des
+// LAUFENDEN Aufbaus vorbeikommen — drei Anfragen, keine davon an
+// `/api/events?`.
+//
+// `tl` ist ein `const` auf oberster Skriptebene und damit **keine
+// Fenster-Eigenschaft** (CLAUDE.md führt dieselbe Falle für `OVERLAYS` und
+// `LANG`): `w.tl` wäre stumm `undefined`, und die Wartebedingung wäre sofort
+// wahr — der Wächter hätte sich seinen eigenen Fehler bestätigt. Über
+// `w.eval` sieht man die Bindung so, wie die Seite sie sieht.
+const tlIdle = () => {
+  try { return w.eval('tl.loading') === false; } catch (_) { return false; }
+};
+
 (async () => {
-  await sleep(2500);                       // Startskript durchlaufen lassen
+  await sleep(500);                        // dem Startskript einen Anlauf geben
   const idx = await fetch(ORIGIN + '/api/events/index').then(r => r.json());
   console.log(`Server ${ORIGIN} — ${idx.total} Einträge, davon ${idx.visits} Besuche\n`);
+
+  // Erst wenn der Startaufbau durch ist, ist ein eigener Aufruf überhaupt einer.
+  const idle = await until(tlIdle, 30000);
+  ok('der Startaufbau der Seite kommt zum Ende', idle,
+     idle ? '' : 'tl.loading blieb wahr — loadTimeline() täte hier gar nichts');
 
   requests.length = 0;
   await w.loadTimeline();
