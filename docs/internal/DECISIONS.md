@@ -2382,6 +2382,88 @@ repair for each: delete it.
     red on the first attempt, the eighth (d) after the guard was rebuilt to
     reproduce the reported situation.
 
+222. ✅ **Review part 3: the demo stock could not show three of the things it
+    ships.**
+
+    Third batch out of the pre-release review (2026-08-12). Nothing here is a
+    crash — a showcase fails quietly. Someone opening the demo and reading
+    “Longest trip: —” concludes the feature is broken, not that the stock is
+    thin; they cannot tell the difference.
+
+    **(a) There was not one multi-day event in 8,468 rows.** `date_end` was NULL
+    everywhere, `parent_event_id` everywhere. The generator said why, and the
+    reason was right: *an unsplit multi-day event occupies only its start day,
+    and the residence fills the rest — the trip would then sit at home in the
+    statistics.* The conclusion went one step too far. **That is exactly what
+    day children are for.** Trips are now a parent event carrying the span, with
+    the existing per-day entries as its children (F7). The children carry the
+    days, so every number stays right; the parent carries the period.
+
+    Four things the shipped stock could not show and now does: “Longest trip”
+    (it stood permanently at `—`; now *Interrail durch Europa, 21 days*), a
+    single F7 parent/child pair, the averaging of the warmest trip over
+    `parent_event_id` — the tile now says **“Andalusien”** instead of a day
+    heading, which is note 199's rule finally being exercised — and the query
+    in `weather_values` that exists for precisely that and returned zero rows in
+    every run (note 220).
+
+    Separately, five **imported multi-day stays** (`life.IMPORTED_STAYS`), left
+    deliberately unsplit: “split multi-day” only takes `google_timeline` rows
+    with a span and no children, and it had nothing at all to find. A button
+    that finds nothing in the demo looks like a button that does not work. They
+    have their own counter-test, because splitting them in some later tidy-up
+    would silently take the work away again.
+
+    **The first attempt gave the parents no weather** — a single temperature for
+    a thirteen-day trip is not a statement. `test_the_weather_run_has_nothing_
+    left_to_fetch` went red immediately: `enrichment` never looks at `date_end`,
+    a multi-day event simply gets its **start day's** weather. Without metrics
+    the parent lacks the revision marker, and the weather button would have
+    fired 29 Open-Meteo requests out of an offline showcase — the endless-fetch
+    trap, self-built. The lesson is this module's own rule: **the demo stock is
+    the RESULT of the pipeline, not a prettier version of it.** The `weather=False`
+    switch is gone rather than left unused; a switch without a caller is an
+    invitation to repeat the mistake.
+
+    **(b) 3,633 of 3,675 places (99 %) were coordinates.** The timeline import
+    invented a random point per visit and named it after itself — “Ort (53.555,
+    9.966)”. Not just ugly: **wrong**. A location history is overwhelmingly
+    *repetition* — the same supermarket, the same station — which is the entire
+    reason the place ranking is an interesting view in this app; with one-off
+    points it was a list of random numbers. Visits now go to a handful of
+    everyday places per residence (`life.ERRANDS`), and the stock has **87
+    places instead of 3,675**.
+
+    A small remainder stays unnamed on purpose (four per residence), because the
+    place a geocoder does not know is a real case. And it is now marked
+    honestly: `_location` no longer sets `name_manual=True` across the board.
+    The flag means *a human typed this name* (note 148) and shields it from the
+    resolve run — true for “Kirschenallee 12”, never true for a coordinate. The
+    consequence had been visible all along: `/api/places/unresolved` reported
+    **zero open places while 3,633 sat unresolved**. It reports 16 now.
+
+    **(c) The wind record described the ceiling.** `wind_max_kmh` was
+    `6 + 22 × uniform`, hard-capped at 36.0 — so the windiest day in thirty-two
+    years on the North Sea coast was a fresh breeze, and the ranking under the
+    tile showed 36.0 ten times over. **The same class note 216 removed four
+    tiles for**, except the cap sat in the invented weather rather than in the
+    evaluation. Now exponential like the rain above it, with no upper end:
+    72.5 km/h with gusts of 117.8, and the top five all distinct.
+
+    **What this cost, stated rather than buried:** the demo stock was the only
+    one that exercised the *many places* dimension, and the numbers in note 204
+    (`_place_ranking` 27 ms at 3,673 places) came from it. With 87 places it no
+    longer does — the load case knows 240, and neither is enough. Whoever
+    touches `_place_ranking` or `_farthest_from_home` next cannot measure it
+    here any more; `tools/_measure_api.py` says so in its header now. The
+    honest trade was realism over a measuring stick that only existed by
+    accident.
+
+    Ten of fourteen guards went red against the old generator. The four that
+    stayed green are the counter-checks — the blank period is still blank,
+    nothing is dated later than yesterday, an invented named place is still not
+    sent to a geocoder — and green is what they are supposed to be.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

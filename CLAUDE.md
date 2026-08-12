@@ -21,7 +21,7 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI,
-  Geocoding aus) — 888 Tests, ~39 s, SQLite im Arbeitsspeicher
+  Geocoding aus) — 902 Tests, ~52 s, SQLite im Arbeitsspeicher
 - **Tests gegen echtes PostgreSQL** (das, worauf betrieben wird): `pwsh
   tools/pg-test.ps1` — **kein Docker**, legt mit den installierten Binärdateien
   einen eigenen Cluster in `backend/_pgtest/` auf Port **55432** an und stoppt
@@ -534,8 +534,8 @@ Ereignis-Hälfte kann dasselbe als `NOT EXISTS`. Bewusst eigene Runde — es
 ändert, welche Zeilen ein Lauf aufgreift.
 
 **Vollständige Durchsicht vor dem Release 2026-08-12 — 30 Befunde, in vier
-Teile geschnitten. Teil 1 (Anmerkung 220) und Teil 2 (Anmerkung 221) sind
-gebaut, Teil 3–4 sind offen.**
+Teile geschnitten. Teile 1–3 (Anmerkungen 220–222)
+sind gebaut, Teil 4 ist offen.**
 Der Bericht liegt als Artefakt vor; die Aufteilung:
 - **Teil 1 ✅ Statistik-Reiter und die Prüfung, die ihn nicht gefangen hat.**
   29 s → 2,3 s, Antwort Byte für Byte identisch. Dazu `DB=`-Modus im
@@ -561,11 +561,23 @@ Der Bericht liegt als Artefakt vor; die Aufteilung:
     eine anzulegen wäre die zweite Kopie von `KNOWN_CATS`. Voraussetzung
     dafür ist EINE Quelle für Kategorien (alle in die Modul-YAMLs, Frontend
     liest `/api/modules`), also ein Umbau und keine Eingangsprüfung.
-- **Teil 3 (offen) Der Demo-Bestand als Schaufenster.** Kein einziges
-  mehrtägiges Ereignis (also keine „Längste Reise", kein F7, nichts für
-  „Mehrtägiges aufteilen") · 3.633 von 3.675 Orten sind Koordinaten-Platzhalter
-  und alle als `name_manual` markiert, weshalb „Ortsnamen auflösen" 0 offen
-  meldet · der Windrekord aus 32 Jahren steht bei 36 km/h.
+- **Teil 3 ✅ Der Demo-Bestand als Schaufenster** (Anmerkung 222). Reisen sind
+  jetzt Eltern mit Tages-Kindern (F7), fünf importierte Mehrtäger bleiben
+  ungeteilt für „Mehrtägiges aufteilen", **87 Orte statt 3.675** mit echten
+  Namen, Wind exponentiell statt gedeckelt. Was dabei zu merken bleibt:
+  - **Der Demo-Bestand ist das ERGEBNIS der Pipeline, keine schönere Fassung.**
+    Der erste Entwurf gab den Reise-Eltern kein Wetter — `enrichment` sieht
+    `date_end` aber gar nicht an und gibt einem Mehrtäger das Wetter seines
+    ANFANGSTAGS. Ohne Metriken fehlt der Revisionsmarker, und der Wetter-Knopf
+    hätte 29 Open-Meteo-Abrufe gestartet. Sofort rot gefahren von
+    `test_the_weather_run_has_nothing_left_to_fetch`.
+  - **`name_manual` heißt „ein Mensch hat den Namen getippt"** — pauschal
+    gesetzt hieß es „null offene Orte", während 3.633 unaufgelöst dastanden.
+  - **Achtung, eine Messgrundlage ist weggefallen:** der Demo-Bestand war der
+    einzige mit vielen ORTEN (3.673), und die Zahlen aus Anmerkung 204 zu
+    `_place_ranking`/`_farthest_from_home` stammen daher. Mit 87 Orten misst er
+    diese Dimension nicht mehr; der Lastfall kennt 240. Steht im Kopf von
+    `tools/_measure_api.py`.
 - **Teil 4 (offen) Betrieb, Start, Doku.** Das Dockerfile setzt `MEDIA_DIR`
   nicht (nur die Compose) · `psycopg2-binary` ist die einzige ungepinnte
   Abhängigkeit · `pytest` steht in den Produktions-Requirements · `chown -R

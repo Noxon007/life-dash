@@ -55,6 +55,93 @@ PLACES: dict[str, Place] = {
 }
 
 # --------------------------------------------------------------------------- #
+# Die Orte des Alltags — wohin ein Standortverlauf tatsächlich führt
+# --------------------------------------------------------------------------- #
+# **Anmerkung 222.** Der Timeline-Import legte je Besuch einen ZUFÄLLIGEN Punkt
+# in der Nähe des Wohnorts an und nannte ihn „Ort (53.555, 9.966)". Über vier
+# Jahre Alltag wurden daraus 3.633 Orte — 99 % des Ortsbestands —, und jede
+# Ansicht, die einen Ortsnamen zeigt, zeigte eine Koordinate.
+#
+# **Das war nicht nur hässlich, es war unrealistisch.** Ein Mensch besucht
+# nicht dreitausend verschiedene Punkte, sondern zwanzigmal denselben
+# Supermarkt. Ein Standortverlauf besteht zum allergrößten Teil aus
+# Wiederholungen — genau deshalb ist die Ortsrangliste in dieser App überhaupt
+# eine interessante Ansicht.
+#
+# Ein Rest bleibt absichtlich unbenannt (`STRAY_VISITS`): der Ort, den der
+# Geocoder nicht kennt, ist ein echter Fall, und „Ortsnamen auflösen" braucht
+# etwas zu tun. Er ist jetzt eine Handvoll statt Tausender.
+ERRANDS: dict[str, tuple[Place, ...]] = {
+    "elternhaus": (
+        ("Marktplatz, Bad Segeberg", "Bad Segeberg", "Deutschland", 53.9375, 10.3110),
+        ("Supermarkt, Ziegelstraße", "Bad Segeberg", "Deutschland", 53.9340, 10.3161),
+        ("Stadtbücherei Bad Segeberg", "Bad Segeberg", "Deutschland", 53.9358, 10.3085),
+        ("Dahlmannschule", "Bad Segeberg", "Deutschland", 53.9391, 10.3050),
+        ("Bahnhof Bad Segeberg", "Bad Segeberg", "Deutschland", 53.9331, 10.3212),
+        ("Freibad Bad Segeberg", "Bad Segeberg", "Deutschland", 53.9302, 10.3199),
+    ),
+    "wg-kiel": (
+        ("Mensa I, Olshausenstraße", "Kiel", "Deutschland", 54.3411, 10.1182),
+        ("Wochenmarkt Exerzierplatz", "Kiel", "Deutschland", 54.3272, 10.1291),
+        ("Hauptbahnhof Kiel", "Kiel", "Deutschland", 54.3146, 10.1319),
+        ("Café am Knooper Weg", "Kiel", "Deutschland", 54.3316, 10.1266),
+        ("Sportforum Kiel", "Kiel", "Deutschland", 54.3448, 10.1276),
+        ("Universitätsbibliothek Kiel", "Kiel", "Deutschland", 54.3389, 10.1197),
+    ),
+    "hh-altona": (
+        ("Bahnhof Altona", "Hamburg", "Deutschland", 53.5525, 9.9351),
+        ("Wochenmarkt Spritzenplatz", "Hamburg", "Deutschland", 53.5581, 9.9446),
+        ("Mercado Altona", "Hamburg", "Deutschland", 53.5512, 9.9358),
+        ("Fischmarkt", "Hamburg", "Deutschland", 53.5456, 9.9489),
+        ("Bücherhalle Altona", "Hamburg", "Deutschland", 53.5536, 9.9376),
+        ("Zeise Kinos", "Hamburg", "Deutschland", 53.5541, 9.9349),
+    ),
+    "lissabon": (
+        ("Mercado da Ribeira", "Lisboa", "Portugal", 38.7071, -9.1459),
+        ("Praça do Comércio", "Lisboa", "Portugal", 38.7076, -9.1365),
+        ("Jardim da Estrela", "Lisboa", "Portugal", 38.7148, -9.1604),
+        ("Supermercado, Baixa", "Lisboa", "Portugal", 38.7121, -9.1391),
+        ("Estação do Rossio", "Lisboa", "Portugal", 38.7141, -9.1411),
+        ("Livraria no Chiado", "Lisboa", "Portugal", 38.7106, -9.1421),
+    ),
+    "hh-eimsbuettel": (
+        ("Wochenmarkt Osterstraße", "Hamburg", "Deutschland", 53.5789, 9.9519),
+        ("Isemarkt", "Hamburg", "Deutschland", 53.5820, 9.9741),
+        ("Bücherhalle Eimsbüttel", "Hamburg", "Deutschland", 53.5746, 9.9576),
+        ("Kaifu-Bad", "Hamburg", "Deutschland", 53.5761, 9.9702),
+        ("Bahnhof Sternschanze", "Hamburg", "Deutschland", 53.5621, 9.9652),
+        ("Grindelhof", "Hamburg", "Deutschland", 53.5701, 9.9821),
+    ),
+}
+
+# Wie viele unbenannte Punkte je Wohnort übrig bleiben — der Ort, den der
+# Geocoder nicht kennt. Klein, aber nicht null: „Ortsnamen auflösen" soll
+# etwas zu tun haben, und die Liste der offenen Orte soll eine Liste sein und
+# keine Wand.
+STRAY_VISITS = 4
+# Wie oft ein Besuch an einen der Alltagsorte führt statt an einen neuen Punkt.
+ERRAND_SHARE = 0.92
+
+# --------------------------------------------------------------------------- #
+# Importierte Besuche über mehrere Tage — damit „Mehrtägiges aufteilen" etwas tut
+# --------------------------------------------------------------------------- #
+# Ein Standortverlauf enthält solche Zeilen wirklich: wer drei Tage im selben
+# Hotel schläft, hinterlässt EINEN Besuch über drei Tage. Für diese App sind
+# sie der Sonderfall, für den es den Lauf gibt — ein ungeteilter Mehrtäger
+# belegt nur seinen Anfangstag, und der Wohnort füllt die übrigen (Anm. 183).
+#
+# Sie stehen hier als Liste und werden nicht gewürfelt: der Lauf soll in jedem
+# Aufbau dieselbe Zahl finden, sonst ist ein Screenshot davon ein Einzelstück.
+# (Anreise, Nächte, Ort, Stadt, Land, lat, lng)
+IMPORTED_STAYS: tuple[tuple[date, int, str, str, str, float, float], ...] = (
+    (date(2017, 11, 17), 3, "Hotel am Dom, Köln", "Köln", "Deutschland", 50.9413, 6.9583),
+    (date(2019, 2, 22), 2, "Pension Ostsee, Travemünde", "Lübeck", "Deutschland", 53.9630, 10.8720),
+    (date(2021, 10, 15), 4, "Quinta do Vale, Évora", "Évora", "Portugal", 38.5714, -7.9135),
+    (date(2023, 6, 9), 2, "Gästehaus Elbe, Lauenburg", "Lauenburg", "Deutschland", 53.3742, 10.5570),
+    (date(2024, 9, 20), 3, "Berghütte, Oberstdorf", "Oberstdorf", "Deutschland", 47.4090, 10.2790),
+)
+
+# --------------------------------------------------------------------------- #
 # Die weiße Stelle — der Grund, warum der Lückenbericht etwas zu sagen hat
 # --------------------------------------------------------------------------- #
 # **Ein Bestand ohne eine einzige Lücke lässt den Lückenbericht leer**, und eine

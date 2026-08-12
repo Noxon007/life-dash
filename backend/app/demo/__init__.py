@@ -49,7 +49,7 @@ from app.demo.weather import synth_weather
 from app.models import (BaselineLocation, ConfirmState, DatePrecision, DayMetric,
                         Entity, Event, EventEntityLink, Fragment, FragmentStatus,
                         Location, MediaRef, Metric, Source, Track, User)
-from app.services import media
+from app.services import geocode, media
 from app.services.enrichment import WEATHER_REVISION, _too_recent
 
 log = logging.getLogger("lifedash.demo")
@@ -124,12 +124,31 @@ class _Builder:
 
     def _location(self, name: str, city: str, country: str,
                   lat: float, lng: float, type_: str = "poi") -> Location:
+        """Ein Ort. `name_manual` folgt der Wahrheit über den NAMEN.
+
+        **Anmerkung 222: nicht mehr pauschal `True`.** Die Marke bedeutet „ein
+        Mensch hat diesen Namen getippt" (Anmerkung 148) und schützt ihn vor
+        dem nächsten Auflöse-Lauf. Für „Kirschenallee 12" stimmt das. Für den
+        Koordinaten-Platzhalter „Ort (53.555, 9.966)" hat sie nie jemand
+        getippt, und die Folge war sichtbar: `_resolve_candidates` lässt von
+        Hand benannte Orte aus, also meldete „Ortsnamen auflösen" **null
+        offene Orte, während 3.633 unaufgelöst dastanden**.
+
+        Ein Platzhalter ist damit genau das, was er ist: ein Ort, dessen Name
+        noch aussteht. `address` bleibt für ihn ebenfalls offen (NULL statt
+        `{}`) — das ist der Zustand „nie nachgesehen", und nur in dem hat der
+        Lauf etwas zu holen. Bei den benannten Orten bleibt beides wie bisher,
+        damit für ein erfundenes Café kein echter Geocoder befragt wird.
+        """
+        placeholder = geocode.is_coordinate_name(name)
         loc = Location(id=_uuid(), user_id=self.user.id, name=name, type=type_,
                        lat=lat, lng=lng, city=city, country=country,
-                       # `{}` und nicht NULL: „nachgesehen, nichts bekommen".
-                       # NULL hieße „nie nachgesehen", und der Rückfüll-Lauf
-                       # würde für einen erfundenen Ort echtes Geocoding fahren.
-                       address={}, name_manual=True)
+                       # Benannt: `{}` und nicht NULL — „nachgesehen, nichts
+                       # bekommen". NULL hieße „nie nachgesehen", und der
+                       # Rückfüll-Lauf würde für einen erfundenen Ort echtes
+                       # Geocoding fahren.
+                       address=None if placeholder else {},
+                       name_manual=not placeholder)
         self.db.add(loc)
         return loc
 
@@ -159,18 +178,31 @@ class _Builder:
               hour: int = 12, minute: int = 0, note: str | None = None,
               source: Source = Source.manual, confirmed: bool = True,
               confidence: float = 1.0, precision: DatePrecision = DatePrecision.day,
-              confirmed_by: str = "manual") -> str:
+              confirmed_by: str = "manual", until: date | None = None,
+              parent: str | None = None) -> str:
+        """Ein Ereignis.
+
+        `until` macht daraus einen MEHRTÄGER, `parent` ein Tages-Kind (F7).
+
+        Anmerkung 222: Es gab hier kurz ein `weather=False`, um dem Elternteil
+        einer Reise die Wetterwerte zu ersparen. Es ist wieder weg — jedes
+        bestätigte Ereignis bekommt sie, weil `enrichment` es genauso täte, und
+        ein Schalter ohne Aufrufer ist die Einladung, den Fehler zu wiederholen
+        (siehe `_trips`).
+        """
         eid = _uuid()
         start = _noon(when, hour, minute)
         self.events.append({
             "id": eid, "user_id": self.user.id, "title": title, "description": None,
-            "date_start": start, "date_end": None, "date_precision": precision,
+            "date_start": start,
+            "date_end": _noon(until, 20) if until else None,
+            "date_precision": precision,
             "category": category, "note": note, "confidence": confidence,
             "confirmed": ConfirmState.confirmed if confirmed else ConfirmState.unconfirmed,
             "confirmed_at": start if confirmed else None,
             "confirmed_by": confirmed_by if confirmed else None,
             "field_overrides": {}, "source": source, "location_id": loc.id,
-            "origin_fragment_id": None, "parent_event_id": None, "embedding": None,
+            "origin_fragment_id": None, "parent_event_id": parent, "embedding": None,
             "external_id": None, "created_at": start, "updated_at": start,
         })
         if confirmed:
@@ -272,18 +304,24 @@ def _weighted(rng: random.Random, weighted: list[tuple[str, int]]) -> str:
 # --------------------------------------------------------------------------- #
 # Die einzelnen Kapitel
 # --------------------------------------------------------------------------- #
-def _residences(b: _Builder) -> list[tuple[date, date, Location]]:
-    """Die Wohnorte als stehende Tatsachen — und ihre Zeiträume zurück."""
-    spans: list[tuple[date, date, Location]] = []
+def _residences(b: _Builder) -> list[tuple[date, date, Location, str]]:
+    """Die Wohnorte als stehende Tatsachen — und ihre Zeiträume zurück.
+
+    Anmerkung 222: Der SCHLÜSSEL des Wohnorts steht mit im Zeitraum, weil der
+    Timeline-Import ihn braucht — an ihm hängen die Orte des Alltags
+    (`life.ERRANDS`). Über die Location allein ginge es nicht: Altona und
+    Eimsbüttel liegen beide in Hamburg, und ihre Alltagsorte sind verschieden.
+    """
+    spans: list[tuple[date, date, Location, str]] = []
     for label, key, start, end in life.RESIDENCES:
         loc = b.place(key)
         b.db.add(BaselineLocation(id=_uuid(), user_id=b.user.id, location_id=loc.id,
                                   label=label, date_start=start, date_end=end))
-        spans.append((start, end or b.last_day, loc))
+        spans.append((start, end or b.last_day, loc, key))
     return spans
 
 
-def _home_at(spans: list[tuple[date, date, Location]], day: date) -> Location:
+def _home_at(spans: list[tuple[date, date, Location, str]], day: date) -> Location:
     """Wo diese Person an diesem Tag zu Hause war.
 
     **Der letzte Abschnitt, der begonnen hat — nicht der, der ihn enthält.**
@@ -294,10 +332,23 @@ def _home_at(spans: list[tuple[date, date, Location]], day: date) -> Location:
     Eine Zeile, die niemand ansieht, und eine Landkarte, die es doch tut.
     """
     home = spans[0][2]
-    for start, _end, loc in spans:
+    for start, _end, loc, _key in spans:
         if start <= day:
             home = loc
     return home
+
+
+def _home_key_at(spans: list[tuple[date, date, Location, str]], day: date) -> str:
+    """Derselbe Griff wie `_home_at`, nur der Schlüssel — für `life.ERRANDS`.
+
+    Dieselbe Regel ausgeschrieben wäre die stille Doppelregel; deshalb dieselbe
+    Schleife über dieselbe Liste, und wer eine ändert, sieht die andere.
+    """
+    key = spans[0][3]
+    for start, _end, _loc, k in spans:
+        if start <= day:
+            key = k
+    return key
 
 
 def _milestones(b: _Builder) -> None:
@@ -307,7 +358,7 @@ def _milestones(b: _Builder) -> None:
         b.photo(when, title, loc, event_id=eid, hour=10)
 
 
-def _day_photos(b: _Builder, spans: list[tuple[date, date, Location]]) -> None:
+def _day_photos(b: _Builder, spans: list[tuple[date, date, Location, str]]) -> None:
     """Bilder, die an einem TAG hängen und an keinem Ereignis (F18).
 
     **Beide Sorten müssen vorkommen.** Die Foto-Statistik liest `captured_at`
@@ -330,6 +381,38 @@ def _trips(b: _Builder) -> None:
         start, days, title, _, city, country, _, _, programme = trip
         loc = b.trip_place(trip)
         country_entity = b.entity("country", country)
+        last = min(start + timedelta(days=days - 1), b.last_day)
+        if start > b.last_day:
+            continue
+        # **Anmerkung 222: die Reise selbst ist ein Ereignis, die Tage sind ihre
+        # Kinder (F7).** Bis hierher gab es nur die Tage — mit der Begründung,
+        # ein ungeteilter Mehrtäger belege nur seinen Anfangstag und der Wohnort
+        # fülle die übrigen. Die Begründung stimmt, die Schlussfolgerung war zu
+        # weit: genau dafür gibt es Tages-Kinder. Die Kinder tragen die Tage
+        # (die Statistik bleibt also richtig), der Elternteil trägt die SPANNE.
+        #
+        # Ohne ihn zeigte der ausgelieferte Bestand vier Dinge nicht, die es
+        # gibt: „Längste Reise" stand dauerhaft auf „—", F7 hatte kein einziges
+        # Eltern/Kind-Paar, die Mittelung der wärmsten Reise über
+        # `parent_event_id` lief nie, und die Abfrage, die dafür in
+        # `weather_values` steht, gab in jedem Lauf null Zeilen zurück.
+        #
+        # **Der Elternteil bekommt Wetter wie jedes andere Ereignis**, obwohl
+        # eine Temperatur für dreizehn Tage keine Angabe ist. Der erste Entwurf
+        # ließ es weg — und `test_the_weather_run_has_nothing_left_to_fetch`
+        # wurde sofort rot: `enrichment` sieht `date_end` überhaupt nicht an,
+        # ein Mehrtäger bekommt dort das Wetter seines ANFANGSTAGS. Ohne
+        # Metriken fehlt dem Elternteil damit der Revisionsmarker, und der
+        # Wetter-Knopf hätte im Schaufenster neunundzwanzig Abrufe gegen
+        # Open-Meteo gestartet — die Endlos-Abruf-Falle, diesmal selbst gebaut.
+        #
+        # Die Lehre ist die Regel dieses Moduls: **der Demo-Bestand ist das
+        # ERGEBNIS der Pipeline und keine schönere Fassung davon.** Was die
+        # Anreicherung an einem Mehrtäger täte, muss hier stehen, auch wenn ich
+        # es anders gebaut hätte.
+        parent = b.event(start, title, "trip", loc, hour=8, until=last,
+                         note=f"{(last - start).days + 1} Tage")
+        b.link(parent, country_entity, "mentioned")
         for offset in range(days):
             day = start + timedelta(days=offset)
             if day > b.last_day:
@@ -341,8 +424,7 @@ def _trips(b: _Builder) -> None:
             else:
                 heading = life.FILLER_DAYS[offset % len(life.FILLER_DAYS)]
             hour = 9 + (offset * 3) % 9
-            eid = b.event(day, heading, "trip", loc, hour=hour,
-                          note=title if offset == 0 else None)
+            eid = b.event(day, heading, "trip", loc, hour=hour, parent=parent)
             b.link(eid, country_entity, "mentioned")
             # Auf einer Reise wird fotografiert, zu Hause seltener — deshalb
             # sitzen die Bilder hier und nicht gleichverteilt über den Bestand.
@@ -363,7 +445,7 @@ def _concerts(b: _Builder) -> None:
             b.photo(when, artist, loc, event_id=eid, hour=20)
 
 
-def _habits(b: _Builder, spans: list[tuple[date, date, Location]]) -> None:
+def _habits(b: _Builder, spans: list[tuple[date, date, Location, str]]) -> None:
     """Der Alltag: verteilt über die Jahre, gewichtet nach Lebensabschnitt."""
     for category, since, until, per_year in life.HABITS:
         day = max(since, life.BIRTH)
@@ -420,7 +502,7 @@ def _one_habit(b: _Builder, category: str, day: date, home: Location) -> None:
         b.link(eid, b.entity(type_, title))
 
 
-def _timeline_import(b: _Builder, spans: list[tuple[date, date, Location]]) -> None:
+def _timeline_import(b: _Builder, spans: list[tuple[date, date, Location, str]]) -> None:
     """Was ein Google-Timeline-Import hinterlässt: Besuche und Wege.
 
     Eigene Quelle und `confirmed_by="import"` — Gerätedaten werden beim Import
@@ -440,21 +522,78 @@ def _timeline_import(b: _Builder, spans: list[tuple[date, date, Location]]) -> N
             continue
         if life.in_blank(day):
             continue
-        home = _home_at(spans, day)
+        home, home_key = _home_at(spans, day), _home_key_at(spans, day)
         for _ in range(1 + b.rng.randrange(3)):
-            # Ein Besuch in der Nähe des Wohnorts — Supermarkt, Büro, Café.
-            lat = home.lat + (b.rng.random() - 0.5) * 0.06
-            lng = home.lng + (b.rng.random() - 0.5) * 0.09
-            key = f"visit:{round(lat, 3)}:{round(lng, 3)}"
-            if key not in b.locations:
-                b.locations[key] = b._location(
-                    f"Ort ({lat:.3f}, {lng:.3f})", home.city or "", home.country or "",
-                    lat, lng)
+            loc = _visit_place(b, home, home_key)
             hour = 7 + b.rng.randrange(14)
-            eid = b.event(day, f"Besuch in {home.city}", "event", b.locations[key],
+            eid = b.event(day, f"Besuch in {home.city}", "event", loc,
                           hour=hour, source=Source.google_timeline,
                           confirmed_by="import")
             _track(b, day, hour, home, eid)
+    _imported_stays(b)
+
+
+def _imported_stays(b: _Builder) -> None:
+    """Besuche über mehrere Tage — die Arbeit für „Mehrtägiges aufteilen".
+
+    Anmerkung 222: Der Lauf greift ausschließlich `google_timeline`-Ereignisse
+    mit einer Spanne und ohne Tages-Kinder (`_scan_multiday_visits`). Der
+    Demo-Bestand hatte kein einziges davon, also fand der Knopf nichts — und
+    ein Knopf, der in der Demo nichts findet, sieht aus wie einer, der nicht
+    geht. Sie bleiben ABSICHTLICH ungeteilt: geteilt hätte der Lauf wieder
+    nichts zu tun.
+    """
+    for start, nights, name, city, country, lat, lng in life.IMPORTED_STAYS:
+        end = start + timedelta(days=nights)
+        if start < TIMELINE_FROM or end > b.last_day or life.in_blank(start):
+            continue
+        key = f"stay:{name}"
+        if key not in b.locations:
+            b.locations[key] = b._location(name, city, country, lat, lng)
+        b.event(start, f"Besuch in {city}", "event", b.locations[key],
+                hour=16, until=end, source=Source.google_timeline,
+                confirmed_by="import")
+
+
+def _visit_place(b: _Builder, home: Location, home_key: str) -> Location:
+    """Wohin dieser Besuch führte.
+
+    **Anmerkung 222: fast immer an einen Ort, an dem diese Person schon war.**
+    Hier stand ein zufälliger Punkt je Besuch, gerundet auf drei Nachkommastellen
+    und benannt nach seiner eigenen Koordinate. Über vier Jahre wurden daraus
+    3.633 Orte — 99 % des Ortsbestands —, und der Zeitstrahl, die Karte und jede
+    Rangliste zeigten „Ort (53.555, 9.966)" statt eines Namens.
+
+    Das war nicht nur hässlich, sondern falsch: ein Standortverlauf besteht zum
+    allergrößten Teil aus WIEDERHOLUNGEN — derselbe Supermarkt, dasselbe Büro,
+    derselbe Weg zum Bahnhof. Genau deshalb ist die Ortsrangliste in dieser App
+    überhaupt eine interessante Ansicht, und mit lauter Einzelbesuchen war sie
+    eine Liste von Zufallszahlen.
+
+    Ein kleiner Rest bleibt unbenannt (`life.STRAY_VISITS` je Wohnort): der Ort,
+    den der Geocoder nicht kennt, ist ein echter Fall, und „Ortsnamen auflösen"
+    soll etwas zu tun haben. Vier statt siebenhundert je Wohnort.
+    """
+    errands = life.ERRANDS.get(home_key, ())
+    if errands and b.rng.random() < life.ERRAND_SHARE:
+        name, city, country, lat, lng = errands[b.rng.randrange(len(errands))]
+        key = f"errand:{home_key}:{name}"
+        if key not in b.locations:
+            b.locations[key] = b._location(name, city, country, lat, lng)
+        return b.locations[key]
+
+    # Der unbenannte Rest — aus einem festen kleinen Vorrat je Wohnort, damit
+    # er sich wiederholt wie alles andere auch. Ein neuer Punkt je Besuch wäre
+    # wieder der alte Bestand, nur mit anderem Mischungsverhältnis.
+    n = b.rng.randrange(life.STRAY_VISITS)
+    lat = round(home.lat + (n - life.STRAY_VISITS / 2) * 0.011, 3)
+    lng = round(home.lng + (n - life.STRAY_VISITS / 2) * 0.017, 3)
+    key = f"visit:{home_key}:{n}"
+    if key not in b.locations:
+        b.locations[key] = b._location(
+            f"{geocode.COORD_NAME_PREFIX}{lat:.3f}, {lng:.3f})",
+            home.city or "", home.country or "", lat, lng)
+    return b.locations[key]
 
 
 def _track(b: _Builder, day: date, hour: int, home: Location, event_id: str) -> None:
@@ -478,7 +617,7 @@ def _track(b: _Builder, day: date, hour: int, home: Location, event_id: str) -> 
     })
 
 
-def _residence_days(b: _Builder, spans: list[tuple[date, date, Location]]) -> None:
+def _residence_days(b: _Builder, spans: list[tuple[date, date, Location, str]]) -> None:
     """Wetter für die Tage, an denen NICHTS erfasst wurde (F20).
 
     Das ist der Teil, für den es `day_metrics` überhaupt gibt: die frühen
@@ -488,7 +627,7 @@ def _residence_days(b: _Builder, spans: list[tuple[date, date, Location]]) -> No
     beide Quellen nebeneinander zu schreiben.
     """
     taken = {row["date_start"].date() for row in b.events}
-    for start, end, loc in spans:
+    for start, end, loc, _key in spans:
         day = start
         while day <= end:
             if day not in taken and not _too_recent(day):

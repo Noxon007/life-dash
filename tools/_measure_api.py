@@ -6,11 +6,22 @@ der LASTFALL — grob, gleichverteilt, und in jeder Dimension größer als das,
 was ein Mensch in zwanzig Jahren zusammenträgt.
 
 Mit `DEMO=1` misst derselbe Lauf stattdessen den **Demo-Bestand** (R1a): das
-erfundene Leben, das die Anwendung ausliefert. Er ist in den Ereignissen
-kleiner und in den ORTEN um ein Vielfaches größer (3.700 statt 240), weil
-importierte Besuche je einen anlegen — und genau daran hängen die Fragen, die
-Anmerkung 199 offen gelassen hat. **Ein Lastfall, der eine Dimension nicht
-kennt, misst sie auch nicht.**
+erfundene Leben, das die Anwendung ausliefert.
+
+**Anmerkung 222 — und das ist eine Warnung, keine Fußnote.** Bis hierher stand
+hier, der Demo-Bestand sei „in den ORTEN um ein Vielfaches größer (3.700 statt
+240)" und decke damit die Dimension ab, an der die Fragen aus Anmerkung 199
+hängen (`_place_ranking`, `_farthest_from_home`). Das stimmt nicht mehr: die
+3.673 Orte waren ein Zufallspunkt je importiertem Besuch, also der Defekt aus
+Anmerkung 222, und der Bestand hat seitdem **87 Orte**. Er ist damit
+realistischer und misst diese eine Dimension NICHT mehr.
+
+**Wer `_place_ranking` oder `_farthest_from_home` anfasst, misst also nicht
+mehr hier.** Der Lastfall kennt 240 Orte, der Demo-Bestand 87 — beides ist zu
+klein. Die Zahlen aus Anmerkung 204 (27 ms bei 3.673 Orten, 199 ms bei 28.673)
+bleiben gültig, sie sind nur nicht mehr nachzustellen, ohne den Lastfall zu
+erweitern. **Ein Lastfall, der eine Dimension nicht kennt, misst sie auch
+nicht** — der Satz stand schon hier, er zeigt jetzt nur woandershin.
 
     <python> tools/_measure_api.py          # Lastfall
     DEMO=1 <python> tools/_measure_api.py   # Demo-Bestand
@@ -34,17 +45,18 @@ beantwortet die Frage „wie teuer ist die Abfrage?" — nicht die Frage „wie
 teuer ist sie HIER?".
 
 Zuletzt gemessen 2026-08-12 (SQLite, Windows) — der nächste Umbau wird daran
-gemessen und nicht an einem Gefühl:
+gemessen und nicht an einem Gefühl. Die Demo-Spalte ist nach Anmerkung 222 neu
+erhoben (anderer Ortsbestand, 8.480 statt 8.468 Ereignisse):
 
                               Demo     Lastfall
-    /api/events/index          52 ms      92 ms
-    Zeitstrahl-Seite (300)     39 ms      11 ms
-    …mit Fotos + verdichtet    61 ms     168 ms
-    /api/days/weather (alles) 1557 ms     212 ms
-    /api/achievements          625 ms     203 ms
-    /api/stats/overview       1320 ms     543 ms   (2326 → 1710 → 1611 → 1320)
-    /api/stats/toplists        800 ms     479 ms
-    /api/events/map            160 ms     138 ms
+    /api/events/index          50 ms      92 ms
+    Zeitstrahl-Seite (300)     41 ms      11 ms
+    …mit Fotos + verdichtet    59 ms     168 ms
+    /api/days/weather (alles) 1560 ms     212 ms
+    /api/achievements          636 ms     203 ms
+    /api/stats/overview       1312 ms     543 ms   (2326 → 1710 → 1611 → 1312)
+    /api/stats/toplists        881 ms     479 ms
+    /api/events/map            155 ms     138 ms
 
 Die letzten beiden Zeilen sind Anmerkung 220. Über HTTP gegen einen frisch
 geseedeten Demo-Bestand gemessen — also so, wie ein Nutzer sie erlebt — waren

@@ -299,6 +299,21 @@ any `MINOR`.
   broken up, but it no longer leaves you guessing either: the page dims and says
   it is working.
 
+### Changed
+- **The bundled demo now shows the things it ships with.** The invented life
+  used to consist entirely of single days, so *Longest trip* stayed empty, no
+  trip had day entries under it, and *Split multi-day* found nothing to do.
+  Trips are now a period with their days beneath them, and a few imported stays
+  are left whole so that button has something to demonstrate. Everyday
+  places — the market, the station, the swimming pool — repeat instead of
+  being a new random point each time, which is both what a location history
+  actually looks like and the reason the place ranking now reads as a ranking:
+  87 places instead of 3,675, of which all but a handful have real names. The
+  handful that do not are what *Resolve place names* is for, and it now
+  offers them instead of reporting nothing to do. Invented weather got a
+  proper spread as well: the windiest day in thirty-two years was 36 km/h in
+  every build, because that was the highest value the generator could produce.
+
 ### Fixed
 - **Places without a resolved name are no longer cut off mid-coordinate.**
   Where the map service knows no address, the coordinate itself is the name —

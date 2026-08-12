@@ -149,8 +149,26 @@ def synth_weather(lat: float, lng: float, day: date) -> dict:
     cloud = min(1.0, (0.25 + 0.55 * _noise(lat, lng, day, "c")) + (0.35 if wet else 0.0))
     sun_h = round(max(0.0, light * (1 - cloud)), 1)
 
-    wind = round(6.0 + 22.0 * _noise(lat, lng, day, "w") + (8.0 if wet else 0.0), 1)
-    gust = round(wind * (1.4 + 0.6 * _noise(lat, lng, day, "g")), 1)
+    # **Anmerkung 222: Wind ist ein seltenes Ereignis, keine Gleichverteilung.**
+    # Hier stand `6 + 22 * _noise(...)`, also gleichverteilt zwischen 6 und 36
+    # km/h — und damit war 36,0 nicht der stärkste Sturm in zweiunddreißig
+    # Jahren, sondern der DECKEL. Die Kachel „Windigster Tag" zeigte ihn, und
+    # die Rangliste darunter zeigte ihn zehnmal.
+    #
+    # Das ist genau die Klasse, für die Anmerkung 216 vier Kacheln gestrichen
+    # hat („ein Extremwert über eine gedeckelte Größe beschreibt den Deckel,
+    # nicht den Tag") — nur saß der Deckel diesmal nicht in der Auswertung,
+    # sondern im erfundenen Wetter. Eine Demo, die einen Rekord zeigt, den
+    # jeder Norddeutsche als zu klein erkennt, kostet mehr Vertrauen als eine
+    # leere Kachel.
+    #
+    # Exponentiell wie der Regen darüber: viele ruhige Tage, wenige Stürme, und
+    # kein oberes Ende. Über elftausend Tage kommt der stärkste damit in die
+    # Gegend von 70 km/h mit Böen um 110 — ein plausibler Rekord für die
+    # Nordseeküste statt einer frischen Brise.
+    gale = -math.log(max(1e-6, _noise(lat, lng, day, "w")))
+    wind = round(4.0 + 6.5 * gale + (5.0 if wet else 0.0), 1)
+    gust = round(wind * (1.35 + 0.35 * _noise(lat, lng, day, "g")), 1)
 
     # UV aus Sonnenhöhe und Bewölkung — im Winter in Kiel nahe null, im
     # Sommer in Lissabon zweistellig.
