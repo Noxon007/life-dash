@@ -1,19 +1,19 @@
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
-sqlalchemy==2.0.36
-pydantic==2.10.4
-pydantic-settings==2.7.1
-pyyaml==6.0.2
+fastapi==0.141.1
+uvicorn[standard]==0.52.1
+sqlalchemy==2.0.51
+pydantic==2.13.4
+pydantic-settings==2.15.0
+pyyaml==6.0.3
 # F15: hochgeladene Bilder — Formaterkennung, Vorschaubilder, EXIF
 Pillow==11.3.0
 # F15: Datei-Uploads (multipart/form-data) für FastAPI
-python-multipart==0.0.20
+python-multipart==0.0.32
 python-dateutil==2.9.0.post0
 # Auth (OIDC / Pocket ID): JWT-Validierung inkl. RS256 (JWKS)
-PyJWT[crypto]==2.10.1
+PyJWT[crypto]==2.13.0
 # Der Datenbanktreiber. Anmerkung 223: stand als einziges Paket UNGEPINNT im
 # Dockerfile hinter dieser Datei, während requirements-dev.txt dieselbe
 # Bibliothek auf 2.9.10 festlegte — zwei Orte, eine Angabe, auseinanderlaufend.
 # Er gehört hierher: die Vorgabe der Compose-Datei ist PostgreSQL, also braucht
 # ihn der BETRIEB und nicht nur der Test.
-psycopg2-binary==2.9.10
+psycopg2-binary==2.9.12
