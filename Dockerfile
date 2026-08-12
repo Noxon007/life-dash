@@ -24,8 +24,15 @@ RUN groupadd --gid 10001 lifedash \
  && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin lifedash
 
 # Dependencies first (Docker layer cache)
+# Anmerkung 223: `psycopg2-binary` stand hier ungepinnt hinter der Datei — die
+# einzige Abhängigkeit des Images ohne feste Version, und ausgerechnet der
+# Datenbanktreiber. Das Basis-Image ist am Digest festgenagelt, mit der
+# Begründung, ein Tag sei „unbrauchbar als Aussage darüber, was gebaut wurde";
+# ein Treiber, der bei jedem Bau ein anderer sein darf, hebt genau diese Aussage
+# wieder auf. Er steht jetzt in `requirements.txt` und wird von Dependabot
+# mitgehoben wie alles andere.
 COPY backend/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt psycopg2-binary
+RUN pip install --no-cache-dir -r requirements.txt
 
 # App code + module definitions + frontend
 COPY backend/app ./app
@@ -42,9 +49,23 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 ARG BUILD_REF=""
 ARG BUILD_SHA=""
 
+# Anmerkung 223: `MEDIA_DIR` gehört dazu, und zwar hierher.
+#
+# Drei der vier Pfade standen hier, der vierte nicht — und `config.py` legt ihn
+# vorgabeweise neben den Code (`/app/media`). Über `docker compose` fiel das nie
+# auf: die Compose-Datei setzt ihn. Wer das Image direkt startet, bekam dagegen
+# beides auf einmal: die hochgeladenen Bilder landen AUSSERHALB des
+# `/data`-Volumes (weg beim nächsten `docker run`), und `/app` gehört root,
+# während der Prozess als 10001 läuft — der erste Upload scheitert.
+#
+# Derselbe Wert steht im Einstiegspunkt als Vorgabe (`${MEDIA_DIR:-/data/media}`).
+# Ein Image, das seine eigene Vorgabe anders beantwortet als sein Einstiegspunkt,
+# ist die Doppelregel in ihrer teuersten Form: sie stimmt auf dem dokumentierten
+# Weg und nur dort.
 ENV MODULES_DIR=/app/modules \
     FRONTEND_DIR=/app/frontend \
     DATABASE_URL=sqlite:////data/lifedash.db \
+    MEDIA_DIR=/data/media \
     BUILD_REF=${BUILD_REF} \
     BUILD_SHA=${BUILD_SHA}
 

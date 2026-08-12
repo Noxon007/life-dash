@@ -1,21 +1,7 @@
-# Changelog
-
-All notable changes to Life-Dash. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows
-[Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
-
-While the version stays at `0.x`, the app counts as in development: new
-features raise `MINOR`, bug fixes raise `PATCH`; breaking changes can occur in
-any `MINOR`.
-
-> This changelog is maintained in **English** from version 0.20.0 on. Earlier
-> entries were translated once at that point; entries before 0.12.0 were
-> additionally condensed, since they describe development history in internal
-> package codes (see note 39 in the concept document).
-
 ## [Unreleased]
 
 ### Added
+
 - **Your age, exactly.** The statistics tab now has a block showing the time
   since you were born in years, months, weeks, days, hours, minutes and
   seconds, with the seconds running while the tab is open. Each cell counts the
@@ -193,8 +179,6 @@ any `MINOR`.
   countries, years and categories by days, and your longest streaks: the
   longest run of consecutive days with entries, the longest gap without any,
   and your longest recorded trip.
-
-### Added
 - **A demo mode: an invented life, thirty-two years of it, behind one switch.**
   `SEED_DEMO=true` fills a fresh instance with around 8,500 entries — five
   places lived in, twenty-nine trips across six continents, concerts, meals,
@@ -227,30 +211,70 @@ any `MINOR`.
   and the days with the most. And **how far you have ever been from home** —
   measured against the residence that applied *on that day*, because a centre of
   life moves; plus how many countries and cities each year of your life touched.
-
-### Security
-- **The login cookie is now marked HTTPS-only on every path into the app.**
-  Signing in with e-mail and password already set it that way; signing in
-  through an identity provider did not, so on a site served over HTTPS the
-  session could still travel over an unencrypted connection. Both paths now go
-  through one place, along with the short-lived cookie that carries the login
-  handshake. Running locally over plain HTTP is unchanged.
-- **A hand-written import file can no longer reach into another account.**
-  Restoring a backup always filed everything under the account doing the
-  restoring — but a row carries more than its owner, and a file written by hand
-  could point one of those references at somebody else's entry, place or
-  object: a measurement attached to their entry, or their place name showing up
-  in your timeline. Every reference is now checked against what you actually
-  own, and the import reports how many rows it turned away. Genuine backups
-  bring everything they refer to and are unaffected, including the entries a
-  multi-day trip splits into.
-- **The Immich connection test now checks the address it is handed.** Saving an
-  address had always rejected anything that was not `http://` or `https://`; the
-  *test* button had not, although that is the path that actually calls the
-  address. Where your Immich lives is still entirely your choice, including on
-  your own network.
+- **Timeline and map: what evidence and what is proven now look different.**
+  Photos and visits found by Google or Immich are evidence — they used to
+  appear as “unconfirmed” cards mixed in among your confirmed entries. They no
+  longer do: a proposal only joins the timeline once you have actually
+  confirmed it in moderation. Until then, a small hint (“N proposals waiting”)
+  links there instead of showing the card itself. The photo and visit layers
+  themselves (toggled on/off) are unaffected — they were never proposals to
+  begin with, just evidence of where you were and what was photographed.
+- **Year and decade view now group by month and year instead of listing every
+  card.** A year used to list every single entry — and once a repeated
+  location visit spans more than a single day, sorting it purely by time
+  and bundling it by place pull in different directions, so the more a year
+  or decade condensed imported visits, the less the order actually held. Year
+  view now shows one row per month (event count, day count, main place),
+  decade view one row per year; clicking a row expands it — a year's row into
+  its months, a month's row into the familiar day-by-day view with its photo
+  strip.
+- **Immich: a day with enough photos in one place becomes a confirmed entry
+  directly — the same way an imported Google visit always has.** Until now it
+  became an unconfirmed proposal that needed a separate trip to Moderation,
+  even though the two connectors are the same kind of evidence (a machine
+  measuring where you were). The mandatory preview before creating anything is
+  unchanged — if anything it matters more now, since there is no review step
+  left afterwards. Everywhere Google visits were hidden by default, bundled per
+  day and place, and counted (“🛰️ N automatically detected”), Immich photo-day
+  entries now are too, so this does not flood the timeline with individual
+  cards. Albums are no longer offered as a source at all (they were off by
+  default already); the Immich API key this connector asks for now needs four
+  read-only permissions instead of five.
+- **A greeting on the Today page.** A short line at the top now greets you by
+  time of day and name and shows today's date, above the “on this day” look-back.
+- **“In the timeline” button on every collection entry, not just cities.**
+  Opening a country, animal or artist in the collection now offers the same jump
+  into the timeline that city pages already had.
+- **System tab: links to the API docs and the health page.** A small
+  “Diagnostics & links” block points to the interactive API (`/docs`) and the
+  one-line status page (`/health`) — the latter is the right target for an
+  uptime monitor.
+- **“My data”: each section now says what it does to your data.** Every step
+  carries a small coloured badge — *setting*, *creates proposals*, *enriches*,
+  *changes confirmed data*, *read only*, *writes*, *deletes for good* — the same
+  idea the Immich block already used, now across the whole page.
+- **“All years” for both Immich runs.** Locating photos and suggesting entries
+  could only be done one year at a time, which for a twenty-year library meant
+  twenty rounds of the same handful of clicks. Both now offer *All years* as an
+  entry in the year picker. Locating photos simply works through them in the
+  background, ticking off each year as it goes, and can be stopped at any point
+  — everything already done stays done. Suggesting entries keeps its rule that
+  nothing is created before you have seen it: the preview walks the years one by
+  one, shows a running total while it does, and can be cancelled — and the run
+  is then given exactly the years the preview covered.
+- **“My data” now shows what is running, right where you started it.** A strip
+  at the top of the page names the current run, its progress and a stop button,
+  and the last finished run stays there with its result. Starting a run no
+  longer jumps to the Jobs tab.
+- **The timeline's day heading now carries the weather of that day.** Until now
+  the weather only ever sat on individual cards, so a day with several imported
+  visits showed whichever of them the condensation happened to pick — and a
+  bundled card (“4× Home”) showed no weather at all. The day now says it once,
+  in one place, and days that touch more than one weather region say that too
+  instead of passing one of the values off as “the” weather.
 
 ### Changed
+
 - **“Farthest from home” now answers the question for every place you have
   lived.** It used to be a single line for your whole life, and that only ever
   described the residence you happened to travel furthest from. You now get the
@@ -298,8 +322,6 @@ any `MINOR`.
   the *Jobs* tab while it runs. *Discard links* is a single step and cannot be
   broken up, but it no longer leaves you guessing either: the page dims and says
   it is working.
-
-### Changed
 - **The bundled demo now shows the things it ships with.** The invented life
   used to consist entirely of single days, so *Longest trip* stayed empty, no
   trip had day entries under it, and *Split multi-day* found nothing to do.
@@ -313,8 +335,256 @@ any `MINOR`.
   offers them instead of reporting nothing to do. Invented weather got a
   proper spread as well: the windiest day in thirty-two years was 36 km/h in
   every build, because that was the highest value the generator could produce.
+- **“Baseline location” is now called “residence”.** The old name described the
+  mechanism — a fallback for days nothing else says anything about — rather than
+  the thing you actually enter. It also makes the point of it legible: enter
+  every place you have lived, leave the last period open-ended, and every day
+  from your birth to today is covered without anything to maintain. Only the
+  wording changed; your periods, the days derived from them, and the rule behind
+  them are untouched. A day with any entry on it still belongs to that entry and
+  not to your residence.
+- **A new mark: a bee.** It forages, stores what it brings in cells, and dances
+  the location of where it has just been — collecting, keeping each thing as its
+  own record, and saying *where*. The honeycomb beside it stands for the
+  collection rather than the collecting and turns up where the app talks about
+  what has been gathered. Both are explained in the README. If your browser or
+  phone still shows the old symbol, it is coming from the offline cache and will
+  be replaced on the next visit.
+- **The map's layer buttons count the period you are looking at.** They used to
+  name the whole database — “🛰️ 13,291 auto-detected”, in a month that holds
+  forty of them. Each button now says how much of its layer is on the map right
+  now; the total is still there, in the tooltip. A layer you have switched off
+  reads zero, because that is how much of it you are seeing.
+- **The map starts by showing everything.** Every point on its own instead of
+  merged bubbles, all layers and categories on, photos included — and the
+  connecting line between places *off*, because over a thousand points it is a
+  tangle rather than a route. Photos were off by default because they used to be
+  tens of thousands of individual map markers; they have been drawn on a single
+  canvas for a while now, so the reason had gone and only the habit was left.
+  Everything is still one click away, and a choice you make is remembered.
+- **The first-entry form asks for your place of birth, not your home town.** A
+  home town is a period of time, and periods of time belong to the residence
+  location, which has proper from/to dates and a view of its own — as a dateless
+  milestone it landed nowhere in the timeline and counted as a “move” in the
+  statistics. Date and place of birth now make **one** entry, because that is
+  what they are.
+- **Long-running actions show their numbers everywhere.** The weather run, the
+  place-name run, the AI passes and the recompute already knew how far along
+  they were; they only ever told the button, which is the one thing you do not
+  look at while waiting. They now use the same panel as the timeline import:
+  bar, “34,523 / 39,662”, an estimate, and a line saying what is happening.
+  Switching an admin tab or a view shows what it is fetching, too.
+- **Both delete buttons ask for the same word.** “My data” wanted `LOESCHEN`,
+  “System” wanted `LÖSCHEN`. Both now ask for the word in your interface
+  language — `LÖSCHEN` in German, `DELETE` in English — and the server accepts
+  either along with the umlaut-free spelling. A typed confirmation is a brake
+  against a misclick, not a password, and a brake you cannot operate on your
+  keyboard is a wall. The system-wide delete is also checked by the server now,
+  not only by the browser.
+- **The effect badges under *My data* all sit in the same spot now** — at the
+  right-hand end of the heading of whatever they describe. They used to be in
+  three different places (beside the section heading, at the end of a card
+  header, and underneath a button), so the one label that tells you what a run
+  will do to your data had to be hunted for each time.
+- **Less text.** The explanation of why photo albums are not used as a source is
+  gone, along with the sentences that described how earlier versions behaved.
+- **A residence period is no longer cut off after its label.** “Elternhaus ·
+  Mözen, Deutschland · 25.9.1991 – 25.9.2011 · 7,298 days” shared a 105-pixel
+  column with the bar charts, so everything after the name disappeared.
+- **The map draws every point now — the 300 limit is gone.** “Every point” used
+  to stop at 300 and tell you how many it was hiding. That was never a limit
+  about your data: each entry was drawn as a marker *plus* a numbered circle on
+  top of it, and fifteen thousand entries meant thirty thousand things for the
+  browser to keep alive. The photo layer next to it had been drawing twenty
+  thousand dots without that cost for a while; the entries use the same
+  approach now, so there is nothing left to leave out and nothing left to
+  announce.
+- **The sequence number only appears when “Connect in order” is on.** A number
+  on every point is the caption of a line — without the line it answered a
+  question nobody asked, and in year or decade view it did so on top of
+  thousands of points at once. It also stops above 120 points, where numbered
+  circles are a pattern rather than an order.
+- **One mark per entry instead of two.** A pin and a coloured circle in the same
+  spot were saying the same thing twice; the circle stayed, because it carries
+  the category colour.
+- **The labels above the merged bubbles are gone.** They were meant as a bonus
+  for the biggest ones and became a row of overlapping boxes exactly where the
+  map is busiest. The name is in the popup and in the list beside the map.
+- **Merged points are a teardrop now, sized by how much is in them.** A place you
+  went to fifty times draws a bigger mark than one you went to twice, in the
+  colour of whatever you mostly did there — and its tip sits exactly on the
+  place, so a big mark still says *here* rather than *roughly here*. A single
+  entry stays a round dot, so the shape tells you whether there is one thing or
+  several before you read a number. The same mark is used whether you merged by
+  proximity or per place, and the same size means the same count in every
+  period.
+- **“By proximity” and “per place” now look the same.** They were two different
+  bubbles — one blue with a number from the clustering library, one in the
+  colour of what you did there — for the same statement, depending only on
+  which level you had picked.
+- **The map's controls are rebuilt around the two questions they answer.**
+  The “Display” row used to hold four different kinds of thing at once — which
+  layers are drawn, a line drawn *over* them, a merge mode, and fullscreen —
+  all looking alike because they were all chips. It is now **“Layers”** (where
+  what you see comes from: by hand, Google, photos, paths) and **“How dense”**;
+  fullscreen moved into the corner of the map. Each layer switch carries the
+  colour it has on the map, so there is nothing left to decode.
+- **“Merge points” became four named steps: every point · by proximity · per
+  place · per city.** The old switch quietly did three different things
+  depending on how far you were zoomed out — and switching it *off* was also
+  what made the map hide everything past the first 300 points, which it never
+  said. Now the step you pick is the step you get, the zoom level no longer
+  changes what it means, and the 300 limit belongs to “every point” alone and
+  is written on it. **“Per city” is new**, for the question “which cities was I
+  in that year?”.
+- **When the map does show a selection, it now spreads it across the whole
+  period** instead of taking the first 300 by date. In a busy month that used
+  to mean everything after the first few days was missing while the map looked
+  complete.
+- **Places you visited a lot now look like it.** A place with 59 visits used to
+  draw the same marker as one with two, and the number only appeared once you
+  clicked. It is now a circle whose *area* is the count, in the colour of
+  whatever you mostly did there, with the name on the biggest ones. The same
+  applies to the proximity clusters, which used to be near-identical bubbles
+  with a number in them.
+- **Photos are no longer orange.** They shared a colour with imported Google
+  visits — two shades of orange for the two things on that map you most want to
+  tell apart. Photo dots are cyan now, in both light and dark themes, and the
+  photo switch shows the same colour.
+- **Removed: the “merge map points above N” setting.** With four named steps on
+  the map itself, a number in the settings page answering the same question was
+  a second, invisible answer to it.
+- **The map loads about half as much, twice as fast.** At twenty thousand
+  entries opening the map tab moved 6.1 MB in 0.64 s; it is now 2.7 MB in
+  0.19 s. Nothing was dropped: photo dots are simply sent as dots — a position,
+  a time and the picture they belong to — instead of as complete entries with
+  a title, a category and a place record the map never displays. What you see
+  and what you can click is unchanged.
+- **The concept document has been split.** `docs/KONZEPT.md` keeps what
+  Life-Dash is and where it is going; the numbered decisions with their
+  reasoning moved into **`docs/DECISIONS.md`**. Nothing was deleted and the
+  numbering is unbroken — two audiences, two documents.
+- **“Days with weather” is gone from the weather record.** It counted how far
+  the weather run had got, which says something about the run and nothing about
+  your life. The other three tiles are unchanged.
+- **Vague dates in moderation are one block now.** The heading and a separate
+  bordered box were merged into a single header with a plain sub-line.
+- **Logs are clearer.** The manual “refresh” button is gone (the view already
+  updates on its own every few seconds), and the text now distinguishes the two
+  controls: the dropdown filters only what is *shown*, while `LOG_LEVEL` in the
+  `.env` decides what the server records at all — set to `INFO`, there are no
+  `DEBUG` lines for the dropdown to reveal.
+- **Photo strips in the timeline now show at most twelve pictures — at every
+  zoom level.** Previously a single day or a single week showed *all* of its
+  photos, so a photo-heavy day could draw hundreds of thumbnails and the
+  timeline stuttered. Every strip now shows up to twelve, spread evenly across
+  the day or week, and says how many there are in total when it has left some
+  out. Tap any of them to browse.
+- **The “Delete all my data” button is easier to see.** It was a plain link
+  with no background; it now sits on a red-tinted background with a red border,
+  matching the seriousness of what it does.
+- **The Immich section is now a numbered flow instead of one stacked panel.**
+  Its three runs — attaching photos to entries you already have, proposing new
+  entries from photo days, and placing photo points on the map — did different
+  things but looked like one block, and two near-identical year pickers made it
+  worse. Each run is now its own card in the order you use them (connect → attach
+  → propose → locate), and each card carries a small badge in its header saying
+  what it does to your data: *attaches* (changes nothing), *creates proposals*
+  (goes to moderation), *map only* (a layer you can discard). Only one year
+  picker is on show now — on “propose”, where the preview needs it; locating
+  photos simply runs over all years, with the single-year choice tucked under
+  *Advanced*. No run, setting or key changed — only the layout.
+- **Clearer button labels.** “Start run” for resolving place names is now
+  “Resolve place names”, and the two “Take a look” preview buttons now say
+  “Show preview”, so each button names what it does. The *Advanced* expanders in
+  “My data” also got more room to breathe.
+- **“My data” reads more calmly.** Each of the seven steps kept a full paragraph
+  of explanation next to its button — accurate, but a wall of text. The buttons
+  now carry a single sentence of what they do; the detailed how-and-why has moved
+  into the README guide (“Getting started — a sensible order”), which each step
+  points to. Every step now leads with one primary button, and the controls you
+  set once and rarely touch again — the import-confidence filter, the address
+  display format, the one-off “cut older data into days” repair — sit behind a
+  small **Advanced** toggle instead of being always open. Nothing was removed and
+  no run changed — only the reading. The map and its controls are untouched for
+  now.
+- **The map now draws all your photo points instead of a selection.** The old
+  ceiling of 5000 points per answer already bit at an ordinary collection of
+  8000 located photos, so the map was condensing in everyday use while nothing
+  was actually tight — and a limit that fires normally teaches you to overlook
+  its message, which is the one thing it exists for. What made 5000 necessary
+  was drawing, not data: each dot used to be its own element in the page. The
+  dots now go onto a canvas, which moves that threshold by an order of
+  magnitude, and the ceiling is a safety net at 50 000. If it ever does apply,
+  the points are picked evenly across the period rather than from its
+  beginning, the full allowance is used (an even step of “every second point”
+  showed 4060 of 8120 while 5000 were allowed), and the note on the map says
+  what you are looking at.
+- **“Locate photos” now says why a picture got no point.** The run reported
+  “2016 photos read, 17 newly located” and left open the one question you ask
+  when reading it: what happened to the other 1999? The two possible answers —
+  “my library simply carries no GPS” and “the API key points at somebody else’s
+  account” — call for completely different steps, and until now they looked
+  identical. The result line breaks the difference down (“without a point: 1950
+  without coordinates, 40 belonging to someone else, 9 not in the Immich
+  timeline”) and additionally names how many points were already there and
+  unchanged — without that number a second run over the same year reads like a
+  failed first one.
+
+### Removed
+
+- **The two clean-up runs for data from earlier versions:** “Advanced: cut older
+  data into days” under Imports, and the Immich card “Remove old photo-day
+  summary entries”. New imports have cut visits into days by themselves for a
+  while, and step B replaced the photo-day summaries — the buttons were a
+  changelog on screen. Their endpoints are still there if a run is ever needed.
+- **The “Strongest sun” (UV) statistics tile.** It could never fill: the weather
+  archive used for past dates carries no UV values at all, so the tile stayed
+  empty no matter how much weather you added.
+- **Four weather records that could not tell two days apart:** *Sunniest day*,
+  *Longest rain*, *Longest day* and *Shortest day*, each with its ranking.
+  Every one of them is capped, and the cap is what they showed — sunshine
+  cannot last longer than daylight, so every cloudless day around midsummer
+  ties at the same number; a day has 24 hours, and a day that rains through is
+  not rare; and the length of a day is a property of the calendar, so the tile
+  named the solstice no matter what happened. The rankings underneath made it
+  plain: ten places, one value. Hours of sunshine still count towards the
+  yearly total in the weather balance, and all the values are still shown on
+  the individual entry.
+- **The “Days with the most photos” ranking.** A day's photo strip holds at most
+  twelve pictures, so the list showed twelve for every day in it — that is our
+  own limit, not a statement about the day you took the most photos.
+- **The “Build embeddings” button in the System tab.** With the AI-based search
+  gone (see above), it had nothing left to do.
+- **The “Go to the timeline” tile on the Today page.** It was a navigation
+  shortcut dressed up as a statistic; the bottom navigation already goes there.
+- **The “🧭 Vector map” background map, and its settings block.** It was the one
+  map option that did nothing until you had first copied a style URL out of
+  another program's admin settings, and it brought its own troubles: a slow
+  first paint when the map switched to week or month, missing icons in
+  third-party styles, and a dependency on WebGL that older devices do not
+  offer. The three built-in maps — OpenStreetMap, topography, satellite — and
+  **🔧 Custom map** for your own tile server are unchanged. If you had chosen
+  the vector map, your maps quietly fall back to the standard one; the style
+  URL was only ever stored on your device and needs no cleaning up. Two of the
+  four map libraries the page loads disappear with it.
 
 ### Fixed
+
+- **Restoring a backup no longer depends on the order inside the file.** A trip
+  and the day entries under it could be written in either order; on a SQLite
+  installation with strict database checks the day entry could arrive before
+  the trip it belongs to and stop the restore.
+- **Uploaded photos land in the data volume when the image is started
+  directly.** With `docker compose` they always did; started by hand, they went
+  next to the program instead — lost on the next update, and unwritable to
+  begin with, so the first upload failed.
+- **Starting up no longer rescans the whole database for work finished months
+  ago.** Two one-off clean-ups from earlier versions ran their full table scan
+  at every start.
+- **Data from before accounts existed is fully adopted by the first account.**
+  Routes and photos were left behind, which made them invisible everywhere —
+  including in the export.
 - **Places without a resolved name are no longer cut off mid-coordinate.**
   Where the map service knows no address, the coordinate itself is the name —
   “Ort (54.358, 10.123)”. Anywhere a place name was shortened for display
@@ -713,205 +983,6 @@ any `MINOR`.
   as though it were working. It is now struck through with the reason, the same
   way the other map switches already were, and your choice survives the zoom
   change.
-
-### Changed
-- **“Baseline location” is now called “residence”.** The old name described the
-  mechanism — a fallback for days nothing else says anything about — rather than
-  the thing you actually enter. It also makes the point of it legible: enter
-  every place you have lived, leave the last period open-ended, and every day
-  from your birth to today is covered without anything to maintain. Only the
-  wording changed; your periods, the days derived from them, and the rule behind
-  them are untouched. A day with any entry on it still belongs to that entry and
-  not to your residence.
-- **A new mark: a bee.** It forages, stores what it brings in cells, and dances
-  the location of where it has just been — collecting, keeping each thing as its
-  own record, and saying *where*. The honeycomb beside it stands for the
-  collection rather than the collecting and turns up where the app talks about
-  what has been gathered. Both are explained in the README. If your browser or
-  phone still shows the old symbol, it is coming from the offline cache and will
-  be replaced on the next visit.
-- **The map's layer buttons count the period you are looking at.** They used to
-  name the whole database — “🛰️ 13,291 auto-detected”, in a month that holds
-  forty of them. Each button now says how much of its layer is on the map right
-  now; the total is still there, in the tooltip. A layer you have switched off
-  reads zero, because that is how much of it you are seeing.
-- **The map starts by showing everything.** Every point on its own instead of
-  merged bubbles, all layers and categories on, photos included — and the
-  connecting line between places *off*, because over a thousand points it is a
-  tangle rather than a route. Photos were off by default because they used to be
-  tens of thousands of individual map markers; they have been drawn on a single
-  canvas for a while now, so the reason had gone and only the habit was left.
-  Everything is still one click away, and a choice you make is remembered.
-- **The first-entry form asks for your place of birth, not your home town.** A
-  home town is a period of time, and periods of time belong to the residence
-  location, which has proper from/to dates and a view of its own — as a dateless
-  milestone it landed nowhere in the timeline and counted as a “move” in the
-  statistics. Date and place of birth now make **one** entry, because that is
-  what they are.
-- **Long-running actions show their numbers everywhere.** The weather run, the
-  place-name run, the AI passes and the recompute already knew how far along
-  they were; they only ever told the button, which is the one thing you do not
-  look at while waiting. They now use the same panel as the timeline import:
-  bar, “34,523 / 39,662”, an estimate, and a line saying what is happening.
-  Switching an admin tab or a view shows what it is fetching, too.
-- **Both delete buttons ask for the same word.** “My data” wanted `LOESCHEN`,
-  “System” wanted `LÖSCHEN`. Both now ask for the word in your interface
-  language — `LÖSCHEN` in German, `DELETE` in English — and the server accepts
-  either along with the umlaut-free spelling. A typed confirmation is a brake
-  against a misclick, not a password, and a brake you cannot operate on your
-  keyboard is a wall. The system-wide delete is also checked by the server now,
-  not only by the browser.
-- **The effect badges under *My data* all sit in the same spot now** — at the
-  right-hand end of the heading of whatever they describe. They used to be in
-  three different places (beside the section heading, at the end of a card
-  header, and underneath a button), so the one label that tells you what a run
-  will do to your data had to be hunted for each time.
-- **Less text.** The explanation of why photo albums are not used as a source is
-  gone, along with the sentences that described how earlier versions behaved.
-- **A residence period is no longer cut off after its label.** “Elternhaus ·
-  Mözen, Deutschland · 25.9.1991 – 25.9.2011 · 7,298 days” shared a 105-pixel
-  column with the bar charts, so everything after the name disappeared.
-- **The map draws every point now — the 300 limit is gone.** “Every point” used
-  to stop at 300 and tell you how many it was hiding. That was never a limit
-  about your data: each entry was drawn as a marker *plus* a numbered circle on
-  top of it, and fifteen thousand entries meant thirty thousand things for the
-  browser to keep alive. The photo layer next to it had been drawing twenty
-  thousand dots without that cost for a while; the entries use the same
-  approach now, so there is nothing left to leave out and nothing left to
-  announce.
-- **The sequence number only appears when “Connect in order” is on.** A number
-  on every point is the caption of a line — without the line it answered a
-  question nobody asked, and in year or decade view it did so on top of
-  thousands of points at once. It also stops above 120 points, where numbered
-  circles are a pattern rather than an order.
-- **One mark per entry instead of two.** A pin and a coloured circle in the same
-  spot were saying the same thing twice; the circle stayed, because it carries
-  the category colour.
-- **The labels above the merged bubbles are gone.** They were meant as a bonus
-  for the biggest ones and became a row of overlapping boxes exactly where the
-  map is busiest. The name is in the popup and in the list beside the map.
-- **Merged points are a teardrop now, sized by how much is in them.** A place you
-  went to fifty times draws a bigger mark than one you went to twice, in the
-  colour of whatever you mostly did there — and its tip sits exactly on the
-  place, so a big mark still says *here* rather than *roughly here*. A single
-  entry stays a round dot, so the shape tells you whether there is one thing or
-  several before you read a number. The same mark is used whether you merged by
-  proximity or per place, and the same size means the same count in every
-  period.
-- **“By proximity” and “per place” now look the same.** They were two different
-  bubbles — one blue with a number from the clustering library, one in the
-  colour of what you did there — for the same statement, depending only on
-  which level you had picked.
-- **The map's controls are rebuilt around the two questions they answer.**
-  The “Display” row used to hold four different kinds of thing at once — which
-  layers are drawn, a line drawn *over* them, a merge mode, and fullscreen —
-  all looking alike because they were all chips. It is now **“Layers”** (where
-  what you see comes from: by hand, Google, photos, paths) and **“How dense”**;
-  fullscreen moved into the corner of the map. Each layer switch carries the
-  colour it has on the map, so there is nothing left to decode.
-- **“Merge points” became four named steps: every point · by proximity · per
-  place · per city.** The old switch quietly did three different things
-  depending on how far you were zoomed out — and switching it *off* was also
-  what made the map hide everything past the first 300 points, which it never
-  said. Now the step you pick is the step you get, the zoom level no longer
-  changes what it means, and the 300 limit belongs to “every point” alone and
-  is written on it. **“Per city” is new**, for the question “which cities was I
-  in that year?”.
-- **When the map does show a selection, it now spreads it across the whole
-  period** instead of taking the first 300 by date. In a busy month that used
-  to mean everything after the first few days was missing while the map looked
-  complete.
-- **Places you visited a lot now look like it.** A place with 59 visits used to
-  draw the same marker as one with two, and the number only appeared once you
-  clicked. It is now a circle whose *area* is the count, in the colour of
-  whatever you mostly did there, with the name on the biggest ones. The same
-  applies to the proximity clusters, which used to be near-identical bubbles
-  with a number in them.
-- **Photos are no longer orange.** They shared a colour with imported Google
-  visits — two shades of orange for the two things on that map you most want to
-  tell apart. Photo dots are cyan now, in both light and dark themes, and the
-  photo switch shows the same colour.
-- **Removed: the “merge map points above N” setting.** With four named steps on
-  the map itself, a number in the settings page answering the same question was
-  a second, invisible answer to it.
-- **The map loads about half as much, twice as fast.** At twenty thousand
-  entries opening the map tab moved 6.1 MB in 0.64 s; it is now 2.7 MB in
-  0.19 s. Nothing was dropped: photo dots are simply sent as dots — a position,
-  a time and the picture they belong to — instead of as complete entries with
-  a title, a category and a place record the map never displays. What you see
-  and what you can click is unchanged.
-- **The concept document has been split.** `docs/KONZEPT.md` keeps what
-  Life-Dash is and where it is going; the numbered decisions with their
-  reasoning moved into **`docs/DECISIONS.md`**. Nothing was deleted and the
-  numbering is unbroken — two audiences, two documents.
-- **“Days with weather” is gone from the weather record.** It counted how far
-  the weather run had got, which says something about the run and nothing about
-  your life. The other three tiles are unchanged.
-
-### Added (earlier this cycle)
-- **Timeline and map: what evidence and what is proven now look different.**
-  Photos and visits found by Google or Immich are evidence — they used to
-  appear as “unconfirmed” cards mixed in among your confirmed entries. They no
-  longer do: a proposal only joins the timeline once you have actually
-  confirmed it in moderation. Until then, a small hint (“N proposals waiting”)
-  links there instead of showing the card itself. The photo and visit layers
-  themselves (toggled on/off) are unaffected — they were never proposals to
-  begin with, just evidence of where you were and what was photographed.
-- **Year and decade view now group by month and year instead of listing every
-  card.** A year used to list every single entry — and once a repeated
-  location visit spans more than a single day, sorting it purely by time
-  and bundling it by place pull in different directions, so the more a year
-  or decade condensed imported visits, the less the order actually held. Year
-  view now shows one row per month (event count, day count, main place),
-  decade view one row per year; clicking a row expands it — a year's row into
-  its months, a month's row into the familiar day-by-day view with its photo
-  strip.
-- **Immich: a day with enough photos in one place becomes a confirmed entry
-  directly — the same way an imported Google visit always has.** Until now it
-  became an unconfirmed proposal that needed a separate trip to Moderation,
-  even though the two connectors are the same kind of evidence (a machine
-  measuring where you were). The mandatory preview before creating anything is
-  unchanged — if anything it matters more now, since there is no review step
-  left afterwards. Everywhere Google visits were hidden by default, bundled per
-  day and place, and counted (“🛰️ N automatically detected”), Immich photo-day
-  entries now are too, so this does not flood the timeline with individual
-  cards. Albums are no longer offered as a source at all (they were off by
-  default already); the Immich API key this connector asks for now needs four
-  read-only permissions instead of five.
-- **A greeting on the Today page.** A short line at the top now greets you by
-  time of day and name and shows today's date, above the “on this day” look-back.
-- **“In the timeline” button on every collection entry, not just cities.**
-  Opening a country, animal or artist in the collection now offers the same jump
-  into the timeline that city pages already had.
-- **System tab: links to the API docs and the health page.** A small
-  “Diagnostics & links” block points to the interactive API (`/docs`) and the
-  one-line status page (`/health`) — the latter is the right target for an
-  uptime monitor.
-- **“My data”: each section now says what it does to your data.** Every step
-  carries a small coloured badge — *setting*, *creates proposals*, *enriches*,
-  *changes confirmed data*, *read only*, *writes*, *deletes for good* — the same
-  idea the Immich block already used, now across the whole page.
-- **“All years” for both Immich runs.** Locating photos and suggesting entries
-  could only be done one year at a time, which for a twenty-year library meant
-  twenty rounds of the same handful of clicks. Both now offer *All years* as an
-  entry in the year picker. Locating photos simply works through them in the
-  background, ticking off each year as it goes, and can be stopped at any point
-  — everything already done stays done. Suggesting entries keeps its rule that
-  nothing is created before you have seen it: the preview walks the years one by
-  one, shows a running total while it does, and can be cancelled — and the run
-  is then given exactly the years the preview covered.
-- **“My data” now shows what is running, right where you started it.** A strip
-  at the top of the page names the current run, its progress and a stop button,
-  and the last finished run stays there with its result. Starting a run no
-  longer jumps to the Jobs tab.
-- **The timeline's day heading now carries the weather of that day.** Until now
-  the weather only ever sat on individual cards, so a day with several imported
-  visits showed whichever of them the condensation happened to pick — and a
-  bundled card (“4× Home”) showed no weather at all. The day now says it once,
-  in one place, and days that touch more than one weather region say that too
-  instead of passing one of the values off as “the” weather.
-
-### Fixed
 - **Grouped location visits by district now expand again.** When the timeline
   condenses imported visits by district, a card like “HafenCity · 3 visits” did
   nothing when you tried to open it — it was looking up the group by *city*
@@ -985,73 +1056,6 @@ any `MINOR`.
   map used to keep the *oldest* ones; over a library spanning 2009 to today
   that quietly dropped everything after roughly 2016, so a trip in the middle
   of your life vanished while the map still looked full.
-
-### Changed
-- **Vague dates in moderation are one block now.** The heading and a separate
-  bordered box were merged into a single header with a plain sub-line.
-- **Logs are clearer.** The manual “refresh” button is gone (the view already
-  updates on its own every few seconds), and the text now distinguishes the two
-  controls: the dropdown filters only what is *shown*, while `LOG_LEVEL` in the
-  `.env` decides what the server records at all — set to `INFO`, there are no
-  `DEBUG` lines for the dropdown to reveal.
-- **Photo strips in the timeline now show at most twelve pictures — at every
-  zoom level.** Previously a single day or a single week showed *all* of its
-  photos, so a photo-heavy day could draw hundreds of thumbnails and the
-  timeline stuttered. Every strip now shows up to twelve, spread evenly across
-  the day or week, and says how many there are in total when it has left some
-  out. Tap any of them to browse.
-- **The “Delete all my data” button is easier to see.** It was a plain link
-  with no background; it now sits on a red-tinted background with a red border,
-  matching the seriousness of what it does.
-- **The Immich section is now a numbered flow instead of one stacked panel.**
-  Its three runs — attaching photos to entries you already have, proposing new
-  entries from photo days, and placing photo points on the map — did different
-  things but looked like one block, and two near-identical year pickers made it
-  worse. Each run is now its own card in the order you use them (connect → attach
-  → propose → locate), and each card carries a small badge in its header saying
-  what it does to your data: *attaches* (changes nothing), *creates proposals*
-  (goes to moderation), *map only* (a layer you can discard). Only one year
-  picker is on show now — on “propose”, where the preview needs it; locating
-  photos simply runs over all years, with the single-year choice tucked under
-  *Advanced*. No run, setting or key changed — only the layout.
-- **Clearer button labels.** “Start run” for resolving place names is now
-  “Resolve place names”, and the two “Take a look” preview buttons now say
-  “Show preview”, so each button names what it does. The *Advanced* expanders in
-  “My data” also got more room to breathe.
-- **“My data” reads more calmly.** Each of the seven steps kept a full paragraph
-  of explanation next to its button — accurate, but a wall of text. The buttons
-  now carry a single sentence of what they do; the detailed how-and-why has moved
-  into the README guide (“Getting started — a sensible order”), which each step
-  points to. Every step now leads with one primary button, and the controls you
-  set once and rarely touch again — the import-confidence filter, the address
-  display format, the one-off “cut older data into days” repair — sit behind a
-  small **Advanced** toggle instead of being always open. Nothing was removed and
-  no run changed — only the reading. The map and its controls are untouched for
-  now.
-- **The map now draws all your photo points instead of a selection.** The old
-  ceiling of 5000 points per answer already bit at an ordinary collection of
-  8000 located photos, so the map was condensing in everyday use while nothing
-  was actually tight — and a limit that fires normally teaches you to overlook
-  its message, which is the one thing it exists for. What made 5000 necessary
-  was drawing, not data: each dot used to be its own element in the page. The
-  dots now go onto a canvas, which moves that threshold by an order of
-  magnitude, and the ceiling is a safety net at 50 000. If it ever does apply,
-  the points are picked evenly across the period rather than from its
-  beginning, the full allowance is used (an even step of “every second point”
-  showed 4060 of 8120 while 5000 were allowed), and the note on the map says
-  what you are looking at.
-- **“Locate photos” now says why a picture got no point.** The run reported
-  “2016 photos read, 17 newly located” and left open the one question you ask
-  when reading it: what happened to the other 1999? The two possible answers —
-  “my library simply carries no GPS” and “the API key points at somebody else’s
-  account” — call for completely different steps, and until now they looked
-  identical. The result line breaks the difference down (“without a point: 1950
-  without coordinates, 40 belonging to someone else, 9 not in the Immich
-  timeline”) and additionally names how many points were already there and
-  unchanged — without that number a second run over the same year reads like a
-  failed first one.
-
-### Fixed
 - **When a background run finishes, the page updates by itself.** Adding
   weather, resolving place names, linking Immich photos, recalculating
   proposals — all of that happened on the server, and nothing you had open took
@@ -1064,6 +1068,27 @@ any `MINOR`.
   long finished.
 
 ### Security
+
+- **The login cookie is now marked HTTPS-only on every path into the app.**
+  Signing in with e-mail and password already set it that way; signing in
+  through an identity provider did not, so on a site served over HTTPS the
+  session could still travel over an unencrypted connection. Both paths now go
+  through one place, along with the short-lived cookie that carries the login
+  handshake. Running locally over plain HTTP is unchanged.
+- **A hand-written import file can no longer reach into another account.**
+  Restoring a backup always filed everything under the account doing the
+  restoring — but a row carries more than its owner, and a file written by hand
+  could point one of those references at somebody else's entry, place or
+  object: a measurement attached to their entry, or their place name showing up
+  in your timeline. Every reference is now checked against what you actually
+  own, and the import reports how many rows it turned away. Genuine backups
+  bring everything they refer to and are unaffected, including the entries a
+  multi-day trip splits into.
+- **The Immich connection test now checks the address it is handed.** Saving an
+  address had always rejected anything that was not `http://` or `https://`; the
+  *test* button had not, although that is the path that actually calls the
+  address. Where your Immich lives is still entirely your choice, including on
+  your own network.
 - **The container no longer runs as root.** It starts as root only long enough
   to hand your `data` and `media` folders to an unprivileged user, then drops
   to it before the application starts. Existing installations need nothing;
@@ -1127,43 +1152,6 @@ any `MINOR`.
   content security policy, and **the offline map finally works** — without a
   network the map used to fail at the library, not at the map tiles, so it never
   drew anything at all.
-
-### Removed
-- **The two clean-up runs for data from earlier versions:** “Advanced: cut older
-  data into days” under Imports, and the Immich card “Remove old photo-day
-  summary entries”. New imports have cut visits into days by themselves for a
-  while, and step B replaced the photo-day summaries — the buttons were a
-  changelog on screen. Their endpoints are still there if a run is ever needed.
-- **The “Strongest sun” (UV) statistics tile.** It could never fill: the weather
-  archive used for past dates carries no UV values at all, so the tile stayed
-  empty no matter how much weather you added.
-- **Four weather records that could not tell two days apart:** *Sunniest day*,
-  *Longest rain*, *Longest day* and *Shortest day*, each with its ranking.
-  Every one of them is capped, and the cap is what they showed — sunshine
-  cannot last longer than daylight, so every cloudless day around midsummer
-  ties at the same number; a day has 24 hours, and a day that rains through is
-  not rare; and the length of a day is a property of the calendar, so the tile
-  named the solstice no matter what happened. The rankings underneath made it
-  plain: ten places, one value. Hours of sunshine still count towards the
-  yearly total in the weather balance, and all the values are still shown on
-  the individual entry.
-- **The “Days with the most photos” ranking.** A day's photo strip holds at most
-  twelve pictures, so the list showed twelve for every day in it — that is our
-  own limit, not a statement about the day you took the most photos.
-- **The “Build embeddings” button in the System tab.** With the AI-based search
-  gone (see above), it had nothing left to do.
-- **The “Go to the timeline” tile on the Today page.** It was a navigation
-  shortcut dressed up as a statistic; the bottom navigation already goes there.
-- **The “🧭 Vector map” background map, and its settings block.** It was the one
-  map option that did nothing until you had first copied a style URL out of
-  another program's admin settings, and it brought its own troubles: a slow
-  first paint when the map switched to week or month, missing icons in
-  third-party styles, and a dependency on WebGL that older devices do not
-  offer. The three built-in maps — OpenStreetMap, topography, satellite — and
-  **🔧 Custom map** for your own tile server are unchanged. If you had chosen
-  the vector map, your maps quietly fall back to the standard one; the style
-  URL was only ever stored on your device and needs no cleaning up. Two of the
-  four map libraries the page loads disappear with it.
 
 ## [0.39.0] – 2026-07-23
 

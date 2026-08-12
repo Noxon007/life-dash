@@ -1,6 +1,6 @@
 # PRÜFGLEIS. Läuft bei jedem Push und jedem Pull Request.
 #
-# Bis hierher gab es 43 Testdateien und 27 Wächter — und keinen Auslöser, der
+# Als dieses Gleis entstand, gab es 43 Testdateien und 27 Wächter — und keinen Auslöser, der
 # sie fährt. Sie liefen genau dann, wenn jemand daran dachte. Ein Wächter, den
 # niemand startet, prüft nichts (dieselbe Klasse wie Anmerkung 108: eine
 # Prüfung, die nie gegen den Defekt läuft, ist keine).

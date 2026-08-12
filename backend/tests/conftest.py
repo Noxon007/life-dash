@@ -37,7 +37,7 @@ from sqlalchemy.pool import StaticPool
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.config import settings  # noqa: E402
-from app.database import Base  # noqa: E402
+from app.database import Base, attach_sqlite_pragmas  # noqa: E402
 from app.models import User, UserRole  # noqa: E402
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "").strip()
@@ -114,6 +114,11 @@ def db(_shared_engine):
             connect_args={"check_same_thread": False},
             poolclass=StaticPool,
         )
+        # Anmerkung 223: dieselben Einstellungen wie im Betrieb — vor allem
+        # `PRAGMA foreign_keys=ON`. Ohne diese Zeile hat die Testdatenbank
+        # ANDERE Regeln als die betriebene, und die Erzwingung wäre eingebaut,
+        # ohne dass ein einziger Test sie sieht.
+        attach_sqlite_pragmas(engine)
         Base.metadata.create_all(engine)
         session = sessionmaker(bind=engine, autoflush=False)()
         yield session

@@ -21,7 +21,8 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI,
-  Geocoding aus) — 902 Tests, ~52 s, SQLite im Arbeitsspeicher
+  Geocoding aus, **Fremdschlüssel erzwungen**) — 927 Tests, ~48 s,
+  SQLite im Arbeitsspeicher
 - **Tests gegen echtes PostgreSQL** (das, worauf betrieben wird): `pwsh
   tools/pg-test.ps1` — **kein Docker**, legt mit den installierten Binärdateien
   einen eigenen Cluster in `backend/_pgtest/` auf Port **55432** an und stoppt
@@ -224,8 +225,9 @@ Der wiederkehrende Defekt in diesem Projekt ist nicht Kaputtheit, sondern
 - **Wer eine Zahl über den GESAMTEN Bestand braucht, holt sie vom Server.**
 - **`query().delete()` verliert die ORM-Kaskade** — sichtbar nur dort, wo
   Fremdschlüssel erzwungen werden (PostgreSQL), still auf SQLite.
-- **SQLite erzwingt keine Fremdschlüssel — eine vergessene Kindtabelle ist
-  deshalb in JEDEM Test grün.** Sie fällt erst auf PostgreSQL um, und dann
+- **SQLite erzwingt Fremdschlüssel seit Anmerkung 223 — die alte Falle ist
+  entschärft, aber ihr Grund bleibt lesenswert.** Bis dahin galt: eine
+  vergessene Kindtabelle ist in JEDEM Test grün. Sie fällt erst auf PostgreSQL um, und dann
   NACHDEM die Zeilen davor schon „gelöscht" ins Log geschrieben haben: ein
   Protokoll, das einen Erfolg meldet, den es nicht gab, ist teurer als keins.
   Deshalb ist die Löschreihenfolge in `app/wipe.py` eine Liste, und der Test
@@ -534,8 +536,8 @@ Ereignis-Hälfte kann dasselbe als `NOT EXISTS`. Bewusst eigene Runde — es
 ändert, welche Zeilen ein Lauf aufgreift.
 
 **Vollständige Durchsicht vor dem Release 2026-08-12 — 30 Befunde, in vier
-Teile geschnitten. Teile 1–3 (Anmerkungen 220–222)
-sind gebaut, Teil 4 ist offen.**
+Teile geschnitten. Teile 1–4 (Anmerkungen 220–223)
+sind gebaut.**
 Der Bericht liegt als Artefakt vor; die Aufteilung:
 - **Teil 1 ✅ Statistik-Reiter und die Prüfung, die ihn nicht gefangen hat.**
   29 s → 2,3 s, Antwort Byte für Byte identisch. Dazu `DB=`-Modus im
@@ -578,14 +580,24 @@ Der Bericht liegt als Artefakt vor; die Aufteilung:
     `_place_ranking`/`_farthest_from_home` stammen daher. Mit 87 Orten misst er
     diese Dimension nicht mehr; der Lastfall kennt 240. Steht im Kopf von
     `tools/_measure_api.py`.
-- **Teil 4 (offen) Betrieb, Start, Doku.** Das Dockerfile setzt `MEDIA_DIR`
-  nicht (nur die Compose) · `psycopg2-binary` ist die einzige ungepinnte
-  Abhängigkeit · `pytest` steht in den Produktions-Requirements · `chown -R
-  /data` läuft bei jedem Start über die ganze Fotobibliothek · `sqlite://`
-  stürzt beim Import ab · SQLite läuft ohne `PRAGMA foreign_keys` · zwei
-  Alt-Aufräumläufe scannen bei jedem Start die vollen Tabellen · **der
-  `[Unreleased]`-Block hat 172 Punkte und doppelte Überschriften und muss vor
-  dem Tag verdichtet werden.**
+- **Teil 4 ✅ Betrieb, Start, Doku** (Anmerkung 223). Was dabei zu merken
+  bleibt:
+  - **SQLite erzwingt jetzt Fremdschlüssel.** Die Falle „eine vergessene
+    Kindtabelle ist in JEDEM Test grün" gilt damit nicht mehr — sie fällt im
+    schnellen Lauf um. EINE Liste (`database.SQLITE_PRAGMAS`), von Anwendung
+    UND `conftest` gelesen: der erste Entwurf hing nur an der App-Engine, und
+    902 Tests waren grün, ohne dass die Erzwingung im Lauf galt.
+  - **Und sie hat sofort etwas gefunden:** der Backup-Import hing an der
+    Reihenfolge in der Datei. Beide Dialekte verdeckten es aus VERSCHIEDENEN
+    Gründen — SQLite erzwang nichts, PostgreSQL prüft am Ende der ANWEISUNG,
+    und SQLAlchemy schreibt einen Block als ein einziges `INSERT`.
+  - **Für den Tabellen-Neubau muss das Pragma AUS** (`ALTER TABLE … RENAME`
+    schreibt sonst fremde Verweise um) — und es gehört an die
+    DBAPI-Verbindung: SQLAlchemy 2.0 beginnt bei `exec_driver_sql` eine
+    Transaktion, und SQLite ignoriert das Pragma in einer offenen. Das wäre
+    lautlos wirkungslos gewesen.
+  - **`[Unreleased]` ist verdichtet**: 180 Punkte unter fünf kanonischen
+    Überschriften statt dreizehn. Vor dem Tag muss der Block LEER sein.
 
 **Code-Durchsicht 2026-08-07 (Anmerkung 201): fünf Reparaturen und vier
 Aufräumungen drin, drei Punkte bewusst offen — sie brauchen erst eine

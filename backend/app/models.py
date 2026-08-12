@@ -398,7 +398,17 @@ class MediaRef(Base):
     # Anmerkung 57: fehlte bisher, obwohl Kap. 6.1 es zusagt. Solange Medien
     # nur über ihr Event erreichbar waren, war das folgenlos — mit eigenen
     # Uploads wäre es der Weg zu fremden Bildern.
-    user_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    #
+    # **Anmerkung 223: jetzt mit Fremdschlüssel.** Sie war die EINZIGE
+    # Besitzspalte im Modell ohne einen — ein `String(36)`, das zufällig wie
+    # `users.id` aussah. Heute folgenlos, weil `wipe.py` eine eigene Liste
+    # führt; morgen nicht, denn seit Anmerkung 219 beantwortet dieses Projekt
+    # „was hängt woran?" mit `Base.metadata`, und eine Spalte ohne
+    # Fremdschlüssel ist für jede dieser Fragen unsichtbar. Sie stand damit
+    # genau eine schemagetriebene Prüfung davon entfernt, still übersehen zu
+    # werden.
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True)
     # F18: nullable seit 0.34. Ein Bild kann statt an einem Ereignis auch an
     # einem TAG hängen — der Ort, an den ein Foto am ehesten gehört, war bis
     # dahin der einzige, an den es nicht konnte (Anmerkung 87). Der Tag ist

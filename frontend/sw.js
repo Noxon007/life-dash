@@ -24,9 +24,15 @@
 // lesen, also fehlte ohne Netz nicht die Kachel, sondern die Bibliothek. Die
 // Bilder gehören dazu (Leaflet sucht sie relativ zu seinem CSS), sonst öffnet
 // die Karte offline ohne Marker.
-const CACHE = "lifedash-shell-v4";
+// v5 (Anmerkung 223): `world-countries.geojson` steht in der Liste. Der
+// Welt-Reiter war die einzige Hauptansicht, die ohne Netz nichts zeigte — die
+// Karte lag seit v4 im eigenen Haus, ihre Umrisse nicht. Der Fetch-Handler
+// unten holte sie zwar beim ersten Aufruf in den Cache, aber nur für den, der
+// den Reiter im Netz schon einmal geöffnet hatte: eine Offline-Fähigkeit, die
+// davon abhängt, ob jemand vorher zufällig irgendwo geklickt hat, ist keine.
+const CACHE = "lifedash-shell-v5";
 const SHELL = ["/", "/index.html", "/manifest.json", "/icon.svg", "/icon-maskable.svg",
-               "/icon-comb.svg",
+               "/icon-comb.svg", "/world-countries.geojson",
                "/vendor/leaflet.js", "/vendor/leaflet.css",
                "/vendor/leaflet.markercluster.js",
                "/vendor/MarkerCluster.css", "/vendor/MarkerCluster.Default.css",
@@ -53,7 +59,13 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
   // API, Docs & fremde Origins: nie aus dem Cache
   if (url.origin !== location.origin) return;
-  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/docs") || url.pathname === "/health") return;
+  // Anmerkung 223: `/redoc` gehört dazu. Von den beiden Doku-Oberflächen stand
+  // nur `/docs` hier — dieselbe Sorte Seite, dieselbe Begründung (fremdes
+  // Skript vom CDN, nichts, was in einen App-Cache gehört), und die zweite
+  // Hälfte fehlte. Dieselbe Auslassung wie bei `_CSP_EXEMPT` im Server, nur
+  // andersherum.
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/docs")
+      || url.pathname.startsWith("/redoc") || url.pathname === "/health") return;
   // Nur GET landet je im Cache — ein POST hat dort nichts verloren.
   if (req.method !== "GET") return;
   const isNav = req.mode === "navigate";

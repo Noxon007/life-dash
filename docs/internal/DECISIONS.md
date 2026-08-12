@@ -2464,6 +2464,103 @@ repair for each: delete it.
     nothing is dated later than yesterday, an invented named place is still not
     sent to a geocoder — and green is what they are supposed to be.
 
+223. ✅ **Review part 4: SQLite enforces foreign keys now — and found a bug in
+    the first minute.**
+
+    Last batch out of the pre-release review (2026-08-12). Mostly small
+    operational items, and one change that pulls a whole class of defect out of
+    the slow lane.
+
+    **(a) `PRAGMA foreign_keys=ON`.** SQLite does not enforce foreign keys
+    unless asked, which is why `CLAUDE.md` carries its own trap for it: *a
+    forgotten child table is green in EVERY test*, it only falls over on
+    PostgreSQL, and by then the log has already reported success. Every promise
+    that hangs on this is now checked against `Base.metadata`
+    (`wipe.WIPE_ORDER`, `admin.ON_DELETE`, `data._user_scoped_refs`) and green
+    on PostgreSQL, so switching it on moves the class from the 95-second run
+    into the 50-second one everybody fires anyway.
+
+    **The first attempt was the trap itself.** The pragma hung on the
+    application's engine; the suite builds its own (`conftest.db`) and never saw
+    it. 902 tests green, enforcement in production, not in the run meant to
+    check it — *green because the setting EXISTS, not because it applies here*.
+    It is one list now (`database.SQLITE_PRAGMAS`, `attach_sqlite_pragmas`),
+    read by both, with a test that asserts `PRAGMA foreign_keys` is 1 inside the
+    test database.
+
+    **And then it immediately found something.** `test_own_export_still_
+    restores_completely` went red: the import writes a backup's `events` block
+    in file order, and a day child can precede its parent. Both dialects were
+    hiding it for *different* reasons — SQLite enforced nothing, and PostgreSQL
+    checks a foreign key at the end of the **statement**, where SQLAlchemy's
+    single `INSERT … VALUES (…), (…)` had already inserted both. On SQLite with
+    enforcement, `executemany` is one statement per row and the child arrives
+    first. `_parents_first()` now orders a block by its self-reference, read
+    from the schema (`_self_ref`) rather than naming `parent_event_id`.
+
+    **(b) `media_refs.user_id` got its foreign key.** It was the only ownership
+    column in the model without one — a `String(36)` that happened to look like
+    `users.id`. Harmless today, because `wipe.py` keeps its own list; not
+    harmless as a habit, since note 219 answers *what hangs on what* with
+    `Base.metadata`, and a column without a foreign key is invisible to every
+    one of those questions.
+
+    That exposed the second-order problem: the rebuild for F18 copies rows into
+    a schema that is now *stricter* than the old one, so a legacy database with
+    a dangling owner would have refused to start. **A pointer to an account that
+    does not exist is not data, it is damage** — `_drop_dangling_refs` sets such
+    a nullable column to NULL and says so in the log; a NOT NULL column still
+    aborts, because deciding that silently is not a migration's business. The
+    SQLite rebuild also turns the pragma off for its duration — `ALTER TABLE …
+    RENAME` rewrites other tables' references while it is on — and the pragma
+    goes to the DBAPI connection, because SQLAlchemy 2.0 autobegins a
+    transaction and SQLite ignores the pragma inside one. That would have failed
+    *silently*.
+
+    **(c) `adopt_orphan_rows` skipped `tracks` and `media_refs`.** Both filter
+    on `user_id` everywhere, so a row without an owner is invisible for good —
+    including in the export — and would have survived deleting the account. The
+    first fix asked the schema (*every table with a nullable `user_id`*) and
+    caught `jobs`, the run log, whose rows deliberately have no owner. It asks
+    `wipe.WIPE_ORDER` now: the same question, already answered in one place, and
+    already guarded for completeness.
+
+    **(d) Small operational items.** `sqlite://` — the commoner of the two
+    in-memory spellings, and the one the test suite uses — got the pool
+    arguments and crashed `create_engine` at *import* time. Two one-off
+    migrations (`ux_metrics_weather` dedup, the A19 label rename) ran their full
+    table scans on **every** start; they ask first now, and the weather one is
+    skipped entirely once its index exists — *the index is the promise*. The
+    entrypoint's `chown -R` ran over the whole photo library at every start;
+    it checks the directory's owner first. `_CSP_EXEMPT` used `startswith`, so
+    `/docsomething` was exempt from the security header too.
+
+    **(e) The image.** `MEDIA_DIR` was set in Compose and in the entrypoint and
+    **not** in the Dockerfile, whose default put uploads in `/app/media`:
+    outside the `/data` volume and in a root-owned directory while the process
+    runs as 10001. Only the documented path (`docker compose`) was ever right.
+    `psycopg2-binary` was the sole unpinned install, appended after
+    `requirements.txt` — while `requirements-dev.txt` pinned the same library at
+    2.9.10. And `pytest` shipped in the image on the reasoning that the
+    invariant test *should be runnable in a container*: the image copies
+    `app`, `modules` and `frontend`, so **the tests are not in it**. Test tooling
+    without tests. It moved to the dev file, the driver moved to production.
+
+    Docker itself still is not built here (note 210), so what is checked is what
+    can be checked without a build: that these files do not contradict each
+    other. That was the defect — not a broken image, but one value stated in
+    three places and missing from the fourth.
+
+    **(f) The changelog.** `[Unreleased]` had 180 entries under **thirteen**
+    headings — `### Changed` four times, `### Fixed` three times. A reader could
+    not find the fixes in one place, and this block becomes the release notes at
+    the cut. Now five headings in Keep a Changelog order; every entry compared
+    before and after, none lost, none altered.
+
+    Fourteen guards, each run against its own broken state, all red. Plus the
+    one for the legacy rebuild, which is the only way to reach
+    `_drop_dangling_refs` at all.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

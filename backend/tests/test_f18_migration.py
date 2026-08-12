@@ -27,7 +27,17 @@ from app.migrate import ensure_schema
 # auslösen würde (`confirmed_at`, `confirmed_by`). Sonst prüfte dieser Test
 # nebenbei die halbe Migrationsgeschichte mit und bräche an deren Stelle statt
 # an seiner eigenen.
+# Anmerkung 223: `users` gehoert dazu. Die Tabelle gab es in 0.33 laengst —
+# sie fehlte hier nur, weil `media_refs.user_id` damals ein blosses
+# `VARCHAR(36)` war und niemand nachfragte, ob die Kennung ein Konto trifft.
+# Seit die Spalte einen Fremdschluessel hat, ist eine Attrappe ohne Konten
+# keine 0.33-Datenbank mehr, sondern eine, die es nie gab.
 OLD_SCHEMA = """
+CREATE TABLE users (
+    id VARCHAR(36) NOT NULL PRIMARY KEY, oidc_subject VARCHAR(255),
+    email VARCHAR(255), display_name VARCHAR(255), role VARCHAR(16),
+    settings JSON, created_at DATETIME
+);
 CREATE TABLE events (
     id VARCHAR(36) PRIMARY KEY, user_id VARCHAR(36), title VARCHAR(255),
     source VARCHAR(32), confirmed VARCHAR(16),
@@ -59,6 +69,8 @@ def old_db(tmp_path):
         for stmt in OLD_SCHEMA.strip().split(";"):
             if stmt.strip():
                 conn.execute(text(stmt))
+        conn.execute(text("INSERT INTO users (id, oidc_subject, role) "
+                          "VALUES ('u1', 'sub-1', 'admin')"))
         conn.execute(text("INSERT INTO events (id, user_id, title) "
                           "VALUES ('e1', 'u1', 'Urlaub')"))
         conn.execute(text(

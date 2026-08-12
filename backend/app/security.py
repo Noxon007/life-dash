@@ -56,7 +56,22 @@ from app.config import settings
 log = logging.getLogger("lifedash.security")
 
 # Die Doku-Oberflächen laden ihr eigenes Skript von einem CDN — siehe Kopf.
+#
+# **Anmerkung 223: genau diese Pfade, nicht alles, was so anfängt.** Geprüft
+# wurde mit `startswith`, und damit war auch `/docsomething` von der Regel
+# ausgenommen. Heute unerreichbar — der Static-Mount kennt den Pfad nicht —,
+# aber die Bedingung sagte etwas anderes, als sie meinte, und eine Ausnahme von
+# der Sicherheitsregel ist die falsche Stelle für „ungefähr".
+#
+# `/docs/oauth2-redirect` gibt es als Unterpfad wirklich (Swagger benutzt ihn
+# beim OAuth-Fluss), deshalb bleibt der Präfix erlaubt — aber nur mit einem
+# Schrägstrich dahinter.
 _CSP_EXEMPT = ("/docs", "/redoc")
+
+
+def _csp_exempt(path: str) -> bool:
+    """Ist dieser Pfad eine der Doku-Oberflächen (oder ein Unterpfad davon)?"""
+    return any(path == p or path.startswith(p + "/") for p in _CSP_EXEMPT)
 
 _INLINE_SCRIPT = re.compile(rb"<script(?![^>]*\bsrc\b)[^>]*>(.*?)</script>", re.DOTALL | re.IGNORECASE)
 
@@ -218,7 +233,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)
         path = request.url.path
-        if not path.startswith(_CSP_EXEMPT):
+        if not _csp_exempt(path):
             response.headers.setdefault("Content-Security-Policy", self.csp)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")

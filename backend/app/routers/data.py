@@ -150,6 +150,76 @@ def _block(payload: dict, key: str) -> list[dict]:
     return rows
 
 
+def _self_ref(model) -> str | None:
+    """Die Spalte, mit der diese Tabelle auf SICH SELBST zeigt — oder None.
+
+    Heute ist das genau `events.parent_event_id`. Gefragt wird trotzdem das
+    Schema und nicht diese eine Spalte: eine zweite Selbstbeziehung wäre sonst
+    beim Import stumm falsch, und zwar erst beim Zurückspielen eines Backups —
+    dem Vorgang, bei dem am wenigsten jemand zusieht.
+    """
+    for col in model.__table__.columns:
+        for fk in col.foreign_keys:
+            if fk.column.table.name == model.__table__.name:
+                return col.name
+    return None
+
+
+def _parents_first(model, rows: list[dict]) -> list[dict]:
+    """Zeilen so ordnen, dass ein Verweis auf die eigene Tabelle hinten steht.
+
+    **Anmerkung 223 — gefunden, als SQLite anfing, Fremdschlüssel zu erzwingen.**
+    Der Export liest die Zeilen in der Reihenfolge der Datenbank, und die stellt
+    nichts über Eltern und Kinder zu. `_OwnRows` war für genau diesen Fall
+    gebaut (die „versprochenen" Kennungen), aber nur für die BESITZFRAGE — die
+    Einfüge-Reihenfolge blieb, wie sie in der Datei stand.
+
+    Dass das funktionierte, lag an zwei verschiedenen Zufällen:
+
+    * **SQLite** erzwang Fremdschlüssel gar nicht — eine Waise entstand
+      klaglos und wurde erst zur Waise, wenn jemand sie las.
+    * **PostgreSQL** prüft eine Fremdschlüsselbedingung am Ende der ANWEISUNG,
+      nicht je Zeile. SQLAlchemy schreibt einen Block als ein einziges
+      `INSERT … VALUES (…), (…)`, also stand am Ende der Anweisung beides da
+      und die Prüfung ging durch.
+
+    Zwei Netze also, und keines davon war Absicht. Auf SQLite mit erzwungenen
+    Fremdschlüsseln zerreißt es sofort: dort ist `executemany` eine Anweisung
+    JE ZEILE, und das Kind kommt vor seinem Elternteil an.
+
+    Sortiert wird stabil: was keinen Verweis auf die eigene Tabelle hat oder
+    auf etwas außerhalb dieses Blocks zeigt, behält seinen Platz. Nur wer auf
+    eine Zeile DIESER Datei zeigt, rutscht dahinter.
+    """
+    column = _self_ref(model)
+    if column is None:
+        return rows
+    here = {r["id"]: r for r in rows if r.get("id")}
+    out: list[dict] = []
+    placed: set[str] = set()
+
+    def emit(row: dict, seen: frozenset[str]) -> None:
+        rid = row.get("id")
+        if rid in placed:
+            return
+        parent_id = row.get(column)
+        # Ein Zyklus kann nur aus einer von Hand geschriebenen Datei kommen.
+        # Er darf den Import nicht aufhängen; die Zeile geht durch und
+        # scheitert an der Datenbank, wo sie hingehört.
+        if parent_id in here and parent_id not in placed and parent_id not in seen:
+            emit(here[parent_id], seen | {rid})
+        if rid not in placed:
+            placed.add(rid)
+            out.append(row)
+
+    for row in rows:
+        if row.get("id"):
+            emit(row, frozenset())
+        else:
+            out.append(row)      # ohne Kennung wird sie ohnehin übersprungen
+    return out
+
+
 class _OwnRows:
     """Welche Zeilen darf diese Datei ansprechen? Je Tabelle einmal beantwortet.
 
@@ -541,7 +611,11 @@ def import_data(
         # Tabelle schon als „importiert" gezählt war.
         taken = _day_metric_keys(db, user.id) if key == "day_metrics" else None
         refs = _user_scoped_refs(model)          # Anmerkung 200
-        for row in _block(payload, key):
+        # Anmerkung 223: Eltern vor Kindern innerhalb desselben Blocks. Die
+        # Datei sagt zu ihrer Reihenfolge nichts zu; ohne das entsteht auf
+        # SQLite mit erzwungenen Fremdschlüsseln eine Waise, und der Import
+        # bricht mitten im Zurückspielen ab.
+        for row in _parents_first(model, _block(payload, key)):
             seen += 1
             progress.beat(seen, rows_total - seen, note=key)
             if not row.get("id") or db.get(model, row["id"]) is not None:

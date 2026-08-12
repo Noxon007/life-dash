@@ -6,8 +6,12 @@ diesen Mechanismus.
 """
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
+
+log = logging.getLogger("lifedash.migrate")
 
 # Tabelle -> {Spalte: SQL-Typ}
 _MISSING_COLUMNS: dict[str, dict[str, str]] = {
@@ -131,6 +135,43 @@ def _copy_expr(column) -> str:
     return f"COALESCE({name}, {fallback})"
 
 
+def _drop_dangling_refs(conn, model) -> list[str]:
+    """Verweise ins Leere auf NULL setzen — beim Tabellen-Neubau, und nur da.
+
+    **Anmerkung 223.** Der Neubau kopiert die Zeilen in eine Tabelle, deren
+    Schema STRENGER ist als das alte: `media_refs.user_id` hat seit dieser
+    Runde einen Fremdschlüssel, vorher war es ein `VARCHAR(36)`, das zufällig
+    wie eine Kennung aussah. Eine Altdatenbank, in der dort etwas steht, das
+    kein Konto ist, hätte den Umbau damit zum Abbruch gebracht — und aus einer
+    alten Unsauberkeit eine Instanz gemacht, die nicht mehr startet.
+
+    **Ein Zeiger auf ein Konto, das es nicht gibt, ist keine Angabe, sondern
+    ein Schaden.** NULL sagt genau dasselbe, nur ehrlich: „gehört niemandem".
+    Verloren geht nichts — die Zeile war über diesen Verweis ohnehin für
+    niemanden erreichbar.
+
+    Nur für NULLABLE Spalten. Ist die Spalte Pflicht, bleibt der Abbruch
+    richtig: dann wäre die Zeile ohne ihr Ziel gar keine Zeile, und das
+    stillschweigend zu entscheiden steht einer Migration nicht zu.
+    """
+    notes: list[str] = []
+    for col in model.columns:
+        for fk in col.foreign_keys:
+            if not col.nullable:
+                continue
+            target = fk.column.table.name
+            n = conn.execute(text(
+                f'UPDATE "{model.name}" SET "{col.name}" = NULL '
+                f'WHERE "{col.name}" IS NOT NULL AND "{col.name}" NOT IN '
+                f'(SELECT "{fk.column.name}" FROM "{target}")')).rowcount or 0
+            if n:
+                log.warning(
+                    "%s.%s: %d Verweis(e) zeigten auf ein nicht vorhandenes %s "
+                    "und stehen jetzt auf NULL", model.name, col.name, n, target)
+                notes.append(f"{model.name}.{col.name} ({n} Waisen gelöst)")
+    return notes
+
+
 def _relax_not_null(engine: Engine, insp) -> list[str]:
     """Macht die Spalten aus `_DROP_NOT_NULL` nullable — idempotent.
 
@@ -163,12 +204,51 @@ def _relax_not_null(engine: Engine, insp) -> list[str]:
             # über das ORM. Die neue Tabelle verbietet NULL, der Umzug bräche
             # also genau bei den ältesten Zeilen ab.
             src = ", ".join(_copy_expr(model.columns[c]) for c in keep)
-            with engine.begin() as conn:
-                conn.execute(text(f'ALTER TABLE "{table}" RENAME TO "{table}__old"'))
-                model.create(conn)
-                conn.execute(text(
-                    f'INSERT INTO "{table}" ({cols}) SELECT {src} FROM "{table}__old"'))
-                conn.execute(text(f'DROP TABLE "{table}__old"'))
+            # **Anmerkung 223: Fremdschlüssel für den Umbau AUS.** Seit sie
+            # erzwungen werden, ist der Tabellen-Neubau der eine Ort, an dem
+            # das schadet: `ALTER TABLE … RENAME` schreibt bei eingeschalteten
+            # Fremdschlüsseln die Verweise ANDERER Tabellen auf den neuen Namen
+            # um — hier also auf `media_refs__old`, das gleich danach fällt.
+            # Genau dafür nennt die SQLite-Doku diesen Ablauf: Pragma aus,
+            # umbauen, Pragma an, `foreign_key_check`.
+            #
+            # **Das Pragma geht an die DBAPI-Verbindung, nicht über
+            # `exec_driver_sql`.** SQLite ignoriert `PRAGMA foreign_keys` in
+            # einer offenen Transaktion, und SQLAlchemy 2.0 beginnt eine, sobald
+            # irgendetwas über die `Connection` läuft (Autobegin). Der Aufruf
+            # wäre also folgenlos gewesen — und zwar lautlos, was hier besonders
+            # teuer ist: der Umbau hätte die Verweise anderer Tabellen auf
+            # `…__old` umgeschrieben und die Tabelle danach gelöscht.
+            #
+            # Der Umbau selbst bleibt EINE Transaktion (ein Abbruch mittendrin
+            # darf keine halbe Tabelle hinterlassen), und danach fragt
+            # `foreign_key_check`, ob wirklich nichts ins Leere zeigt.
+            with engine.connect() as conn:
+                raw = conn.connection
+                raw.execute("PRAGMA foreign_keys=OFF")
+                try:
+                    # **Vorher zählen, nachher vergleichen.** Die Frage ist
+                    # „hat DIESER Umbau etwas zerrissen?" und nicht „ist in
+                    # dieser Altdatenbank alles heil?". Eine Migration, die
+                    # wegen einer Waise abbricht, die vorher schon da war,
+                    # macht aus einer alten Unsauberkeit eine Instanz, die
+                    # nicht mehr startet — der teurere Fehler.
+                    with conn.begin():
+                        conn.execute(text(
+                            f'ALTER TABLE "{table}" RENAME TO "{table}__old"'))
+                        model.create(conn)
+                        conn.execute(text(
+                            f'INSERT INTO "{table}" ({cols}) '
+                            f'SELECT {src} FROM "{table}__old"'))
+                        conn.execute(text(f'DROP TABLE "{table}__old"'))
+                        applied += _drop_dangling_refs(conn, model)
+                    broken = list(raw.execute("PRAGMA foreign_key_check"))
+                    if broken:
+                        raise RuntimeError(
+                            f"Nach dem Umbau von {table} zeigen Verweise ins "
+                            f"Leere: {broken[:5]}")
+                finally:
+                    raw.execute("PRAGMA foreign_keys=ON")
         else:
             with engine.begin() as conn:
                 for col in todo:
@@ -224,6 +304,16 @@ def ensure_schema(engine: Engine) -> list[str]:
     applied += _drop_obsolete(engine, inspect(engine))
     if "metrics" in existing_tables:
         ensure_weather_unique_index(engine)
+    # **Anmerkung 223: die Alt-Aufräumung läuft nur noch, wenn es etwas gibt.**
+    # Beide Schritte darunter waren einmalige Nacharbeiten und liefen seitdem
+    # bei JEDEM Start über die vollen Tabellen — zwei `UPDATE … LIKE` über
+    # `locations` und `events`. Auf einem Raspberry Pi mit gewachsenem Bestand
+    # ist das Startzeit für eine Arbeit, die vor Monaten erledigt war.
+    #
+    # Ein `SELECT EXISTS` statt eines `UPDATE` ist derselbe Scan — ABER er
+    # bricht beim ersten Treffer ab, und wenn es keinen gibt, läuft er über den
+    # Index bzw. einmal durch und schreibt nichts. Der Unterschied ist nicht
+    # die Suche, sondern die Schreiblast und das WAL-Wachstum bei jedem Start.
     if "locations" in existing_tables:
         cleanup_searched_address_labels(engine)
     ensure_indexes(engine, existing_tables)
@@ -261,18 +351,38 @@ def ensure_indexes(engine: Engine, existing_tables: set[str]) -> None:
                     f'CREATE INDEX IF NOT EXISTS "{name}" ON "{table}" ("{column}")'))
 
 
-def cleanup_searched_address_labels(engine: Engine) -> None:
+def cleanup_searched_address_labels(engine: Engine) -> int:
     """A19: Das Alt-Label „Gesuchte Adresse — " aus bereits aufgelösten Orten
     und Besuchs-Titeln entfernen. Idempotent (WHERE greift nach dem REPLACE
     nicht mehr); nackte „Gesuchte Adresse"-Orte bleiben und laufen über
-    „Ortsnamen auflösen" in reine Adressen."""
+    „Ortsnamen auflösen" in reine Adressen.
+
+    **Anmerkung 223: erst fragen, dann schreiben.** Beide `UPDATE` liefen bei
+    jedem Start über die vollen Tabellen. Sie fanden seit Monaten nichts und
+    schrieben trotzdem eine Transaktion je Start ins WAL. Ein `EXISTS` davor
+    kostet denselben Scan einmal, bricht aber beim ersten Treffer ab — und im
+    Normalfall (nichts zu tun) bleibt es beim Lesen.
+
+    Gibt zurück, wie viele Zeilen umbenannt wurden — für das Startprotokoll:
+    eine Nacharbeit, die niemand meldet, ist eine, von der niemand weiß.
+    """
+    jobs = (
+        ("locations", "name",
+         "UPDATE locations SET name = REPLACE(name, 'Gesuchte Adresse — ', '') "
+         "WHERE name LIKE 'Gesuchte Adresse — %'",
+         "SELECT 1 FROM locations WHERE name LIKE 'Gesuchte Adresse — %' LIMIT 1"),
+        ("events", "title",
+         "UPDATE events SET title = REPLACE(title, 'Besuch: Gesuchte Adresse — ', 'Besuch: ') "
+         "WHERE title LIKE 'Besuch: Gesuchte Adresse — %'",
+         "SELECT 1 FROM events WHERE title LIKE 'Besuch: Gesuchte Adresse — %' LIMIT 1"),
+    )
+    changed = 0
     with engine.begin() as conn:
-        conn.execute(text(
-            "UPDATE locations SET name = REPLACE(name, 'Gesuchte Adresse — ', '') "
-            "WHERE name LIKE 'Gesuchte Adresse — %'"))
-        conn.execute(text(
-            "UPDATE events SET title = REPLACE(title, 'Besuch: Gesuchte Adresse — ', 'Besuch: ') "
-            "WHERE title LIKE 'Besuch: Gesuchte Adresse — %'"))
+        for _table, _col, update, probe in jobs:
+            if conn.execute(text(probe)).first() is None:
+                continue
+            changed += conn.execute(text(update)).rowcount or 0
+    return changed
 
 
 def ensure_weather_unique_index(engine: Engine) -> None:
@@ -290,17 +400,57 @@ def ensure_weather_unique_index(engine: Engine) -> None:
     es trotzdem, und deshalb bleibt es: Dubletten entstehen nur, wenn zwei
     Läufe DENSELBEN Tag am DEMSELBEN Ort fragen, und beide bekommen dieselbe
     Antwort. Wer die Werte wirklich austauschen will, hat seit Anmerkung 186
-    den ausdrücklichen Weg über `discard_weather`."""
+    den ausdrücklichen Weg über `discard_weather`.
+
+    **Anmerkung 223: das Aufräumen läuft nur, solange es den Index nicht gibt.**
+    Der `DELETE` mit seiner `GROUP BY`-Unterabfrage ging bei JEDEM Start über
+    die ganze Metrik-Tabelle — am Demo-Bestand 143.000 Zeilen, im Betrieb
+    mehr. Er kann seit dem ersten Lauf nichts mehr finden: **der Index IST die
+    Zusage**, Dubletten entstehen danach nicht wieder. Ihn trotzdem jedes Mal
+    zu suchen, heißt eine einmalige Nacharbeit für eine dauerhafte zu halten.
+    """
+    insp = inspect(engine)
+    have = {ix["name"] for ix in insp.get_indexes("metrics")}
     with engine.begin() as conn:
-        conn.execute(text(
-            "DELETE FROM metrics WHERE source = 'weather' AND id NOT IN ("
-            "SELECT MIN(id) FROM metrics WHERE source = 'weather' "
-            "GROUP BY event_id, \"key\")"
-        ))
+        if "ux_metrics_weather" not in have:
+            conn.execute(text(
+                "DELETE FROM metrics WHERE source = 'weather' AND id NOT IN ("
+                "SELECT MIN(id) FROM metrics WHERE source = 'weather' "
+                "GROUP BY event_id, \"key\")"
+            ))
         conn.execute(text(
             'CREATE UNIQUE INDEX IF NOT EXISTS ux_metrics_weather '
             'ON metrics (event_id, "key") WHERE source = \'weather\''
         ))
+
+
+def _adoptable_tables() -> list[str]:
+    """Welche Tabellen Altdaten ohne Besitzer haben können — aus EINER Liste.
+
+    **Anmerkung 223.** Hier stand die Aufzählung `fragments, locations, events,
+    entities`, und `tracks` und `media_refs` fehlten. Beide haben eine nullbare
+    `user_id`, beide werden überall über sie gefiltert — eine Zeile ohne
+    Besitzer ist damit für immer unsichtbar: nicht im Zeitstrahl, nicht in der
+    Statistik, **und nicht im Export**. Sie wäre auch beim Löschen des Kontos
+    stehen geblieben.
+
+    **Gefragt wird `wipe.WIPE_ORDER` und nicht das Schema.** Der erste Versuch
+    nahm jede Tabelle mit nullbarer `user_id` — und griff damit `jobs` mit, das
+    Lauf-Protokoll. Ein systemweiter Lauf (Neuberechnung, Embeddings) hat
+    ausdrücklich KEINEN Besitzer; ihn dem ersten Konto zuzuschlagen wäre eine
+    erfundene Aussage über die Vergangenheit. `wipe.py` beantwortet dieselbe
+    Frage — „was gehört einem Konto?" — seit Anmerkung 219 an einer Stelle, und
+    `WIPE_KEEPS` nennt `jobs` mit genau dieser Begründung.
+
+    Dass diese Liste vollständig ist, prüft `test_wipe_covers_every_user_table`
+    gegen `Base.metadata`. Eine neue Tabelle mit Besitzer ist damit von selbst
+    dabei — und eine ohne bleibt es auch.
+    """
+    from app.wipe import WIPE_ORDER
+
+    return [model.__table__.name for model, _key, _scope in WIPE_ORDER
+            if "user_id" in model.__table__.columns
+            and model.__table__.columns["user_id"].nullable]
 
 
 def adopt_orphan_rows(engine: Engine, user_id: str) -> int:
@@ -310,11 +460,17 @@ def adopt_orphan_rows(engine: Engine, user_id: str) -> int:
     Single-User-Zeit nicht verwaist bleiben.
     """
     total = 0
+    existing = set(inspect(engine).get_table_names())
     with engine.begin() as conn:
-        for table in ("fragments", "locations", "events", "entities"):
+        for table in _adoptable_tables():
+            if table not in existing:
+                continue
             result = conn.execute(
                 text(f'UPDATE "{table}" SET user_id = :uid WHERE user_id IS NULL'),
                 {"uid": user_id},
             )
-            total += result.rowcount or 0
+            n = result.rowcount or 0
+            if n:
+                log.info("Altdaten übernommen: %s — %d Zeile(n)", table, n)
+            total += n
     return total

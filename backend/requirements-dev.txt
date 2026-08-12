@@ -1,14 +1,18 @@
-# Nur für Tests und Prüfläufe — NICHT im Image (Dockerfile installiert
-# requirements.txt plus psycopg2-binary).
+# Nur für Tests und Prüfläufe — NICHT im Image (das installiert
+# requirements.txt, und zwar nur die).
 #
-# `pytest` selbst steht bewusst weiter in requirements.txt: der
-# Invarianten-Test (P2.6) soll auch in einem Container laufen können.
+# **Anmerkung 223: `pytest` ist hierher gewandert.** Es stand in
+# requirements.txt, begründet damit, der Invarianten-Test (P2.6) solle „auch in
+# einem Container laufen können". Der Grund trägt nicht: das Image kopiert
+# `backend/app`, `backend/modules` und `frontend` — **die Tests sind gar nicht
+# darin**. Ausgeliefert wurde also ein Testwerkzeug ohne Tests. Wer sie im
+# Container fahren will, braucht ohnehin diese Datei UND das Testverzeichnis.
+#
+# Der Treiber steht seit derselben Runde in requirements.txt: die Vorgabe der
+# Compose-Datei ist PostgreSQL, also gehört er zum Betrieb.
 -r requirements.txt
 
-# Derselbe Treiber, den das Image benutzt (Dockerfile) und den die
-# docker-compose-URL nennt (`postgresql+psycopg2://`). Ein anderer Treiber
-# würde eine andere Datenbank testen als die, die betrieben wird.
-psycopg2-binary==2.9.10
+pytest==9.1.1
 
 # Zeigt, wohin die Testdateien NICHT schauen.
 pytest-cov==6.0.0

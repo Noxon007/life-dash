@@ -21,8 +21,23 @@ if [ "$(id -u)" = "0" ]; then
     # wäre bequemer und würde jede Datei des Images anfassen, die niemand
     # ändern soll — der Code gehört ausdrücklich weiter root und ist für den
     # Anwendungsbenutzer nur lesbar.
+    # Anmerkung 223: Erst FRAGEN, dann übereignen.
+    #
+    # `chown -R` lief bei jedem Start über den ganzen Baum. In der Compose-Datei
+    # liegt `./media` unter `/data/media`, also INNERHALB des ersten Eintrags —
+    # der rekursive Lauf fasst damit jedes Foto an, und die Schleife danach
+    # gleich noch einmal. Bei einigen zehntausend Bildern auf einer SD-Karte
+    # sind das Sekunden bis Minuten vor jedem Neustart, für Rechte, die sich
+    # seit dem letzten Mal nicht geändert haben.
+    #
+    # Geprüft wird das Verzeichnis selbst: gehört es bereits dem
+    # Anwendungsbenutzer, war der letzte Lauf erfolgreich und der Inhalt ist es
+    # auch. `-h` sonst nicht nötig; `stat -c` gibt es in Debian-Slim.
     for dir in /data "${MEDIA_DIR:-/data/media}"; do
         [ -d "$dir" ] || mkdir -p "$dir"
+        owner="$(stat -c '%u:%g' "$dir" 2>/dev/null || echo '?')"
+        [ "$owner" = "$APP_UID:$APP_GID" ] && continue
+        echo "Übereigne $dir an $APP_UID:$APP_GID (bisher $owner) — einmalig." >&2
         chown -R "$APP_UID:$APP_GID" "$dir" 2>/dev/null || \
             echo "Hinweis: $dir konnte nicht übereignet werden — liegt es auf" \
                  "einem Netzlaufwerk? Falls die App nicht schreiben kann," \
