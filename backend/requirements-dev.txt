@@ -15,7 +15,7 @@
 pytest==9.1.1
 
 # Zeigt, wohin die Testdateien NICHT schauen.
-pytest-cov==6.0.0
+pytest-cov==7.1.0
 
 # `fastapi.testclient.TestClient` steht darauf — ohne httpx scheitert schon der
 # IMPORT, also die Sammelphase, und pytest bricht mit Code 2 ab, bevor ein
