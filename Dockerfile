@@ -7,7 +7,7 @@
 # Digest zeigt; Dependabot hebt beides gemeinsam an (`.github/dependabot.yml`).
 # **Ein Digest ohne einen Mechanismus, der ihn anhebt, ist eine Konserve** —
 # deshalb kommt das eine nicht ohne das andere.
-FROM python:3.13-slim@sha256:9662417aace5ae7b8e2609cce472b72a8958e134ba372808abe9cc1a0c0125e6
+FROM python:3.14-slim@sha256:a7fb1e634c4a578f9e0bd6327f11a3cde11b7a9395f48e24360c0988bcc5c2bc
 
 # Links the GHCR package to the repo (visibility, overview page)
 LABEL org.opencontainers.image.source="https://github.com/Noxon007/life-dash" \
