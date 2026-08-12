@@ -21,7 +21,7 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI,
-  Geocoding aus) — 864 Tests, ~40 s, SQLite im Arbeitsspeicher
+  Geocoding aus) — 888 Tests, ~39 s, SQLite im Arbeitsspeicher
 - **Tests gegen echtes PostgreSQL** (das, worauf betrieben wird): `pwsh
   tools/pg-test.ps1` — **kein Docker**, legt mit den installierten Binärdateien
   einen eigenen Cluster in `backend/_pgtest/` auf Port **55432** an und stoppt
@@ -534,21 +534,33 @@ Ereignis-Hälfte kann dasselbe als `NOT EXISTS`. Bewusst eigene Runde — es
 ändert, welche Zeilen ein Lauf aufgreift.
 
 **Vollständige Durchsicht vor dem Release 2026-08-12 — 30 Befunde, in vier
-Teile geschnitten. Teil 1 ist gebaut (Anmerkung 220), Teil 2–4 sind offen.**
+Teile geschnitten. Teil 1 (Anmerkung 220) und Teil 2 (Anmerkung 221) sind
+gebaut, Teil 3–4 sind offen.**
 Der Bericht liegt als Artefakt vor; die Aufteilung:
 - **Teil 1 ✅ Statistik-Reiter und die Prüfung, die ihn nicht gefangen hat.**
   29 s → 2,3 s, Antwort Byte für Byte identisch. Dazu `DB=`-Modus im
   Messwerkzeug und `live-check.js` als CI-Job. Einzelheiten: Anmerkung 220.
-- **Teil 2 (offen) Korrektheit in Ableitungen und an den Eingängen.** Sieben
-  Befunde, alle „eine Regel an zwei Orten" oder eine fehlende Prüfung am Rand:
-  `admin._coerce_value` kennt `Date` nicht (PATCH auf `baseline_locations.
-  date_start` → 500 auf SQLite, still durchgewinkt auf PostgreSQL) · die
-  wärmste Reise verliert 23 % ihrer Tage, weil `by_day` VOR dem
-  Kategorie-Filter verdichtet · der Import antwortet auf kaputte Nutzlast mit
-  einem 500er · die Rangliste „Jahre" sortiert nach einer Kalenderkonstante
-  (sechsmal 366) · `_short_place` schneidet „Ort (54.358, 10.123)" hinter der
-  ersten Zahl ab · `date_end` vor `date_start` und ein Wohnort ab 2099 werden
-  angenommen.
+- **Teil 2 ✅ Korrektheit in Ableitungen und an den Eingängen** (Anmerkung 221).
+  Sechs Reparaturen, fünf davon „eine Regel an zwei Orten". Was dabei zu
+  merken bleibt:
+  - **`Date` ist KEINE Unterart von `DateTime`.** `isinstance(col.type,
+    DateTime)` ist für einen Tag falsch, und der Wert geht dann als
+    Zeichenkette an die Datenbank: SQLite wirft, **PostgreSQL castet still**.
+    Die Dialektklasse in die Richtung, in die `pg-test.ps1` nicht schaut.
+  - **Der Ort ohne Namen ist die Koordinate**, und ihr Komma trennt keine
+    Bestandteile. EINE Regel: `geocode.short_place`/`is_coordinate_name`,
+    im Browser `shortPlace()`; `check-place-format.js` hält beide zusammen.
+  - **Erst filtern, dann verdichten.** Eine Verdichtung „je Tag das erste"
+    entscheidet sonst mit, welche KATEGORIE den Tag bekommt.
+  - **Eine Prüfung über eine Teiländerung gehört hinter das Zusammenfügen** —
+    der Rumpf trägt nur eine Hälfte, die andere steht in der Datenbank.
+  - **Zwei gemeldete Befunde waren keine**, und das steht in Anmerkung 221
+    ausgeschrieben: `confidence: 42` wird gar nicht erst angenommen (das Feld
+    gibt es im Schema nicht), und eine erfundene `category` bleibt bewusst
+    erlaubt — **es gibt serverseitig keine kanonische Kategorienliste**, und
+    eine anzulegen wäre die zweite Kopie von `KNOWN_CATS`. Voraussetzung
+    dafür ist EINE Quelle für Kategorien (alle in die Modul-YAMLs, Frontend
+    liest `/api/modules`), also ein Umbau und keine Eingangsprüfung.
 - **Teil 3 (offen) Der Demo-Bestand als Schaufenster.** Kein einziges
   mehrtägiges Ereignis (also keine „Längste Reise", kein F7, nichts für
   „Mehrtägiges aufteilen") · 3.633 von 3.675 Orten sind Koordinaten-Platzhalter

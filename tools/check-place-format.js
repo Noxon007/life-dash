@@ -72,6 +72,42 @@ setTimeout(async () => {
   ok('Bausteine stehen in der Reihenfolge Straße/Ortsteil/Stadt/Land',
      order.join(',') === PARTS.join(','), order.join(','));
 
+  // 5. Anmerkung 221 — der Ort OHNE Namen wird nicht in der Zahl zerschnitten.
+  //
+  // Wo Nominatim nichts kennt, IST die Koordinate der Name. Das Komma darin
+  // trennt Breite von Länge und keine Bestandteile; wer stumpf am ersten Komma
+  // kürzt, zeigt „Ort (54.358". Drei Stellen im Frontend taten genau das.
+  //
+  // `shortPlace` steht auf oberster Skriptebene und ist deshalb KEINE
+  // Fenster-Eigenschaft (CLAUDE.md) — `w.shortPlace` wäre stumm `undefined`
+  // und die Prüfung eine über nichts. Geholt wird sie über `w.eval`.
+  const shortPlace = w.eval('shortPlace');
+  ok('shortPlace() gibt es überhaupt', typeof shortPlace === 'function');
+  ok('eine Langadresse wird auf den ersten Bestandteil gekürzt',
+     shortPlace('Kirschenallee 12, Bad Segeberg') === 'Kirschenallee 12',
+     shortPlace('Kirschenallee 12, Bad Segeberg'));
+  ok('ein Koordinaten-Platzhalter bleibt ganz',
+     shortPlace('Ort (54.358, 10.123)') === 'Ort (54.358, 10.123)',
+     shortPlace('Ort (54.358, 10.123)'));
+  ok('leer bleibt leer', shortPlace(null) === '' && shortPlace('') === '');
+
+  // Und die Kürzung wird auch BENUTZT: ein ausgeschriebenes
+  // `name.split(',')[0]` auf einem Ortsnamen ist die alte Fassung.
+  // `\.name\.split` verlangt einen ZUGRIFF (`loc.name`, `e.location.name`) —
+  // die Zuweisung in `shortPlace` selbst arbeitet auf dem Parameter und hat
+  // keinen Punkt davor, sonst würde die Regel ihre eigene Umsetzung melden.
+  ok('keine Stelle kürzt einen Ortsnamen mehr von Hand',
+     !/\.name\.split\(',' *\)\[0\]/.test(html.replace(/^\s*\/\/.*$/gm, '')),
+     'irgendwo steht noch <etwas>.name.split(\',\')[0] statt shortPlace()');
+
+  // Der Prefix muss zu `geocode.COORD_NAME_PREFIX` im Server passen — sonst
+  // kürzt die eine Hälfte, was die andere für einen echten Namen hält.
+  const py = fs.readFileSync(process.argv[3] || 'backend/app/services/geocode.py', 'utf8');
+  const server = (py.match(/COORD_NAME_PREFIX\s*=\s*"([^"]+)"/) || [])[1];
+  ok('Frontend und Server meinen denselben Platzhalter',
+     server !== undefined && w.eval('COORD_PREFIX') === server,
+     `Server: ${JSON.stringify(server)}, Frontend: ${JSON.stringify(w.eval('COORD_PREFIX'))}`);
+
   console.log(fail ? `\nOrtsnamen-Format: ${fail} Prüfung(en) fehlgeschlagen`
                    : '\nOrtsnamen-Format: alles grün');
   process.exit(fail ? 1 : 0);

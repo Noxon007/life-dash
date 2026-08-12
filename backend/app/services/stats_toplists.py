@@ -31,8 +31,28 @@ from app.sqlutil import day_number
 TOP_N = 10
 
 
-def _merge_baseline(rows: list[dict], extra: dict[str, int]) -> list[dict]:
+def _merge_baseline(rows: list[dict], extra: dict[str, int],
+                    by: str = "days") -> list[dict]:
     """Abgeleitete Tage in eine fertige Rangliste einrechnen (F20).
+
+    **`by` sagt, welche Zahl die Rangfolge trägt** (Anmerkung 221). Für Orte,
+    Städte und Länder sind es die Tage: „wo war ich am längsten" ist genau die
+    Frage, und ein Ort mit mehr Tagen ist mehr gelebt worden.
+
+    Für JAHRE ist es die falsche Zahl, und zwar nicht knapp. Seit der Wohnort
+    jede Lücke füllt, hat jedes vollständig gelebte Jahr 365 oder 366 Tage —
+    die Zahl kann zwei Jahre nicht unterscheiden. Die Rangliste zeigte deshalb
+    oben die Schaltjahre, und ein Jahr mit einem einzigen Eintrag stand vor
+    jedem Nicht-Schaltjahr:
+
+        2024   366 Tage   670 Einträge
+        2000   366 Tage     1 Eintrag     ← Platz 5
+        2004   366 Tage     1 Eintrag     ← Platz 6
+
+    Das ist die Klasse, für die Anmerkung 216 vier Kacheln gestrichen hat: ein
+    Wert, der nach oben gedeckelt ist, ist kein Rang. Hier ist der Deckel der
+    Kalender. **Die Probe ist die Rangliste, nicht die Kachel** — sechs
+    identische Werte untereinander.
 
     **Die Rangfolge entsteht danach neu, und das ist der Punkt.** Wer den
     Wohnort erst nach dem `LIMIT 10` addierte, bekäme eine Liste, in der ein
@@ -46,8 +66,13 @@ def _merge_baseline(rows: list[dict], extra: dict[str, int]) -> list[dict]:
     zählen wäre genau die Vermischung, gegen die Anmerkung 143 die zweite Zahl
     überhaupt eingeführt hat.
     """
+    # Bei Gleichstand entscheidet die jeweils andere Zahl, dann der Name —
+    # sonst wäre die Reihenfolge die des `dict` und zwischen zwei Aufrufen
+    # verschieden (dieselbe Regel wie in `_ranked` und `_extreme_tops`).
+    order = ((lambda r: (-r["events"], -r["days"], r["name"])) if by == "events"
+             else (lambda r: (-r["days"], -r["events"], r["name"])))
     if not extra:
-        return rows[:TOP_N]
+        return sorted(rows, key=order)[:TOP_N]
     by_name = {r["name"]: r for r in rows}
     for name, n in extra.items():
         cur = by_name.get(name)
@@ -55,9 +80,7 @@ def _merge_baseline(rows: list[dict], extra: dict[str, int]) -> list[dict]:
             by_name[name] = {"name": name, "days": n, "events": 0}
         else:
             cur["days"] += n
-    out = sorted(by_name.values(),
-                 key=lambda r: (-r["days"], -r["events"], r["name"]))
-    return out[:TOP_N]
+    return sorted(by_name.values(), key=order)[:TOP_N]
 
 
 # Wie viele Zeilen die Abfragen holen, bevor der Wohnort eingerechnet wird.
@@ -302,8 +325,13 @@ def compute_toplists(db: Session, user_id: str, n: int = TOP_N,
                           func.count(Event.id))
                  .filter(Event.user_id == user_id, Event.date_start.isnot(None))
                  .group_by("y")
-                 .order_by(func.count(func.distinct(day_key)).desc(),
-                           func.count(Event.id).desc(), "y")
+                 # Anmerkung 221: EINTRÄGE zuerst. Die Tage eines Jahres sind
+                 # der Kalender (365/366, seit der Wohnort jede Lücke füllt) und
+                 # taugen als Rangfolge nicht — Begründung in `_merge_baseline`.
+                 # Auch die Vorauswahl muss danach gehen, sonst schnitte das
+                 # `LIMIT` die Jahre weg, die die Liste zeigen soll.
+                 .order_by(func.count(Event.id).desc(),
+                           func.count(func.distinct(day_key)).desc(), "y")
                  .limit(_PRE_N if b["years"] else n).all())
 
     return {
@@ -321,9 +349,13 @@ def compute_toplists(db: Session, user_id: str, n: int = TOP_N,
                              Event.location_id == Location.id,
                              Location.country != "",
                              baseline_days=b["countries"], label=land),
+        # Anmerkung 221: `by="events"` — die Tage eines Jahres sind der
+        # Kalender und können zwei Jahre nicht unterscheiden. Die Wohnort-Tage
+        # werden trotzdem eingerechnet: sie stehen in der Zeile und sind eine
+        # richtige Auskunft, sie tragen nur nicht den Rang.
         "years": _merge_baseline(
             [{"name": str(int(y)), "days": d, "events": e} for y, d, e in year_rows],
-            {str(y): n for y, n in b["years"].items()}),
+            {str(y): n for y, n in b["years"].items()}, by="events"),
         # **Kategorien bekommen den Wohnort NICHT**, und das ist keine Lücke:
         # ein abgeleiteter Tag hat keine Kategorie. Ihm eine zu geben — und sei
         # es „event" — hieße, eine Aussage zu erfinden, die niemand gemacht hat.

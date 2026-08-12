@@ -141,6 +141,19 @@ def correct_event(
                 db.delete(entity)
         overrides["entities"] = True
 
+    # **Anmerkung 221: gegen den ZUSAMMENGEFÜGTEN Stand prüfen, nicht gegen die
+    # Nutzlast.** Eine Teiländerung schickt oft nur eine der beiden Zeitangaben;
+    # das Schema kann die Spanne dann gar nicht beurteilen, weil ihm die andere
+    # Hälfte fehlt — sie steht in der Datenbank. Wer allein `date_end` auf einen
+    # Tag vor dem gespeicherten `date_start` setzt, käme also durch jede
+    # Prüfung, die nur den Rumpf ansieht.
+    start = data.get("date_start", event.date_start)
+    end = data.get("date_end", event.date_end)
+    if start is not None and end is not None and end < start:
+        raise HTTPException(
+            400, f"Das Ende liegt vor dem Anfang ({end.isoformat()} < "
+                 f"{start.isoformat()}).")
+
     for key, value in data.items():
         setattr(event, key, value)
         overrides[key] = True

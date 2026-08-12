@@ -117,6 +117,39 @@ def _user_scoped_refs(model) -> list[tuple[str, str]]:
     return refs
 
 
+def _block(payload: dict, key: str) -> list[dict]:
+    """Ein Abschnitt der Datei — geprüft, bevor irgendjemand darauf zugreift.
+
+    **Anmerkung 221.** Hier stand überall `payload.get(key, [])`, und jeder
+    Leser nahm danach an, darin stünden Objekte. Eine Datei mit
+    `"events": "kaputt"` lief deshalb bis `r.get("id")` und endete in einem
+    ungefangenen `AttributeError` — HTTP 500 mit Stapelspur, auf dem Weg, auf
+    dem ein Mensch seine Sicherung zurückspielt. Dasselbe für `[null]` und
+    `[123]`.
+
+    Ein 500er sagt „hier ist etwas kaputt" und meint den Server. Kaputt war
+    aber die Datei, und das ist eine Auskunft, die der Aufrufer gebrauchen
+    kann: sie nennt den Abschnitt und was dort stehen müsste.
+
+    Ein fehlender Abschnitt bleibt ausdrücklich erlaubt — ältere Exporte
+    kennen `baseline_locations` und `day_metrics` nicht, und genau darauf
+    beruht die Entscheidung, für sie keine neue Export-Version zu vergeben.
+    """
+    rows = payload.get(key, [])
+    if rows is None:
+        return []
+    if not isinstance(rows, list):
+        raise HTTPException(
+            400, f"„{key}“ muss eine Liste sein, ist aber "
+                 f"{type(rows).__name__} — die Datei ist beschädigt.")
+    bad = next((i for i, r in enumerate(rows) if not isinstance(r, dict)), None)
+    if bad is not None:
+        raise HTTPException(
+            400, f"„{key}“ enthält an Stelle {bad + 1} keinen Datensatz, "
+                 f"sondern {type(rows[bad]).__name__} — die Datei ist beschädigt.")
+    return rows
+
+
 class _OwnRows:
     """Welche Zeilen darf diese Datei ansprechen? Je Tabelle einmal beantwortet.
 
@@ -146,7 +179,7 @@ class _OwnRows:
         self._db, self._user_id = db, user_id
         self._cache: dict[str, set[str]] = {}
         for key, model in promised_from:
-            ids = {r["id"] for r in payload.get(key, []) if r.get("id")}
+            ids = {r["id"] for r in _block(payload, key) if r.get("id")}
             if ids:
                 table = model.__table__.name
                 self._promise(table, ids)
@@ -448,8 +481,16 @@ def import_data(
 ) -> dict:
     """Spielt einen Life-Dash-Export zurück. Vorhandene IDs werden übersprungen
     (idempotent); alle importierten Zeilen gehören dem angemeldeten Nutzer."""
+    # **Anmerkung 221: Das hier ist der Endpunkt, auf den jemand im Ernstfall
+    # seine Sicherungsdatei wirft.** Er antwortete auf ein falsches `format` mit
+    # HTTP 200 und einem `error`-Feld im Rumpf — als einziger Fehlerweg dieser
+    # Datei, alle anderen werfen `HTTPException`. Eine Oberfläche, die auf den
+    # Statuscode sieht, meldete damit einen erfolgreichen Import von null Zeilen.
     if payload.get("format") != "lifedash-export":
-        return {"error": "Kein Life-Dash-Export (format-Feld fehlt/falsch)"}
+        raise HTTPException(
+            400, "Das ist kein Life-Dash-Export — im Dokument fehlt das Feld "
+                 "„format“ mit dem Wert „lifedash-export“. Erwartet wird die "
+                 "Datei aus Verwaltung → Meine Daten → Export.")
 
     # Reihenfolge beachtet Fremdschlüssel (Eltern zuerst)
     plan = [
@@ -483,7 +524,7 @@ def import_data(
     # Der Import prüft jede Zeile einzeln gegen die Datenbank (Idempotenz) —
     # bei einem vollen Backup sind das zehntausende Abfragen. Ohne Zwischenstand
     # ist der Unterschied zwischen „arbeitet" und „hängt" nicht zu sehen.
-    rows_total = sum(len(payload.get(key, [])) for key, _, _ in plan)
+    rows_total = sum(len(_block(payload, key)) for key, _, _ in plan)
     progress = Progress(log, "Daten-Import", unit="Zeilen")
     progress.start(rows_total, note=f"user={user.email or user.id}")
     seen = 0
@@ -500,7 +541,7 @@ def import_data(
         # Tabelle schon als „importiert" gezählt war.
         taken = _day_metric_keys(db, user.id) if key == "day_metrics" else None
         refs = _user_scoped_refs(model)          # Anmerkung 200
-        for row in payload.get(key, []):
+        for row in _block(payload, key):
             seen += 1
             progress.beat(seen, rows_total - seen, note=key)
             if not row.get("id") or db.get(model, row["id"]) is not None:
@@ -533,9 +574,9 @@ def import_data(
             count += 1
         db.flush()
         imported[key] = count
-        if payload.get(key):
+        if _block(payload, key):
             log.info("Import: %s — %d neu, %d schon vorhanden",
-                     key, count, len(payload[key]) - count)
+                     key, count, len(_block(payload, key)) - count)
     db.commit()
     progress.finish(f"{sum(imported.values())} neu, {skipped} übersprungen"
                     + (f", {skipped_foreign} mit fremdem Verweis" if skipped_foreign else ""))

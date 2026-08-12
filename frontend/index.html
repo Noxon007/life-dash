@@ -5007,6 +5007,27 @@ const chipCat = e => (FILTER_CATS.includes(e.category) ? e.category : 'event');
 function catClass(c) { return KNOWN_CATS.includes(c) ? `cat-${c}` : 'cat-media'; }
 function catColor(c) { return catColors[c] || '#f5a623'; }
 
+// ---------- Ortsnamen kürzen (Anmerkung 221) ----------
+// Ein Ortsname wird für die Anzeige auf seinen ersten Bestandteil gekürzt:
+// „Kirschenallee 12, Bad Segeberg" -> „Kirschenallee 12". Ohne das stünde
+// dieselbe Straße mit jeder Nominatim-Langadresse als eigener Ort da.
+//
+// **Die Ausnahme ist der Ort OHNE Namen.** Wo Nominatim nichts kennt, ist die
+// Koordinate selbst der Name — „Ort (54.358, 10.123)" —, und das Komma darin
+// trennt keine Bestandteile, sondern Breite von Länge. Drei Stellen im
+// Frontend schrieben `name.split(',')[0]` aus und machten daraus „Ort (54.358",
+// eine halbe Zahl. Der Server hatte denselben Fehler an derselben Stelle
+// (`stats_overview._short_place`); dort steht die Regel jetzt in
+// `geocode.short_place`, hier in dieser Funktion — und `COORD_PREFIX` muss zu
+// `geocode.COORD_NAME_PREFIX` passen. `check-place-format.js` hält beide
+// Hälften zusammen.
+const COORD_PREFIX = 'Ort (';
+const isCoordName = n => !!n && n.startsWith(COORD_PREFIX);
+function shortPlace(name) {
+  if (!name) return '';
+  return isCoordName(name) ? name.trim() : name.split(',')[0].trim();
+}
+
 // ---------- Datum nach Präzision formatieren ----------
 const MONTHS_SHORT = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
 // F10: Monats- und Jahreszeitennamen laufen wie jeder andere Text über t() —
@@ -8128,6 +8149,14 @@ function renderStatsTops(top) {
   // Einträge stehen daneben.
   const rank = list => (list || []).map((r, i) =>
     topRow(i, r.name, dayCount(r.days), entryCount(r.events)));
+  // Anmerkung 221: Die Jahres-Liste ist nach EINTRÄGEN geordnet, also muss die
+  // große Zahl daneben die Einträge zeigen. Die Tage eines Jahres sind der
+  // Kalender — 365 oder 366, seit der Wohnort jede Lücke füllt — und eine
+  // Rangfolge, deren angezeigte Zahl bei sechs Zeilen identisch ist, liest sich
+  // wie ein Fehler, auch wenn die Sortierung stimmt. Die Tage bleiben als
+  // Nebenangabe stehen; sie sind richtig, sie tragen nur nicht den Rang.
+  const rankByEntries = list => (list || []).map((r, i) =>
+    topRow(i, r.name, entryCount(r.events), dayCount(r.days)));
 
   const streak = top.streaks || {};
   const span = s => s ? `${fmtDay(s.from)} – ${fmtDay(s.to)}` : '';
@@ -8206,7 +8235,7 @@ function renderStatsTops(top) {
     + topPanel(t('tops.places', '📍 Top-Orte'), rank(top.places), noData)
     + topPanel(t('tops.cities', '🏙️ Top-Städte'), rank(top.cities), noData)
     + topPanel(t('tops.countries', '🌍 Top-Länder'), rank(top.countries), noData)
-    + topPanel(t('tops.years', '📅 Top-Jahre'), rank(top.years), noData)
+    + topPanel(t('tops.years', '📅 Top-Jahre'), rankByEntries(top.years), noData)
     + topPanel(t('tops.categories', '🏷️ Top-Kategorien'),
                (top.categories || []).map((r, i) =>
                  topRow(i, catLabel(r.name), dayCount(r.days), entryCount(r.events))),
@@ -8492,7 +8521,7 @@ async function loadFuzzyDates() {
       <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
         <span class="chip badge-unconfirmed">⏳ ${esc(prec)}</span>
         <b>${esc(e.title)}</b>
-        <span class="stat-label">${fmtDate(e)}${e.location ? ' · ' + esc(e.location.name.split(',')[0]) : ''}</span>
+        <span class="stat-label">${fmtDate(e)}${e.location ? ' · ' + esc(shortPlace(e.location.name)) : ''}</span>
         <span class="stat-label" style="margin-left:auto">✏️ ${esc(t('edit', 'bearbeiten'))}</span>
       </div>
     </div>`;
@@ -8590,7 +8619,7 @@ async function bulkPreview() {
       r.events.map(e => `
         <div class="field-row">
           <div class="field-key">${Math.round(e.confidence * 100)}%</div>
-          <div class="field-val">${esc(e.title)} <span class="stat-label">· ${fmtDate(e)}${e.location ? ' · ' + esc(e.location.name.split(',')[0]) : ''}</span></div>
+          <div class="field-val">${esc(e.title)} <span class="stat-label">· ${fmtDate(e)}${e.location ? ' · ' + esc(shortPlace(e.location.name)) : ''}</span></div>
         </div>`).join('');
     confirmBtn.textContent = `✓ ${t('bulk.confirm.n', 'Alle {n} bestätigen').replace('{n}', r.total)}`;
     confirmBtn.style.display = '';
@@ -11303,7 +11332,7 @@ function renderGroupedPeriod(all, key, stops, level) {
       : `${day(first.date_start)} – ${day(last.date_start)}`;
     const short = level === 'city'
       ? (g.loc.city || noCity)
-      : (first.title.replace(/^Besuch: /, '') || g.loc.name.split(',')[0]);
+      : (first.title.replace(/^Besuch: /, '') || shortPlace(g.loc.name));
     const ll = level === 'city' ? [g.lat / n, g.lng / n] : [g.loc.lat, g.loc.lng];
     latlngs.push(ll);
     const cat = mpGroupColorCat(g.items);

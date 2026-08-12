@@ -5,7 +5,7 @@ from datetime import date as date_type
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models import ConfirmState, DatePrecision, FragmentStatus, Source, UserRole
 
@@ -398,6 +398,52 @@ LatField = Annotated[float, Field(ge=-90, le=90)]
 LngField = Annotated[float, Field(ge=-180, le=180)]
 
 
+# --------------------------------------------------------------------------- #
+#  Anmerkung 221 — was für ein Datum überhaupt in diese Datenbank gehört
+# --------------------------------------------------------------------------- #
+# Ein Ereignis im Jahr 9999 wurde bis hierher angenommen. Es passiert nichts
+# Dramatisches damit — es steht nur ab dann in jeder Jahresachse, und ein
+# Balkendiagramm über „1994 bis 9999" ist keins mehr.
+#
+# **Die Grenzen sind bewusst weit und nicht eng.** Dies ist eine
+# Lebensdatenbank, und darin steht Geerbtes: „Großvater geboren 1893" ist ein
+# vollkommen richtiger Meilenstein. Was hier abgewiesen wird, ist nicht
+# „unwahrscheinlich", sondern „kann nicht gemeint sein" — ein Vertipper in der
+# Jahreszahl, ein Zeitstempel in Millisekunden, ein kaputter Import.
+#
+# Nach oben zählt der Abstand zu HEUTE und keine feste Jahreszahl: ein Datum
+# hundert Jahre in der Zukunft ist in jedem Jahr gleich sinnlos, eine
+# eingetragene Obergrenze wäre irgendwann Vergangenheit.
+YEAR_MIN = 1800
+YEARS_AHEAD_MAX = 100
+
+
+def _check_year(value, field: str):
+    """Wirft, wenn das Jahr nicht gemeint sein kann. `None` geht immer durch."""
+    if value is None:
+        return value
+    limit = date_type.today().year + YEARS_AHEAD_MAX
+    if not (YEAR_MIN <= value.year <= limit):
+        raise ValueError(
+            f"{field}: das Jahr {value.year} kann nicht gemeint sein "
+            f"(erlaubt ist {YEAR_MIN} bis {limit})")
+    return value
+
+
+def _check_span(start, end, *, unit: str = "Ereignis"):
+    """Wirft, wenn das Ende vor dem Anfang liegt. Fehlt eins, gibt es nichts zu prüfen.
+
+    Der Wohnort-Endpunkt stellte diese Frage seit F20 („Das Ende liegt vor dem
+    Anfang.", HTTP 400), die Ereignisse nie — dieselbe Zusage, an der zweiten
+    Stelle nicht gestellt. Ein Ereignis mit negativer Spanne ist danach still:
+    `_streaks` überspringt es über `span < 2`, „Mehrtägiges aufteilen" findet
+    nichts, und im Zeitstrahl steht ein Zeitraum, der rückwärts läuft.
+    """
+    if start is not None and end is not None and end < start:
+        raise ValueError(f"{unit}: das Ende liegt vor dem Anfang "
+                         f"({end.isoformat()} < {start.isoformat()})")
+
+
 class BaselineCreate(BaseModel):
     place: str
     date_start: date_type
@@ -405,6 +451,23 @@ class BaselineCreate(BaseModel):
     label: str | None = None
     lat: LatField | None = None
     lng: LngField | None = None
+
+    @model_validator(mode="after")
+    def _plausible(self):
+        # Der Endpunkt prüft Überschneidung und „Ende vor Anfang" seit F20
+        # selbst; hier steht nur, was er nicht fragt: ob das Jahr gemeint sein
+        # kann.
+        #
+        # **Ein Wohnort, der in der Zukunft BEGINNT, bleibt ausdrücklich
+        # erlaubt** (Anmerkung 221). Er wurde als Befund gemeldet, weil er
+        # irgendwann von selbst anfängt, Tage zu füllen — nur ist genau das
+        # richtig: wer zum Ersten des nächsten Monats umzieht, trägt das vorher
+        # ein, und die Tage sollen dann zählen. Eine Frist dafür wäre eine
+        # erfundene Politik über die Daten des Nutzers; die Jahresgrenze
+        # darüber fängt den Fall ab, der wirklich niemand gemeint haben kann.
+        _check_year(self.date_start, "date_start")
+        _check_year(self.date_end, "date_end")
+        return self
 
 
 class BaselineUpdate(BaseModel):
@@ -422,6 +485,12 @@ class BaselineUpdate(BaseModel):
     label: str | None = None
     lat: LatField | None = None
     lng: LngField | None = None
+
+    @model_validator(mode="after")
+    def _plausible(self):
+        _check_year(self.date_start, "date_start")
+        _check_year(self.date_end, "date_end")
+        return self
 
 
 class FragmentRead(BaseModel):
@@ -483,6 +552,13 @@ class EventManualCreate(BaseModel):
     location_lat: LatField | None = None
     location_lng: LngField | None = None
     entities: list[ManualEntity] = []
+
+    @model_validator(mode="after")
+    def _plausible(self):
+        _check_year(self.date_start, "date_start")
+        _check_year(self.date_end, "date_end")
+        _check_span(self.date_start, self.date_end)
+        return self
 
 
 # --------------------------------------------------------------------------- #
@@ -626,6 +702,15 @@ class EventUpdate(BaseModel):
     # Ersetzt die verknüpften Objekte vollständig (z. B. "Seeadler" -> "Adler").
     # Leere Liste = alle Verknüpfungen entfernen. None = unverändert.
     entities: list[ManualEntity] | None = None
+
+    @model_validator(mode="after")
+    def _plausible(self):
+        # Nur das Jahr — die SPANNE prüft `correct_event`, weil eine
+        # Teiländerung nur eine der beiden Zeitangaben mitschickt und die
+        # andere in der Datenbank steht (Anmerkung 221).
+        _check_year(self.date_start, "date_start")
+        _check_year(self.date_end, "date_end")
+        return self
 
 
 # --------------------------------------------------------------------------- #

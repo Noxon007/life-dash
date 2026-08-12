@@ -300,6 +300,34 @@ any `MINOR`.
   it is working.
 
 ### Fixed
+- **Places without a resolved name are no longer cut off mid-coordinate.**
+  Where the map service knows no address, the coordinate itself is the name —
+  “Ort (54.358, 10.123)”. Anywhere a place name was shortened for display
+  (weather records, rankings, map popups, the moderation list) that name was
+  cut at its first comma, so half a number was left standing: “Ort (54.358”.
+- **“Warmest trip” now counts every day of the trip.** If anything else had
+  been recorded earlier the same day — a run, a diary entry, an animal you
+  saw — that day silently dropped out of the average. On a full stock that was
+  roughly one trip day in four.
+- **The *Top years* ranking says something again.** It was ordered by days, and
+  since your residence fills every gap, every full year has 365 or 366 of them
+  — so the list showed the leap years first, and a year with a single entry
+  could outrank a year with hundreds. It now ranks by how much you recorded,
+  and shows that number; the days stay beside it.
+- **A damaged backup file now gets an explanation instead of an error page.**
+  Importing a file whose contents were the wrong shape ended in a server error
+  with no indication of what was wrong. The import now names the section it
+  could not read and what it expected there. A file that is not a Life-Dash
+  export at all is refused outright rather than reported as an import of
+  nothing.
+- **Days can be edited in the raw table view again.** Changing a residence
+  period's start or end date there — or a day of stored weather — failed with a
+  server error instead of saving.
+- **An entry can no longer end before it begins.** Both dates are checked
+  against each other now, whether you set them together or change just one of
+  them afterwards; residence periods have always been checked this way. Dates
+  far outside a human lifetime (a mistyped year like 9999) are refused too,
+  with the allowed range named in the message.
 - **The statistics tab opens in about a second instead of a quarter of a
   minute.** On a full life's worth of entries it was taking roughly fifteen
   seconds to appear, and the rankings underneath another fourteen — long enough

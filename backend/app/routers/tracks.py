@@ -450,7 +450,10 @@ def _link_country(db: Session, user_id: str, country: str,
 def _unresolved_name_filter():
     """SQL-Filter für Orte ohne echten Namen: Koordinaten-Platzhalter
     („Ort (lat, lng)") und Alt-Labels aus früheren Importen (A19/Anm. 114)."""
-    return or_(Location.name.like("Ort (%"),
+    # Anmerkung 221: Der Prefix steht in `geocode.COORD_NAME_PREFIX`. Er war
+    # hier und zwei Zeilen weiter unten ausgeschrieben, und die dritte Stelle
+    # (`stats_overview._short_place`) kannte ihn gar nicht.
+    return or_(Location.name.like(geocode_svc.COORD_NAME_PREFIX + "%"),
                Location.name.in_(DROP_LABELS))
 
 
@@ -496,7 +499,7 @@ def _name_defect(name: str | None, parts: list[str],
     Frage nicht mehr „wie viele Kommas sind erlaubt?", sondern „steht da, was
     das Format ergibt?" — und darauf gibt es eine exakte Antwort."""
     n = name or ""
-    if n.startswith("Ort (") or n in DROP_LABELS:
+    if geocode_svc.is_coordinate_name(n) or n in DROP_LABELS:
         return "unnamed"
     # Alt-Label mit Adresse dahinter: nur abschneiden, kein Abruf nötig.
     if _drop_label(n):
@@ -716,7 +719,7 @@ def import_timeline(
     # Adressen statt „Ort (lat, lng)". Große Erstimporte laufen über den Button.
     names_resolved = 0
     unnamed_new = [l for l in new_locations
-                   if l.name.startswith("Ort (") or l.name in DROP_LABELS]
+                   if geocode_svc.is_coordinate_name(l.name) or l.name in DROP_LABELS]
     if auto_resolve and settings.geocoding_enabled and 0 < len(unnamed_new) <= AUTO_RESOLVE_MAX:
         # Neue Events erst in die DB schreiben (autoflush ist aus), sonst
         # findet die Titel-Nachführung in _apply_resolved_name sie nicht

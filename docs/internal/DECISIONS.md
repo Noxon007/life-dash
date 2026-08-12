@@ -2267,6 +2267,121 @@ repair for each: delete it.
     Three things, one chain: a defect, a blind measurement, an unfired guard.
     Repairing only the first would have left the other two.
 
+221. ✅ **Review part 2: six repairs, and five of them are one rule kept in two
+    places.**
+
+    The second batch out of the pre-release review (2026-08-12, see note 220 for
+    the first). Every one of these was green in 864 tests before this pass.
+
+    **(a) The raw table view could not edit a day.** `_coerce_value` knew
+    `DateTime` and not `Date` — and `Date` is not a subclass of it. A plain day
+    fell through every branch and went to the database as a *string*: on SQLite
+    an uncaught `StatementError` (HTTP 500), on PostgreSQL psycopg2 casts it and
+    it passes silently. That is this project's favourite dialect class in the
+    direction nobody looks — `pg-test.ps1` is aimed at *SQLite passes,
+    PostgreSQL breaks*, and here it was the other way round.
+    `data._dict_to_kwargs` has handled `Date` explicitly since F20, with the
+    same reasoning written next to it. Same rule, second site, never carried
+    over.
+
+    **(b) The place without a name was cut in half.** Where Nominatim knows
+    nothing, the coordinate *is* the name — “Ort (54.358, 10.123)”. Three places
+    knew that (`tracks`, twice by hand plus a third copy I found while fixing
+    it); the fourth did not: `stats_overview._short_place` shortens a place name
+    at the first comma, and in the placeholder that comma separates latitude
+    from longitude. The statistics tile read **“Ort (54.358”**. The frontend had
+    the identical bug in three more spots (`name.split(',')[0]`).
+
+    The rule now lives once, in `geocode.short_place` / `is_coordinate_name`,
+    because `geocode` is the module that decides about place names and whoever
+    greps for one word should find it. The frontend has `shortPlace()`, and
+    `check-place-format.js` holds the two halves together — including that
+    `COORD_PREFIX` still equals `COORD_NAME_PREFIX`, and that no site shortens
+    by hand again.
+
+    **(c) “Warmest trip” lost 23 % of its trip days to a morning jog.** The
+    per-day thinning (`by_day`) ran over *all* events carrying weather and kept
+    the earliest one per calendar day; `category == "trip"` was applied
+    afterwards. So any earlier entry on the same day — a run, an animal
+    sighting, a diary entry — pushed the trip day out of the calculation
+    entirely. Measured on the shipped demo stock: **60 of 257 trip days** never
+    reached the average. `2015-09-07 'Jökulsárlón'` displaced by `'Fuchs
+    gesehen'`.
+
+    The thinning itself is right and stays — an imported day with thirty visits
+    must not enter the average thirty times. It just has to decide *which trip
+    day counts*, not *whether the day was a trip*. Filter first, then thin.
+
+    **(d) The “years” ranking measured the calendar.** Sorted by days — and
+    since the residence fills every gap, every fully lived year has 365 or 366
+    of them. The list therefore showed the leap years on top, and 2000 and 2004
+    with a single entry each outranked every non-leap year. That is exactly the
+    class note 216 removed four tiles for, and **the ranking is the test, not
+    the tile**: six identical values under one another. Years now rank by
+    entries (`_merge_baseline(..., by="events")`, and the SQL preselect with
+    them — otherwise the `LIMIT` would cut away the rows the list is meant to
+    show). Places, cities and countries keep ranking by days, where the number
+    is the right one.
+
+    **The first version of this guard stayed green against the broken state.**
+    It had no residence, and without derived days the year with more entries
+    also has more *days* — both rules answer the same. Only the residence
+    levels the days, and that is what created the defect in the first place. The
+    guard now builds the reported situation: 2019 (365 days, three entries)
+    against 2020 (366 days, one entry).
+
+    **(e) A damaged backup got a stack trace.** `/api/data/import` is the
+    endpoint a person points at their backup file in the one situation that
+    matters. `{"events": "kaputt"}`, `[null]` and `[123]` all ran into an
+    uncaught `AttributeError` — HTTP 500. A 500 says “something here is broken”
+    and means the server; what was broken was the file, and that is information
+    the caller can use. `_block()` now checks each section once, names it, and
+    says what should have been there. A *missing* section stays explicitly legal
+    — older exports have fewer, which is the whole reason
+    `baseline_locations` and `day_metrics` were added without a new export
+    version. And a wrong `format` is a 400 now, not HTTP 200 with `{"error": …}`
+    in the body — it was the only error path in that file that answered with a
+    success code.
+
+    **(f) An event could end before it began.** The residence endpoint has
+    refused that since F20 with a good message; events never did. The
+    consequence is silent: `_streaks` skips the row via `span < 2`, “split
+    multi-day” finds nothing, and the timeline shows a period running backwards.
+    **The check sits behind the merge, not in the schema** — a partial change
+    sends only one of the two timestamps and the other one is in the database,
+    so a validator over the request body has nothing to compare and would be
+    green exactly when it matters. Dates also get a plausibility window now
+    (1800 … today + 100 years); year 9999 was accepted and stretched every year
+    axis after it. Deliberately wide: this is a life database and inherits —
+    “grandfather born 1893” is a perfectly correct milestone.
+
+    **Two reported items turned out not to be defects, and are recorded as
+    such rather than repaired:**
+
+    * *`confidence: 42` is accepted.* It is not. `EventManualCreate` has no
+      `confidence` field at all, so pydantic drops it and the event keeps the
+      default 1.0. The 201 in the review was real, the conclusion was not.
+    * *An arbitrary `category` is accepted.* True, and it does make the event
+      unreachable through the filter row. But **there is no canonical list of
+      categories on the server** — the module YAMLs carry five
+      (`concert, meal, milestone, sighting, trip`), while `event`, `journal`,
+      `sport`, `home` and `media` exist only in the frontend's `KNOWN_CATS`.
+      Adding a server-side whitelist would create a second copy of that list,
+      which is the very failure this whole note is about. The prerequisite is
+      one source for categories (the YAMLs carrying all of them, the frontend
+      reading them from `/api/modules`) — a refactor, not an input check, and
+      not something to slip into a validation pass.
+
+    A residence that *starts* in the future stays legal too, for the same kind
+    of reason: someone moving on the first of next month enters it beforehand,
+    and the days should count from then. A deadline for that would be invented
+    policy over the user's own data; the year window catches the case nobody can
+    have meant.
+
+    Each repair was run against its broken state, one at a time — seven of eight
+    red on the first attempt, the eighth (d) after the guard was rebuilt to
+    reproduce the reported situation.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

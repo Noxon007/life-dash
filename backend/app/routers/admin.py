@@ -8,6 +8,7 @@ from typing import Annotated, Any
 
 from dateutil import parser as dateparser
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from sqlalchemy import Date as SADate
 from sqlalchemy import DateTime as SADateTime
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy import Float as SAFloat
@@ -184,6 +185,27 @@ def _coerce_value(table: str, col, raw: Any) -> Any:
         except (ValueError, OverflowError):
             raise HTTPException(400, f"{table}.{col.name}: keine gültige Zeitangabe "
                                      f"({raw!r}, erwartet ISO, z. B. 2026-07-12T14:30:00)")
+    # **Anmerkung 221: `Date` ist KEINE Unterart von `DateTime`.** Ein reiner Tag
+    # fiel hier durch jeden Zweig und ging als ZEICHENKETTE an die Datenbank —
+    # auf SQLite ein ungefangener `StatementError` („SQLite Date type only
+    # accepts Python date objects"), auf PostgreSQL castet psycopg2 und es geht
+    # lautlos durch. Betroffen war jede Änderung an `baseline_locations.
+    # date_start`/`date_end` und `day_metrics.day` über die Rohansicht.
+    #
+    # Die Reihenfolge ist Pflicht und dieselbe wie in `data._row_to_dict`:
+    # `datetime` IST ein `date`, also muss der Zeitpunkt oben stehen. Andersherum
+    # geprüft verlöre jeder Zeitstempel seine Uhrzeit.
+    #
+    # `data._dict_to_kwargs` behandelt `Date` seit jeher ausdrücklich, mit
+    # derselben Begründung („sonst steht in `baseline_locations` etwas, das die
+    # Wohnort-Rechnung anders vergleicht als das, was sie selbst schreibt").
+    # Dieselbe Regel, zweite Stelle, nicht nachgezogen.
+    if isinstance(col.type, SADate):
+        try:
+            return dateparser.isoparse(str(raw)).date()
+        except (ValueError, OverflowError):
+            raise HTTPException(400, f"{table}.{col.name}: kein gültiger Tag "
+                                     f"({raw!r}, erwartet ISO, z. B. 2026-07-12)")
     if isinstance(col.type, SAFloat):
         try:
             return float(raw)

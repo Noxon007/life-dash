@@ -171,6 +171,46 @@ _PART_KEYS = {
 }
 
 
+# --------------------------------------------------------------------------- #
+#  Anmerkung 221 — der Ort ohne Namen, an EINER Stelle
+# --------------------------------------------------------------------------- #
+# Nominatim kennt nicht jeden Punkt. Was dann bleibt, ist die Koordinate selbst
+# als Name: „Ort (54.358, 10.123)". Drei Stellen wussten das schon von sich aus
+# (`tracks._unresolved_name_filter`, `tracks._name_state`, und der Erzeuger),
+# und die vierte wusste es nicht: `stats_overview._short_place` kürzt einen
+# Ortsnamen auf seinen ersten Bestandteil — und traf damit die Koordinate
+# mitten in der Zahl. In der Statistik-Kachel stand „Ort (54.358".
+#
+# Der Prefix steht deshalb hier und nicht dort: `geocode` ist das Modul, das
+# über Ortsnamen entscheidet, und wer nach EINEM Wort greppt, soll die Regel
+# finden. Der Erzeuger bleibt vorerst bei seinen Aufrufern — beide bauen eine
+# Zeichenkette, auf die dieser Prefix passt.
+COORD_NAME_PREFIX = "Ort ("
+
+
+def is_coordinate_name(name: str | None) -> bool:
+    """Ist das der Platzhalter für einen Ort ohne aufgelösten Namen?"""
+    return bool(name) and name.startswith(COORD_NAME_PREFIX)
+
+
+def short_place(name: str | None) -> str | None:
+    """Ortsname auf den ersten Bestandteil — außer er IST die Koordinate.
+
+    „Kirschenallee 12, Bad Segeberg" -> „Kirschenallee 12". Ohne die Ausnahme
+    würde „Ort (54.358, 10.123)" zu „Ort (54.358" — eine halbe Zahl, und zwar
+    an genau den Stellen, an denen ein Mensch hinsieht: Rekord-Kacheln,
+    Ranglisten, Karten-Popups.
+
+    Das Kürzen selbst bleibt richtig: ohne es zählte jede Nominatim-Langadresse
+    als eigener Ort, und dieselbe Straße stünde in der Rangliste zweimal.
+    """
+    if not name:
+        return None
+    if is_coordinate_name(name):
+        return name.strip() or None
+    return name.split(",")[0].strip() or None
+
+
 def sanitize_parts(parts) -> list[str]:
     """Whitelist + kanonische Reihenfolge; leere/ungültige Auswahl -> alle."""
     chosen = [p for p in PLACE_NAME_PARTS if parts and p in parts]

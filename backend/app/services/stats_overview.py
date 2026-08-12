@@ -29,7 +29,7 @@ from app.sqlutil import day_number
 from app.models import (BaselineLocation, ConfirmState, DatePrecision,
                         DayMetric, Entity, Event, EventEntityLink, Location,
                         Metric, Source)
-from app.services import baseline, weather_day
+from app.services import baseline, geocode, weather_day
 
 # Dieselben Muster wie im Frontend (dort als RegExp über „Titel + Beschreibung")
 #
@@ -110,11 +110,12 @@ TOP_N = 8
 def _short_place(name: str | None) -> str | None:
     """Ortsname auf den ersten Bestandteil kürzen.
 
-    Ohne das zählt jede Nominatim-Langadresse als eigener Ort — dieselbe Regel
-    wie im Frontend (`placeOf`)."""
-    if not name:
-        return None
-    return name.split(",")[0].strip() or None
+    Anmerkung 221: Die Regel steht in `geocode.short_place` — sie muss den
+    Koordinaten-Platzhalter kennen („Ort (54.358, 10.123)"), und dieses Wissen
+    gehört zu den Ortsnamen und nicht in die Statistik. Hier stand das Kürzen
+    ausgeschrieben und traf die Koordinate mitten in der Zahl.
+    """
+    return geocode.short_place(name)
 
 
 def _as_day(value) -> date_type | None:
@@ -774,16 +775,31 @@ def _weather_stats(db: Session, user_id: str) -> dict:
     # deshalb bleibt hier die Tagesliste aus den Ereignissen stehen. Ein
     # Wohnort-Tag gehört zu keiner Reise; ihn mitzuzählen hieße, dieselbe Regel
     # in die andere Richtung zu verletzen (F20: als TAG voll, als EINTRAG nie).
-    by_day: dict[str, str] = {}
-    for eid in sorted(values, key=lambda i: (events[i].date_start, i)):
-        by_day.setdefault(events[eid].date_start.date().isoformat(), eid)
+    #
+    # **Anmerkung 221: erst auf Reisen einschränken, DANN je Tag verdichten.**
+    # Die Verdichtung stand hier über ALLEN Ereignissen mit Wetter und nahm je
+    # Kalendertag das früheste; der Filter `category == "trip"` kam erst danach.
+    # Damit hat ein Lauf am Morgen, eine Tiersichtung oder ein Tagebucheintrag
+    # den Reisetag desselben Tages aus der Rechnung geworfen — er war ja nicht
+    # der erste. Am ausgelieferten Demo-Bestand traf das **58 von 257
+    # Reisetagen (23 %)**: „Museumsinsel" verdrängt von „Radfahren, 27.9 km",
+    # „Jökulsárlón" von „Fuchs gesehen".
+    #
+    # Die Verdichtung selbst ist richtig und bleibt: ein Tag trägt EINE
+    # Temperatur, und ein importierter Tag mit dreißig Besuchen darf ihn nicht
+    # dreißigmal in den Schnitt geben. Sie soll nur entscheiden, WELCHER
+    # Reisetag zählt — nicht, OB der Tag eine Reise war.
     day_of = lambda i: events[i].date_start.date().isoformat()  # noqa: E731
+    by_day: dict[str, str] = {}
+    for eid in sorted((i for i in values if events[i].category == "trip"),
+                      key=lambda i: (events[i].date_start, i)):
+        by_day.setdefault(day_of(eid), eid)
 
     trips: dict[str, list] = {}
     for i in by_day.values():
         e = events[i]
         temp = dval(day_of(i), "temperature_c")
-        if e.category != "trip" or temp is None:
+        if temp is None:
             continue
         key = e.parent_event_id or i
         # **Der Name kommt von dem, wonach gefragt wurde** (Anmerkung 199).
