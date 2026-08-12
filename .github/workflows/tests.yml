@@ -45,9 +45,9 @@ jobs:
           --health-retries 20
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: pip
@@ -79,7 +79,7 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # `npm ci` gegen eine EINGECHECKTE tools/package-lock.json. Die Lockdatei
       # war bis 2026-08-04 ignoriert, mit der Begründung, ein einziger
@@ -89,7 +89,7 @@ jobs:
       # darf eine andere Unterversion ziehen als du lokal. Ein Wächter, der hier
       # anders urteilt als bei dir, ist genau der Fall aus Anm. 108 — eine
       # Prüfung, die nicht das prüft, was du geprüft glaubst.
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -121,15 +121,15 @@ jobs:
   live:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
