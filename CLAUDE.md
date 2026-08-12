@@ -21,7 +21,7 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI,
-  Geocoding aus) — 763 Tests, ~21 s, SQLite im Arbeitsspeicher
+  Geocoding aus) — 864 Tests, ~40 s, SQLite im Arbeitsspeicher
 - **Tests gegen echtes PostgreSQL** (das, worauf betrieben wird): `pwsh
   tools/pg-test.ps1` — **kein Docker**, legt mit den installierten Binärdateien
   einen eigenen Cluster in `backend/_pgtest/` auf Port **55432** an und stoppt
@@ -39,7 +39,16 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
   dann `<python> tools/smoke_a45.py` — findet, was Unit-Tests prinzipiell nicht
   können (Blättern, Zeitzonen, echte DTOs). Immer aus dem Wurzelverzeichnis.
 - **API-Kosten messen** statt raten: `<python> tools/_measure_api.py` legt
-  20.000 Ereignisse an und misst die Endpunkte
+  20.000 Ereignisse an und misst die Endpunkte; `DEMO=1` misst stattdessen den
+  ausgelieferten Demo-Bestand. **`DB=pfad/zur.db` misst eine BESTEHENDE
+  Datenbank** (Anmerkung 220) — die ersten beiden Formen bauen sich ihren
+  Messgegenstand selbst und messen die Herstellung mit; genau daran hat der
+  Lauf 1.412 ms gemeldet, wo es 15 Sekunden waren.
+- **Live-Lauf gegen einen laufenden Server**: `node tools/live-check.js
+  http://127.0.0.1:8123` — der einzige Lauf mit echtem Frontend gegen echte
+  Antworten (alle anderen Wächter benutzen Attrappen). Seit Anmerkung 220 ein
+  eigener CI-Job **mit Demo-Bestand**, weil eine leere Datenbank die
+  Größenordnung nicht zeigt; `LIVE_BUDGET_MS` deckelt die Statistik-Endpunkte.
 - **Zeitstrahl messen**: `node tools/measure-timeline.js [Seiten]
   [Wohnort-Jahre]` — Aufbauzeit und Knotenzahl je nachgeladener Seite, für
   alle drei Zoomstufen; mit dem zweiten Wert zusätzlich die abgeleiteten Tage.
@@ -233,6 +242,20 @@ Der wiederkehrende Defekt in diesem Projekt ist nicht Kaputtheit, sondern
   PostgreSQL auch nicht: ihr Bestand ist zu klein. **Wer einen Plan prüft,
   prüft ihn mit dem ECHTEN Wertesatz** — mit vier statt dreizehn Schlüsseln
   schätzt der Planer anders und antwortet auf eine andere Frage.
+- **Eine korrelierte Unterabfrage wird je Zeile der äußeren Tabelle neu
+  ausgewertet — und WELCHEN Index sie dabei nimmt, entscheidest nicht du**
+  (Anmerkung 220). SQLite bricht ohne `ANALYZE` den Gleichstand zugunsten des
+  ZULETZT angelegten Index, und `Table.indexes` ist eine `set`: dieselbe
+  Migration auf denselben Daten legt sie in verschiedener Reihenfolge an.
+  Gemessen an drei Demo-Beständen: 1,33 s / 14,6 s / 15,0 s für dieselbe
+  Abfrage. **In einer Ein-Personen-Instanz ist `user_id` die UNSELEKTIVSTE
+  Spalte** — greift der Planer danach, läuft die innere Suche jedes Mal ganz
+  durch. Die Antwort ist nicht, den Index zu erzwingen, sondern die Korrelation
+  wegzunehmen: ein Semi-Join (`IN` über eine Unterabfrage ohne Außenbezug) wird
+  EINMAL ausgewertet. Im Plan steht der Unterschied wörtlich da — `LIST
+  SUBQUERY` gegen `CORRELATED SCALAR SUBQUERY`, und das ist die einzige
+  Eigenschaft, auf die ein Wächter sich verlassen darf (eine Zeitmessung ist
+  auf jedem dritten Bau grün).
 - **Hängt etwas auf dem Server, ist `pg_stat_activity` die erste Frage**, nicht
   die zweite: `SELECT now()-query_start, query FROM pg_stat_activity WHERE
   state='active'` nennt die Anweisung im vollen Wortlaut, während sie läuft.
@@ -509,6 +532,36 @@ kaputtes Konto. Dazu: EIN User-Agent in `version.py`, `/health` nennt
 `_day_weather_candidates` fragt die `weather_rev`-Marke in SQL; die
 Ereignis-Hälfte kann dasselbe als `NOT EXISTS`. Bewusst eigene Runde — es
 ändert, welche Zeilen ein Lauf aufgreift.
+
+**Vollständige Durchsicht vor dem Release 2026-08-12 — 30 Befunde, in vier
+Teile geschnitten. Teil 1 ist gebaut (Anmerkung 220), Teil 2–4 sind offen.**
+Der Bericht liegt als Artefakt vor; die Aufteilung:
+- **Teil 1 ✅ Statistik-Reiter und die Prüfung, die ihn nicht gefangen hat.**
+  29 s → 2,3 s, Antwort Byte für Byte identisch. Dazu `DB=`-Modus im
+  Messwerkzeug und `live-check.js` als CI-Job. Einzelheiten: Anmerkung 220.
+- **Teil 2 (offen) Korrektheit in Ableitungen und an den Eingängen.** Sieben
+  Befunde, alle „eine Regel an zwei Orten" oder eine fehlende Prüfung am Rand:
+  `admin._coerce_value` kennt `Date` nicht (PATCH auf `baseline_locations.
+  date_start` → 500 auf SQLite, still durchgewinkt auf PostgreSQL) · die
+  wärmste Reise verliert 23 % ihrer Tage, weil `by_day` VOR dem
+  Kategorie-Filter verdichtet · der Import antwortet auf kaputte Nutzlast mit
+  einem 500er · die Rangliste „Jahre" sortiert nach einer Kalenderkonstante
+  (sechsmal 366) · `_short_place` schneidet „Ort (54.358, 10.123)" hinter der
+  ersten Zahl ab · `date_end` vor `date_start` und ein Wohnort ab 2099 werden
+  angenommen.
+- **Teil 3 (offen) Der Demo-Bestand als Schaufenster.** Kein einziges
+  mehrtägiges Ereignis (also keine „Längste Reise", kein F7, nichts für
+  „Mehrtägiges aufteilen") · 3.633 von 3.675 Orten sind Koordinaten-Platzhalter
+  und alle als `name_manual` markiert, weshalb „Ortsnamen auflösen" 0 offen
+  meldet · der Windrekord aus 32 Jahren steht bei 36 km/h.
+- **Teil 4 (offen) Betrieb, Start, Doku.** Das Dockerfile setzt `MEDIA_DIR`
+  nicht (nur die Compose) · `psycopg2-binary` ist die einzige ungepinnte
+  Abhängigkeit · `pytest` steht in den Produktions-Requirements · `chown -R
+  /data` läuft bei jedem Start über die ganze Fotobibliothek · `sqlite://`
+  stürzt beim Import ab · SQLite läuft ohne `PRAGMA foreign_keys` · zwei
+  Alt-Aufräumläufe scannen bei jedem Start die vollen Tabellen · **der
+  `[Unreleased]`-Block hat 172 Punkte und doppelte Überschriften und muss vor
+  dem Tag verdichtet werden.**
 
 **Code-Durchsicht 2026-08-07 (Anmerkung 201): fünf Reparaturen und vier
 Aufräumungen drin, drei Punkte bewusst offen — sie brauchen erst eine

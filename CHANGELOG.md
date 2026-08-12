@@ -300,6 +300,15 @@ any `MINOR`.
   it is working.
 
 ### Fixed
+- **The statistics tab opens in about a second instead of a quarter of a
+  minute.** On a full life's worth of entries it was taking roughly fifteen
+  seconds to appear, and the rankings underneath another fourteen — long enough
+  that it looked like nothing was happening. One of the queries behind the
+  weather tiles was searching the whole event table once for every event it
+  looked at, and on a database holding one person's data that search could never
+  narrow anything down. It now asks the question the other way round and is
+  effectively instant. **The numbers are unchanged** — every tile, ranking and
+  chart shows exactly what it showed before, down to the last decimal.
 - **Changing your password no longer signs you out of the app you are in.**
   Changing it ends every other session, which is the whole point — but it was
   also ending the one doing the changing, so the next click landed on the login

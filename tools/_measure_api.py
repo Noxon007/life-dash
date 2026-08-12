@@ -14,21 +14,43 @@ kennt, misst sie auch nicht.**
 
     <python> tools/_measure_api.py          # Lastfall
     DEMO=1 <python> tools/_measure_api.py   # Demo-Bestand
+    DB=pfad/zur.db <python> tools/_measure_api.py   # eine BESTEHENDE Datenbank
 
 Immer aus dem Wurzelverzeichnis.
 
-Zuletzt gemessen 2026-08-09 (SQLite, Windows) — der nächste Umbau wird daran
+**Anmerkung 220: die dritte Form gibt es, weil die ersten beiden sich ihren
+Messgegenstand selbst herstellen — und damit die Herstellung mitmessen.** Der
+Lauf meldete für `/api/stats/overview` 1412 ms, während derselbe Endpunkt auf
+demselben Demo-Bestand über HTTP 15 Sekunden brauchte. Beides stimmte: die
+Abfrage war quadratisch, und ob SQLite in ihr den teuren oder den billigen
+Index nimmt, entscheidet die Reihenfolge, in der die Indizes ANGELEGT wurden.
+`Table.indexes` ist eine `set`, also fällt diese Reihenfolge zwischen zwei
+Läufen derselben Migration verschieden aus. Dieser Lauf hatte Glück, drei
+Erststarts hintereinander nicht.
+
+Wer eine Zahl gegen den Betrieb halten will, misst deshalb die Datenbank, die
+dort liegt (`DB=…`), nicht eine frisch gebaute. Eine selbst gebaute Datenbank
+beantwortet die Frage „wie teuer ist die Abfrage?" — nicht die Frage „wie
+teuer ist sie HIER?".
+
+Zuletzt gemessen 2026-08-12 (SQLite, Windows) — der nächste Umbau wird daran
 gemessen und nicht an einem Gefühl:
 
                               Demo     Lastfall
-    /api/events/index          54 ms      92 ms
-    Zeitstrahl-Seite (300)     41 ms      11 ms
-    …mit Fotos + verdichtet    62 ms     168 ms
-    /api/days/weather (alles) 1648 ms     212 ms
-    /api/achievements          764 ms     203 ms
-    /api/stats/overview       1679 ms     543 ms   (2326 → 1710 → 1611 → 1679)
-    /api/stats/toplists       1190 ms     479 ms
-    /api/events/map            173 ms     138 ms
+    /api/events/index          52 ms      92 ms
+    Zeitstrahl-Seite (300)     39 ms      11 ms
+    …mit Fotos + verdichtet    61 ms     168 ms
+    /api/days/weather (alles) 1557 ms     212 ms
+    /api/achievements          625 ms     203 ms
+    /api/stats/overview       1320 ms     543 ms   (2326 → 1710 → 1611 → 1320)
+    /api/stats/toplists        800 ms     479 ms
+    /api/events/map            160 ms     138 ms
+
+Die letzten beiden Zeilen sind Anmerkung 220. Über HTTP gegen einen frisch
+geseedeten Demo-Bestand gemessen — also so, wie ein Nutzer sie erlebt — waren
+es vorher **15,0 s** und **14,4 s**, jetzt **1,41 s** und **0,91 s**. Die
+Antwort ist dabei Byte für Byte dieselbe geblieben (auf derselben Datenbank
+verglichen).
 
 **Und dieser Lauf ist als Nachweis NICHT ausreichend — Anmerkung 214.** Er
 misst SQLite, und die teuerste Fehlerklasse dieses Projekts ist auf SQLite
@@ -91,9 +113,14 @@ from datetime import date, datetime, timedelta
 
 sys.path.insert(0, os.path.abspath("backend"))
 DEMO = os.environ.get("DEMO", "").strip() not in ("", "0", "false")
-DB = "_measure.db"
-if os.path.exists(DB):
+# Anmerkung 220: `DB=…` misst eine BESTEHENDE Datenbank, statt eine zu bauen.
+# Dann wird nichts angelegt und nichts gelöscht — der Lauf ist reines Lesen.
+EXISTING = os.environ.get("DB", "").strip()
+DB = EXISTING or "_measure.db"
+if not EXISTING and os.path.exists(DB):
     os.remove(DB)
+if EXISTING and not os.path.exists(DB):
+    raise SystemExit(f"DB={DB} gibt es nicht.")
 os.environ.setdefault("DATABASE_URL", f"sqlite:///./{DB}")
 os.environ.setdefault("AUTH_MODE", "dev")
 os.environ.setdefault("AI_PROVIDER", "mock")
@@ -102,7 +129,9 @@ os.environ.setdefault("AI_PROVIDER", "mock")
 # seine 20.000 Ereignisse dann obendrauf und maß eine Mischung, die es nirgends
 # gibt. (Bis das auffiel, brach er an der Eindeutigkeit der Wohnort-Tage ab,
 # was der glückliche Fall ist: ein lautloses Messergebnis wäre teurer gewesen.)
-os.environ["SEED_DEMO"] = "true" if DEMO else "false"
+#
+# `DB=…` misst, was schon da ist — es wird weder geseedet noch gebaut.
+os.environ["SEED_DEMO"] = "true" if (DEMO and not EXISTING) else "false"
 os.environ.setdefault("MEDIA_DIR", "./_measure_media")
 
 from fastapi.testclient import TestClient   # noqa: E402
@@ -124,7 +153,14 @@ with TestClient(app):
     # Start gar kein Konto an — der Dev-Nutzer entsteht sonst erst bei der
     # ersten Anfrage, und die kommt hier nach dem Bestand.
     user = get_dev_user(db)
-    if DEMO:
+    if EXISTING:
+        from app.models import Entity, EventEntityLink  # noqa: E402
+        print(f"Bestehende Datenbank {DB} — nur gelesen, nichts angelegt:")
+        for model in (Event, Location, Entity, EventEntityLink, Metric,
+                      DayMetric, MediaRef, Track):
+            print(f"  {model.__name__:18} {db.query(model).count():>8,}")
+        db.close()
+    elif DEMO:
         from app.models import Entity, EventEntityLink  # noqa: E402
         print("Demo-Bestand (R1a) — vom Start angelegt:")
         for model in (Event, Location, Entity, EventEntityLink, Metric,
@@ -132,7 +168,7 @@ with TestClient(app):
             print(f"  {model.__name__:18} {db.query(model).count():>8,}")
         db.close()
     random.seed(7)
-    if not DEMO:
+    if not DEMO and not EXISTING:
         # Der künstliche Lastfall. Er entsteht nur, wenn nicht ohnehin
         # der Demo-Bestand gemessen wird — zwei Bestände übereinander
         # wären eine Größe, die es nirgends gibt.
@@ -259,4 +295,5 @@ with TestClient(app):
 try:
     os.remove(DB)
 except OSError:
-    print(f"\n(Hinweis: {DB} liegt noch da und wird beim nächsten Lauf ersetzt.)")
+    print(f"\n(Hinweis: {DB} wurde nur gelesen.)" if EXISTING else
+          f"\n(Hinweis: {DB} liegt noch da und wird beim nächsten Lauf ersetzt.)")

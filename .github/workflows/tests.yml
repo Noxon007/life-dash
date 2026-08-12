@@ -102,3 +102,75 @@ jobs:
       - name: Wächter
         working-directory: tools
         run: npm run check
+
+  # ------------------------------------------------------------------------ #
+  # Anmerkung 220 — der Lauf gegen einen LAUFENDEN Server.
+  #
+  # `live-check.js` gab es seit A37 und stand in keinem Auslöser: er braucht
+  # einen Server, also lief er genau dann, wenn jemand daran dachte. Das ist
+  # wörtlich die Begründung im Kopf dieser Datei, nur eine Ebene tiefer — und
+  # er ist der EINZIGE Lauf, der das echte Frontend gegen echte Antworten
+  # stellt. Alle anderen arbeiten mit Attrappen.
+  #
+  # **Mit Demo-Bestand, und das ist die Bedingung, nicht die Bequemlichkeit.**
+  # Anmerkung 220 war eine Abfrage, die quadratisch über den Bestand lief:
+  # über einer leeren Datenbank ist sie schnell, über den ausgelieferten 8.500
+  # Ereignissen brauchte der Statistik-Reiter neunundzwanzig Sekunden. Ein
+  # Lauf, der nichts in der Datenbank hat, hätte auch das nicht gesehen.
+  # ------------------------------------------------------------------------ #
+  live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: tools/package-lock.json
+
+      - name: Abhängigkeiten
+        run: |
+          pip install -r backend/requirements.txt
+          cd tools && npm ci --no-audit --no-fund
+
+      # Scratch-Datenbank, Mock-KI, kein Geocoding — dieselbe Beschwörung wie
+      # im Kopf von live-check.js und in CLAUDE.md. Der Demo-Seed braucht rund
+      # zwölf Sekunden und kein Netz.
+      - name: Smoke-Server mit Demo-Bestand
+        working-directory: backend
+        env:
+          DATABASE_URL: sqlite:///./_ci.db
+          AUTH_MODE: dev
+          AI_PROVIDER: mock
+          SEED_DEMO: "true"
+          GEOCODING_ENABLED: "false"
+        run: |
+          python -m uvicorn app.main:app --port 8123 > /tmp/server.log 2>&1 &
+          # Auf die BEDINGUNG warten, nicht auf eine Frist: der Seed läuft
+          # nach dem ersten /health durch, und ein festes `sleep` ist auf einem
+          # geteilten Runner entweder zu kurz oder verschenkte Zeit.
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:8123/api/events/index >/dev/null && break
+            sleep 2
+          done
+          curl -sf http://127.0.0.1:8123/api/events/index >/dev/null \
+            || { echo "Server kam nicht hoch:"; cat /tmp/server.log; exit 1; }
+
+      # Das Budget ist großzügig: der Runner ist geteilt und langsamer als jede
+      # echte Instanz. Es soll keine Millisekunden bewachen, sondern die
+      # Größenordnung — der Defekt aus Anmerkung 220 lag bei 15.000 ms.
+      - name: Live-Lauf gegen das echte Frontend
+        env:
+          LIVE_BUDGET_MS: "8000"
+        run: node tools/live-check.js http://127.0.0.1:8123
+
+      - name: Serverlog bei Fehlschlag
+        if: failure()
+        run: cat /tmp/server.log

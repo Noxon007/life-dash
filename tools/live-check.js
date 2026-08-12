@@ -85,6 +85,32 @@ const evCalls = () => requests.filter(u => u.startsWith('/api/events?'));
   ok('Wetter-Kachel zeigt Wert oder Strich, nie NaN/undefined',
      !/NaN|undefined/.test(txt('stat-hot')), txt('stat-hot'));
 
+  // --- Anmerkung 220: der Reiter muss auch ANKOMMEN ----------------------
+  // Bis hierher prüfte dieser Lauf, was die Statistik ANFRAGT, und nie, wie
+  // lange sie dazu braucht. Genau darin lag Anmerkung 220: die Zahlen waren
+  // richtig, die Anfragen waren richtig, und der Reiter brauchte neunundzwanzig
+  // Sekunden. Alle Prüfungen des Projekts waren dabei grün.
+  //
+  // **Eine Zeitmessung über einen leeren Bestand sagt nichts** — deshalb wird
+  // erst ab einer Größe geurteilt, bei der der Unterschied nicht mehr im
+  // Rauschen liegt. Darunter wird die Zahl nur berichtet: eine Prüfung, die
+  // beim Fehlen ihrer Voraussetzung stillschweigend „bestanden" meldet, ist
+  // die Sorte, die dieses Projekt teuer bezahlt hat.
+  const BUDGET = parseInt(process.env.LIVE_BUDGET_MS || '8000', 10);
+  const MIN_ROWS = 1000;
+  for (const path of ['/api/stats/overview', '/api/stats/toplists']) {
+    const t0 = Date.now();
+    await fetch(ORIGIN + path).then(r => r.json());
+    const ms = Date.now() - t0;
+    if (idx.total >= MIN_ROWS) {
+      ok(`${path} bleibt im Zeitbudget`, ms <= BUDGET,
+         `${ms} ms von ${BUDGET} ms bei ${idx.total} Einträgen`);
+    } else {
+      console.log(`  --   ${path}: ${ms} ms bei nur ${idx.total} Einträgen ` +
+                  `— zu wenig für ein Urteil (ab ${MIN_ROWS} wird geprüft)`);
+    }
+  }
+
   // --- Die Karte hat ihren eigenen Endpunkt ------------------------------
   requests.length = 0;
   await w.openMapView();

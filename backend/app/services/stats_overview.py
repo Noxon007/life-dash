@@ -22,7 +22,7 @@ from datetime import date as date_type
 from datetime import datetime, time
 from typing import NamedTuple
 
-from sqlalchemy import and_, exists, func, or_
+from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.orm import Session, aliased
 
 from app.sqlutil import day_number
@@ -429,6 +429,27 @@ def _extreme_tops(src: WeatherSource, n: int) -> dict[str, list[dict]]:
     return out
 
 
+def parents_with_weather(user_id: str, child, wx):
+    """Die Kennungen der Ereignisse, deren KINDER Wetter tragen — als Semi-Join.
+
+    Eigene Funktion und nicht drei Zeilen im Aufrufer, damit der Wächter
+    (`test_anm220_stats_plan.py`) genau diese Abfrage prüfen kann, statt sie
+    ein zweites Mal hinzuschreiben. Was er prüft, ist nicht das ERGEBNIS —
+    das war nie falsch — sondern die FORM: dass hier nichts nach außen
+    korreliert. Genau daran hing der Unterschied zwischen 0,005 s und 15 s,
+    und ein Ergebnis-Test hätte ihn nie gesehen.
+
+    `child` ist ein `aliased(Event)`, `wx` die Bedingungen auf `metrics`.
+    Beide kommen vom Aufrufer, weil sie dort schon stehen — zwei Fassungen der
+    Wetter-Bedingung wären die stille Doppelregel, an der Anmerkung 213 die
+    Elternzeilen schon einmal verloren hat.
+    """
+    return (select(child.parent_event_id)
+            .where(child.parent_event_id.isnot(None),
+                   child.user_id == user_id,
+                   exists().where(and_(Metric.event_id == child.id, *wx))))
+
+
 def weather_values(db: Session, user_id: str):
     """Die Wetterwerte je Ereignis, plus die zwei Regeln, die auf ihnen gelten.
 
@@ -488,6 +509,37 @@ def weather_values(db: Session, user_id: str):
     # werden; die Vereinigung macht das `dict`. `EXISTS` statt `IN`, weil es
     # die Absicht („gibt es dazu eine Wetterzeile?") direkt hinschreibt und
     # über den Index auf `metrics.event_id` läuft.
+    #
+    # **Anmerkung 220: die ELTERN-Hälfte fragt nach oben, nicht nach unten.**
+    # Hier stand ein `EXISTS` über die Kindzeile, das nach AUSSEN korreliert war
+    # (`child.parent_event_id == Event.id`) und ein zweites `EXISTS` in sich
+    # trug. Fachlich richtig, und auf dem ausgelieferten Demo-Bestand fünfzehn
+    # Sekunden für NULL Zeilen.
+    #
+    # Der Grund ist die Index-Wahl. Für die korrelierte Kindzeile griff SQLite
+    # zu `ix_events_user_id` statt zu `ix_events_parent_event_id` — und in einer
+    # Instanz mit EINEM Nutzer ist `user_id` die unselektivste Spalte überhaupt:
+    # jede Zeile passt, also lief die innere Suche je äußerer Zeile einmal
+    # vollständig durch. Quadratisch über den ganzen Bestand.
+    #
+    # **Und welchen Index es nimmt, konnten wir nicht bestimmen.** Ohne
+    # `ANALYZE` entscheidet bei gleich plausiblen Indizes der zuletzt angelegte,
+    # und `Table.indexes` ist in SQLAlchemy eine `set` — die Reihenfolge der
+    # `CREATE INDEX` unterscheidet sich zwischen zwei Läufen DERSELBEN Migration
+    # auf denselben Daten. Gemessen an drei unabhängig gebauten Demo-Beständen:
+    # 1,33 s, 14,6 s, 15,0 s. Dieselbe Version, dieselbe Frage, dieselben Daten.
+    # `ANALYZE` ist keine Antwort (12,9 → 9,6 s, der Plan wird sogar schlechter).
+    #
+    # Die Antwort ist, die Korrelation wegzunehmen: Ein Semi-Join über die
+    # ELTERNKENNUNGEN steht für sich, wird EINMAL ausgewertet und darf deshalb
+    # `ix_events_parent_event_id` benutzen — was er auch tut. Gemessen auf dem
+    # langsamen Bestand, identische Ergebnismenge: **13,312 s → 0,005 s.**
+    #
+    # Die Eigenschaft aus Anmerkung 214 bleibt: kein `OR` zwischen zwei
+    # Unterabfragen, also auch auf PostgreSQL weiterhin ein Semi-Join und keine
+    # zwei `SubPlan`. `parent_event_id.isnot(None)` steht ausdrücklich da —
+    # ohne die Bedingung nimmt die Unterabfrage NULL-Zeilen mit, und `IN` über
+    # eine Menge mit NULL ist in SQL nicht dasselbe wie ohne.
     wx = (Metric.source == Source.weather,
           Metric.key.in_(_WX_KEYS), Metric.value.isnot(None))
     child = aliased(Event)
@@ -502,10 +554,7 @@ def weather_values(db: Session, user_id: str):
     events = {r.id: r for r in _base().filter(
         exists().where(and_(Metric.event_id == Event.id, *wx))).all()}
     events.update({r.id: r for r in _base().filter(
-        exists().where(and_(child.parent_event_id == Event.id,
-                            child.user_id == user_id,
-                            exists().where(and_(Metric.event_id == child.id,
-                                                *wx))))).all()})
+        Event.id.in_(parents_with_weather(user_id, child, wx))).all()})
     values: dict[str, dict[str, float]] = {}
     if events:
         rows = (db.query(Metric.event_id, Metric.key, Metric.value)

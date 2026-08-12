@@ -2192,6 +2192,81 @@ repair for each: delete it.
     open deliberately: it changes which rows a run picks up, and that wants its
     own pass with its own guard.
 
+220. ✅ **The statistics tab took 29 seconds, every check was green, and the
+    project's own measuring tool said 1.4 seconds.**
+
+    Found in a full pre-release review (2026-08-12) by doing the one thing no
+    check did: opening the shipped demo stock over HTTP and looking at the
+    clock. `/api/stats/overview` 15.0 s, `/api/stats/toplists` 14.4 s,
+    reproduced on two independently built databases. 861 tests, 41 guards and
+    the live run were green throughout.
+
+    **All of it sat in one query.** `weather_values` asks twice — events that
+    carry weather, and the *parents* of events that carry weather (note 213: the
+    warmest trip is named after the parent row, not after “Andalusia — day 1”).
+    The second one was a correlated `EXISTS` over the child row with a second
+    `EXISTS` inside it. On the demo stock it cost **12.9 s and returned zero
+    rows**.
+
+    The cause is index choice. For the correlated child row SQLite reached for
+    `ix_events_user_id` instead of `ix_events_parent_event_id` — and **in a
+    one-person instance `user_id` is the least selective column there is**:
+    every row matches, so the inner search ran to completion once per outer row.
+    Quadratic over the whole stock.
+
+    **And which index it takes was not ours to decide.** Without `ANALYZE`,
+    SQLite breaks a tie between equally plausible indexes by preferring the most
+    recently created one — and `Table.indexes` is a `set`, so the order of the
+    `CREATE INDEX` statements differs between two runs of *the same migration on
+    the same data*. Measured across three independently built demo stocks: 1.33 s,
+    14.6 s, 15.0 s. Same version, same question, same data. `ANALYZE` is not an
+    answer either (12.9 → 9.6 s; the plan gets worse, not better).
+
+    The repair is to remove the correlation, not to chase the index: a semi-join
+    over the *parent ids* stands on its own, is evaluated once, and may
+    therefore use `ix_events_parent_event_id` — which it does. Measured on the
+    slow stock, identical result set: **13.312 s → 0.005 s.** End to end the tab
+    went from 29 s to 2.3 s, and the answer is byte-for-byte the same (compared
+    on one database, old code against new).
+
+    Note 214's property survives: still no `OR` between two subqueries, so
+    PostgreSQL still gets a semi-join instead of two `SubPlan`s.
+
+    **The guard is about the shape, and its first draft was worthless.** A
+    result test could never have caught this — the old query was *correct*, only
+    slow. A timing test would have been blind in exactly the way that caused the
+    bug: on a lucky build the broken version is fast. What does not depend on
+    luck is whether the plan says `LIST SUBQUERY` (evaluated once) or
+    `CORRELATED SCALAR SUBQUERY` (once per outer row); that is a property of the
+    SQL, not of the estimate. The first draft checked
+    `parents_with_weather()` directly — and stayed **green** when I put
+    `weather_values` back to the broken version, because the function still
+    existed, nobody just called it any more. Green because the function *exists*,
+    not because the caller *uses* it, verbatim from `CLAUDE.md`. It now records
+    at the connection and explains the statements actually sent.
+
+    **The second half of this note is why nobody saw it.**
+
+    `tools/_measure_api.py` reported **1,412 ms** for the same endpoint on the
+    same demo stock. It builds its own database and had drawn the lucky index
+    order. Its header number (1,679 ms) was written in `34949b1` — *the very
+    commit that introduced the nested `EXISTS`* — validated on PostgreSQL and
+    never re-measured on SQLite. A tool that manufactures its own subject
+    measures the manufacturing; it now takes `DB=<path>` and reads an existing
+    database without writing to it.
+
+    `live-check.js` is the only run that puts the real frontend against real
+    answers, and it was **in no trigger at all** — deliberately kept out of
+    `npm run check` because it needs a server, and therefore never in CI either.
+    That is the argument in this repository's own workflow header, one level
+    down: a guard nobody starts checks nothing. It is a CI job now, **with the
+    demo seed**, because a run over an empty database would not have seen this
+    one either. It reports the two statistics endpoints against a budget, and
+    stays quiet about the number below 1,000 rows instead of passing silently.
+
+    Three things, one chain: a defect, a blind measurement, an unfired guard.
+    Repairing only the first would have left the other two.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into
