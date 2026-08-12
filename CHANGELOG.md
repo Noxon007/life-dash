@@ -275,6 +275,27 @@
 
 ### Changed
 
+- **The five statistics views are now laid out alike.** *Numbers*, *Charts*,
+  *Rankings*, *Gaps* and *Tracks* each set their own spacing, so switching
+  between them felt like switching between five pages: blocks sat flush against
+  each other in some views and far apart in others. Every view now uses one
+  spacing, every block on them is a panel with a heading — including the two
+  tile groups, which now say what they show (*Overview* and *Weather records*)
+  instead of running into each other as one long set of numbers. In *Gaps*,
+  *Coverage per year* and *Longest gaps* now stand side by side at the same
+  height and both scroll after ten rows, like every other ranking; before that,
+  one of them grew to forty rows next to a neighbour that stopped at ten. *What
+  is missing* also shows its share as a bar, so “7,298 of 12,437 days” can be
+  read without doing the arithmetic.
+- **A general polish of the interface.** Cards, panels and dialogs now sit on
+  their background with a slight shadow rather than a single hairline — most
+  noticeable in the light theme, where a white card on light grey used to be
+  hard to make out. Tabs respond to the mouse pointer, buttons respond to being
+  pressed, all figures use fixed-width digits so columns line up and the ticking
+  seconds no longer make the age cell wobble, and percentages no longer wrap on
+  narrow columns. Between about 860 and 1150 pixels wide, the tile grids use
+  three columns instead of four — four fit arithmetically and cut the labels in
+  half.
 - **“Farthest from home” now answers the question for every place you have
   lived.** It used to be a single line for your whole life, and that only ever
   described the residence you happened to travel furthest from. You now get the

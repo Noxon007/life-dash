@@ -2725,6 +2725,66 @@ repair for each: delete it.
     `TestClient` in favour of `httpx2`. One warning, no failure; recorded so it
     is not rediscovered.
 
+226. ✅ **A design pass, and the one thing it kept finding: spacing that lives
+    in the blocks instead of in their container.**
+
+    The request was a light polish with one named target — *the Statistics tab's
+    five panes should be laid out alike*. They were not, and the reason was
+    structural rather than cosmetic.
+
+    **(a) The rhythm belonged to the container, not to the blocks.** Every
+    block carried its own gap, inline: `margin-bottom:24px` on the tile grids,
+    `margin-bottom:20px` on the panels, `margin-top:16px` on exactly **one** of
+    the three grids in Rankings — and *nothing at all* between two consecutive
+    grids in Rankings, Tracks and Gaps, because `gap` only works **inside** a
+    grid, never between two of them. Five tabs therefore read as five pages.
+    The fix is one rule: the five panes and the three script-filled boxes are
+    flex columns with a shared `--stack`. A new block now gets the right gap by
+    construction, and no `innerHTML` line has to remember it. *`display` lives
+    in the stylesheet on purpose* — `showStatsPane` reveals a pane with
+    `style.display = ''`, so the value must come back **from** the rule.
+
+    **(b) Two panels for the same job, built two different ways.** Gaps drew
+    "Longest gaps" by hand — same heading, but no `panel-rows`, and therefore
+    none of the cap every other ranking has. Next to it, "Coverage per year"
+    passed its forty rows to `topPanel` as **one joined string**, so the row
+    count was 1 and the cap never applied either. One panel stood at twice the
+    height of its neighbour. Both go through `topPanel` now (which grew an
+    optional `foot` for the "20 of 417 shown" line, so that note sits *inside*
+    the panel rather than behind it). Same shape as the recurring "one rule in
+    two places drifts apart, silently".
+
+    **(c) Two tile grids had no heading at all** while every other pane
+    consists purely of headed panels — twelve tiles and then eight more read as
+    one set, though they answer two different questions ("how much do I have"
+    against "what was extreme"). They are panels now, like everything else.
+
+    **(d) `align-items: start` is right for panels and wrong for tiles.** Note
+    195 added it so a one-line panel would not be stretched to the height of a
+    forty-line one. Widening it to `#view-stats .grid` would have caught the
+    *tile* grids too — and there the stretch is the point: only equal-height
+    cells put the footnote of every card on the same line. The rule is scoped
+    to grids that sit directly in a pane.
+
+    **What the polish itself changed** (deliberately small): a radius and
+    shadow ladder in `:root`, redefined for the light theme — a white card on
+    light grey is separated from its ground by a 1px border alone, and the page
+    reads like a form; `--hover` as its own token, because `--bg-elev` was
+    doing double duty as "lies deeper" *and* "responds"; `.hint` bound to
+    `--accent` via `color-mix` instead of two hard-coded rgba values of the
+    **dark** accent (in the light theme it was the only element in a colour
+    that occurred nowhere else); `tabular-nums` on every stat number, not just
+    the age cells; `.bar-val` from 36 px to 46 px, because "100 %" did not fit
+    and the year coverage wrapped; a hover state for `.zoom-btn`, which had
+    none — nine tabs whose only clue that they were pressable was the cursor;
+    and a three-column step for `.grid.cols-4` between 861 px and 1150 px,
+    where four columns fit arithmetically and not practically.
+
+    **Not touched:** every guard that describes *what* the Statistics tab says
+    stayed as it was and stayed green (829 checks, 936 tests, `live-check.js`
+    against the demo stock). A layout pass that needs its own tests rewritten
+    has changed more than layout.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

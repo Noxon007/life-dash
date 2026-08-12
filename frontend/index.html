@@ -36,6 +36,25 @@
     --confirmed: #35c4a7;
     --unconfirmed: #f5a623;
     --radius: 12px;
+    /* Eine Radius- und eine Schattenleiter statt einzeln gewählter Werte.
+       Vorher trugen Kachel, Dialog, Chip und Knopf vier Zahlen, die sich um
+       ein bis zwei Pixel unterschieden — nichts davon fällt einzeln auf, in
+       der Summe wirkt eine Seite dadurch unaufgeräumt. */
+    --radius-sm: 8px;
+    --radius-lg: 16px;
+    /* Tiefe statt nur Rahmen. Im dunklen Theme trägt der Schatten wenig und
+       darf kräftig sein; im hellen ist er das EINZIGE, was eine Kachel vom
+       Untergrund abhebt, und wird dort eigens gesetzt (siehe unten). */
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.28);
+    --shadow-md: 0 4px 14px rgba(0,0,0,.30);
+    --shadow-lg: 0 12px 32px rgba(0,0,0,.45);
+    /* Der Untergrund einer Zeile unter dem Zeiger. Als Variable, weil ihn
+       Ranglisten, Balken und Tabellen gleich brauchen — bisher stand dafür
+       dreimal `var(--bg-elev)`, das aber auch die Füllung von Balken und
+       Eingabefeldern ist: derselbe Ton für „liegt tiefer" und „reagiert". */
+    --hover: color-mix(in srgb, var(--accent) 10%, transparent);
+    /* Der vertikale Takt der Statistik-Ansichten (siehe `.stats-pane`). */
+    --stack: 20px;
     --cat-trip: #5b8cff;
     --cat-sighting: #35c4a7;
     --cat-country: #b07bff;
@@ -80,6 +99,14 @@
     /* Dunkler, weil ein leuchtendes Cyan auf der hellen Karte verschwindet */
     --photo-dot: #0e8ba8;
     --baseline-dot: #2f8f4f;
+    /* Im hellen Theme liegt eine weiße Kachel auf hellgrauem Grund — der
+       1-px-Rahmen ist dann der einzige Unterschied, und die Seite liest sich
+       wie ein Formular. Der Schatten macht aus dem Rahmen eine Fläche; er
+       muss dafür weicher und blauer sein als im dunklen (ein neutrales
+       Schwarz wirkt auf Hellgrau schmutzig). */
+    --shadow-sm: 0 1px 2px rgba(29,37,54,.06);
+    --shadow-md: 0 4px 14px rgba(29,37,54,.08);
+    --shadow-lg: 0 12px 32px rgba(29,37,54,.16);
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
@@ -136,7 +163,7 @@
     user-select: none;
   }
   .nav-item:hover { background: var(--bg-elev); color: var(--text); }
-  .nav-item.active { background: var(--accent); color: #fff; }
+  .nav-item.active { background: var(--accent); color: #fff; box-shadow: var(--shadow-sm); }
   .nav-item .ico { width: 20px; text-align: center; font-size: 16px; }
   .nav-badge {
     margin-left: auto;
@@ -172,7 +199,7 @@
     background: var(--bg-panel);
     flex-wrap: wrap;
   }
-  .topbar h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  .topbar h1 { font-size: 18px; margin: 0; font-weight: 600; letter-spacing: -.2px; }
   .topbar .sub { color: var(--text-dim); font-size: 13px; }
   .search {
     margin-left: auto;
@@ -184,8 +211,13 @@
     width: 280px;
     font-size: 13px;
     outline: none;
+    transition: border-color .15s, box-shadow .15s;
   }
-  .search:focus { border-color: var(--accent); }
+  /* Ein Feld, das nur seine Randfarbe ändert, sieht auf einem Kasten, der
+     ohnehin einen Rand hat, unverändert aus. Der Ring macht den Zustand
+     sichtbar, ohne dass etwas seine Größe ändert (kein Springen im Layout). */
+  .search:focus { border-color: var(--accent);
+                  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
   /* ---------- Sichtbarer Fokus ----------
      Ohne diese Regel ist die Tastaturbedienung zwar möglich, aber blind: der
      Standardrahmen des Browsers liegt auf `.btn` (eigener Hintergrund, kein
@@ -224,8 +256,16 @@
   .zoom-btn {
     padding: 7px 16px; border-radius: 20px; border: 1px solid var(--border);
     background: var(--bg-panel); color: var(--text-dim); cursor: pointer; font-size: 13px; font-weight: 500;
+    transition: background-color .15s, color .15s, border-color .15s;
+    user-select: none;
   }
-  .zoom-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  /* Ein Reiter ohne Hover-Zustand sieht aus wie eine Beschriftung. Die Leiste
+     trägt fünf Statistik-Ansichten und vier Zoomstufen — dass man sie DRÜCKEN
+     kann, stand bisher nur im Zeigefinger des Mauszeigers. */
+  .zoom-btn:hover { border-color: var(--accent); color: var(--text); background: var(--hover); }
+  .zoom-btn.active { background: var(--accent); color: #fff; border-color: var(--accent);
+                     box-shadow: var(--shadow-sm); }
+  .zoom-btn.active:hover { background: var(--accent); color: #fff; }
   .timeline { position: relative; padding-left: 32px; }
   .timeline::before {
     content: ""; position: absolute; left: 8px; top: 8px; bottom: 8px; width: 2px;
@@ -249,9 +289,12 @@
   .event-card {
     position: relative; background: var(--bg-panel); border: 1px solid var(--border);
     border-left: 3px solid var(--accent); border-radius: var(--radius);
-    padding: 14px 18px; margin-bottom: 12px; cursor: pointer; transition: all .15s;
+    padding: 14px 18px; margin-bottom: 12px; cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: transform .15s, border-color .15s, box-shadow .15s;
   }
-  .event-card:hover { transform: translateX(3px); border-color: var(--accent); }
+  .event-card:hover { transform: translateX(3px); border-color: var(--accent);
+                      box-shadow: var(--shadow-md); }
   .event-card::before {
     content: ""; position: absolute; left: -30px; top: 20px; width: 12px; height: 12px;
     border-radius: 50%; background: var(--accent); border: 3px solid var(--bg);
@@ -315,15 +358,36 @@
   .grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
   .grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
   .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  /* Zwischen der Mobilgrenze und dem breiten Schirm gibt es einen Bereich, in
+     dem vier Spalten rechnerisch passen und praktisch nicht: bei 1000 px
+     Fensterbreite bleiben nach Leiste, Seitenrand und Tafelinnenrand rund
+     150 px je Kachel, und „🥶 Gefühlt kältester Tag" braucht dort drei Zeilen.
+     Drei Spalten statt vier — die Kacheln stehen weiter in einem Raster, nur
+     in einem, das ihre Beschriftung trägt. */
+  @media (max-width: 1150px) and (min-width: 861px) {
+    .grid.cols-4 { grid-template-columns: repeat(3, 1fr); }
+  }
   .stat-card {
-    background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px;
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px 20px; box-shadow: var(--shadow-sm);
+    /* Die Zahl steht oben, die Beschriftung darunter, der Zusatz am FUSS —
+       auch dann, wenn die Beschriftung daneben zweizeilig ist. Ohne das
+       tanzen „Kategorie concert" und „Kompendium" in einer Reihe von zwölf
+       Kacheln auf drei verschiedenen Höhen. */
+    display: flex; flex-direction: column;
   }
   /* Klickbare Statistik-Kacheln & Chart-Balken (führen zu Kompendium/Timeline/Karte) */
-  .stat-card[data-go], .stat-card[data-event-slot] { cursor: pointer; transition: all .15s; }
-  .stat-card[data-go]:hover, .stat-card[data-event-slot]:hover { border-color: var(--accent); transform: translateY(-2px); }
-  .bar-row[data-bar-key] { cursor: pointer; border-radius: 6px; }
-  .bar-row[data-bar-key]:hover { background: var(--bg-elev); }
-  .stat-num { font-size: 34px; font-weight: 700; letter-spacing: -1px; }
+  .stat-card[data-go], .stat-card[data-event-slot] { cursor: pointer;
+    transition: transform .15s, border-color .15s, box-shadow .15s; }
+  .stat-card[data-go]:hover, .stat-card[data-event-slot]:hover {
+    border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .bar-row[data-bar-key] { cursor: pointer; border-radius: var(--radius-sm); }
+  .bar-row[data-bar-key]:hover { background: var(--hover); }
+  /* `tabular-nums` überall, nicht nur in den Alterszellen: eine Reihe von
+     Kacheln, deren Ziffern verschieden breit sind, steht optisch schief,
+     und eine Zahl, die sich sekündlich ändert, wackelt sichtbar. */
+  .stat-num { font-size: 32px; font-weight: 700; letter-spacing: -1px; line-height: 1.15;
+              font-variant-numeric: tabular-nums; }
   /* Anmerkung 216 — die Zellen im Alters-Block. Eigene Größe, weil dort
      „1.135.849.203" steht und nicht „34": bei 34px bräche die Zahl um und die
      Kachel wäre zwei Zeilen hoch, während ihre Nachbarn eine sind.
@@ -334,26 +398,91 @@
     font-variant-numeric: tabular-nums;
   }
   .age-cell { padding: 14px 16px; }
-  .stat-label { color: var(--text-dim); font-size: 13px; margin-top: 4px; }
-  .stat-sub { font-size: 12px; margin-top: 8px; color: var(--accent-2); }
+  .stat-label { color: var(--text-dim); font-size: 13px; margin-top: 4px; line-height: 1.35; }
+  /* `margin-top: auto` schiebt den Zusatz an den unteren Rand der Kachel —
+     siehe die Begründung an `.stat-card`. In einer Kachel ohne Zusatz kostet
+     die Regel nichts, weil sie gar nicht vorkommt. */
+  .stat-sub { font-size: 12px; margin-top: auto; padding-top: 8px; color: var(--accent-2); line-height: 1.35; }
   .panel {
-    background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px;
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px 22px; box-shadow: var(--shadow-sm);
   }
-  .panel h3 { margin: 0 0 16px; font-size: 15px; }
+  /* Eine Panel-Überschrift ist eine Auskunft über den Kasten, keine
+     Seitenüberschrift — deshalb klein, halbfett und mit etwas Sperrung, damit
+     sie sich von einer Zeile darunter unterscheidet, ohne laut zu sein. */
+  .panel h3 { margin: 0 0 14px; font-size: 14.5px; font-weight: 600; letter-spacing: -.1px;
+              line-height: 1.35; }
+  /* Eine Tafel, die warnt. Der Rand allein reicht nicht — auf einem Kasten,
+     der ohnehin einen hat, ist eine andere Randfarbe ein Detail; der leicht
+     eingefärbte Grund macht daraus einen Block, den man beim Überfliegen
+     bemerkt. `color-mix` statt eines festen Tons, damit er im hellen Theme
+     nicht dunkler wirkt als der Untergrund. */
+  .panel.warn { border-color: color-mix(in srgb, var(--warn) 55%, var(--border));
+                background: color-mix(in srgb, var(--warn) 7%, var(--bg-panel)); }
+  .panel.warn > h3 { color: var(--warn); }
+  /* Der erklärende Satz UNTER einer Tafelüberschrift. Bisher stand dafür an
+     manchen Stellen `.hint` (ein Kasten mit eigenem Rahmen — in einer Tafel
+     ein Rahmen im Rahmen), an anderen `.action-desc` (eine Regel aus den
+     Einstellungszeilen, die dort gar nicht hingehört). */
+  .panel-note { font-size: 12.5px; color: var(--text-dim); line-height: 1.6; }
+  .panel-note b { color: var(--text); }
+  /* Eine Kachel IN einer Tafel liegt eine Ebene tiefer und darf nicht
+     denselben Grund haben wie die Tafel selbst — sonst trennt sie nur ein
+     1-px-Rahmen vom Nichts, und eine Reihe solcher Kacheln liest sich wie ein
+     Formular. Ohne eigenen Schatten: zwei Schattenlagen übereinander sind
+     unruhig, die Tafel bringt ihren schon mit. */
+  .panel .stat-card { background: var(--bg-elev); box-shadow: none; }
   /* Anmerkung 195 — „das sieht doof aus mit großer Lücke".
      Ein Raster streckt jede Zelle auf die Höhe der höchsten — neben
      „Reichweite je Jahr" (vierzig Zeilen) stand deshalb ein leeres weißes
      Feld von einem Meter Höhe, in dem EINE Zeile lag. `start` lässt jede
      Kachel so hoch sein, wie sie Inhalt hat; die Höhen gleicht statt der
      Streckung der Deckel darunter an (`.panel-rows.capped`). */
-  #stats-tops .grid { align-items: start; }
+  /* Anmerkung 195: ein Raster streckt jede Zelle auf die Höhe der höchsten —
+     neben „Reichweite je Jahr" (vierzig Zeilen) stand deshalb ein leeres Feld
+     von einem Meter Höhe. Das gilt für die Raster aus TAFELN.
+     **Nicht für die Raster aus KACHELN**: dort ist die Streckung erwünscht,
+     denn nur mit gleich hohen Zellen steht der Zusatz am Fuß jeder Kachel auf
+     derselben Linie (siehe `.stat-sub`). Deshalb nur die Raster, die
+     unmittelbar in einer Ansicht liegen, und nicht die in den Tafeln. */
+  #view-stats > .stats-pane > .grid,
+  #stats-tops > .grid, #stats-gaps > .grid, #stats-tracks > .grid { align-items: start; }
+  /* ---------- Der Takt der fünf Statistik-Ansichten ----------
+     Bis hierher trug jeder Block seinen Abstand selbst, und zwar als
+     Inline-Stil: `margin-bottom:24px` an den Kachelrastern, `margin-bottom:20px`
+     an den Tafeln, `margin-top:16px` an genau EINEM der drei Raster in den
+     Ranglisten — und zwischen zwei aufeinanderfolgenden Rastern (Ranglisten,
+     Wege, Lücken) gar keiner, weil `gap` nur INNERHALB eines Rasters wirkt.
+     Fünf Reiter sahen dadurch aus wie fünf Seiten.
+
+     Der Abstand gehört nicht an die Blöcke, sondern an ihren Behälter: die
+     fünf Ansichten UND die drei Kästen, die das Skript füllt, sind Spalten mit
+     EINEM Zwischenraum. Damit hat ein neuer Block von selbst den richtigen
+     Abstand, und keine `innerHTML`-Zeile muss ihn mehr mitschreiben.
+
+     `display` steht hier und nicht im Markup, weil `showStatsPane` zum
+     Einblenden `style.display = ''` setzt — der Wert kommt also aus dieser
+     Regel zurück, nicht aus einem inline gemerkten `block`. */
+  .stats-pane, #stats-tops, #stats-gaps, #stats-tracks {
+    display: flex; flex-direction: column; gap: var(--stack);
+  }
   /* Zehn Zeilen sind die Höhe, die alle Ranglisten teilen (TOP_N im Server).
      Wer mehr hat — die Jahre —, bekommt sie nicht abgeschnitten, sondern
      scrollend: eine Ansicht darf auswählen, aber nichts verschweigen. Die
      Gesamtzahl steht dafür in der Überschrift. */
-  .panel-rows.capped { max-height: 340px; overflow-y: auto; padding-right: 4px; }
+  .panel-rows.capped { max-height: 340px; overflow-y: auto; padding-right: 4px;
+                       overscroll-behavior: contain; }
   .panel-rows.capped .bar-row:last-child { margin-bottom: 0; }
+  .panel-rows > .bar-row:last-child { margin-bottom: 0; }
+  /* Die Zeile UNTER der Liste, die etwas ÜBER die Liste sagt („20 von 417
+     gezeigt"). Abgesetzt durch eine Linie, weil sie sonst wie eine weitere
+     Zeile der Liste aussieht — und der Satz „417 Strecken" gelesen als
+     Ranglistenzeile ist genau die Verwechslung, gegen die er geschrieben ist. */
+  .panel-foot { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border);
+                font-size: 12px; color: var(--text-dim); line-height: 1.5; }
   .panel h3 .panel-count { color: var(--text-dim); font-weight: 400; }
+  /* Der Kopfsatz der Lücken-Ansicht — er trägt die Zahl, um die es geht. */
+  .gaps-head { font-size: 14px; line-height: 1.55; }
   .bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
   .bar-label { width: 105px; font-size: 12px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
   /* Anmerkung 156: Ranglisten-Zeile. Anders als beim Balken ist hier die
@@ -425,7 +554,7 @@
      zur Hauptsache. */
   .im-flow { display: flex; flex-direction: column; gap: 12px; }
   .im-card { background: var(--bg-panel); border: 1px solid var(--border);
-             border-radius: var(--radius); padding: 14px 16px; }
+             border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow-sm); }
   .im-card.setup { border-style: dashed; }
   .im-head { display: flex; align-items: baseline; justify-content: space-between;
              gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -469,16 +598,24 @@
        untereinander steht alles links. */
     .action-row > .eff { margin-left: 0; }
   }
-  .bar-track { flex: 1; height: 22px; background: var(--bg-elev); border-radius: 6px; overflow: hidden; }
-  .bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 6px; }
-  .bar-val { width: 36px; font-size: 12px; text-align: right; }
+  .bar-track { flex: 1; height: 20px; background: var(--bg-elev); border-radius: 6px;
+               overflow: hidden; border: 1px solid var(--border); }
+  .bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2));
+              border-radius: 6px; }
+  /* 36 px reichten für „412" und nicht für „100 %" — die Jahresabdeckung
+     brach dort um. `tabular-nums`, damit die Werte einer Liste untereinander
+     an derselben Stelle enden. */
+  .bar-val { width: 46px; font-size: 12px; text-align: right; flex-shrink: 0;
+             font-variant-numeric: tabular-nums; }
   /* ---------- Compendium ---------- */
   .comp-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
   .comp-card {
     background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 18px; cursor: pointer; transition: all .15s; text-align: center;
+    padding: 18px; cursor: pointer; text-align: center; box-shadow: var(--shadow-sm);
+    transition: transform .15s, border-color .15s, box-shadow .15s;
   }
-  .comp-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .comp-card:hover { border-color: var(--accent); transform: translateY(-2px);
+                     box-shadow: var(--shadow-md); }
   .comp-emoji { font-size: 40px; margin-bottom: 8px; }
   .comp-name { font-weight: 600; font-size: 15px; }
   .comp-count { color: var(--text-dim); font-size: 12px; margin-top: 4px; }
@@ -490,12 +627,23 @@
   }
   textarea.input-area:focus { border-color: var(--accent); }
   .btn {
-    padding: 11px 22px; border-radius: 10px; border: none; cursor: pointer; font-size: 14px;
-    font-weight: 600; background: var(--accent); color: #fff; transition: all .15s;
+    padding: 11px 22px; border-radius: 10px; border: 1px solid transparent; cursor: pointer;
+    font-size: 14px; font-weight: 600; background: var(--accent); color: #fff;
+    box-shadow: var(--shadow-sm);
+    transition: filter .15s, background-color .15s, border-color .15s, box-shadow .15s;
   }
-  .btn:hover { filter: brightness(1.1); }
-  .btn.secondary { background: var(--bg-elev); color: var(--text); border: 1px solid var(--border); }
-  .btn.ghost { background: transparent; color: var(--text-dim); }
+  .btn:hover { filter: brightness(1.1); box-shadow: var(--shadow-md); }
+  /* Ein Knopf, der gedrückt IST, muss anders aussehen als einer, über dem nur
+     der Zeiger steht — sonst fehlt die Rückmeldung genau in dem Moment, in dem
+     man sie erwartet. Ein Pixel Versatz reicht dafür. */
+  .btn:active { filter: brightness(.95); box-shadow: none; transform: translateY(1px); }
+  /* `border: 1px solid transparent` oben, damit die Varianten mit Rahmen
+     dieselbe Größe haben wie die ohne — vorher sprang eine Zeile mit
+     „Speichern" (ohne Rahmen) und „Abbrechen" (mit) um zwei Pixel. */
+  .btn.secondary { background: var(--bg-elev); color: var(--text); border-color: var(--border); }
+  .btn.secondary:hover { border-color: var(--accent); }
+  .btn.ghost { background: transparent; color: var(--text-dim); box-shadow: none; }
+  .btn.ghost:hover { color: var(--text); background: var(--hover); box-shadow: none; }
   .btn.small { padding: 6px 14px; font-size: 12px; }
   .btn-row { display: flex; gap: 10px; margin-top: 14px; align-items: center; flex-wrap: wrap; }
   .examples { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
@@ -556,13 +704,14 @@
   /* ---------- Admin / moderation ---------- */
   .mod-item {
     background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 18px; margin-bottom: 14px;
+    padding: 18px; margin-bottom: 14px; box-shadow: var(--shadow-sm);
   }
   .mod-raw { background: var(--bg-elev); border-radius: 8px; padding: 12px; font-size: 13px; color: var(--text-dim); margin: 12px 0; font-style: italic; }
   .arrow { color: var(--accent); font-size: 18px; text-align: center; margin: 6px 0; }
   .stages { display: grid; grid-template-columns: 1fr 40px 1fr 40px 1fr; gap: 10px; align-items: stretch; margin-bottom: 24px; }
   .stage {
-    background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px;
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px; box-shadow: var(--shadow-sm);
   }
   .stage-num { font-size: 12px; color: var(--accent); font-weight: 700; letter-spacing: 1px; }
   .stage h4 { margin: 6px 0 8px; font-size: 15px; }
@@ -637,6 +786,7 @@
   .ach-card {
     display: flex; gap: 14px; align-items: center; padding: 14px 16px; margin-bottom: 10px;
     background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
   }
   .ach-card.locked { opacity: .62; }
   .ach-medal {
@@ -793,7 +943,18 @@
   .event-card.is-group { border-left-style: dashed; }
   .chip.is-loading { opacity: .5; }
   .section-title { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); margin: 28px 0 14px; font-weight: 600; }
-  .hint { background: rgba(91,140,255,.08); border: 1px solid rgba(91,140,255,.3); border-radius: 10px; padding: 12px 16px; font-size: 13px; color: var(--text-dim); margin-bottom: 20px; }
+  /* Der Ton kam bis hierher aus zwei festen rgba-Werten des DUNKLEN Akzents.
+     Im hellen Theme ist `--accent` ein anderer Blauton — der Hinweiskasten
+     stand dort also als einziges Element in einer Farbe, die sonst nirgends
+     mehr vorkam. `color-mix` bindet ihn an die Variable. */
+  .hint { background: color-mix(in srgb, var(--accent) 8%, transparent);
+          border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+          border-radius: 10px; padding: 12px 16px; font-size: 13px;
+          color: var(--text-dim); line-height: 1.6; margin-bottom: 20px; }
+  /* Ein Abstand nach unten, unter dem nichts mehr kommt, ist kein Abstand,
+     sondern ein Loch — sichtbar in jedem Kasten, dessen letzter Inhalt ein
+     Hinweis ist (die Lade-Anzeige der drei Statistik-Ansichten war genau das). */
+  .hint:last-child { margin-bottom: 0; }
   .hint b { color: var(--accent); }
   code { background: var(--bg-elev); padding: 1px 6px; border-radius: 5px; font-size: 12px; }
   /* ---------- DB raw view ---------- */
@@ -818,12 +979,12 @@
   }
   .modal-overlay.show { display: flex; }
   .modal-box {
-    background: var(--bg-panel); border: 1px solid var(--border); border-radius: 16px;
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-lg);
     padding: 24px; width: min(560px, 100%); max-height: 90dvh; overflow-y: auto;
-    overscroll-behavior: contain;
+    overscroll-behavior: contain; box-shadow: var(--shadow-lg);
     animation: fade .2s;
   }
-  .modal-box h3 { margin: 0 0 6px; }
+  .modal-box h3 { margin: 0 0 6px; font-size: 17px; }
   .btn.danger { background: var(--danger); color: #fff; }
   /* Ortswahl auf der Karte. Höhe in dvh, nicht vh (A38): vh rechnet ohne
      Adressleiste, und dann steht „Übernehmen" auf dem Handy unter dem Rand. */
@@ -845,6 +1006,7 @@
     border-radius: 18px 18px 0 0; width: min(560px, 100%);
     max-height: 88dvh; display: flex; flex-direction: column;
     padding-bottom: env(safe-area-inset-bottom);
+    box-shadow: var(--shadow-lg);
     animation: sheet-up .22s ease-out;
   }
   @keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
@@ -879,8 +1041,9 @@
   }
   .login-overlay.show { display: flex; }
   .login-box {
-    background: var(--bg-panel); border: 1px solid var(--border); border-radius: 16px;
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-lg);
     padding: 40px 36px; text-align: center; max-width: 340px; width: 90%;
+    box-shadow: var(--shadow-lg);
   }
   .login-box .logo { justify-content: center; padding-bottom: 8px; font-size: 24px; }
   .login-box p { color: var(--text-dim); font-size: 13px; line-height: 1.6; margin: 0 0 24px; }
@@ -899,7 +1062,7 @@
   .loading-card {
     background: var(--bg-panel); border: 1px solid var(--border); border-radius: 16px;
     padding: 26px 28px; display: flex; flex-direction: column; align-items: center;
-    gap: 12px; box-shadow: 0 18px 48px rgba(0,0,0,.45);
+    gap: 12px; box-shadow: var(--shadow-lg);
     max-width: min(420px, 88vw); text-align: center;
   }
   .loading-overlay .spinner {
@@ -968,8 +1131,8 @@
        verschiebt sie unter dem Zeiger weg. */
     .event-card, .stat-card[data-go], .stat-card[data-event-slot],
     .comp-card, .nav-item, .filter-chip, .ach-track > i, .mp-caret,
-    .seg-switch button { transition: none; }
-    .event-card:hover, .comp-card:hover,
+    .seg-switch button, .zoom-btn, .search, .btn { transition: none; }
+    .event-card:hover, .comp-card:hover, .btn:active,
     .stat-card[data-go]:hover, .stat-card[data-event-slot]:hover { transform: none; }
   }
 
@@ -983,7 +1146,7 @@
     background: var(--bg-panel); border: 1px solid var(--border);
     border-left: 3px solid var(--accent); border-radius: 10px;
     padding: 10px 14px; font-size: 13px; color: var(--text); line-height: 1.5;
-    box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    box-shadow: var(--shadow-lg);
     white-space: pre-line; animation: toast-in .25s ease; cursor: pointer;
   }
   .toast.error { border-left-color: var(--danger); }
@@ -1842,7 +2005,15 @@
           <div class="zoom-btn" data-stats="tracks" data-i18n="stats.tab.tracks">🛣️ Wege</div>
         </div>
         <div class="stats-pane" data-stats-pane="tiles">
-        <div class="grid cols-4" style="margin-bottom:24px">
+        <!-- Anmerkung 226: Die beiden Kachelraster standen ohne Überschrift da,
+             während jeder andere Statistik-Reiter ausschließlich aus Tafeln mit
+             Überschrift besteht. Zwölf Kacheln und dann acht weitere lesen sich
+             ohne Zäsur wie eine einzige Menge — dabei beantworten sie zwei
+             verschiedene Fragen („wie viel habe ich" gegen „was war extrem").
+             Jetzt trägt jeder Block dieselbe Bauform wie in den Ranglisten. -->
+        <div class="panel">
+          <h3 data-i18n="stats.sec.overview">📊 Überblick</h3>
+        <div class="grid cols-4">
           <div class="stat-card" data-go="timeline:all"><div class="stat-num" id="stat-events">–</div><div class="stat-label" data-i18n="stat.events">Ereignisse gesamt</div><div class="stat-sub" data-i18n="stat.sub.lifedb" data-i18n="layer.mid.title">Lebensdatenbank</div></div>
           <div class="stat-card" data-go="comp:country" data-req-mod="country"><div class="stat-num" id="stat-countries">–</div><div class="stat-label" data-i18n="stat.countries">Länder besucht</div><div class="stat-sub" data-i18n="stat.sub.collection">Kompendium</div></div>
           <div class="stat-card" data-go="map"><div class="stat-num" id="stat-places">–</div><div class="stat-label" data-i18n="stat.places">Orte besucht</div><div class="stat-sub" data-i18n="stat.sub.located">verortete Events</div></div>
@@ -1865,6 +2036,7 @@
           <div class="stat-card" data-go="timeline:meal" data-req-mod="food"><div class="stat-num" id="stat-meals">–</div><div class="stat-label" data-i18n="stat.meals">Mahlzeiten</div><div class="stat-sub" data-i18n="stat.sub.catmeal">Kategorie meal</div></div>
           <div class="stat-card" data-go="admin"><div class="stat-num" id="stat-unconfirmed">–</div><div class="stat-label" data-i18n="stat.unconfirmed">Unbestätigt</div><div class="stat-sub" data-i18n="stat.sub.tomoderate">zu moderieren</div></div>
         </div>
+        </div>
 
         <!-- Anmerkung 216: Das Alter in sieben Einheiten. Die Kachel darüber
              sagt „34" und beantwortet damit die Frage, die man einmal im Jahr
@@ -1880,7 +2052,7 @@
              Ohne Geburts-Meilenstein bleibt der Block ganz weg statt mit
              Nullen dazustehen: eine Null ist hier keine Auskunft, sondern eine
              fehlende. -->
-        <div class="panel" id="age-exact" style="margin-bottom:24px; display:none">
+        <div class="panel" id="age-exact" style="display:none">
           <h3 data-i18n="age.exact.title">🎂 Dein Alter genau</h3>
           <div class="action-desc" style="margin-bottom:12px" id="age-exact-sub"></div>
           <!-- Die Beschriftungen stehen im MARKUP und nicht im Skript: sie
@@ -1900,7 +2072,9 @@
           </div>
         </div>
 
-        <div class="grid cols-4" style="margin-bottom:24px">
+        <div class="panel">
+          <h3 data-i18n="stats.sec.records">🌡️ Wetter-Rekorde</h3>
+        <div class="grid cols-4">
           <div class="stat-card" data-event-slot="hot">
             <div class="stat-num" id="stat-hot">–</div>
             <div class="stat-label" data-i18n="stat.hot">🔥 Heißester Tag</div>
@@ -1963,9 +2137,10 @@
                Sonnenwende, egal was an dem Tag geschehen ist. `daylight_h` wird
                weiter geholt und steht weiter am einzelnen Ereignis. -->
         </div>
+        </div>
 
         <!-- F11: Auswertungen aus bereits gespeicherten Wetterdaten -->
-        <div class="panel" id="weather-summary" style="margin-bottom:20px; display:none">
+        <div class="panel" id="weather-summary" style="display:none">
           <h3 data-i18n="wx.title">🌦️ Deine Wetterbilanz</h3>
           <div class="grid cols-4" id="weather-tiles"></div>
           <div class="action-desc" style="margin-top:12px">
@@ -1976,7 +2151,7 @@
         <!-- P3.1: Kennzahlen der Module — kommen aus den Modul-YAMLs (statistics:),
              nicht mehr aus fest verdrahteten Kacheln. Neues Modul = Statistik ohne
              Frontend-Änderung. -->
-        <div class="panel" id="module-widgets" style="margin-bottom:20px; display:none">
+        <div class="panel" id="module-widgets" style="display:none">
           <h3 data-i18n="widgets.title">📊 Aus deinen Modulen</h3>
           <div class="grid cols-4" id="widget-tiles"></div>
           <div id="widget-charts" style="margin-top:8px"></div>
@@ -1984,13 +2159,17 @@
         </div><!-- /Zahlen -->
 
         <div class="stats-pane" data-stats-pane="charts" style="display:none">
+        <!-- Anmerkung 226: „Regentage pro Jahr" stand in einem EIGENEN Raster
+             über den anderen fünf Diagrammen und war meistens leer — ein
+             Raster ohne sichtbares Kind ist ein Kasten von null Höhe, der
+             trotzdem einen Zwischenraum erzeugt. Als sechste Kachel im selben
+             Raster verschwindet es sauber, wenn es nichts zu zeigen gibt, und
+             füllt sonst seine Spalte wie jede andere. -->
         <div class="grid cols-2">
           <div class="panel" id="panel-rain-years" style="display:none">
             <h3 data-i18n="chart.raindays">Regentage pro Jahr</h3>
             <div id="chart-raindays"></div>
           </div>
-        </div>
-        <div class="grid cols-2">
           <div class="panel">
             <h3 data-i18n="chart.peryear">Ereignisse pro Jahr</h3>
             <div id="chart-years"></div>
@@ -2036,9 +2215,14 @@
         <div class="stats-pane" data-stats-pane="tracks" style="display:none">
           <!-- Die Warnung steht ÜBER den Zahlen und nicht darunter: wer eine
                Jahressumme liest, hat die Fußnote schon hinter sich. -->
-          <div class="panel" style="border-color:var(--warn, #c9a227)">
-            <b data-i18n="tr.warn.title">⚠️ Diese Zahlen kommen ausschließlich aus dem Google-Timeline-Import</b>
-            <div class="hint" style="margin-top:6px" data-i18n="tr.warn.desc">
+          <!-- Anmerkung 226: Als Tafel wie jede andere gebaut — Überschrift im
+               `h3`, Text darunter —, statt als Kasten mit fettem Satz und einem
+               `.hint` darin. Die Warnfarbe steckt in `.panel.warn` und nicht
+               mehr in einem Inline-Stil; ein zweiter Warnkasten irgendwo sonst
+               sähe sonst zwangsläufig anders aus. -->
+          <div class="panel warn">
+            <h3 data-i18n="tr.warn.title">⚠️ Diese Zahlen kommen ausschließlich aus dem Google-Timeline-Import</h3>
+            <div class="panel-note" data-i18n="tr.warn.desc">
               Sie sagen nicht, wie viel du zurückgelegt hast, sondern was Google davon aufgezeichnet hat —
               und das kann <b>sehr ungenau</b> sein. Ohne Telefon in der Tasche gibt es die Fahrt nicht.
               Die Fortbewegungsart ist Googles <b>Vermutung</b> (ein Fußweg im Bus zählt gern als Radfahrt).
@@ -4233,6 +4417,9 @@ const I18N_EN = {
   'stats.tab.tiles': "🔢 Numbers",
   'stats.tab.charts': "📊 Charts",
   'stats.tab.tops': "🏆 Rankings",
+  // Anmerkung 226: die beiden Kachelraster heißen jetzt, was sie zeigen
+  'stats.sec.overview': "📊 Overview",
+  'stats.sec.records': "🌡️ Weather records",
   'tops.fail': "The rankings could not be loaded.",
   'tops.nowx': "no weather data yet",
   'tops.none': "nothing recorded yet",
@@ -8126,7 +8313,13 @@ const TOP_PANEL_ROWS = 10;
 // ist (Anmerkung 216). Die Wohnort-Gruppen im „Am weitesten"-Panel schieben
 // Zwischenüberschriften zwischen die Zeilen — „(20)" hieße dort fünf Wohnorte
 // plus fünfzehn Ziele, und das ist keine Menge, nach der jemand fragt.
-function topPanel(title, rows, empty, count = null) {
+// `foot` ist die Zeile UNTER der Liste, die etwas über die Liste selbst sagt
+// („20 von 417 Strecken gezeigt"). Sie gehört in die Tafel und nicht dahinter:
+// eine Fußnote hinter dem Kasten liest sich wie ein Satz über die ganze
+// Ansicht. Anmerkung 226 — bis dahin baute die Lücken-Ansicht ihre zweite
+// Tafel deshalb von Hand nach, ohne `panel-rows` und damit ohne den Deckel,
+// den jede andere Rangliste hat.
+function topPanel(title, rows, empty, count = null, foot = '') {
   // Anmerkung 195: Eine Liste, die über die Kachelhöhe hinausgeht,
   // wird gescrollt und NICHT gekürzt — und die Überschrift sagt, wie viele
   // es insgesamt sind. Ein Deckel, der schweigt, sieht aus wie das Ende der
@@ -8138,7 +8331,8 @@ function topPanel(title, rows, empty, count = null) {
       ? ` <span class="panel-count">(${shown.toLocaleString(LOC())})</span>` : ''}</h3>
     <div class="panel-rows${capped ? ' capped' : ''}">${
       rows.length ? rows.join('')
-                  : `<div class="stat-label">${esc(empty)}</div>`}</div>
+                  : `<div class="stat-label">${esc(empty)}</div>`}</div>${
+    foot ? `<div class="panel-foot">${foot}</div>` : ''}
   </div>`;
 }
 function renderStatsTops(top) {
@@ -8231,7 +8425,11 @@ function renderStatsTops(top) {
     + topPanel(t('tops.far', '🧭 Am weitesten von zu Hause'), farRows,
                t('tops.far.none', 'Trag einen Wohnort ein — ohne ihn gibt es kein „weit weg".'),
                (top.farthest || []).length)
-    + `<div class="grid cols-2" style="margin-top:16px">`
+    // Anmerkung 226: der Abstand zwischen den Rastern steht nicht mehr hier.
+    // Er stand an EINEM der drei (`margin-top:16px`) und fehlte den anderen
+    // beiden — `gap` wirkt nur innerhalb eines Rasters, nicht zwischen zweien.
+    // Jetzt taktet der Behälter (`.stats-pane, #stats-tops, …` im Stylesheet).
+    + `<div class="grid cols-2">`
     + topPanel(t('tops.places', '📍 Top-Orte'), rank(top.places), noData)
     + topPanel(t('tops.cities', '🏙️ Top-Städte'), rank(top.cities), noData)
     + topPanel(t('tops.countries', '🌍 Top-Länder'), rank(top.countries), noData)
@@ -8262,7 +8460,7 @@ function renderStatsTops(top) {
     + `</div>`
     // Anmerkung 186: unter den Wetter-Ranglisten steht, woher ihre Zahlen
     // kommen — hier, wo man sie liest, und nicht in einer Einstellung.
-    + `<div class="hint" id="stats-wx-source" style="margin-top:4px"></div>`;
+    + `<div class="hint" id="stats-wx-source"></div>`;
   const src = document.getElementById('stats-wx-source');
   if (src) src.textContent = wxSourceNote();
   box.querySelectorAll('[data-top-day]').forEach(row =>
@@ -8393,15 +8591,24 @@ function renderStatsGaps(r) {
   const head = r.since_birth
     ? t('gaps.head.birth', 'Seit deiner Geburt am {from} sind {k} von {total} Tagen bekannt ({pct} %).')
     : t('gaps.head.rec', 'Zwischen dem {from} und dem {to} sind {k} von {total} Tagen bekannt ({pct} %).');
-  const sub = r.since_birth ? '' : `<div class="hint" style="margin-top:6px">${esc(
+  const sub = r.since_birth ? '' : `<div class="hint" style="margin-top:10px">${esc(
     t('gaps.head.nobirth', 'Trag die Geburt als Meilenstein ein, dann rechnet diese Ansicht über dein ganzes Leben statt nur über den erfassten Zeitraum.'))}</div>`;
 
+  // Anmerkung 226: Der Anteil steht jetzt auch als Balken da. Die drei Zahlen
+  // darunter nennen dieselbe Aufteilung — aber „7.298 von 12.437" beantwortet
+  // die Frage „wie voll ist das?" erst nach einer Kopfrechnung, und genau die
+  // ist der Grund, warum diese Ansicht existiert. Derselbe Balken wie in der
+  // Jahresabdeckung daneben (`cov-track`), damit man beide gleich liest.
   const summary = `<div class="panel">
     <h3>${esc(t('gaps.sum.title', '🕳️ Was fehlt'))}</h3>
-    <div>${esc(head.replace('{from}', fmtDay(r.from)).replace('{to}', fmtDay(r.to))
+    <div class="gaps-head">${esc(head.replace('{from}', fmtDay(r.from)).replace('{to}', fmtDay(r.to))
       .replace('{k}', n(r.known_days)).replace('{total}', n(r.total_days))
       .replace('{pct}', pct))}</div>
-    <div class="stat-label" style="margin-top:6px">${esc(
+    <div class="bar-row" style="margin-top:12px">
+      <div class="cov-track"><div class="cov-fill" style="width:${pct}%"></div></div>
+      <div class="bar-val">${pct} %</div>
+    </div>
+    <div class="panel-note" style="margin-top:8px">${esc(
       t('gaps.sum.split', '{rec} Tage erfasst · {base} Tage aus dem Wohnort abgeleitet · {gap} Tage unbekannt')
         .replace('{rec}', n(r.recorded_days)).replace('{base}', n(r.baseline_days))
         .replace('{gap}', n(r.unknown_days)))}</div>
@@ -8411,6 +8618,11 @@ function renderStatsGaps(r) {
   // Jahresabdeckung: beantwortet „wo fange ich an?" besser als jede Liste,
   // weil sie den ganzen Zeitraum auf einen Blick zeigt, statt zwanzig
   // Strecken zu nennen und vierhundert zu verschweigen.
+  // Anmerkung 226: eine Zeile je Jahr als ARRAY, nicht als ein zusammengefügter
+  // Klumpen. `topPanel` zählt die Zeilen, um zu entscheiden, ob die Tafel
+  // scrollt — als eine einzige „Zeile" waren vierzig Jahre unter dem Deckel
+  // hindurchgerutscht, und die Tafel stand meterhoch neben einer, die bei zehn
+  // Zeilen aufhört.
   const years = (r.per_year || []).map(([y, known, total]) => {
     const share = total ? Math.round(known / total * 100) : 0;
     return `<div class="bar-row">
@@ -8418,26 +8630,29 @@ function renderStatsGaps(r) {
       <div class="cov-track"><div class="cov-fill" style="width:${share}%"></div></div>
       <div class="bar-val">${share} %</div>
     </div>`;
-  }).join('');
+  });
 
   const rows = (r.stretches || []).map((s, i) =>
     topRow(i, `${fmtDay(s.from)} – ${fmtDay(s.to)}`, dayCount(s.days), '',
            ` data-gap-from="${esc(s.from)}" data-gap-to="${esc(s.to)}" `
            + `title="${esc(t('gaps.row.tip', 'Klicken: als Wohnort-Zeitraum eintragen'))}"`));
   const capped = r.stretch_count > (r.stretches || []).length
-    ? `<div class="stat-label" style="margin-top:8px">${esc(
-        t('gaps.capped', '{n} von {m} Strecken gezeigt, die längsten zuerst.')
-          .replace('{n}', n(r.stretches.length)).replace('{m}', n(r.stretch_count)))}</div>`
+    ? esc(t('gaps.capped', '{n} von {m} Strecken gezeigt, die längsten zuerst.')
+            .replace('{n}', n(r.stretches.length)).replace('{m}', n(r.stretch_count)))
     : '';
 
+  // Anmerkung 226: BEIDE Tafeln über `topPanel`. Die rechte war von Hand
+  // nachgebaut — dieselbe Überschrift, aber ohne `panel-rows` und damit ohne
+  // den Deckel, den jede andere Rangliste im Programm hat. Zwei Bauformen für
+  // dieselbe Sache laufen auseinander, und zwar still: hier stand die eine
+  // Tafel schon auf doppelter Höhe der anderen daneben.
   box.innerHTML = summary
     + `<div class="grid cols-2">`
-    + topPanel(t('gaps.years', '📅 Abdeckung je Jahr'), years ? [years] : [],
+    + topPanel(t('gaps.years', '📅 Abdeckung je Jahr'), years,
                t('gaps.none', 'keine Lücke — jeder Tag ist belegt'))
-    + `<div class="panel"><h3>${esc(t('gaps.top', '📏 Längste Lücken'))}</h3>`
-    + (rows.length ? rows.join('')
-       : `<div class="stat-label">${esc(t('gaps.none', 'keine Lücke — jeder Tag ist belegt'))}</div>`)
-    + capped + `</div>`
+    + topPanel(t('gaps.top', '📏 Längste Lücken'), rows,
+               t('gaps.none', 'keine Lücke — jeder Tag ist belegt'),
+               r.stretch_count, capped)
     + `</div>`;
 
   // **Der Klick führt dorthin, wo die Lücke zu schließen ist.** Ein Sprung in
