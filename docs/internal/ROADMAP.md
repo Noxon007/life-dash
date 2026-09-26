@@ -98,17 +98,6 @@ blocks another except where stated.
 
 ## 3. Backlog
 
-### T1 — the timeline rebuilds the whole list per page · S–M
-
-Left over from notes 179 and 227. Layout is no longer the problem
-(`content-visibility`, heights carried across the rebuild), but the
-**JavaScript** rebuild still grows with every loaded page: 50 ms at page 6,
-284 ms under 4× CPU throttling (`tools/measure-timeline-chrome.js`). The fix is
-to append the new groups instead of replacing `innerHTML` — which touches the
-index-based registers `VISIT_GROUPS` and `TL_STRIP_MEDIA`, and the boundary
-group that a new page can extend. Measure with the Chrome tool, and check the
-jump, not only the time.
-
 ### P6.1 — a shared view across accounts · M–L
 
 Two independent databases laid over each other: who was where and when on one

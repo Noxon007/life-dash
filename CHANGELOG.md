@@ -621,8 +621,10 @@
   *Day* zoom every page of older entries rebuilt the whole list, and each page
   took longer than the one before: after six pages, around half a second on a
   computer and two and a half seconds on a phone. The browser now only lays out
-  the days you can actually see — the same six pages take a sixth of the time,
-  and the view stays exactly where you were reading while more entries load.
+  the days you can actually see, and loading more entries leaves the days
+  already on screen as they are instead of building them again. The sixth page
+  now takes a tenth of the time it did, and the view stays exactly where you
+  were reading while more entries load.
 - **The timeline no longer shows years as “only at home” before their entries
   have loaded.** Days filled in from your residence could run years ahead of
   the entries loaded so far, so a stretch with plenty going on looked as if

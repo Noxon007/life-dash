@@ -3012,6 +3012,55 @@ repair for each: delete it.
     the server. Missing indexes cost speed, not data; `migrate._INDEXES` stays
     the place for the ones that matter.
 
+230. ✅ **The timeline keeps what did not change (backlog item T1).** After
+    note 227 the day zoom's remaining cost per loaded page was JavaScript, and
+    splitting it showed that **parsing** was the larger part — 31 of 54 ms at
+    page 6, 257 of 386 ms throttled. A new page almost only appends; the groups
+    in front of it are character for character the same as before.
+
+    The obstacle, recorded since note 179, was the index-based registers:
+    `VISIT_GROUPS`, `TL_STRIP_MEDIA` and `TL_AGG_GROUPS` are filled while the
+    HTML is built, and the markup refers to them by position. Replacing single
+    groups looked like it required rebuilding those registers as maps. **It did
+    not, because the rule is the string, not a guess about it.** Every group's
+    HTML is still built on every pass, so the registers fill exactly as before;
+    `tlPlaceGroups` then keeps a group's existing node whenever its new HTML is
+    *identical* to the HTML that node was made from. An identical string
+    contains identical indices, so the kept node points at the same register
+    entries a fresh one would.
+
+    **What changes a group after it was placed** — expanding a visit card,
+    “show N more”, opening a year row — makes the node differ from its string
+    *and* appends register entries that the next pass will overwrite. A
+    `MutationObserver` on the list marks such groups, and they are rebuilt (the
+    expansion closes, as it always did on a rebuild). An observer rather than a
+    list of the three click handlers: the fourth handler that mutates a group is
+    covered without anybody remembering this note.
+
+    **One consequence that is invisible when it goes wrong.** The “show N
+    more” listener used to be bound per button on every pass. On a kept node
+    that accumulates — after five passes one click built the cards five times.
+    Nothing on screen shows it: `outerHTML` on a button that has already been
+    replaced is, per the spec, a silent no-op. The listener is delegated to the
+    list now, and the guard counts `renderItem` calls rather than looking at the
+    result — the first version of the guard looked at the result and stayed
+    green against the broken state.
+
+    Measured in Chrome (`measure-timeline-chrome.js`, which now times the pass
+    `loadTimeline(true)` itself triggers — three `renderTimeline()` calls in a
+    row would have measured two passes with nothing to do): page 6 **64 → 34
+    ms, throttled 365 → 186 ms**, no jump; a full rebuild (filter or zoom
+    change) is unchanged, since nothing can be reused there. Against the demo
+    data in the week zoom, after two appended pages, all 257 visit cards still
+    name their own register entry and all 65 photo strips find theirs; 153 of
+    200 groups were kept. `check-tl-heights.js` covers kept nodes, a mutated
+    group being rebuilt and only it, appending at the end, the footer, and the
+    listener count; each of the four was run against a state with that part
+    removed.
+
+    What remains is building the strings (25 / 140 ms at page 6), still linear
+    in the pages loaded. That is small enough to leave; T1 leaves the roadmap.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

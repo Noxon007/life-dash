@@ -6248,14 +6248,116 @@ document.getElementById('seed-save').addEventListener('click', async () => {
 // DOM-Schutz: pro Zeitgruppe zunächst nur TL_GROUP_CAP Karten rendern —
 // nach einem Timeline-Import (10k+ Events) friert der Browser sonst ein.
 const TL_GROUP_CAP = 25;
+
+// --------------------------------------------------------------------------- //
+// **Anmerkung 230 — was sich nicht geändert hat, bleibt stehen.**
+// --------------------------------------------------------------------------- //
+// Jede nachgeladene Seite baute die GANZE Liste per `innerHTML` neu, und das
+// Parsen war der größere Teil davon (Seite 6: 31 von 54 ms, gedrosselt 257
+// von 386). Eine neue Seite hängt aber fast nur hinten an — die Gruppen davor
+// sind Zeichen für Zeichen dieselben.
+//
+// **Die Regel ist die Zeichenkette, nicht eine Vermutung darüber.** Eine Gruppe
+// wird wiederverwendet, wenn ihr HTML GENAU dem entspricht, mit dem ihr Knoten
+// gebaut wurde. Darin stehen auch die Indizes in die Register (`data-visit-
+// group`, `data-tl-more`, `data-agg-group`, die Schlüssel der Fotoleisten), und
+// die Register werden weiter bei jedem Durchgang vollständig und in derselben
+// Reihenfolge gefüllt: gleiche Zeichenkette heißt gleiche Indizes, also zeigt
+// der alte Knoten auf dieselben Einträge wie ein neuer. Genau deshalb musste
+// der Umbau die Register nicht anfassen, an denen er bis hier hing.
+//
+// **Was eine Gruppe NACH dem Einsetzen verändert** (Sammelkarte aufklappen,
+// „N weitere anzeigen", eine Jahreszeile öffnen), macht ihren Knoten ungleich
+// zu seiner Zeichenkette — und schreibt dabei Einträge ans Ende der Register,
+// die beim nächsten Durchgang nicht mehr stimmen. Solche Gruppen merkt ein
+// MutationObserver, und sie werden neu gebaut (das Aufgeklappte schließt sich,
+// wie bisher bei jedem Neuaufbau). Ein Beobachter statt einer Liste der
+// Klick-Handler: der vierte Handler, der eine Gruppe verändert, ist dann von
+// selbst dabei.
+const TL_GROUP_HTML = new Map();   // Schlüssel -> HTML, aus dem der Knoten stammt
+let TL_ORDERED = [];               // die Gruppen des letzten Durchgangs
+let TL_GROUP_WATCH = null;
+function tlDirtyGroups(records, list) {
+  for (const r of records) {
+    if (r.target === list) continue;   // Einsetzen und Entfernen ganzer Gruppen
+    const at = r.target.nodeType === 1 ? r.target : r.target.parentElement;
+    const g = at && at.closest('.tl-year[data-tl-key]');
+    if (g) TL_GROUP_HTML.delete(g.dataset.tlKey);
+  }
+}
+function tlPlaceGroups(el, keys, htmls, heights) {
+  if (!TL_GROUP_WATCH && typeof MutationObserver === 'function') {
+    TL_GROUP_WATCH = new MutationObserver(recs => tlDirtyGroups(recs, el));
+    TL_GROUP_WATCH.observe(el, { childList: true, subtree: true, characterData: true });
+  }
+  // Was seit dem letzten Durchgang geschah, zuerst: der Beobachter meldet
+  // gesammelt und später — hier muss es JETZT feststehen.
+  if (TL_GROUP_WATCH) tlDirtyGroups(TL_GROUP_WATCH.takeRecords(), el);
+  const old = new Map();
+  for (const n of el.children) if (n.dataset && n.dataset.tlKey) old.set(n.dataset.tlKey, n);
+  const nodes = new Array(keys.length);
+  const fresh = [];
+  keys.forEach((k, i) => {
+    const n = old.get(k);
+    if (n && TL_GROUP_HTML.get(k) === htmls[i]) { nodes[i] = n; old.delete(k); }
+    else fresh.push(i);
+  });
+  if (fresh.length) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = fresh.map(i => htmls[i]).join('');
+    const made = [...tpl.content.children];
+    if (made.length !== fresh.length) {
+      // Eine Gruppe, die nicht genau EIN Element ergibt, ließe sich nicht
+      // zuordnen. Dann lieber alles neu als eine verschobene Zuordnung.
+      el.innerHTML = htmls.join('');
+      TL_GROUP_HTML.clear();
+      keys.forEach((k, i) => TL_GROUP_HTML.set(k, htmls[i]));
+      if (TL_GROUP_WATCH) TL_GROUP_WATCH.takeRecords();
+      return;
+    }
+    made.forEach((n, j) => {
+      const i = fresh[j];
+      nodes[i] = n;
+      // Anmerkung 227: eine NEU eingesetzte Gruppe bekommt die Höhe ihres
+      // Vorgängers als Platzhalter — sonst springt die Ansicht.
+      const h = heights.get(keys[i]);
+      if (h) n.setAttribute('style', `contain-intrinsic-size:auto ${h}px`);
+    });
+  }
+  const keep = new Set(nodes);
+  [...el.childNodes].forEach(n => { if (!keep.has(n)) n.remove(); });   // Fuß, Leerzeilen, Verwaistes
+  let cur = el.firstChild;
+  for (const n of nodes) {
+    if (n === cur) cur = cur.nextSibling;
+    else el.insertBefore(n, cur);
+  }
+  TL_GROUP_HTML.clear();
+  keys.forEach((k, i) => TL_GROUP_HTML.set(k, htmls[i]));
+  // Die eigenen Einsätze eben sind keine Veränderung einer Gruppe.
+  if (TL_GROUP_WATCH) TL_GROUP_WATCH.takeRecords();
+}
+// „N weitere anzeigen": EIN Horcher an der Liste statt einer je Knopf. Ein
+// wiederverwendeter Knoten behielte sonst seinen alten Horcher und bekäme bei
+// jedem Durchgang einen weiteren — nach fünf Durchgängen baute ein Klick die
+// Karten fünfmal. Sichtbar ist das nicht: `outerHTML` auf einem schon
+// ersetzten Knopf ist laut Spezifikation still wirkungslos. Gelesen wird
+// `TL_ORDERED`: der Index im Knopf ist der des aktuellen Durchgangs (die
+// Zeichenkette war gleich, siehe oben).
+document.getElementById('timeline-list').addEventListener('click', ev => {
+  const btn = ev.target.closest('[data-tl-more]');
+  if (!btn) return;
+  const g = TL_ORDERED[+btn.dataset.tlMore];
+  if (g) btn.outerHTML = g.items.slice(TL_GROUP_CAP).map(renderItem).join('');
+});
 function renderTimelineList() {
   const el = document.getElementById('timeline-list');
   // **Anmerkung 227: die gemessenen Höhen überleben den Neuaufbau.** Die
   // Gruppen tragen `content-visibility: auto` (siehe `.tl-year`), und der
-  // Browser merkt sich die Höhe einer gezeichneten Gruppe AM ELEMENT. Das
-  // `innerHTML` unten ersetzt jedes Element — ohne diese Zeilen fiele bei
-  // jeder nachgeladenen Seite alles über dem Bildschirm auf die Schätzung
-  // zurück, und die Ansicht sprang (gemessen: eine halbe Million Pixel).
+  // Browser merkt sich die Höhe einer gezeichneten Gruppe AM ELEMENT. Eine
+  // Gruppe, die neu eingesetzt wird, hat diese Erinnerung nicht — ohne diese
+  // Zeilen fiele sie auf die Schätzung zurück, und die Ansicht sprang
+  // (gemessen: 205.000 px). Seit Anmerkung 230 betrifft das nur noch Gruppen,
+  // deren Inhalt sich geändert hat; die übrigen bleiben stehen.
   // Gelesen wird VOR jedem Schreiben: dann ist das Layout sauber und die
   // Abfrage kostet nichts. Nachkommastellen zählen — gerundet summierte sich
   // der Fehler über tausend Gruppen zu einem sichtbaren Versatz.
@@ -6329,6 +6431,7 @@ function renderTimelineList() {
       ? `<div class="hint">${t('tl.empty', 'Keine Events. Leg unter „Eingabe" eins an — oder Suche/Filter zurücksetzen.')}</div>`
       : `<div class="hint">${t('tl.nothing.yet', 'In den geladenen Einträgen ist dazu nichts — weiter zurück suchen?')}</div>`)
       + tlFooter();
+    TL_GROUP_HTML.clear();   // Anmerkung 230: es steht keine Gruppe mehr da
     tlBindFooter(el);
     return;
   }
@@ -6419,9 +6522,12 @@ function renderTimelineList() {
     g.items.sort((a, b) => dayOf(a) === dayOf(b) ? jr(b) - jr(a) : 0);
   });
   const ordered = Object.values(groups).sort((a,b) => b.sort - a.sort);
-  el.innerHTML = ordered.map((g, gi) => `
-    <div class="tl-year" data-tl-key="${esc(g.key)}"${tlHeights.has(g.key)
-      ? ` style="contain-intrinsic-size:auto ${tlHeights.get(g.key)}px"` : ''}>
+  // Anmerkung 230: Das HTML jeder Gruppe entsteht weiter vollständig und in
+  // derselben Reihenfolge — die Register (`VISIT_GROUPS`, `TL_STRIP_MEDIA`,
+  // `TL_AGG_GROUPS`) werden also genau so gefüllt wie zuvor. Eingesetzt wird
+  // aber nur, was sich geändert hat (`tlPlaceGroups`).
+  const htmls = ordered.map((g, gi) => `
+    <div class="tl-year" data-tl-key="${esc(g.key)}">
       <div class="tl-year-label">${esc(g.label)}${!g.agg && g.items.length > TL_GROUP_CAP ? ` <span class="stat-label">(${g.items.length})</span>` : ''}${tlGroupWeather(g)}</div>
       ${g.agg ? g.agg.map(aggRowCard).join('')
               : g.items.slice(0, TL_GROUP_CAP).map(renderItem).join('')}
@@ -6429,13 +6535,9 @@ function renderTimelineList() {
         ? `<div class="hint" data-tl-more="${gi}" style="cursor:pointer">▼ ${
             t('tl.showmore', '{n} weitere anzeigen').replace('{n}', g.items.length - TL_GROUP_CAP)}</div>`
         : ''}
-    </div>`).join('');
-  // „mehr anzeigen": restliche Karten der Gruppe nachrendern
-  el.querySelectorAll('[data-tl-more]').forEach(btn =>
-    btn.addEventListener('click', () => {
-      const g = ordered[+btn.dataset.tlMore];
-      btn.outerHTML = g.items.slice(TL_GROUP_CAP).map(renderItem).join('');
-    }));
+    </div>`);
+  tlPlaceGroups(el, ordered.map(g => g.key), htmls, tlHeights);
+  TL_ORDERED = ordered;
   el.insertAdjacentHTML('beforeend', tlFooter());
   tlBindFooter(el);
   // Anmerkung 178: Erst hier steht fest, wie viele abgeleitete Tage gezeigt

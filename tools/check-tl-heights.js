@@ -14,6 +14,10 @@
 // Gegenmaßnahme liest die Höhen VOR dem Neuaufbau und schreibt sie danach als
 // Platzhalter zurück, je Gruppe über ihren Schlüssel.
 //
+// Anmerkung 230 kam eine vierte dazu: **unveränderte Gruppen bleiben stehen**
+// (dieselben Knoten), veränderte und aufgeklappte werden neu gebaut, und
+// „N weitere anzeigen" läuft auf einem wiederverwendeten Knoten genau einmal.
+//
 // Drei Zusagen, alle gegen den kaputten Stand gefahren:
 //   1. Jede Gruppe trägt ihren Schlüssel (sonst findet die Höhe nicht zurück).
 //   2. Nach einem Neuaufbau trägt jede Gruppe GENAU ihre alte Höhe — mit
@@ -35,11 +39,21 @@ const html = fs.readFileSync(process.argv[2] || 'frontend/index.html', 'utf8');
 const START = new Date('2024-12-31T12:00:00Z').getTime();
 // Ein Eintrag je sechs Stunden: 40 Einträge über zehn Tage, also zehn Gruppen
 // im Tages-Zoom.
-const EVENTS = Array.from({ length: 40 }, (_, n) => ({
-  id: 'e' + n, title: 'Eintrag ' + n, category: 'event', source: 'manual',
-  date_start: new Date(START - n * 6 * 3600e3).toISOString().slice(0, 19),
-  date_precision: 'exact', confirmed: 'confirmed', entities: [], metrics: [], media: [],
-}));
+const ev = (id, at) => ({
+  id, title: 'Eintrag ' + id, category: 'event', source: 'manual',
+  date_start: at, date_precision: 'exact', confirmed: 'confirmed',
+  entities: [], metrics: [], media: [],
+});
+const EVENTS = Array.from({ length: 40 }, (_, n) =>
+  ev('e' + n, new Date(START - n * 6 * 3600e3).toISOString().slice(0, 19)))
+  // Anmerkung 230: ein Tag mit mehr als TL_GROUP_CAP (25) Einträgen, damit
+  // „N weitere anzeigen" überhaupt erscheint.
+  .concat(Array.from({ length: 30 }, (_, n) =>
+    ev('v' + n, `2024-12-01T${String(8 + Math.floor(n / 4)).padStart(2, '0')}:${
+      String((n % 4) * 15).padStart(2, '0')}:00`)));
+// Eine „nachgeladene Seite": fünf ältere Tage.
+const OLDER = Array.from({ length: 5 }, (_, n) =>
+  ev('o' + n, `2024-11-${String(20 - n).padStart(2, '0')}T12:00:00`));
 
 const dom = new JSDOM(html, {
   runScripts: 'dangerously', pretendToBeVisual: true, url: 'http://localhost:8000/',
@@ -103,7 +117,9 @@ setTimeout(async () => {
     want.set(g.dataset.tlKey, h);
     g.getBoundingClientRect = () => ({ top: 0, left: 0, right: 0, bottom: h, width: 0, height: h });
   });
-  w.eval('renderTimeline();');
+  // Seit Anmerkung 230 bleiben unveränderte Gruppen stehen — die Höhen-Mitnahme
+  // betrifft nur NEU eingesetzte. Also hier jede Gruppe als verändert markieren.
+  w.eval('TL_GROUP_HTML.clear(); renderTimeline();');
   const second = groups();
   ok('Der Neuaufbau ersetzt die Elemente (sonst prüft das hier nichts)',
      second.length && second[0] !== first[0],
@@ -121,7 +137,7 @@ setTimeout(async () => {
   // Eine Gruppe, die nie Layout hatte (Höhe 0), bekommt keinen Platzhalter
   // von null — sie stünde sonst als Strich da, bis sie ins Bild rollt.
   second.forEach(g => { g.getBoundingClientRect = () => ({ height: 0 }); });
-  w.eval('renderTimeline();');
+  w.eval('TL_GROUP_HTML.clear(); renderTimeline();');
   ok('Ohne gemessene Höhe bleibt die Schätzung aus dem CSS',
      groups().every(g => !/contain-intrinsic-size/.test(g.getAttribute('style') || '')),
      groups().map(g => g.getAttribute('style')).join(' | '));
@@ -141,6 +157,73 @@ setTimeout(async () => {
      inset && pad && +inset[1] === gutter && +pad[1] === gutter,
      `Rand ${gutter}px, Gruppe ${inset && inset[1]}/${pad && pad[1]} — sonst schneidet `
      + 'content-visibility die Punkte der Zeitlinie (left:-30px) ab');
+
+  // (4) Anmerkung 230: was sich nicht geändert hat, bleibt stehen.
+  const errors = [];
+  w.addEventListener('error', e => errors.push(e.message || String(e.error)));
+  const keyOf = n => n.dataset.tlKey;
+  w.eval('renderTimeline();');
+  const a = groups();
+  w.eval('renderTimeline();');
+  const b = groups();
+  ok('Ohne Änderung bleibt jeder Knoten derselbe',
+     a.length === b.length && a.every((n, i) => n === b[i]),
+     `${a.filter((n, i) => n !== b[i]).length} von ${a.length} neu gebaut — dann wird wieder `
+     + 'alles geparst, und genau das war der teure Teil');
+  ok('…und in derselben Reihenfolge', a.map(keyOf).join() === b.map(keyOf).join());
+
+  // Eine Gruppe, die NACH dem Einsetzen verändert wird (Aufklappen), wird neu
+  // gebaut — ihre nachträglich geschriebenen Register-Einträge stimmen beim
+  // nächsten Durchgang nicht mehr.
+  const touched = b[1];
+  touched.appendChild(d.createElement('div'));
+  w.eval('renderTimeline();');
+  const c = groups();
+  ok('Eine nachträglich veränderte Gruppe wird neu gebaut',
+     c[1] !== touched && c[1].dataset.tlKey === touched.dataset.tlKey,
+     'ein aufgeklappter Knoten mit Indizes eines alten Durchgangs zeigte beim Klick auf falsche Einträge');
+  ok('…und nur sie', c.every((n, i) => i === 1 || n === b[i]),
+     `${c.filter((n, i) => i !== 1 && n !== b[i]).length} weitere neu gebaut`);
+
+  // Nachladen: ältere Tage kommen HINTEN dazu, die vorderen bleiben stehen.
+  w.eval(`tl.events = tl.events.concat(${JSON.stringify(OLDER)}); renderTimeline();`);
+  const e = groups();
+  ok('Nachladen hängt an und lässt die vorderen Gruppen stehen',
+     e.length === c.length + OLDER.length && c.every((n, i) => n === e[i]),
+     `${e.length} Gruppen, ${c.filter((n, i) => n !== e[i]).length} der alten neu gebaut`);
+  ok('…und die neuen stehen hinten, in der Reihenfolge der Zeit',
+     e.slice(c.length).map(keyOf).join() === '2024-11-20,2024-11-19,2024-11-18,2024-11-17,2024-11-16',
+     e.slice(c.length).map(keyOf).join());
+  const list = d.getElementById('timeline-list');
+  ok('…und der Fuß steht darunter, genau einmal',
+     list.querySelectorAll('#tl-load-more, #tl-more-baseline').length <= 1
+     && !list.lastElementChild.classList.contains('tl-year')
+     && [...list.children].filter(n => !n.classList.contains('tl-year')).length === 1,
+     [...list.children].filter(n => !n.classList.contains('tl-year')).map(n => n.outerHTML.slice(0, 60)).join(' | '));
+
+  // „N weitere anzeigen" auf einem WIEDERVERWENDETEN Knoten: genau ein Lauf.
+  // Mit einem Horcher je Knopf bekäme der Knoten bei jedem Durchgang einen
+  // weiteren, und der zweite schriebe auf einen schon ersetzten Knopf.
+  const big = groups().find(n => n.dataset.tlKey === '2024-12-01');
+  const more = big && big.querySelector('[data-tl-more]');
+  ok('Der volle Tag bietet „weitere anzeigen" an', !!more);
+  // Gezählt wird die ARBEIT, nicht das Bild: der zweite Horcher schriebe
+  // `outerHTML` auf einen schon ersetzten Knopf, und das ist laut Spezifikation
+  // still wirkungslos — das Bild stimmt, und jeder Klick baut die Karten doppelt.
+  w.eval(`window.__items = 0; const __ri = renderItem;
+          renderItem = x => { window.__items++; return __ri(x); };`);
+  if (more) more.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await wait(20);
+  ok('…und ein Klick zeigt alle, ohne Fehler',
+     big && big.querySelectorAll('.event-card').length === 30 && errors.length === 0,
+     `${big && big.querySelectorAll('.event-card').length} Karten, Fehler: ${errors.join(' | ')}`);
+  ok('…und baut die fünf fehlenden Karten genau einmal', w.__items === 5,
+     `${w.__items} Karten gebaut — ein Horcher je Knopf sammelt sich auf einem `
+     + 'wiederverwendeten Knoten mit jedem Durchgang an');
+  w.eval('renderTimeline();');
+  ok('…und danach wird der Tag wieder zugeklappt gebaut',
+     groups().find(n => n.dataset.tlKey === '2024-12-01') !== big,
+     'der Beobachter hat das Aufklappen nicht bemerkt');
 
   console.log(fail ? `\n${fail} Zusage(n) gebrochen` : '\nZeitstrahl-Höhen: alles grün');
   process.exit(fail ? 1 : 0);

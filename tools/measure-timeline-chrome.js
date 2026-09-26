@@ -31,9 +31,17 @@
 //     Fenster endet jetzt am ältesten geladenen Eintrag — daher auch die
 //     14.500 Knoten weniger.
 //
-// Was bleibt, ist der JavaScript-Aufbau (50 / 284 ms), der mit jeder Seite
-// wächst, weil `renderTimelineList` die GANZE Liste neu baut. Das ist der
-// offene Rest aus Anmerkung 179 — und das Layout ist ihm nicht mehr im Weg.
+// **Anmerkung 230: unveränderte Gruppen bleiben stehen.** Seitdem misst die
+// erste Tabelle den Durchgang, den das Nachladen selbst auslöst, und die
+// Spalte „voller Neuaufbau" den Fall Filter-/Zoomwechsel. Seite 6:
+//
+//                        nachladen    gedrosselt 4×   voller Neuaufbau (4×)
+//   Anmerkung 227          64 ms         365 ms            365 ms
+//   Anmerkung 230          34 ms         186 ms            365 ms
+//
+// Übrig ist das Bauen der Zeichenketten (25 / 140 ms), das mit jeder Seite
+// weiter wächst — die Register verlangen, dass jede Gruppe in jedem Durchgang
+// ihr HTML bekommt.
 //
 // Braucht einen laufenden Server MIT Demo-Bestand (eine leere Datenbank zeigt
 // die Größenordnung nicht) und ein installiertes Chrome/Chromium. Kein
@@ -118,28 +126,53 @@ const done = code => {
   await ev(idle);
 
   // --- 1. Zeit je Seite ----------------------------------------------------
-  // Nur `renderTimeline()`, dann erzwungenes Layout, dann zwei Frames — der
-  // Median aus drei Läufen. Der Abruf selbst zählt NICHT mit.
-  const measure = `new Promise(res => {
-    const t0 = performance.now();
-    renderTimeline();
-    const t1 = performance.now();
-    void document.getElementById('timeline-list').getBoundingClientRect().height;
-    const t2 = performance.now();
-    requestAnimationFrame(() => requestAnimationFrame(() => res({
-      events: tl.events.length, js: t1 - t0, layout: t2 - t1, frame: performance.now() - t0,
-      nodes: document.getElementById('timeline-list').getElementsByTagName('*').length })));
-  })`;
+  // **Gemessen wird der Durchgang, den das Nachladen SELBST auslöst**
+  // (Anmerkung 230). Bis hier rief die Messung `renderTimeline()` dreimal
+  // hintereinander und nahm den Median — seit unveränderte Gruppen stehen
+  // bleiben, wären der zweite und dritte Aufruf Durchgänge ohne Änderung, und
+  // die Zahl sähe besser aus, als das Nachladen ist. Deshalb hängt sich die
+  // Messung in `renderTimeline` und liest den Aufruf aus `loadTimeline(true)`.
+  // Der Abruf selbst zählt nicht mit.
+  //
+  // Daneben der VOLLE Neuaufbau (alle Gruppen als verändert markiert, Median
+  // aus drei): das ist der Fall Filter- oder Zoomwechsel, bei dem nichts
+  // wiederverwendet werden kann.
+  await ev(`(() => { if (window.__wrapped) return; window.__wrapped = true;
+    const orig = renderTimeline;
+    renderTimeline = function () {
+      const t0 = performance.now(); orig(); const t1 = performance.now();
+      void document.getElementById('timeline-list').getBoundingClientRect().height;
+      const t2 = performance.now();
+      const m = window.__last = { js: t1 - t0, layout: t2 - t1, frame: null };
+      requestAnimationFrame(() => requestAnimationFrame(() => { m.frame = performance.now() - t0; }));
+    }; })()`);
+  const lastFrame = `new Promise(async r => { while (!window.__last || window.__last.frame === null)
+    await new Promise(q => setTimeout(q, 10)); r(Object.assign({}, window.__last, {
+      events: tl.events.length,
+      nodes: document.getElementById('timeline-list').getElementsByTagName('*').length })); })`;
+  const cold = `new Promise(res => {
+    if (typeof TL_GROUP_HTML !== 'undefined') TL_GROUP_HTML.clear();
+    window.__last = null; renderTimeline();
+    const w = () => (window.__last && window.__last.frame !== null) ? res(window.__last) : setTimeout(w, 10);
+    w(); })`;
   if (THROTTLE > 1) await send('Emulation.setCPUThrottlingRate', { rate: THROTTLE });
   console.log(`Chrome headless · Tages-Zoom · ${WIDTH}px · CPU-Drossel ${THROTTLE}×`);
-  console.log('Seite  Einträge   JS-Aufbau   Layout   bis Frame   Knoten');
+  console.log('                 --- Seite nachladen ---------------   voller Neuaufbau');
+  console.log('Seite  Einträge   JS-Aufbau   Layout   bis Frame      bis Frame   Knoten');
   for (let p = 1; p <= PAGES; p++) {
-    if (p > 1) { await ev(`loadTimeline(true)`); await ev(idle); }
+    if (p > 1) {
+      await ev('window.__last = null');
+      await ev(`loadTimeline(true)`); await ev(idle);
+    } else {
+      await ev('window.__last = null; renderTimeline()');
+    }
+    const m = await ev(lastFrame);
     const runs = [];
-    for (let k = 0; k < 3; k++) runs.push(await ev(measure));
-    const m = runs.sort((a, b) => a.frame - b.frame)[1];
+    for (let k = 0; k < 3; k++) runs.push(await ev(cold));
+    const c = runs.sort((a, b) => a.frame - b.frame)[1];
     console.log(`${String(p).padStart(5)}  ${String(m.events).padStart(8)}  ${m.js.toFixed(0).padStart(7)} ms  ${
-      m.layout.toFixed(0).padStart(4)} ms  ${m.frame.toFixed(0).padStart(7)} ms  ${String(m.nodes).padStart(7)}`);
+      m.layout.toFixed(0).padStart(4)} ms  ${m.frame.toFixed(0).padStart(7)} ms   ${
+      c.frame.toFixed(0).padStart(9)} ms  ${String(m.nodes).padStart(7)}`);
   }
   await send('Emulation.setCPUThrottlingRate', { rate: 1 });
 

@@ -440,9 +440,17 @@ die Punkte 1 und 2):
     205.000 px, bei grüner Zeitmessung. `check-tl-heights.js` hält es.
   - **`content-visibility` schneidet ab, was hinausragt** — deshalb gehört der
     Rand der Zeitlinie der Gruppe (`margin-left:-32px; padding-left:32px`).
-  Offen bleibt der JavaScript-Aufbau (50 ms / 284 ms gedrosselt), der weiter
-  mit jeder Seite wächst — der Umbau (Gruppen einzeln ersetzen) hängt an den
-  index-basierten Registern `VISIT_GROUPS`/`TL_STRIP_MEDIA`.
+  - **Unveränderte Gruppen bleiben stehen** (Anmerkung 230,
+    `tlPlaceGroups`): das HTML jeder Gruppe entsteht weiter vollständig — die
+    index-basierten Register (`VISIT_GROUPS`, `TL_STRIP_MEDIA`,
+    `TL_AGG_GROUPS`) füllen sich also wie immer —, eingesetzt wird aber nur,
+    was sich als ZEICHENKETTE geändert hat. Gleiche Zeichenkette heißt gleiche
+    Indizes. Was eine Gruppe nachträglich verändert (Aufklappen), meldet ein
+    MutationObserver; die Gruppe wird dann neu gebaut. **Keine Horcher an
+    Knoten in einer Gruppe binden** — ein wiederverwendeter Knoten sammelt sie
+    an (Delegation an `#timeline-list`, `check-tl-heights.js` zählt es).
+    Seite 6: 64 → 34 ms, gedrosselt 365 → 186 ms. Übrig ist das Bauen der
+    Zeichenketten, das weiter linear wächst.
 - **Das Wohnort-Fenster endet am ältesten geladenen Eintrag** (Anmerkung 227),
   solange noch Einträge kommen: es zählt TAGE, die Seiten zählen EINTRÄGE, und
   vorher standen nach zwei Seiten Einträge bis 2024 und Wohnort-Tage bis 2021 —
