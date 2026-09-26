@@ -78,7 +78,10 @@ def old_db(tmp_path):
             " captured_at, mime, bytes, width, height, caption, sort_order, created_at)"
             " VALUES ('m1', 'u1', 'e1', 'local', 'foto.jpg', '2026-07-05 08:14:00',"
             " 'image/jpeg', 4096, 800, 600, 'Am Strand', 2, '2026-07-05 09:00:00')"))
-    return engine
+    # `yield` statt `return`: sonst hält der Pool die Datei offen, bis der
+    # Garbage Collector vorbeikommt — eine ResourceWarning je Test.
+    yield engine
+    engine.dispose()
 
 
 def _nullable(engine, table, column) -> bool:

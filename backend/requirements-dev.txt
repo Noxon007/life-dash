@@ -23,4 +23,10 @@ pytest-cov==7.1.0
 # erst in der CI auf (F20/F21 sind die ersten Tests hier, die einen Client
 # bauen). Nur hier und nicht in requirements.txt: das Image braucht keinen
 # Testclient.
-httpx==0.28.1
+#
+# Seit Starlette 1.6 heißt die Bibliothek `httpx2` (dasselbe Projekt unter
+# neuem Namen, github.com/pydantic/httpx2). Das alte `httpx` ging noch, meldete
+# aber bei JEDEM Lauf eine StarletteDeprecationWarning — und eine Warnung, die
+# jeder Lauf zeigt, liest niemand mehr, auch nicht die nächste, die etwas
+# bedeutet.
+httpx2==2.13.1

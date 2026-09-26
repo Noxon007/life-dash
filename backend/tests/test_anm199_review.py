@@ -297,7 +297,8 @@ def test_the_animal_ranking_carries_the_tiebreak_in_its_query(db, user):
     import re
 
     src = compute_overview.__globals__["__file__"]
-    body = open(src, encoding="utf-8").read()
+    with open(src, encoding="utf-8") as fh:
+        body = fh.read()
     animals = body.split("animal_rows = ", 1)[1].split(".all())", 1)[0]
 
     assert "Entity.name.asc()" in re.sub(r"\s+", " ", animals), (
