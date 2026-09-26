@@ -1,7 +1,9 @@
 """Anmerkung 229 — die betriebene Datenbank kommt bei jedem Schema mit.
 
-Seit Anmerkung 228 wird die betriebene Datenbank dauerhaft behalten, und das
-Migrieren ihrer Daten ist die eine harte Zusage des Projekts. **Jeder andere
+Die betriebene Datenbank wird migriert (Anmerkung 228); während der
+Testphase darf ein teurer Umbau stattdessen ein ANGESAGTER Neuaufbau mit
+Export-Rückspiel sein (Anmerkung 231). Beides setzt voraus, dass man merkt,
+wann ein Schema die Datenbank nicht von selbst erreicht. **Jeder andere
 Test beginnt mit einem FRISCHEN Schema** (`create_all`) — eine Spalte, die in
 `models.py` zu einer bestehenden Tabelle kommt und in
 `migrate._MISSING_COLUMNS` fehlt, ist dort vorhanden und in jedem Test grün.

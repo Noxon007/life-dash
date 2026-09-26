@@ -57,29 +57,51 @@ instance. With no stranger, these are gone rather than postponed:
   the open question about its weather running 5–7 K too cold is closed as not
   needed.
 
-### What the decision added: the data is kept
+### The data: migrate by default, reset only when announced
 
-**The operated database is the life database from now on**, and there will be
-no fresh start. That turns one thing that was “best effort during the test
-phase” into the project's single hard promise: **every schema change must
-migrate the existing database, and must be shown to.** R1(f) was struck on the
-grounds that nobody would ever upgrade *into* 1.0 — that reasoning is void.
+**The project is still in its test phase** (note 231, which revises note 228).
+The operated database is kept and migrated as a matter of course — but until
+the operator declares the data final, a schema change that would be expensive
+to migrate may instead mean *setting up fresh and importing the export*. Never
+silently: a reset is proposed, with the reason, and the operator decides.
 
-In practice, the rules this repository already follows become obligations:
+**That route is only acceptable because it loses nothing, and that was
+measured, not assumed.** A real ZIP export written by v0.39.0 (entries with
+place, note and entity, a multi-day trip, a fuzzy date, free-text captures, a
+Google Timeline import, photos on an event and on a day) was imported into a
+fresh instance of the current version: all 62 rows arrived, every shared field
+identical, both photos restored with previews.
+`tests/test_old_export_import.py` keeps that file and requires every future
+version to read it.
 
-- `migrate.py` stays additive and hand-written (`_MISSING_COLUMNS`,
-  `_DROPPED_TABLES`); a step that rebuilds a table gets a test that starts from
-  the **old** shape and checks every field of an existing row
-  (`test_f18_migration.py` is the model).
+What each kind of change costs:
+
+| Change | Migration | Reset instead? |
+|---|---|---|
+| new column, new table | one line in `_MISSING_COLUMNS` / nothing | not worth it |
+| new enum value (native type on PostgreSQL) | one `ALTER TYPE … ADD VALUE` step, first time about an hour | not worth it |
+| rename, type change, restructuring a table | a hand-written, tested step | **the case for a reset** |
+
+The guards that make the choice visible rather than silent:
+
 - `tests/schema_snapshot.json` is the schema the operated database has *at
   least*; `test_schema_snapshot.py` migrates it and demands the model (note
-  229). It is rewritten only after a new state has run on the server.
+  229). Red means “this does not reach the server by itself” — then either a
+  migration step or an announced reset. The snapshot is rewritten only after
+  the new state has run on the server (or after a reset).
+- `test_old_export_import.py`: the escape hatch still opens.
 - Every step runs on SQLite *and* PostgreSQL (`tools/pg-test.ps1`, CI) —
   PostgreSQL is what is operated.
-- Before an image with schema changes goes onto the server: the app's ZIP
-  export *with photos* **and** a `pg_dump` ([DEPLOY.md §7, Backup](../DEPLOY.md#backup)).
-  The dump is the way back to exactly the old state; the export is the way
-  back that does not depend on the old schema at all.
+- `migrate.py` stays additive and hand-written; a step that rebuilds a table
+  gets a test that starts from the **old** shape (`test_f18_migration.py` is
+  the model).
+- Before an image with schema changes goes onto the server, and before any
+  reset: the app's ZIP export *with photos* **and** a `pg_dump`
+  ([DEPLOY.md §7, Backup](../DEPLOY.md#backup)). The dump is the way back to
+  exactly the old state; the export is the way into a fresh one.
+
+**When the operator declares the data final**, the reset column disappears and
+migrating becomes the only route — nothing else in the setup has to change.
 
 ---
 
@@ -189,8 +211,9 @@ packages may share a version; a version marks a difference the operator would
 notice on upgrade, and every schema change is such a difference. At the tagged
 commit `[Unreleased]` in the changelog must be empty. There is no 1.0 event
 planned: the number stays in `0.x` until there is a reason to call the data
-model stable — and since the data is kept, that reason is really a question of
-how migrations are handled, not of publication.
+model stable. The natural moment is the one in §1 — when the operator declares
+the data final and the reset route closes. That is a question of the data, not
+of publication.
 
 ---
 

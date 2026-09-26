@@ -3061,6 +3061,45 @@ repair for each: delete it.
     What remains is building the strings (25 / 140 ms at page 6), still linear
     in the pages loaded. That is small enough to leave; T1 leaves the roadmap.
 
+231. ✅ **Still a test phase: migrate by default, reset only when announced.**
+    Revises note 228. Asked by the user: *“does keeping the database cost a
+    lot? I'm actually still in a test phase.”* The honest answer was: not
+    much — a new column is one line in `_MISSING_COLUMNS`, a new enum value one
+    `ALTER TYPE` step. The expensive kind is renaming, changing a type or
+    restructuring a table, and that is exactly where a test phase should be
+    allowed to start over. The decision, on the proposal written out: the
+    operated database is migrated as a rule; an expensive change may instead
+    be *set up fresh and import the export* — **proposed with its reason, never
+    done silently**, and the operator decides. Once the operator declares the
+    data final, that route closes; nothing else has to change.
+
+    **The route was only proposed on the condition that it loses nothing, and
+    it was measured before it was written down.** v0.39.0, the last released
+    version, was checked out into its own worktree and started on a scratch
+    database. Through its own API: entries with place, note and entity, a
+    multi-day trip, a season-precision date, a free-text capture through the
+    mock AI, a Google Timeline import with a visit and a path, a photo on an
+    event and one on a day (the old instance also contributed its own example
+    captures). Its ZIP export went into a *fresh* instance of the current
+    version. Compared table by table and field by field against the old
+    SQLite file: **all 62 rows arrived, every shared column identical, both
+    photos restored with previews.** The only table missing is `photo_points`,
+    a derivation dropped on purpose in note 139 and empty in the old state.
+
+    **The file is now a fixture** (`tests/fixtures/export_v0.39.0.zip`, 6.5
+    KB) and `test_old_export_import.py` requires every future version to read
+    it: row counts, the fields where a format change tears first (precision,
+    span, note, entity, image size, ownership, the photo on a day), the files,
+    idempotence. *A real export, not a rebuilt one* — a rebuilt fixture would
+    only prove that the import reads what the test believes an old version
+    writes; the section `photo_points`, which no current code knows, is in the
+    file because v0.39.0 actually wrote it.
+
+    The schema snapshot of note 229 keeps its role and gets a clearer reading:
+    red means *“this does not reach the server by itself”* — then either a
+    migration step or an announced reset, and after either one the snapshot is
+    rewritten.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

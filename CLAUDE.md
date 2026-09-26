@@ -22,22 +22,30 @@ Arbeitsdokumente. **Eine Doku-Seite gibt es nicht und ist nicht geplant**
 (Anmerkung 228, 2026-09-26): „nur für mich, aber sauber und best practice".
 Keine Veröffentlichung, keine Doku-Seite, kein Schaufenster, kein Spendenlink.
 Das Repo bleibt öffentlich (daher `SECURITY.md`/`CONTRIBUTING.md`), die
-Härtung bleibt, wie sie ist. **Und die betriebene Datenbank wird dauerhaft
-behalten** — es gibt keinen Neuanfang mehr, also ist **das Migrieren der
-bestehenden Daten die eine harte Zusage**: jeder Schema-Schritt in
-`migrate.py` mit einem Test, der vom ALTEN Stand ausgeht
-(`test_f18_migration.py` ist das Muster), auf SQLite UND PostgreSQL.
+Härtung bleibt, wie sie ist. **Die Daten: migrieren als Regel, neu aufsetzen
+nur mit Ansage** (Anmerkung 231, korrigiert 228 — „eigentlich bin ich noch in
+einer Testphase"). Die betriebene Datenbank wird migriert; ein Umbau, der teuer
+zu migrieren wäre (Umbenennen, Typwechsel, Tabellenumbau), darf stattdessen
+„frisch aufsetzen + Export einspielen" heißen — **aber nie still: vorschlagen,
+begründen, der User entscheidet.** Das geht nur, weil der Weg verlustfrei ist:
+ein ECHTER v0.39.0-Export kam vollständig an (`test_old_export_import.py`,
+Fixture `tests/fixtures/export_v0.39.0.zip` — nicht nachbauen, nicht
+ersetzen). Neue Spalte = eine Zeile in `_MISSING_COLUMNS`, dafür lohnt kein
+Neuaufbau. Jeder Schema-Schritt in `migrate.py` mit einem Test, der vom ALTEN
+Stand ausgeht (`test_f18_migration.py` ist das Muster), auf SQLite UND
+PostgreSQL. Erklärt der User die Daten für endgültig, entfällt der Neuaufbau.
 **Der Wächter dafür ist `tests/schema_snapshot.json`** (Anmerkung 229): der
 Stand, den die betriebene Datenbank MINDESTENS hat. Eine neue Spalte ohne
 `_MISSING_COLUMNS`-Eintrag, ein neuer Enum-Wert (nativer Typ auf PostgreSQL!)
-oder ein Typwechsel wird rot. **Den Schnappschuss erst neu schreiben
+oder ein Typwechsel wird rot — und Rot heißt „erreicht den Server nicht von
+selbst": Migrationsschritt ODER angesagter Neuaufbau. **Den Schnappschuss erst neu schreiben
 (`<python> tests/test_schema_snapshot.py --write`), wenn der neue Stand auf dem
 Server gelaufen ist** — vorher prüft er die Migration gegen sich selbst.
 
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI,
-  Geocoding aus, **Fremdschlüssel erzwungen**) — 942 Tests, ~45 s,
+  Geocoding aus, **Fremdschlüssel erzwungen**) — 946 Tests, ~45 s,
   SQLite im Arbeitsspeicher. **Jede Warnung ist ein Fehler**
   (`backend/pytest.ini`, Anmerkung 228) — eine bewusst hingenommene wird dort
   einzeln und mit Grund eingetragen, nie pauschal. Der Testclient braucht
