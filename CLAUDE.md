@@ -45,7 +45,7 @@ Server gelaufen ist** — vorher prüft er die Migration gegen sich selbst.
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI,
-  Geocoding aus, **Fremdschlüssel erzwungen**) — 946 Tests, ~45 s,
+  Geocoding aus, **Fremdschlüssel erzwungen**) — 955 Tests, ~46 s,
   SQLite im Arbeitsspeicher. **Jede Warnung ist ein Fehler**
   (`backend/pytest.ini`, Anmerkung 228) — eine bewusst hingenommene wird dort
   einzeln und mit Grund eingetragen, nie pauschal. Der Testclient braucht

@@ -617,6 +617,12 @@
 
 ### Fixed
 
+- **Filling in weather for a long stretch takes seconds instead of minutes.**
+  The weather run used to ask the weather service about one day at a time —
+  twenty years at the same home address were over seven thousand requests, one
+  after the other, close to the service's daily limit and ten minutes or more
+  of waiting. It now asks once per place and year and fills in every day from
+  that answer. The values are exactly the same as before.
 - **Scrolling back through the timeline day by day is much faster.** In the
   *Day* zoom every page of older entries rebuilt the whole list, and each page
   took longer than the one before: after six pages, around half a second on a

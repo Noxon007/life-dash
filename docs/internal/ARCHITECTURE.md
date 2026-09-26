@@ -498,7 +498,7 @@ compendium_view:
 |---|---|---|
 | **Immich** | photos, geo tags, timestamps | API with a per-user key. Every owned, located, timeline-visible photo becomes an immediately confirmed event; thumbnails are proxied by the backend. References only — no copies. |
 | **Google Timeline** | visited places and routes | Since 2024 the timeline lives on the device only. Import is a file upload of the device export (`semanticSegments`) → stored raw as a fragment → `visit` segments become events, `activity` segments become tracks. |
-| **Weather** | context enrichment | Open-Meteo's historical archive, by time and place, retroactively too. Attached as a `Metric` on events and a `DayMetric` on residence days. |
+| **Weather** | context enrichment | Open-Meteo's historical archive, by time and place, retroactively too. Attached as a `Metric` on events and a `DayMetric` on residence days. Fetched as one request per place and span of up to a year (F22), written per day. |
 | **Geocoding** | place name ↔ coordinates, both directions | Nominatim or LocationIQ, self-hostable, with backoff. |
 | **Wikipedia / Wikidata** | city descriptions | Cached in `CityInfo`; a failed lookup is recorded so it is not repeated forever. |
 

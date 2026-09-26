@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models import BaselineLocation, DayMetric, Event, Location, Metric, Source
 from app.services import baseline
+from app.services import weather as weather_svc
 from app.services.weather import ERA5_LAG_DAYS, WEATHER_MODEL, fetch_weather
 
 log = logging.getLogger("lifedash.enrichment")
@@ -378,6 +379,83 @@ def discard_weather(db: Session, user_id: str, *, events: bool = True,
     return out
 
 
+# --------------------------------------------------------------------------- #
+# F22 — eine Anfrage je Ort und Zeitspanne statt je Tag
+# --------------------------------------------------------------------------- #
+# `fetch_weather` fragt genau einen Tag. Ein Wohnort über zwanzig Jahre war
+# damit 7.298 Anfragen an EINER Koordinate, streng nacheinander — nah an der
+# Tagesgrenze des freien Zugangs (10.000) und eine halbe bis ganze Stunde
+# Warten. Open-Meteo gewichtet sein Kontingent nach Variablen × Zeitschritten ×
+# Orten, am KONTINGENT ändert eine Spanne also wenig; was zusammenfällt, ist
+# die Zahl der Rundreisen, und das ist die Wartezeit.
+#
+# **Nichts am Schreiben ändert sich.** `_RangePrefetch` legt Antworten nur in
+# den Prozess-Cache von `weather`; Werte und Revisionsmarke entstehen danach je
+# Tag in `_add_weather`/`_add_day_weather`, Zeile für Zeile wie ohne Vorab-
+# Abfrage. Die Falle, vor der die Roadmap gewarnt hat — eine Marke, die in
+# einer Schleife, die nach Lesen aussieht, fehlt oder falsch gesetzt wird —
+# kann so nicht entstehen: diese Schleife setzt gar keine.
+#
+# Mehrere Koordinaten in EINER Anfrage (auch dokumentiert) bleiben bewusst
+# außen vor: das Gros der Rundreisen steckt in wenigen Orten (Wohnort, die
+# Adressen des Alltags aus dem Timeline-Import), und Spannen je Ort treffen
+# genau das, ohne ein zweites Antwortformat.
+_RANGE_MAX_DAYS = 366   # eine Antwort bleibt überschaubar, der Cache hält mehrere
+_RANGE_GAP_DAYS = 7     # eine Woche Lücke mitzufragen ist billiger als eine Rundreise
+
+
+class _RangePrefetch:
+    """Plant Spannen aus ALLEN Kandidaten, fragt aber erst, wenn ein Tag daraus
+    drankommt — so passt, was geholt wird, in den gedeckelten Cache."""
+
+    def __init__(self, points):
+        from collections import defaultdict
+        q = weather_svc._QUANT
+        by_place: dict[tuple, set] = defaultdict(set)
+        for lat, lng, day in points:
+            if lat is None or lng is None or day is None:
+                continue
+            by_place[(round(lat, q), round(lng, q))].add(day)
+        self._run_of: dict[tuple, tuple] = {}
+        for place, days in by_place.items():
+            run: list = []
+            for d in sorted(days):
+                if run and ((d - run[-1]).days > _RANGE_GAP_DAYS
+                            or (d - run[0]).days >= _RANGE_MAX_DAYS):
+                    self._add(place, run)
+                    run = []
+                run.append(d)
+            if run:
+                self._add(place, run)
+        self._asked: set[tuple] = set()
+        self.requests = 0
+
+    def _add(self, place: tuple, run: list) -> None:
+        key = (place, run[0], run[-1], len(run))
+        for d in run:
+            self._run_of[(place, d)] = key
+
+    def ensure(self, lat: float, lng: float, day) -> None:
+        # Die Spanne füllt den Cache, den NUR das echte `fetch_weather` liest.
+        # Ist der Einzelweg ersetzt (ein Doppel, ein anderer Anbieter), hätte
+        # sie keinen Leser — und wäre eine Netzanfrage an ihm vorbei.
+        if fetch_weather is not weather_svc.fetch_weather:
+            return
+        if lat is None or lng is None or day is None or weather_svc.is_cached(lat, lng, day):
+            return
+        q = weather_svc._QUANT
+        run = self._run_of.get(((round(lat, q), round(lng, q)), day))
+        # Ein einzelner Tag braucht keine Spanne — der Einzelweg ist dieselbe
+        # Anfrage. Und eine Spanne wird nur EINMAL versucht: ist sie
+        # gescheitert, fragt der Einzelweg je Tag (und markiert bei einem
+        # Fehlschlag weiter nichts).
+        if run is None or run[3] < 2 or run in self._asked:
+            return
+        self._asked.add(run)
+        self.requests += 1
+        weather_svc.prefetch_range(run[0][0], run[0][1], run[1], run[2])
+
+
 def enrich_weather(db: Session, limit: int | None = None,
                    user_id: str | None = None) -> tuple[int, int]:
     """Hängt Temperatur + Bedingung an Events ohne Wetter (Batch fürs Admin-UI).
@@ -390,6 +468,11 @@ def enrich_weather(db: Session, limit: int | None = None,
     """
     candidates = _weather_candidates(db, user_id)
     batch = candidates if limit is None else candidates[:limit]
+    # F22: Spannen aus ALLEN Kandidaten planen, nicht nur aus diesem Stapel —
+    # sonst wäre eine Spanne nie länger als der Stapel (25). Was über den
+    # Stapel hinaus geholt wird, liegt für den nächsten im Cache.
+    pre = _RangePrefetch((e.location.lat, e.location.lng, e.date_start.date())
+                         for e in candidates)
     # Pro Event committen: der Unique-Index (A11, ux_metrics_weather) weist
     # Dubletten aus parallelen Läufen ab — dann verliert nur DIESES Event
     # (bereits angereichert), nicht der ganze Batch.
@@ -397,6 +480,7 @@ def enrich_weather(db: Session, limit: int | None = None,
     blank: list[str] = []
     for event in batch:
         try:
+            pre.ensure(event.location.lat, event.location.lng, event.date_start.date())
             if _add_weather(db, event):
                 db.commit()
                 enriched += 1
@@ -426,8 +510,10 @@ def enrich_weather(db: Session, limit: int | None = None,
     if room != 0:
         days = _day_weather_candidates(db, user_id)
         day_total = len(days)
+        pre_days = _RangePrefetch((loc.lat, loc.lng, day) for _, day, loc in days)
         for uid, day, loc in (days if room is None else days[:room]):
             try:
+                pre_days.ensure(loc.lat, loc.lng, day)
                 if _add_day_weather(db, uid, day, loc):
                     db.commit()
                     day_done += 1

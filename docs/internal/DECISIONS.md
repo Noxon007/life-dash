@@ -947,6 +947,7 @@ once it was built:
 | **P2.1** | ✅ **Immich connector** *(stage 1 done v0.25.0, stage 2 done v0.37.0 — note 109; stage 3 done v0.39.0 — note 116)* | M | An Immich URL/API key per user (settings), linking assets to events by time and geo (`MediaRef`), a thumbnail proxy, photos in the event card and detail, a re-enrichment button. **Stage 2 (note 30): Immich as an event SOURCE,** not only enrichment — (a) condense photo clusters by date and place into event **proposals** (“34 photos on 12 July in Detmold” → a proposal in the proposal space, `unconfirmed`); (b) **analyse albums**: album name + time span + places of the contained photos → a trip/event proposal (album “Denmark 2024” → `trip`). Duplicate protection via asset/album IDs as `external_id`; nothing is confirmed automatically. **Stage 1 shipped in v0.25.0:** URL/API key per user with a connection test, linking by time and geo, a thumbnail proxy, a background job and a “discard links” action. Three decisions worth keeping: entries with a **vague date get no photos at all** (a wrong picture is worse than none), at most 12 pictures per entry, and the API key is never returned to the browser — the settings view reports only whether one is stored. One trap found by checking Immich's OpenAPI spec rather than trusting a mock: `takenAfter`/`takenBefore` are validated against a pattern that **requires a timezone**, so naive timestamps are rejected with 400; Life-Dash sends local time, because `Z` would shift the window by the UTC offset and pick up the neighbouring day's photos. **Stage 2 shipped in v0.37.0** (note 109); **note 107 specifies it in full** (what is created, the slot as identity, the seven cases where an entry already exists, year-wise runs with a preview) and establishes that it needs no schema change. **Corrected in 0.35.0 (note 106):** photos of a day made of imported visits now hang on the **date** (the F18 container) instead of on whichever visit the database handed over first — the ±6-hour window, the 25-km place check and an unordered query had made that choice arbitrary, and A39's condensed card then showed a *different* arbitrary visit, so the photos were usually invisible. **Stage 3 in v0.39.0 (note 116): albums only on request.** An album became *one* multi-day proposal with a single point on the map, and the twin of the trip entered by hand — `covering_event` only catches that twin if the trip is already there, which in a nightly run is luck. The direction is reversed: the human creates the trip, the photos attach themselves (which is what stage 1 does). Albums stay reachable behind an explicit tick, preview obligation intact, and the proposals already in the queue can be discarded in one go — unconfirmed ones only, tombstone fragments left in place. | Photos appear automatically next to memories — the biggest “wow” effect among the import sources. |
 | **F20** | ✅ **A baseline location for periods with no data** *(note 144; done on `main` 2026-08-03)* | L | “Eventually I want an entry for every single day, even if it only says ‘visit, Bad Segeberg’ — then weather can be enriched on it.” Built as a **derivation, not as rows**: one record per period (“1986-04-02 to 1992-08-31: parents' house, Bad Segeberg”) — a *standing fact with a validity span*, which is a fourth kind of statement beside fragment, proposal and event — plus a day-level layer-4 derivation that fills every day the period covers. Generating 14 600 confirmed events instead was rejected for one reason and it is decisive: layer 2 is untouchable by machines, so a later correction of the period would leave a thousand wrong rows that nothing is permitted to repair (the row count itself is not the objection — note 140 measured 20 000 events at 86 ms). Four decisions are already made and must not be re-opened silently: an inferred day **counts fully** in the world tab, the top places and the badges; the baseline **fills gaps only**, so any real entry that day wins; **one baseline at a time**; and the timeline marks an inferred day as inferred. **The bulk of the work is not the baseline row but the weather:** weather hangs on `Metric.event_id`, so a day without an event has nowhere to put it — F20 needs a day-keyed weather store, layer 4 and rebuildable, as the sibling of `weather_day.day_values`. **Delivered**, and three things the plan did not contain came with it: the day-endpoint carries its description once with an index per day (note 157's arithmetic, applied at the first build); `EventsIndex.revision` had to learn about baselines, because an *edited* period leaves every event untouched and the cached views would have kept their old state; and the ranking queries fetch more rows than they show before merging, so the cap cannot decide the answer. It rides on `main` without a version of its own (note 89) — 0.40.0 collects it. | Twenty years of “nothing recorded” become twenty years of “here, and this is how it was” — and it is the prerequisite for F21. |
 | **F21** | ✅ **Gap detection** *(note 145; done on `main` 2026-08-03)* | S–M | A run over the days between the birth milestone and today, reporting stretches with no location of any kind — grouped (“1994-03 to 1994-08, 158 days”) rather than listed, each linking into the timeline at that stretch. Cheap: one `distinct day` query and a walk over the calendar. **Not before F20**, because without baselines every childhood day is a gap and a report of 6 000 gaps is not a report; and because F20's ruling settles what a gap *is* — a baselined day counts, so this answers “where do I know nothing at all” rather than “where did I record nothing”. **A view, never a stored state:** the moment “gap” becomes a row it has to be kept in step with every import, deletion and baseline change, and a stale gap list sends someone looking for data that is already there. **Delivered** as the fourth statistics view. Two things the plan did not name: the **window** is the whole design — with a birth milestone the report covers a life, without one only the recorded period, and it says which, because showing one while claiming the other is the only way this view can lie. And the *action* on a stretch is not a link into the timeline (a gap is empty, there would be nothing to see) but a hand-over of its dates into F20's baseline form — the two packages close each other's loop. | The question “what is missing?” is the only one a life database cannot answer by looking at what it has. |
+| **F22** | ✅ **Weather per place and span, not per day** *(note 232; done on `main` 2026-09-26)* | S–M | `fetch_weather` asked one day per request, so twenty years at one residence were 7,298 sequential round trips. `_RangePrefetch` plans spans of up to a year per place from all candidates and fetches one only when a day from it comes up; the answers go into the existing process cache, and values and revision marks are still written per day on the unchanged path — which is how the endless-refetch trap named in the plan was avoided rather than guarded. Checked once against the real service: a span and five single days gave identical values in every field. | Twenty years of residence weather in seconds instead of minutes, and far from the free tier's daily cap. |
 
 ### A.4 Releases 0.21.0 – 0.39.0
 
@@ -3099,6 +3100,58 @@ repair for each: delete it.
     red means *“this does not reach the server by itself”* — then either a
     migration step or an announced reset, and after either one the snapshot is
     rewritten.
+
+232. ✅ **F22 — the weather run asks per place and span, not per day.**
+    `fetch_weather` set `start_date` and `end_date` to the same day, so a
+    residence period of twenty years was 7,298 strictly sequential requests at
+    one coordinate. Measured from the development machine: a single day takes
+    0.09 s, a full year in one request 0.37 s — **about eleven minutes against
+    seven seconds** of waiting for twenty years.
+
+    **The trap the roadmap named was walked around rather than guarded.** It
+    warned that the revision mark must still be set per day, including for days
+    a batch brings nothing for, and that a request failing as a whole must mark
+    nothing. `_RangePrefetch` therefore writes nothing: it only puts answers
+    into the process cache that `fetch_weather` already had (note 119), and
+    values and marks come into being per day in `_add_weather` /
+    `_add_day_weather`, line for line as before. A loop that sets no mark cannot
+    set one wrongly.
+
+    The details that decide whether it actually saves anything:
+
+    - **Spans are planned from all candidates, fetched only when a day from
+      them comes up.** The job runs in batches of 25; a span as short as the
+      batch would save almost nothing, and fetching everything up front would
+      overflow the capped cache (4,096 entries) and silently fall back to
+      single requests. Up to 366 days per span, a gap of up to a week is fetched
+      along (cheaper than a round trip).
+    - **An answered day with no data** is remembered in the process as
+      “answered, nothing” and returns `None`, exactly as the single-day path
+      does for an empty day — no value, no mark, asked again by the next *run*,
+      but not a second time in this one. A network failure is never remembered
+      (note 119's rule stands).
+    - **A span that fails is tried once**, then the single-day path takes over
+      and, on failure, marks nothing.
+    - **The span fills a cache only the real `fetch_weather` reads.** Where the
+      single-day path is replaced (a test double, `conftest.fake_weather`), the
+      span would be a network request behind its back, so it is skipped. That
+      is a condition of the design, not a switch for tests.
+    - Several coordinates in one request (also documented) were left out: the
+      bulk of the round trips is at few places — the residence, the everyday
+      addresses of a timeline import — and spans per place hit exactly those
+      without a second response format.
+
+    **The double reads `start_date`/`end_date` and answers per day** — one that
+    always returned the same single answer could not tell a span from a day.
+    And because a double only encodes one's own assumptions about the format,
+    the real service was asked once: five days in Hamburg as one span against
+    five single requests, **every field identical on every day**, `time` array
+    present. `test_f22_weather_ranges.py` covers one request for thirty days,
+    the split by year, the empty day, the failed span, the failed run, the gap,
+    later batches for residence days *and* events, and the replaced single path;
+    it was run against four broken states, and the first version of the batch
+    test stayed green against one of them (it only used residence days, the
+    broken half was the events') — hence the second batch test.
 
 ## Appendix B — the concept document's closed chapters
 

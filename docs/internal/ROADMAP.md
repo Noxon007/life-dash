@@ -142,38 +142,6 @@ data with it.
 > not a bug but a disclosure, and it is the one package here that a re-run
 > cannot correct.
 
-### F22 — the weather run asks one day at a time · S–M
-
-`fetch_weather` sets `start_date` and `end_date` to the **same day**, so the run
-makes one HTTP round trip per (place, day), strictly sequentially. A residence
-period of twenty years is 7,298 requests at a **single** coordinate — near the
-free tier's 10,000/day cap, and half an hour to an hour of waiting.
-
-**An API key is not the fix and was checked before this was written.** It lifts
-the open-access limits (600/min · 5,000/h · 10,000/day · 300,000/month) and
-moves to `customer-api.open-meteo.com`, but a single request does not get
-faster, and the paid plans are aimed at commercial use. The fix is in this
-repository:
-
-- **A date range instead of a day.** One request per residence period and year
-  instead of 365 — the parameters already exist. This is the whole win for the
-  residence days, where every day shares one coordinate.
-- **Several coordinates per request** (`latitude=52.52,48.85&longitude=…`,
-  documented) for the events, where each day has a different place.
-
-Open-Meteo weights its quota by variables × time steps × locations, so the
-**quota** use stays roughly the same; what collapses is the number of round
-trips, and that is the waiting.
-
-> **The trap this has to walk past.** The revision mark (`weather_rev`) must be
-> set **per day**, including for days the batch returns nothing for — otherwise
-> the endless-refetch trap gets its tenth edition, this time hidden inside a
-> loop that looks like it only reads. And a request that fails as a whole must
-> mark **nothing**, exactly as the single-day path does today.
-
-Asked and deferred on 2026-08-04 (note 167's round); recorded so the measurement
-does not have to be made twice.
-
 ### P5.2 — Whisper voice input · M
 
 Server-side speech-to-text, also for voice memos as a file. Deliberately low:

@@ -125,6 +125,99 @@ WMO = {
 }
 
 
+_DAILY = ("temperature_2m_max,temperature_2m_min,weathercode,"
+          "rain_sum,snowfall_sum,sunshine_duration,windspeed_10m_max,"
+          # F12
+          "apparent_temperature_max,apparent_temperature_min,"
+          "precipitation_hours,sunrise,sunset,daylight_duration,"
+          "windgusts_10m_max,uv_index_max")
+
+# F22: „beantwortet, aber für diesen Tag nichts". Nur aus einer Spannen-Abfrage,
+# die als GANZES geantwortet hat — ein Netzfehler landet nie hier (siehe oben:
+# Fehlschläge werden nicht gemerkt). `fetch_weather` gibt dafür `None` zurück,
+# genau wie der Einzelweg für einen leeren Tag; der Aufrufer setzt dann keine
+# Marke, also dasselbe Verhalten wie bisher, nur ohne die zweite Anfrage.
+_EMPTY: dict = {}
+
+
+def _request(lat: float, lng: float, start: str, end: str) -> dict | None:
+    """EIN Aufruf des Archivs, für einen Tag oder eine Spanne."""
+    params = urllib.parse.urlencode({
+        "latitude": lat,
+        "longitude": lng,
+        "start_date": start,
+        "end_date": end,
+        "daily": _DAILY,
+        "timezone": "auto",
+        # Anmerkung 186: ausdrücklich, sonst entscheidet der Dienst — und zwar
+        # je nach Alter des Tages verschieden.
+        "models": WEATHER_MODEL,
+    })
+    req = urllib.request.Request(f"{ARCHIVE_URL}?{params}")
+    try:
+        with urllib.request.urlopen(req, timeout=30 if start != end else 10) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+        log.warning("Open-Meteo nicht erreichbar (%s–%s, %s): %s", start, end, (lat, lng), exc)
+        return None
+
+
+def _parse(daily: dict, i: int) -> dict | None:
+    """Die Werte des i-ten Tages einer Antwort — oder None, wenn es keine gibt."""
+    def at(key):
+        vals = daily.get(key) or []
+        return vals[i] if i < len(vals) else None
+    tmax, tmin = at("temperature_2m_max"), at("temperature_2m_min")
+    code = at("weathercode")
+    sun_s = at("sunshine_duration")
+    if tmax is None and code is None:
+        return None
+    temp = None
+    if tmax is not None and tmin is not None:
+        temp = round((tmax + tmin) / 2, 1)
+    elif tmax is not None:
+        temp = tmax
+    daylight_s = at("daylight_duration")
+    # Sonnenauf-/-untergang kommen als ISO-Zeitstempel in Ortszeit
+    # ("2024-07-12T05:14"); gespeichert wird nur die Uhrzeit — das Datum
+    # steht ohnehin am Event.
+    clock = lambda v: v.split("T")[1][:5] if isinstance(v, str) and "T" in v else None  # noqa: E731
+    return {
+        "temp_c": temp,
+        "temp_min_c": tmin,
+        "temp_max_c": tmax,
+        "sun_h": round(sun_s / 3600, 1) if sun_s is not None else None,
+        "rain_mm": at("rain_sum"),
+        "snow_cm": at("snowfall_sum"),
+        "wind_max_kmh": at("windspeed_10m_max"),
+        "condition": WMO.get(code, "unbekannt") if code is not None else None,
+        "code": code,
+        # --- F12 ---
+        "apparent_max_c": at("apparent_temperature_max"),
+        "apparent_min_c": at("apparent_temperature_min"),
+        "rain_h": at("precipitation_hours"),
+        "daylight_h": round(daylight_s / 3600, 1) if daylight_s is not None else None,
+        "gust_max_kmh": at("windgusts_10m_max"),
+        "uv_max": at("uv_index_max"),
+        "sunrise": clock(at("sunrise")),
+        "sunset": clock(at("sunset")),
+    }
+
+
+def _remember(key: tuple, value: dict) -> None:
+    # Ältestes zuerst hinaus (Dicts halten die Einfügereihenfolge). Ein Lauf
+    # arbeitet die Zeit entlang, der Deckel schneidet also das ab, was am
+    # wenigsten wahrscheinlich noch einmal drankommt.
+    if key not in _CACHE and len(_CACHE) >= _CACHE_MAX:
+        del _CACHE[next(iter(_CACHE))]
+    _CACHE[key] = value
+
+
+def is_cached(lat: float, lng: float, day: date) -> bool:
+    """Liegt für (Ort, Tag) schon eine Antwort vor — auch „nichts"?"""
+    return (round(lat, _QUANT), round(lng, _QUANT), day.isoformat()) in _CACHE
+
+
 def fetch_weather(lat: float, lng: float, day: datetime | date) -> dict | None:
     """Liefert Tageswetter für Ort+Tag oder None (F3, Entscheidung 2026-07-19:
     reine TAGESWERTE statt abgeleiteter Logik):
@@ -135,81 +228,50 @@ def fetch_weather(lat: float, lng: float, day: datetime | date) -> dict | None:
     und -untergang samt Tageslichtdauer, Windböen und UV-Index. Alles aus
     DEMSELBEN Aufruf — die Felder waren immer verfügbar und wurden bisher
     nur nicht abgefragt. Stundenwerte bleiben bewusst außen vor
-    (Entscheidung F3, siehe DECISIONS Anmerkung 49)."""
+    (Entscheidung F3, siehe DECISIONS Anmerkung 49).
+
+    F22: Liegt der Tag schon aus `prefetch_range` im Cache, kommt er von dort."""
     if isinstance(day, datetime):
         day = day.date()
     iso = day.isoformat()
     lat, lng = round(lat, _QUANT), round(lng, _QUANT)
     cached = _CACHE.get((lat, lng, iso))
+    if cached is _EMPTY:
+        return None
     if cached is not None:
         # Kopie: der Aufrufer hängt die Werte an ein Ereignis, und ein
         # gemeinsam benutztes Dict wäre ein Weg, den Cache zu verändern.
         return dict(cached)
-    params = urllib.parse.urlencode({
-        "latitude": lat,
-        "longitude": lng,
-        "start_date": iso,
-        "end_date": iso,
-        "daily": ("temperature_2m_max,temperature_2m_min,weathercode,"
-                  "rain_sum,snowfall_sum,sunshine_duration,windspeed_10m_max,"
-                  # F12
-                  "apparent_temperature_max,apparent_temperature_min,"
-                  "precipitation_hours,sunrise,sunset,daylight_duration,"
-                  "windgusts_10m_max,uv_index_max"),
-        "timezone": "auto",
-        # Anmerkung 186: ausdrücklich, sonst entscheidet der Dienst — und zwar
-        # je nach Alter des Tages verschieden.
-        "models": WEATHER_MODEL,
-    })
-    req = urllib.request.Request(f"{ARCHIVE_URL}?{params}")
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-        log.warning("Open-Meteo nicht erreichbar (%s, %s): %s", iso, (lat, lng), exc)
+    data = _request(lat, lng, iso, iso)
+    if data is None:
         return None
-
-    daily = data.get("daily") or {}
-    first = lambda key: (daily.get(key) or [None])[0]  # noqa: E731
-    tmax, tmin = first("temperature_2m_max"), first("temperature_2m_min")
-    code = first("weathercode")
-    sun_s = first("sunshine_duration")
-    if tmax is None and code is None:
+    result = _parse(data.get("daily") or {}, 0)
+    if result is None:
         return None
-    temp = None
-    if tmax is not None and tmin is not None:
-        temp = round((tmax + tmin) / 2, 1)
-    elif tmax is not None:
-        temp = tmax
-    daylight_s = first("daylight_duration")
-    # Sonnenauf-/-untergang kommen als ISO-Zeitstempel in Ortszeit
-    # ("2024-07-12T05:14"); gespeichert wird nur die Uhrzeit — das Datum
-    # steht ohnehin am Event.
-    clock = lambda v: v.split("T")[1][:5] if isinstance(v, str) and "T" in v else None  # noqa: E731
-    result = {
-        "temp_c": temp,
-        "temp_min_c": tmin,
-        "temp_max_c": tmax,
-        "sun_h": round(sun_s / 3600, 1) if sun_s is not None else None,
-        "rain_mm": first("rain_sum"),
-        "snow_cm": first("snowfall_sum"),
-        "wind_max_kmh": first("windspeed_10m_max"),
-        "condition": WMO.get(code, "unbekannt") if code is not None else None,
-        "code": code,
-        # --- F12 ---
-        "apparent_max_c": first("apparent_temperature_max"),
-        "apparent_min_c": first("apparent_temperature_min"),
-        "rain_h": first("precipitation_hours"),
-        "daylight_h": round(daylight_s / 3600, 1) if daylight_s is not None else None,
-        "gust_max_kmh": first("windgusts_10m_max"),
-        "uv_max": first("uv_index_max"),
-        "sunrise": clock(first("sunrise")),
-        "sunset": clock(first("sunset")),
-    }
-    # Ältestes zuerst hinaus (Dicts halten die Einfügereihenfolge). Ein Lauf
-    # arbeitet die Zeit entlang, der Deckel schneidet also das ab, was am
-    # wenigsten wahrscheinlich noch einmal drankommt.
-    if len(_CACHE) >= _CACHE_MAX:
-        del _CACHE[next(iter(_CACHE))]
-    _CACHE[(lat, lng, iso)] = result
+    _remember((lat, lng, iso), result)
     return dict(result)
+
+
+def prefetch_range(lat: float, lng: float, start: date, end: date) -> int | None:
+    """F22: EINE Anfrage für eine ganze Spanne an EINEM Ort — legt jeden Tag
+    der Antwort in den Cache, aus dem `fetch_weather` danach liest.
+
+    **Diese Funktion schreibt nichts in die Datenbank und setzt keine Marke.**
+    Das ist der ganze Trick, mit dem F22 an der Endlos-Abruf-Falle vorbeigeht:
+    Werte und Revisionsmarke entstehen weiter je Tag in `_add_weather` /
+    `_add_day_weather`, auf demselben Weg wie ohne Vorab-Abfrage. Scheitert die
+    Spanne als Ganzes, steht nichts im Cache, und der Einzelweg fragt je Tag —
+    ein Fehlschlag markiert also weiter nichts.
+
+    Gibt die Zahl der beantworteten Tage zurück, None bei einem Fehlschlag.
+    """
+    lat, lng = round(lat, _QUANT), round(lng, _QUANT)
+    data = _request(lat, lng, start.isoformat(), end.isoformat())
+    if data is None:
+        return None
+    daily = data.get("daily") or {}
+    times = daily.get("time") or []
+    for i, iso in enumerate(times):
+        result = _parse(daily, i)
+        _remember((lat, lng, iso), result if result is not None else _EMPTY)
+    return len(times)
