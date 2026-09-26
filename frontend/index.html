@@ -271,7 +271,18 @@
     content: ""; position: absolute; left: 8px; top: 8px; bottom: 8px; width: 2px;
     background: linear-gradient(var(--accent), var(--accent-2));
   }
-  .tl-year { margin-bottom: 28px; }
+  /* Anmerkung 227: Layout und Malen nur für die Gruppen, die man SIEHT. Der
+     Tages-Zoom baut bei jeder nachgeladenen Seite die ganze Liste neu, und im
+     echten Chrome waren zwei Drittel davon Layout — 44.500 Knoten bei 1.800
+     Einträgen, 2,5 s je Seite unter vierfacher CPU-Drossel. Gruppen außerhalb
+     des Bildschirms überspringt der Browser jetzt; `auto` merkt sich die
+     zuletzt gemessene Höhe, damit die Bildlaufleiste nicht springt.
+     `content-visibility` schneidet ab, was über den Kasten hinausragt — und
+     die Punkte der Zeitlinie (`left:-30px`) und die Überschrift (`-12px`)
+     ragen hinaus. Deshalb gehört der Rand der Zeitlinie der Gruppe selbst:
+     derselbe Platz, nur innerhalb des Kastens statt davor. */
+  .tl-year { margin: 0 0 28px -32px; padding-left: 32px;
+             content-visibility: auto; contain-intrinsic-size: auto 600px; }
   .tl-year-label {
     font-size: 22px; font-weight: 700; margin-bottom: 14px; margin-left: -12px;
     color: var(--text);
@@ -5686,6 +5697,19 @@ let TL_BASELINE_SHOWN = 0;
 // gezeigt wird? Trägt den Knopf im Fuß — der Zeitstrahl ist sonst „zu Ende",
 // obwohl siebentausend Tage darunter liegen.
 let TL_BASELINE_MORE = false;
+// Anmerkung 227: Hat beim letzten Zeichnen der Deckel gebremst (und nicht die
+// Grenze der geladenen Einträge)? Nur dann holt die nächste Seite einen
+// Schritt Wohnort-Tage dazu.
+let TL_BASELINE_ROOM_FULL = false;
+// Der älteste geladene Tag — die Grenze, bis zu der die Liste etwas weiß.
+function tlOldestLoadedDay() {
+  let min = '';
+  for (const e of tl.events) {
+    const d = e.date_start ? e.date_start.slice(0, 10) : '';
+    if (d && (!min || d < min)) min = d;
+  }
+  return min;
+}
 // Die Tage absteigend sortiert, EINMAL je Stand. Ungültig, sobald sich die
 // Menge ändert; die Länge zu vergleichen genügt, weil nur hinzugefügt wird.
 //
@@ -5716,7 +5740,26 @@ function tlBaselineRows() {
   // gemessen 49 ms. Tag, Woche und Monat bekommen das wachsende Fenster.
   const windowed = tl.zoom !== 'year' && tl.zoom !== 'decade';
   const room = TL_BASELINE_STEP * Math.max(1, tl.blPages || 1);
-  const pick = (windowed && all.length > room) ? all.slice(0, room) : all;
+  let pick = (windowed && all.length > room) ? all.slice(0, room) : all;
+  // **Anmerkung 227: das Fenster reicht nicht weiter zurück als die Einträge.**
+  // Es zählt TAGE, die Seiten zählen EINTRÄGE, und beides lief zeitlich
+  // auseinander: im Demo-Bestand standen nach zwei Seiten die Einträge bis
+  // 09/2024, die Wohnort-Tage bis 2021. Darunter lasen sich drei Jahre als
+  // „nur zu Hause" — nicht, weil nichts war, sondern weil es noch nicht
+  // geladen war. Die nächste Seite schob die Einträge dann dazwischen, und
+  // die Ansicht sprang um zehntausende Pixel. Solange noch Einträge kommen,
+  // endet das Fenster deshalb am ältesten geladenen. (Der Tag selbst kann
+  // kein Wohnort-Tag sein: die beiden Tagesmengen sind disjunkt.)
+  const oldest = (windowed && !tl.done) ? tlOldestLoadedDay() : '';
+  if (oldest) {
+    // Wächst das Fenster nur, wenn der DECKEL bremst — nicht das Datum. Sonst
+    // sammelte jede Seite 300 Tage Vorrat an, die man nicht sieht, und am Ende
+    // der Einträge kämen sie alle auf einmal (7.300 Tage = 10 s, Anm. 182).
+    TL_BASELINE_ROOM_FULL = pick.length === room && pick[pick.length - 1] >= oldest;
+    pick = pick.filter(d => d >= oldest);
+  } else {
+    TL_BASELINE_ROOM_FULL = pick.length < all.length;
+  }
   TL_BASELINE_MORE = pick.length < all.length;
   TL_BASELINE_SHOWN = pick.length;
   return pick.map(day => {
@@ -5793,7 +5836,7 @@ async function loadTimeline(more = false) {
     // mit. Ein frischer Aufbau setzt es zurück — sonst zeigte ein Zoomwechsel
     // plötzlich zwanzig Jahre Tage, weil vorher weit geblättert wurde.
     if (!more) { tl.events = []; tl.offset = 0; tl.done = false; tl.blPages = 1; }
-    else tl.blPages++;
+    else if (TL_BASELINE_ROOM_FULL) tl.blPages++;   // Anmerkung 227
     // F17: Das Geburtsdatum steckt in einem Meilenstein, der fast immer
     // außerhalb der geladenen Seiten liegt — es kommt aus dem Index.
     fetchIndex().then(idx => {
@@ -6207,6 +6250,20 @@ document.getElementById('seed-save').addEventListener('click', async () => {
 const TL_GROUP_CAP = 25;
 function renderTimelineList() {
   const el = document.getElementById('timeline-list');
+  // **Anmerkung 227: die gemessenen Höhen überleben den Neuaufbau.** Die
+  // Gruppen tragen `content-visibility: auto` (siehe `.tl-year`), und der
+  // Browser merkt sich die Höhe einer gezeichneten Gruppe AM ELEMENT. Das
+  // `innerHTML` unten ersetzt jedes Element — ohne diese Zeilen fiele bei
+  // jeder nachgeladenen Seite alles über dem Bildschirm auf die Schätzung
+  // zurück, und die Ansicht sprang (gemessen: eine halbe Million Pixel).
+  // Gelesen wird VOR jedem Schreiben: dann ist das Layout sauber und die
+  // Abfrage kostet nichts. Nachkommastellen zählen — gerundet summierte sich
+  // der Fehler über tausend Gruppen zu einem sichtbaren Versatz.
+  const tlHeights = new Map();
+  el.querySelectorAll('.tl-year[data-tl-key]').forEach(n => {
+    const h = n.getBoundingClientRect().height;
+    if (h > 0) tlHeights.set(n.dataset.tlKey, h);
+  });
   el.style.display = '';
   // Die Leisten werden bei jedem Durchgang neu registriert; ohne dieses
   // Leeren wüchse die Zuordnung bei jedem Nachladen weiter, obwohl die alten
@@ -6363,7 +6420,8 @@ function renderTimelineList() {
   });
   const ordered = Object.values(groups).sort((a,b) => b.sort - a.sort);
   el.innerHTML = ordered.map((g, gi) => `
-    <div class="tl-year">
+    <div class="tl-year" data-tl-key="${esc(g.key)}"${tlHeights.has(g.key)
+      ? ` style="contain-intrinsic-size:auto ${tlHeights.get(g.key)}px"` : ''}>
       <div class="tl-year-label">${esc(g.label)}${!g.agg && g.items.length > TL_GROUP_CAP ? ` <span class="stat-label">(${g.items.length})</span>` : ''}${tlGroupWeather(g)}</div>
       ${g.agg ? g.agg.map(aggRowCard).join('')
               : g.items.slice(0, TL_GROUP_CAP).map(renderItem).join('')}

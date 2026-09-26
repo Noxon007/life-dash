@@ -184,6 +184,14 @@ function makeDom(state) {
                    baseline_days: state.noBaseline ? 0 : 364,
                    baseline_years: state.noBaseline ? []
                                                     : [{ year: 1990, count: 364 }] };
+        } else if (/api\/events\?/.test(p) && state.fullPage) {
+          // Anmerkung 227: eine VOLLE Seite, damit `tl.done` falsch bleibt —
+          // „es kommen noch Einträge" ist genau der Fall, um den es geht.
+          body = Array.from({ length: 300 }, (_, i) => ({
+            id: `p${i}`, title: `Eintrag ${i}`, category: 'milestone',
+            date_start: `${ENTRY_DAY}T09:00:00`, date_precision: 'day',
+            confidence: 1, confirmed: 'confirmed', source: 'manual',
+            entities: [], metrics: [], media: [] }));
         } else if (/api\/events\?/.test(p)) {
           body = [{ id: 'e1', title: 'Einschulung', category: 'milestone',
                     date_start: `${ENTRY_DAY}T09:00:00`, date_precision: 'day',
@@ -308,6 +316,50 @@ setTimeout(async () => {
        + 'eigenen Abruf hätten die abgeleiteten Tage Wetter und zeigten keins');
     ok('…und steht auf der Zeile', /17[.,]7/.test(list.textContent),
        list.textContent.slice(0, 240));
+    w.close();
+  }
+
+  // --- 1b. Anmerkung 227: solange Einträge nachkommen, endet das Fenster am
+  //         ältesten geladenen ---------------------------------------------
+  //
+  // Das Fenster zählt TAGE, die Seiten zählen EINTRÄGE. Im Demo-Bestand standen
+  // nach zwei Seiten die Einträge bis 09/2024 und die Wohnort-Tage bis 2021:
+  // darunter lasen sich drei Jahre als „nur zu Hause", weil die Einträge
+  // dazwischen noch nicht geladen waren — und die nächste Seite schob sie
+  // hinein, die Ansicht sprang um zehntausende Pixel.
+  {
+    const state = { calls: [], fullPage: true };
+    const w = makeDom(state).window, d = w.document;
+    await wait(200);
+    w.eval("tl.zoom = 'day';");
+    await w.loadTimeline();
+    await wait(150);
+    ok('Die Attrappe liefert eine volle Seite', inPage(w, 'tl.done') === false,
+       'ohne volle Seite ist `tl.done` wahr, und die Probe prüft den falschen Fall');
+    const days = inPage(w, "tlBaselineRows().map(r => r.day).sort()");
+    ok('Kein Wohnort-Tag älter als der älteste geladene Eintrag',
+       Array.isArray(days) && days.length > 0 && days[0] > ENTRY_DAY,
+       `${Array.isArray(days) ? days[0] + ' … ' + days[days.length - 1] : days} — der `
+       + `älteste Eintrag ist ${ENTRY_DAY}; ein Tag davor behauptete, dazwischen `
+       + 'sei nichts, obwohl es nur noch nicht geladen ist');
+    ok('…und die Tage danach stehen alle da', Array.isArray(days) && days.length === 199,
+       `${Array.isArray(days) ? days.length : days} von 199 (16.06.–31.12.)`);
+    const list = d.getElementById('timeline-list');
+    ok('…und der Fuß bietet ältere EINTRÄGE an, nicht das Ende',
+       !!list.querySelector('#tl-load-more') && !/Anfang|beginning/i.test(list.textContent),
+       list.textContent.slice(-200));
+    // Der Deckel hat nicht gebremst (199 < 300) — also wächst das Fenster
+    // beim Nachladen nicht. Sonst sammelte jede Seite 300 Tage Vorrat an, und
+    // am Ende der Einträge kämen alle auf einmal.
+    await w.loadTimeline(true);
+    await wait(150);
+    ok('Nachladen vergrößert das Fenster nur, wo der Deckel bremst',
+       inPage(w, 'tl.blPages') === 1 && inPage(w, 'tl.events.length') === 600,
+       `blPages ${inPage(w, 'tl.blPages')}, ${inPage(w, 'tl.events.length')} Einträge`);
+    w.eval('tl.done = true; renderTimeline();');
+    ok('…und am Ende der Einträge kommt EIN Schritt, kein angesammelter Vorrat',
+       inPage(w, 'TL_BASELINE_SHOWN') === inPage(w, 'TL_BASELINE_STEP'),
+       `${inPage(w, 'TL_BASELINE_SHOWN')} gezeigt`);
     w.close();
   }
 

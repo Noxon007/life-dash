@@ -22,6 +22,14 @@
 // Karten, 172 ms bei 1.800, also mit jeder Seite mehr. Diese Zahlen stehen
 // hier, damit der nächste Umbau daran gemessen wird und nicht an einem Gefühl.
 //
+// **Anmerkung 227: diese Zahlen waren zu klein, und zwar um das Wichtigste.**
+// Im echten Chrome gegen den Demo-Bestand waren es 44.500 Knoten statt 8.253
+// und 435 ms bis zum Frame, zwei Drittel davon Layout — das diese Messung gar
+// nicht sieht. Wer am Zeitstrahl baut, misst dort:
+// `node tools/measure-timeline-chrome.js` (misst auch, ob die Ansicht beim
+// Nachladen SPRINGT — eine Frage, die keine Zeitmessung beantwortet). Diese
+// Datei bleibt für die Form: wächst der JavaScript-Aufbau mit jeder Seite?
+//
 // **Und was kosten die abgeleiteten Wohnort-Tage?** (Anmerkung 182) Der
 // zweite Zahlenwert ist ihre Menge in JAHREN; ohne ihn läuft die Messung wie
 // bisher. Gemessen am 2026-08-04, `renderTimeline()` auf vollem Stand:

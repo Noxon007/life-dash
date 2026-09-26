@@ -617,6 +617,18 @@
 
 ### Fixed
 
+- **Scrolling back through the timeline day by day is much faster.** In the
+  *Day* zoom every page of older entries rebuilt the whole list, and each page
+  took longer than the one before: after six pages, around half a second on a
+  computer and two and a half seconds on a phone. The browser now only lays out
+  the days you can actually see — the same six pages take a sixth of the time,
+  and the view stays exactly where you were reading while more entries load.
+- **The timeline no longer shows years as “only at home” before their entries
+  have loaded.** Days filled in from your residence could run years ahead of
+  the entries loaded so far, so a stretch with plenty going on looked as if
+  nothing had happened — until the next page slotted the entries in and the
+  view jumped. Residence days now only appear as far back as the entries
+  already loaded.
 - **The page no longer scrolls sideways on a phone.** In the statistics tab the
   whole page could be pushed left and right. The age block's largest figure —
   “1,135,849,203 seconds”, one word the browser is not allowed to break — set a

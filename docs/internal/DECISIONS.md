@@ -2862,6 +2862,68 @@ repair for each: delete it.
     nothing — or, as here, the instance was simply still the older one. *After
     every frontend change, restart.*
 
+227. ✅ **The timeline's day zoom, measured in a real browser for the first
+    time — and the jump that no timing could see.**
+
+    The open point from note 179 was that every page loaded in the day zoom
+    rebuilds the whole list: 172 ms at 1,800 entries, measured in jsdom. That
+    number turned out to be **the wrong size and the wrong shape**. Headless
+    Chrome against the demo dataset (`tools/measure-timeline-chrome.js`, no
+    extra package — the DevTools protocol over Node's own WebSocket) gave 44,500
+    nodes rather than 8,253, because the jsdom fixture has no weather, no photo
+    strips and no residence days, and **435 ms to the next frame, two thirds of
+    it layout** — the part jsdom does not measure at all. Under 4× CPU
+    throttling, roughly a phone, 2.5 s per page, growing with every page.
+
+    **(a) Layout only for what is on screen.** Each group (`.tl-year`) carries
+    `content-visibility: auto`, and Chrome skips layout and paint for the rest.
+    It comes with paint containment, which clips whatever sticks out of the box
+    — and the timeline dots (`left:-30px`) and the heading (`-12px`) stick out.
+    The timeline's gutter therefore belongs to the group now
+    (`margin-left:-32px; padding-left:32px`): the same space, inside the box
+    instead of in front of it. Screenshots before and after, desktop and 390 px,
+    are identical.
+
+    **(b) That alone made the view jump by 205,000 px on every page.** The
+    browser remembers a rendered group's height *on the element*, and
+    `renderTimelineList` replaces every element through `innerHTML`: everything
+    above the viewport fell back to the estimate, the scroll position pointed
+    somewhere else, and every timing was green. **A faster rebuild that loses
+    its place is not faster, it is unusable** — and only a measurement of the
+    *position* shows it. The fix carries the heights across the rebuild: read
+    per group key *before* anything is written (layout is clean then, the reads
+    cost nothing), written back as the group's placeholder afterwards, with
+    fractions — rounded, the error summed over a thousand groups is a visible
+    offset. The groups carry `data-tl-key` for that. Measured: 0 px.
+
+    **(c) The jump that was older than all of this.** Below the loaded entries,
+    the *old* version also jumped, by 48,000 px. Note 182's residence window
+    counts **days**, the pages count **entries**, and the two ran apart in time:
+    after two pages the entries reached 09/2024 and the residence days 2021.
+    Three years read as "only at home" — not because nothing happened, but
+    because it was not loaded yet — and the next page pushed the entries in
+    between. Note 182 wanted exactly the opposite ("no row jumps away on
+    loading"), and a view that cannot show everything must say so rather than
+    say the opposite of the truth. **While more entries are to come, the window
+    now ends at the oldest loaded entry.** (That day itself cannot be a
+    residence day: the two day sets are disjoint.) And it only grows by a step
+    when the *cap* was what stopped it, not the date — otherwise each page would
+    accumulate 300 days of unseen stock, all of which would arrive at once when
+    the entries run out (7,300 days is 10 s, note 182).
+
+    Result at page 6 (1,800 entries): **435 → 65 ms, 2,511 → 363 ms throttled,
+    44,500 → 29,969 nodes, no jump.** What remains is the JavaScript rebuild
+    itself (50 / 284 ms), which still grows with every page; that is the rest of
+    note 179, and layout is no longer in its way.
+
+    `tools/check-tl-heights.js` holds (a) and (b) — keys present and unique,
+    every height survives a rebuild exactly, no zero placeholder, the rule and
+    the gutter in the CSS — and `check-baseline-days.js` got a case for (c) with
+    a *full* page, because a fixture that returns one entry makes `tl.done`
+    true and tests the other case. All of it was run against five broken copies
+    (carry removed, carry rounded, gutter removed, window unclipped, window
+    growing per page); each one turned the right assertion red.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

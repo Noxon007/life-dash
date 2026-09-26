@@ -35,7 +35,7 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
   der Server?) statt auf `pg_ctl` — das beendet sich auf Windows nicht
   verlässlich, und der gestartete Server erbt die Ausgabekanäle: hängt stdout an
   einer Pipe, bleibt der Lauf nach erfolgreichem Start stumm stehen.
-- Wächter: `cd tools` → `npm run check` (41 jsdom-Dateien)
+- Wächter: `cd tools` → `npm run check` (43 jsdom-Dateien)
 - **Smoke gegen ein HTTP-Doppel** (Immich): `<python> tools/immich_double.py &`
   dann `<python> tools/smoke_a45.py` — findet, was Unit-Tests prinzipiell nicht
   können (Blättern, Zeitzonen, echte DTOs). Immer aus dem Wurzelverzeichnis.
@@ -55,6 +55,12 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
   alle drei Zoomstufen; mit dem zweiten Wert zusätzlich die abgeleiteten Tage.
   Der Kopf der Datei trägt die zuletzt gemessenen Zahlen; der nächste Umbau
   wird daran gemessen und nicht an einem Gefühl (Anmerkung 179/182).
+  **jsdom sieht kein Layout** — und das waren im Tages-Zoom zwei Drittel der
+  Zeit. Im echten Browser: `node tools/measure-timeline-chrome.js
+  http://127.0.0.1:8123/ [Seiten] [Drossel]` gegen einen Smoke-Server MIT
+  `SEED_DEMO=true` (Chrome headless, DevTools-Protokoll, kein Zusatzpaket;
+  `WIDTH=390` fürs Handy). Misst auch, ob die Ansicht beim Nachladen SPRINGT —
+  Exit 1, wenn ja (Anmerkung 227).
 - **CI** (`.github/workflows/tests.yml`): bei jedem Push/PR pytest auf SQLite
   *und* PostgreSQL plus die Wächter. Bewusst ohne Pfadfilter und ohne
   `cancel-in-progress`: ein übersprungener Test sieht aus wie ein bestandener.
@@ -220,6 +226,10 @@ Der wiederkehrende Defekt in diesem Projekt ist nicht Kaputtheit, sondern
 **Last & Datenbank**
 - **Nie ein Zeichenobjekt je Element.** Der Canvas-Renderer ist die halbe
   Antwort; die andere ist, kein Objekt je Punkt zu erzeugen.
+- **Eine Zeitmessung sieht keinen Sprung, und jsdom sieht kein Layout**
+  (Anmerkung 227). Der erste Entwurf mit `content-visibility` war fünfmal
+  schneller und unbenutzbar — die Ansicht sprang beim Nachladen um 205.000 px.
+  Wer eine Ansicht beschleunigt, misst auch, ob sie an ihrer STELLE bleibt.
 - **Ein Proxy-Endpunkt ist kein Datenbank-Endpunkt** — Verbindung VOR dem
   Netzaufruf zurückgeben.
 - **Wer eine Zahl über den GESAMTEN Bestand braucht, holt sie vom Server.**
@@ -391,12 +401,24 @@ die Punkte 1 und 2):
   Ärger"). Weg sind MapLibre, die Leaflet-Brücke, der Einstellungsblock, zwölf
   Katalogschlüssel und `check-vector-basemap.js`. Nicht behoben, sondern
   entfernt — die Frage wird nicht wieder aufgemacht.
-- **Zeitstrahl im Tages-Zoom**: jede nachgeladene Seite baut die GANZE Liste neu
-  — gemessen 26 ms bei 300 Karten, 172 ms bei 1.800, also mit jeder Seite mehr
-  (`node tools/measure-timeline.js`). Anmerkung 179 hat den gemeldeten Fall
-  (Jahr/Jahrzehnt) über den Index gelöst; dieser hier ist bewusst stehen
-  geblieben, weil der Umbau (Gruppen einzeln ersetzen statt `innerHTML`) an den
-  index-basierten Registern `VISIT_GROUPS`/`TL_STRIP_MEDIA` hängt.
+- **Zeitstrahl im Tages-Zoom**: jede nachgeladene Seite baut die GANZE Liste neu.
+  **Anmerkung 227 hat das Layout davon abgekoppelt**: `.tl-year` trägt
+  `content-visibility: auto`, Seite 6 (1.800 Einträge) 435 → 65 ms, auf dem
+  Handy (4× Drossel) 2,5 → 0,36 s. Zwei Regeln, die daran hängen:
+  - **Der Browser merkt sich die Höhe AM ELEMENT, `innerHTML` wirft sie weg.**
+    `renderTimelineList` liest die Höhen je `data-tl-key` VOR dem Neuaufbau und
+    schreibt sie als Platzhalter zurück — ohne das sprang die Ansicht um
+    205.000 px, bei grüner Zeitmessung. `check-tl-heights.js` hält es.
+  - **`content-visibility` schneidet ab, was hinausragt** — deshalb gehört der
+    Rand der Zeitlinie der Gruppe (`margin-left:-32px; padding-left:32px`).
+  Offen bleibt der JavaScript-Aufbau (50 ms / 284 ms gedrosselt), der weiter
+  mit jeder Seite wächst — der Umbau (Gruppen einzeln ersetzen) hängt an den
+  index-basierten Registern `VISIT_GROUPS`/`TL_STRIP_MEDIA`.
+- **Das Wohnort-Fenster endet am ältesten geladenen Eintrag** (Anmerkung 227),
+  solange noch Einträge kommen: es zählt TAGE, die Seiten zählen EINTRÄGE, und
+  vorher standen nach zwei Seiten Einträge bis 2024 und Wohnort-Tage bis 2021 —
+  drei Jahre „nur zu Hause", die nur noch nicht geladen waren. Es wächst nur,
+  wenn der DECKEL bremst (`TL_BASELINE_ROOM_FULL`), sonst sammelte es Vorrat an.
 - **Aus „Grundort" ist „Wohnort" geworden** (Anmerkung 183) — erledigt, hier
   nur noch, damit die Frage nicht ein zweites Mal aufgemacht wird: Die REGEL
   bleibt, wie sie war (jeder Eintrag an einem Tag lässt den Wohnort schweigen).
