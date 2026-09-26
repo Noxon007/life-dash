@@ -71,6 +71,9 @@ In practice, the rules this repository already follows become obligations:
   `_DROPPED_TABLES`); a step that rebuilds a table gets a test that starts from
   the **old** shape and checks every field of an existing row
   (`test_f18_migration.py` is the model).
+- `tests/schema_snapshot.json` is the schema the operated database has *at
+  least*; `test_schema_snapshot.py` migrates it and demands the model (note
+  229). It is rewritten only after a new state has run on the server.
 - Every step runs on SQLite *and* PostgreSQL (`tools/pg-test.ps1`, CI) —
   PostgreSQL is what is operated.
 - Before an image with schema changes goes onto the server: the app's ZIP

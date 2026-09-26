@@ -2962,6 +2962,56 @@ repair for each: delete it.
     that was never disposed, together failing four tests; both are closed now,
     and the next warning will fail the build instead of joining the noise.
 
+229. ✅ **The one hard promise gets a guard: every schema must reach the
+    operated database.** Note 228 made migrating the kept database the
+    project's single hard promise — and nothing checked it. **Every test starts
+    from a fresh schema** (`create_all`), so a column added to an existing
+    table in `models.py` and forgotten in `migrate._MISSING_COLUMNS` exists in
+    every test and is green everywhere; it is missing only in a database older
+    than itself, which is exactly the one that matters, and it would have
+    announced itself at the first access on the server.
+
+    **The same holds, more quietly, for native enums.** `Enum(Source)` is a
+    type of its own on PostgreSQL with a fixed list of values. A new member in
+    the Python enum never reaches an existing database: `create_all` does not
+    touch an existing type and nothing issues `ALTER TYPE … ADD VALUE`. On
+    SQLite an enum is an unchecked `VARCHAR`, so nothing of it is visible there
+    at all.
+
+    **First the past, from git.** Every state of `models.py` was parsed:
+    tables by the commit they first appear in, and every column added
+    afterwards. All 21 of them are in `_MISSING_COLUMNS`; the enum values have
+    not changed since v0.1. The operated database is therefore at the model's
+    state, and the snapshot below may start from today.
+
+    **Then the future.** `tests/schema_snapshot.json` describes the schema the
+    operated database has *at least* — tables, columns with their type per
+    dialect, nullability, keys, enum values. `test_schema_snapshot.py` builds a
+    database from it, runs `ensure_schema`, and requires every column, every
+    nullability and (on PostgreSQL) every enum value of the model afterwards —
+    on both dialects, since the SQL types in `_MISSING_COLUMNS` are hand-written.
+    A second test refuses any **type change** under the snapshot, because
+    `migrate.py` has no way to express one: `String(64)` → `String(128)` is
+    right on a fresh database and the old limit on the operated one.
+
+    **When to rewrite the snapshot: only once the operated database is known to
+    be at the new state**, i.e. after deploying. Rewritten earlier, it checks
+    the migration against itself. A stale snapshot is harmless — it only
+    demands migrating from further back.
+
+    With a snapshot that equals the model, the main test would be green even if
+    `gaps()` checked nothing, so three cases take something *away* from the
+    database: a column `_MISSING_COLUMNS` knows is added, one it does not know
+    is reported, and a missing enum value is reported (PostgreSQL only). And
+    once by hand, as the defect would really arise — a new column in
+    `models.py`, no migration: red, with the message naming the list to fix.
+
+    Deliberately **not** compared: indexes and foreign keys. The operated
+    database got its indexes when its tables were created, the snapshot build
+    does not, and comparing them would report differences that do not exist on
+    the server. Missing indexes cost speed, not data; `migrate._INDEXES` stays
+    the place for the ones that matter.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into

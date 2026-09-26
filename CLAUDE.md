@@ -27,11 +27,17 @@ behalten** — es gibt keinen Neuanfang mehr, also ist **das Migrieren der
 bestehenden Daten die eine harte Zusage**: jeder Schema-Schritt in
 `migrate.py` mit einem Test, der vom ALTEN Stand ausgeht
 (`test_f18_migration.py` ist das Muster), auf SQLite UND PostgreSQL.
+**Der Wächter dafür ist `tests/schema_snapshot.json`** (Anmerkung 229): der
+Stand, den die betriebene Datenbank MINDESTENS hat. Eine neue Spalte ohne
+`_MISSING_COLUMNS`-Eintrag, ein neuer Enum-Wert (nativer Typ auf PostgreSQL!)
+oder ein Typwechsel wird rot. **Den Schnappschuss erst neu schreiben
+(`<python> tests/test_schema_snapshot.py --write`), wenn der neue Stand auf dem
+Server gelaufen ist** — vorher prüft er die Migration gegen sich selbst.
 
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI,
-  Geocoding aus, **Fremdschlüssel erzwungen**) — 936 Tests, ~45 s,
+  Geocoding aus, **Fremdschlüssel erzwungen**) — 942 Tests, ~45 s,
   SQLite im Arbeitsspeicher. **Jede Warnung ist ein Fehler**
   (`backend/pytest.ini`, Anmerkung 228) — eine bewusst hingenommene wird dort
   einzeln und mit Grund eingetragen, nie pauschal. Der Testclient braucht
@@ -289,6 +295,11 @@ Der wiederkehrende Defekt in diesem Projekt ist nicht Kaputtheit, sondern
 - **Dialektklasse SQLite ↔ PostgreSQL:** `round()` nur für `numeric`,
   `DISTINCT` nicht über JSON-Spalten, `concat` erst ab SQLite 3.44, `extract`
   liefert auf PG Fließkomma. Dafür ist `pwsh tools/pg-test.ps1` da.
+- **Jeder Test beginnt mit einem FRISCHEN Schema** (`create_all`) — was
+  `models.py` hat, hat er auch. Eine Migration, die fehlt, ist deshalb in JEDEM
+  Test grün; sichtbar wird sie nur gegen einen alten Stand
+  (`test_schema_snapshot.py`, Anmerkung 229). Und ein Enum ist auf SQLite ein
+  `VARCHAR`, auf PostgreSQL ein TYP mit fester Werteliste.
 - **`with TestClient(app)` fährt den LIFESPAN** — öffnet die KONFIGURIERTE
   Datenbank und startet den Ticker. Auf SQLite unsichtbar, auf PostgreSQL hängt
   die Suite. Client ohne `with` bauen.

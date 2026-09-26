@@ -1,0 +1,863 @@
+{
+ "tables": {
+  "city_info": {
+   "id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": false,
+    "pk": true
+   },
+   "name": {
+    "sqlite": "VARCHAR(128)",
+    "postgresql": "VARCHAR(128)",
+    "nullable": false,
+    "pk": false
+   },
+   "country": {
+    "sqlite": "VARCHAR(64)",
+    "postgresql": "VARCHAR(64)",
+    "nullable": false,
+    "pk": false
+   },
+   "lang": {
+    "sqlite": "VARCHAR(8)",
+    "postgresql": "VARCHAR(8)",
+    "nullable": false,
+    "pk": false
+   },
+   "description": {
+    "sqlite": "TEXT",
+    "postgresql": "TEXT",
+    "nullable": true,
+    "pk": false
+   },
+   "wiki_title": {
+    "sqlite": "VARCHAR(255)",
+    "postgresql": "VARCHAR(255)",
+    "nullable": true,
+    "pk": false
+   },
+   "wiki_url": {
+    "sqlite": "VARCHAR(512)",
+    "postgresql": "VARCHAR(512)",
+    "nullable": true,
+    "pk": false
+   },
+   "thumbnail": {
+    "sqlite": "VARCHAR(512)",
+    "postgresql": "VARCHAR(512)",
+    "nullable": true,
+    "pk": false
+   },
+   "fetched_at": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": false,
+    "pk": false
+   }
+  },
+  "users": {
+   "id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": false,
+    "pk": true
+   },
+   "oidc_subject": {
+    "sqlite": "VARCHAR(255)",
+    "postgresql": "VARCHAR(255)",
+    "nullable": false,
+    "pk": false
+   },
+   "email": {
+    "sqlite": "VARCHAR(255)",
+    "postgresql": "VARCHAR(255)",
+    "nullable": true,
+    "pk": false
+   },
+   "display_name": {
+    "sqlite": "VARCHAR(255)",
+    "postgresql": "VARCHAR(255)",
+    "nullable": true,
+    "pk": false
+   },
+   "password_hash": {
+    "sqlite": "VARCHAR(255)",
+    "postgresql": "VARCHAR(255)",
+    "nullable": true,
+    "pk": false
+   },
+   "role": {
+    "sqlite": "VARCHAR(5)",
+    "postgresql": "userrole",
+    "nullable": false,
+    "pk": false
+   },
+   "settings": {
+    "sqlite": "JSON",
+    "postgresql": "JSON",
+    "nullable": false,
+    "pk": false
+   },
+   "created_at": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": false,
+    "pk": false
+   },
+   "sessions_valid_from": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": true,
+    "pk": false
+   }
+  },
+  "day_metrics": {
+   "id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": false,
+    "pk": true
+   },
+   "user_id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": false,
+    "pk": false
+   },
+   "day": {
+    "sqlite": "DATE",
+    "postgresql": "DATE",
+    "nullable": false,
+    "pk": false
+   },
+   "key": {
+    "sqlite": "VARCHAR(64)",
+    "postgresql": "VARCHAR(64)",
+    "nullable": false,
+    "pk": false
+   },
+   "value": {
+    "sqlite": "FLOAT",
+    "postgresql": "FLOAT",
+    "nullable": true,
+    "pk": false
+   },
+   "value_text": {
+    "sqlite": "VARCHAR(255)",
+    "postgresql": "VARCHAR(255)",
+    "nullable": true,
+    "pk": false
+   },
+   "unit": {
+    "sqlite": "VARCHAR(32)",
+    "postgresql": "VARCHAR(32)",
+    "nullable": true,
+    "pk": false
+   },
+   "source": {
+    "sqlite": "VARCHAR(15)",
+    "postgresql": "source",
+    "nullable": false,
+    "pk": false
+   },
+   "enriched_at": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": false,
+    "pk": false
+   }
+  },
+  "entities": {
+   "id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": false,
+    "pk": true
+   },
+   "user_id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": true,
+    "pk": false
+   },
+   "type": {
+    "sqlite": "VARCHAR(64)",
+    "postgresql": "VARCHAR(64)",
+    "nullable": false,
+    "pk": false
+   },
+   "name": {
+    "sqlite": "VARCHAR(255)",
+    "postgresql": "VARCHAR(255)",
+    "nullable": false,
+    "pk": false
+   },
+   "attributes": {
+    "sqlite": "JSON",
+    "postgresql": "JSON",
+    "nullable": false,
+    "pk": false
+   },
+   "confirmed": {
+    "sqlite": "VARCHAR(11)",
+    "postgresql": "confirmstate",
+    "nullable": false,
+    "pk": false
+   },
+   "created_at": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": false,
+    "pk": false
+   }
+  },
+  "fragments": {
+   "id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": false,
+    "pk": true
+   },
+   "user_id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": true,
+    "pk": false
+   },
+   "raw_text": {
+    "sqlite": "TEXT",
+    "postgresql": "TEXT",
+    "nullable": false,
+    "pk": false
+   },
+   "capture_lat": {
+    "sqlite": "FLOAT",
+    "postgresql": "FLOAT",
+    "nullable": true,
+    "pk": false
+   },
+   "capture_lng": {
+    "sqlite": "FLOAT",
+    "postgresql": "FLOAT",
+    "nullable": true,
+    "pk": false
+   },
+   "audio_ref": {
+    "sqlite": "VARCHAR(512)",
+    "postgresql": "VARCHAR(512)",
+    "nullable": true,
+    "pk": false
+   },
+   "source": {
+    "sqlite": "VARCHAR(15)",
+    "postgresql": "source",
+    "nullable": false,
+    "pk": false
+   },
+   "status": {
+    "sqlite": "VARCHAR(12)",
+    "postgresql": "fragmentstatus",
+    "nullable": false,
+    "pk": false
+   },
+   "created_at": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": false,
+    "pk": false
+   }
+  },
+  "jobs": {
+   "id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": false,
+    "pk": true
+   },
+   "user_id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": true,
+    "pk": false
+   },
+   "type": {
+    "sqlite": "VARCHAR(32)",
+    "postgresql": "VARCHAR(32)",
+    "nullable": false,
+    "pk": false
+   },
+   "status": {
+    "sqlite": "VARCHAR(16)",
+    "postgresql": "VARCHAR(16)",
+    "nullable": false,
+    "pk": false
+   },
+   "done": {
+    "sqlite": "INTEGER",
+    "postgresql": "INTEGER",
+    "nullable": false,
+    "pk": false
+   },
+   "remaining": {
+    "sqlite": "INTEGER",
+    "postgresql": "INTEGER",
+    "nullable": true,
+    "pk": false
+   },
+   "params": {
+    "sqlite": "JSON",
+    "postgresql": "JSON",
+    "nullable": true,
+    "pk": false
+   },
+   "unit": {
+    "sqlite": "VARCHAR(32)",
+    "postgresql": "VARCHAR(32)",
+    "nullable": true,
+    "pk": false
+   },
+   "result": {
+    "sqlite": "VARCHAR(255)",
+    "postgresql": "VARCHAR(255)",
+    "nullable": true,
+    "pk": false
+   },
+   "started_at": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": false,
+    "pk": false
+   },
+   "updated_at": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": false,
+    "pk": false
+   },
+   "finished_at": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": true,
+    "pk": false
+   }
+  },
+  "locations": {
+   "id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": false,
+    "pk": true
+   },
+   "user_id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": true,
+    "pk": false
+   },
+   "name": {
+    "sqlite": "VARCHAR(255)",
+    "postgresql": "VARCHAR(255)",
+    "nullable": false,
+    "pk": false
+   },
+   "type": {
+    "sqlite": "VARCHAR(64)",
+    "postgresql": "VARCHAR(64)",
+    "nullable": true,
+    "pk": false
+   },
+   "lat": {
+    "sqlite": "FLOAT",
+    "postgresql": "FLOAT",
+    "nullable": true,
+    "pk": false
+   },
+   "lng": {
+    "sqlite": "FLOAT",
+    "postgresql": "FLOAT",
+    "nullable": true,
+    "pk": false
+   },
+   "country": {
+    "sqlite": "VARCHAR(64)",
+    "postgresql": "VARCHAR(64)",
+    "nullable": true,
+    "pk": false
+   },
+   "city": {
+    "sqlite": "VARCHAR(128)",
+    "postgresql": "VARCHAR(128)",
+    "nullable": true,
+    "pk": false
+   },
+   "address": {
+    "sqlite": "JSON",
+    "postgresql": "JSON",
+    "nullable": true,
+    "pk": false
+   },
+   "name_manual": {
+    "sqlite": "BOOLEAN",
+    "postgresql": "BOOLEAN",
+    "nullable": true,
+    "pk": false
+   },
+   "external_ref": {
+    "sqlite": "VARCHAR(255)",
+    "postgresql": "VARCHAR(255)",
+    "nullable": true,
+    "pk": false
+   }
+  },
+  "baseline_locations": {
+   "id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": false,
+    "pk": true
+   },
+   "user_id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": false,
+    "pk": false
+   },
+   "location_id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": false,
+    "pk": false
+   },
+   "label": {
+    "sqlite": "VARCHAR(128)",
+    "postgresql": "VARCHAR(128)",
+    "nullable": true,
+    "pk": false
+   },
+   "date_start": {
+    "sqlite": "DATE",
+    "postgresql": "DATE",
+    "nullable": false,
+    "pk": false
+   },
+   "date_end": {
+    "sqlite": "DATE",
+    "postgresql": "DATE",
+    "nullable": true,
+    "pk": false
+   },
+   "created_at": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": false,
+    "pk": false
+   },
+   "updated_at": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": false,
+    "pk": false
+   }
+  },
+  "events": {
+   "id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": false,
+    "pk": true
+   },
+   "user_id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": true,
+    "pk": false
+   },
+   "title": {
+    "sqlite": "VARCHAR(255)",
+    "postgresql": "VARCHAR(255)",
+    "nullable": false,
+    "pk": false
+   },
+   "description": {
+    "sqlite": "TEXT",
+    "postgresql": "TEXT",
+    "nullable": true,
+    "pk": false
+   },
+   "date_start": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": true,
+    "pk": false
+   },
+   "date_end": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": true,
+    "pk": false
+   },
+   "date_precision": {
+    "sqlite": "VARCHAR(6)",
+    "postgresql": "dateprecision",
+    "nullable": false,
+    "pk": false
+   },
+   "category": {
+    "sqlite": "VARCHAR(64)",
+    "postgresql": "VARCHAR(64)",
+    "nullable": false,
+    "pk": false
+   },
+   "note": {
+    "sqlite": "TEXT",
+    "postgresql": "TEXT",
+    "nullable": true,
+    "pk": false
+   },
+   "confidence": {
+    "sqlite": "FLOAT",
+    "postgresql": "FLOAT",
+    "nullable": false,
+    "pk": false
+   },
+   "confirmed": {
+    "sqlite": "VARCHAR(11)",
+    "postgresql": "confirmstate",
+    "nullable": false,
+    "pk": false
+   },
+   "confirmed_at": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": true,
+    "pk": false
+   },
+   "confirmed_by": {
+    "sqlite": "VARCHAR(16)",
+    "postgresql": "VARCHAR(16)",
+    "nullable": true,
+    "pk": false
+   },
+   "field_overrides": {
+    "sqlite": "JSON",
+    "postgresql": "JSON",
+    "nullable": false,
+    "pk": false
+   },
+   "source": {
+    "sqlite": "VARCHAR(15)",
+    "postgresql": "source",
+    "nullable": false,
+    "pk": false
+   },
+   "location_id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": true,
+    "pk": false
+   },
+   "origin_fragment_id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": true,
+    "pk": false
+   },
+   "parent_event_id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": true,
+    "pk": false
+   },
+   "embedding": {
+    "sqlite": "JSON",
+    "postgresql": "JSON",
+    "nullable": true,
+    "pk": false
+   },
+   "external_id": {
+    "sqlite": "VARCHAR(64)",
+    "postgresql": "VARCHAR(64)",
+    "nullable": true,
+    "pk": false
+   },
+   "created_at": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": false,
+    "pk": false
+   },
+   "updated_at": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": false,
+    "pk": false
+   }
+  },
+  "event_entity_links": {
+   "id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": false,
+    "pk": true
+   },
+   "event_id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": false,
+    "pk": false
+   },
+   "entity_id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": false,
+    "pk": false
+   },
+   "role": {
+    "sqlite": "VARCHAR(32)",
+    "postgresql": "VARCHAR(32)",
+    "nullable": false,
+    "pk": false
+   }
+  },
+  "media_refs": {
+   "id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": false,
+    "pk": true
+   },
+   "user_id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": true,
+    "pk": false
+   },
+   "event_id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": true,
+    "pk": false
+   },
+   "provider": {
+    "sqlite": "VARCHAR(32)",
+    "postgresql": "VARCHAR(32)",
+    "nullable": false,
+    "pk": false
+   },
+   "external_id": {
+    "sqlite": "VARCHAR(255)",
+    "postgresql": "VARCHAR(255)",
+    "nullable": false,
+    "pk": false
+   },
+   "captured_at": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": true,
+    "pk": false
+   },
+   "mime": {
+    "sqlite": "VARCHAR(64)",
+    "postgresql": "VARCHAR(64)",
+    "nullable": true,
+    "pk": false
+   },
+   "bytes": {
+    "sqlite": "INTEGER",
+    "postgresql": "INTEGER",
+    "nullable": true,
+    "pk": false
+   },
+   "width": {
+    "sqlite": "INTEGER",
+    "postgresql": "INTEGER",
+    "nullable": true,
+    "pk": false
+   },
+   "height": {
+    "sqlite": "INTEGER",
+    "postgresql": "INTEGER",
+    "nullable": true,
+    "pk": false
+   },
+   "caption": {
+    "sqlite": "TEXT",
+    "postgresql": "TEXT",
+    "nullable": true,
+    "pk": false
+   },
+   "sort_order": {
+    "sqlite": "INTEGER",
+    "postgresql": "INTEGER",
+    "nullable": false,
+    "pk": false
+   },
+   "created_at": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": false,
+    "pk": false
+   }
+  },
+  "metrics": {
+   "id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": false,
+    "pk": true
+   },
+   "event_id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": false,
+    "pk": false
+   },
+   "key": {
+    "sqlite": "VARCHAR(64)",
+    "postgresql": "VARCHAR(64)",
+    "nullable": false,
+    "pk": false
+   },
+   "value": {
+    "sqlite": "FLOAT",
+    "postgresql": "FLOAT",
+    "nullable": true,
+    "pk": false
+   },
+   "value_text": {
+    "sqlite": "VARCHAR(255)",
+    "postgresql": "VARCHAR(255)",
+    "nullable": true,
+    "pk": false
+   },
+   "unit": {
+    "sqlite": "VARCHAR(32)",
+    "postgresql": "VARCHAR(32)",
+    "nullable": true,
+    "pk": false
+   },
+   "source": {
+    "sqlite": "VARCHAR(15)",
+    "postgresql": "source",
+    "nullable": false,
+    "pk": false
+   },
+   "enriched_at": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": false,
+    "pk": false
+   }
+  },
+  "tracks": {
+   "id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": false,
+    "pk": true
+   },
+   "user_id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": true,
+    "pk": false
+   },
+   "date_start": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": false,
+    "pk": false
+   },
+   "date_end": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": false,
+    "pk": false
+   },
+   "points": {
+    "sqlite": "JSON",
+    "postgresql": "JSON",
+    "nullable": false,
+    "pk": false
+   },
+   "activity_type": {
+    "sqlite": "VARCHAR(32)",
+    "postgresql": "VARCHAR(32)",
+    "nullable": true,
+    "pk": false
+   },
+   "distance_m": {
+    "sqlite": "FLOAT",
+    "postgresql": "FLOAT",
+    "nullable": true,
+    "pk": false
+   },
+   "source": {
+    "sqlite": "VARCHAR(15)",
+    "postgresql": "source",
+    "nullable": false,
+    "pk": false
+   },
+   "external_id": {
+    "sqlite": "VARCHAR(64)",
+    "postgresql": "VARCHAR(64)",
+    "nullable": true,
+    "pk": false
+   },
+   "event_id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": true,
+    "pk": false
+   },
+   "origin_fragment_id": {
+    "sqlite": "VARCHAR(36)",
+    "postgresql": "VARCHAR(36)",
+    "nullable": true,
+    "pk": false
+   },
+   "created_at": {
+    "sqlite": "DATETIME",
+    "postgresql": "TIMESTAMP WITHOUT TIME ZONE",
+    "nullable": false,
+    "pk": false
+   }
+  }
+ },
+ "enums": {
+  "userrole": [
+   "admin",
+   "user"
+  ],
+  "source": [
+   "manual",
+   "ai",
+   "immich",
+   "google_timeline",
+   "fitness",
+   "health_connect",
+   "psn",
+   "weather",
+   "api"
+  ],
+  "confirmstate": [
+   "unconfirmed",
+   "confirmed"
+  ],
+  "fragmentstatus": [
+   "pending",
+   "processed",
+   "needs_review",
+   "discarded"
+  ],
+  "dateprecision": [
+   "exact",
+   "day",
+   "month",
+   "season",
+   "year",
+   "decade"
+  ]
+ }
+}
