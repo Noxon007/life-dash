@@ -14,15 +14,28 @@ unter `/` ausgeliefert). AGPL-3.0.
 | Warum ist es so gebaut, und wann kam es? | `docs/internal/DECISIONS.md` — nummerierte Anmerkungen; **Anhang A** = was in welcher Version gebaut wurde, **Anhang B** = die geschlossenen KONZEPT-Kapitel |
 | Was merkt ein NUTZER zwischen zwei Versionen? | `CHANGELOG.md` |
 
-`docs/DEPLOY.md` + `.env.example` sind der Betrieb. `docs/` bleibt sonst frei
-für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
-`docs/internal/`.
+`docs/DEPLOY.md` + `.env.example` sind der Betrieb, `docs/internal/` die
+Arbeitsdokumente. **Eine Doku-Seite gibt es nicht und ist nicht geplant**
+(Anmerkung 228).
+
+**Das Projekt ist ein persönliches Werkzeug mit genau einem Betreiber**
+(Anmerkung 228, 2026-09-26): „nur für mich, aber sauber und best practice".
+Keine Veröffentlichung, keine Doku-Seite, kein Schaufenster, kein Spendenlink.
+Das Repo bleibt öffentlich (daher `SECURITY.md`/`CONTRIBUTING.md`), die
+Härtung bleibt, wie sie ist. **Und die betriebene Datenbank wird dauerhaft
+behalten** — es gibt keinen Neuanfang mehr, also ist **das Migrieren der
+bestehenden Daten die eine harte Zusage**: jeder Schema-Schritt in
+`migrate.py` mit einem Test, der vom ALTEN Stand ausgeht
+(`test_f18_migration.py` ist das Muster), auf SQLite UND PostgreSQL.
 
 ## Kommandos (Windows!)
 - Python: `C:\Users\phili\miniforge3\envs\py313\python.exe` — **kein `python` im PATH**
 - Tests: `cd backend` → `<python> -m pytest tests -q` (laufen offline: Mock-KI,
-  Geocoding aus, **Fremdschlüssel erzwungen**) — 927 Tests, ~48 s,
-  SQLite im Arbeitsspeicher
+  Geocoding aus, **Fremdschlüssel erzwungen**) — 936 Tests, ~45 s,
+  SQLite im Arbeitsspeicher. **Jede Warnung ist ein Fehler**
+  (`backend/pytest.ini`, Anmerkung 228) — eine bewusst hingenommene wird dort
+  einzeln und mit Grund eingetragen, nie pauschal. Der Testclient braucht
+  `httpx2`, nicht `httpx` (Starlette 1.6).
 - **Tests gegen echtes PostgreSQL** (das, worauf betrieben wird): `pwsh
   tools/pg-test.ps1` — **kein Docker**, legt mit den installierten Binärdateien
   einen eigenen Cluster in `backend/_pgtest/` auf Port **55432** an und stoppt
@@ -124,14 +137,15 @@ für die spätere MkDocs-Seite (R2) — Arbeitsdokumente gehören nach
   „ruhig immer committen, nur nicht pushen"). Push und Tag macht der User
   selbst; Push-Befehle nur nennen, nie ausführen.
 - **Zwei Gleise:** Push auf `main` → Image `:main` (Testen, ohne Version).
-  SemVer-Tag → `:X.Y.Z`/`:latest` (Veröffentlichung). Eine neue Version also
-  nur, wenn ein NUTZER einen Unterschied merkt — mehrere Pakete dürfen sich
+  SemVer-Tag → `:X.Y.Z`/`:latest` (ein fester Stand zum Anheften). Eine neue
+  Version also nur, wenn der Betreiber einen Unterschied merkt — mehrere Pakete dürfen sich
   eine teilen. **Nicht je Arbeitspaket eine Nummer vergeben**; das war zweimal
   die Ursache für einen Tag am falschen Commit (ein Bump als Startschuss statt
   als Schlussstrich).
-- **Ab 0.40: alles auf `main`, kein Versionssprung**, bis der User den
-  Demo-Modus ansagt. `version.py` bleibt auf 0.39.0, neue CHANGELOG-Punkte
-  unter `[Unreleased]`, die Anzeige sagt `0.39.0-dev`.
+- **Kein Versionssprung ohne Ansage des Users.** `version.py` bleibt auf
+  0.39.0, neue CHANGELOG-Punkte unter `[Unreleased]`, die Anzeige sagt
+  `0.39.0-dev`. Ein Tag kommt, wenn der User einen Stand anheften will — kein
+  1.0-Termin, kein Demo-Modus als Auslöser (beides seit Anmerkung 228 weg).
 - Jede Version: `backend/app/version.py` + `CHANGELOG.md` (verständliche
   Produktsprache, **keine Paketkürzel** wie „A25") + Paket abhaken in
   `DECISIONS.md` Anhang A (✅ + „fertig vX.Y.Z"); ein fertiges Paket wird aus
@@ -368,10 +382,14 @@ Der wiederkehrende Defekt in diesem Projekt ist nicht Kaputtheit, sondern
 ## Stand
 **Auf `main`, `version.py` = 0.39.0, alles seither unter `[Unreleased]`.**
 Gruppe A (A1–A48) und Gruppe B bis F21 sind gebaut, ebenso P2.1 (alle drei
-Stufen), P3.1, P5.1 und F1. Offen bis 1.0 sind nur noch **R1** (Härtung,
-Projektoberfläche) und **R2** (Doku-Seite) — Einzelheiten in `ROADMAP.md`.
+Stufen), P3.1, P5.1 und F1. **Es gibt kein Tor mehr, nur einen Backlog nach
+Nutzen im Alltag** (Anmerkung 228): R1(b/c/g) und R2 sind gestrichen, nicht
+verschoben. Einzelheiten in `ROADMAP.md`.
 
-**Der Demo-Bestand steht (R1a, Anmerkung 203).** `app/demo/` baut hinter
+**Der Demo-Bestand steht (R1a, Anmerkung 203) — seit Anmerkung 228 als
+TESTBESTAND, nicht als Schaufenster.** Der CI-Job `live-check` und die
+Messwerkzeuge brauchen einen gefüllten Bestand ohne Netz; Politur um seiner
+selbst willen bekommt er nicht mehr. `app/demo/` baut hinter
 `SEED_DEMO=true` (nur dev-Modus, nur wenn das Konto leer ist) ein erfundenes
 Leben von 32 Jahren: ~8.500 Ereignisse, 29 Reisen, 5 Wohnorte, ~4.100 Wege,
 ~460 erzeugte Bilder, Wetter für jeden Tag, in ~12 s und **ohne Netz**. Fünf
@@ -506,9 +524,8 @@ schliessen, die kein Feature nach 1.0 sind.
   unter „Last & Datenbank". Jetzt zwei Abfragen mit `EXISTS`, gleiche Menge,
   geschaetzte Kosten 255.050.589 -> 21.309.
 
-**Damit sind die zehn offenen Punkte aus Anmerkung 200 geschlossen.** Offen
-bleiben aus R1 nur noch **b** (Screenshots/GIF, braucht den User), **c**
-(versionierte ghcr-Images) und **g** (Spendenlink) sowie **R2**.
+**Damit sind die zehn offenen Punkte aus Anmerkung 200 geschlossen.** Die
+übrigen R1-Teile (b, c, g) und R2 sind mit Anmerkung 228 gestrichen.
 
 **Runde 2026-08-09, dritter Satz (Anmerkung 216) — der Statistik-Reiter und die
 Ladeansichten.** Neun Punkte, vier davon derselbe Defekt in vier Verkleidungen.
@@ -670,8 +687,8 @@ Der Bericht liegt als Artefakt vor; die Aufteilung:
     4,8 statt 10,5; Bangkok 21,2 statt 28,5). Der Welt-Reiter druckt das als
     Landesmittel — Griechenland im April liest sich als 8,4 °C. Eine Konstante
     behebt den Versatz, verschiebt aber jeden abgeleiteten Wert (Schneetage,
-    Rekorde, Ranglisten) und braucht einen Neuaufbau: Entscheidung, keine
-    Reparatur.
+    Rekorde, Ranglisten) und braucht einen Neuaufbau. **Mit Anmerkung 228
+    geschlossen, nicht behoben:** es zählte nur in einem Screenshot.
 
 **Code-Durchsicht 2026-08-07 (Anmerkung 201): fünf Reparaturen und vier
 Aufräumungen drin, drei Punkte bewusst offen — sie brauchen erst eine
@@ -763,11 +780,9 @@ der Zeitstrahl sieht Tage ohne Eintrag.**
 **Doku-Umbau 2026-08-04.** `KONZEPT.md` ist aufgelöst: was das System IST steht
 in `ARCHITECTURE.md`, was OFFEN ist in `ROADMAP.md`, die geschlossenen Kapitel
 (MVP-Definition, Release-Risiken, beantwortete Fragen) wörtlich in
-`DECISIONS.md` Anhang B. **Vor der Veröffentlichung werden die 49 alten Tags,
-Releases und ghcr-Images gelöscht** (Entscheidung des Users, 2026-08-04) — der
-Bestand ist ohne getesteten Upgrade-Pfad ohnehin nicht installierbar, und der
-Nachweis waren nie die Tags, sondern `DECISIONS.md`. Der CHANGELOG wird beim
-1.0-Schnitt archiviert (`docs/CHANGELOG-0.x.md`), nicht gelöscht.
+`DECISIONS.md` Anhang B. Das geplante Löschen der alten Tags und das
+Archivieren des CHANGELOG bei einem 1.0-Schnitt entfallen mit Anmerkung 228 —
+beides hing an der Veröffentlichung.
 
 ## Frontend-Übersetzung (F10)
 Deutsch steht im Quelltext und ist die Wahrheit; `I18N_EN` in `index.html`

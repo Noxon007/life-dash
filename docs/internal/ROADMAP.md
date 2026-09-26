@@ -16,102 +16,95 @@
 
 ## 1. Where the project stands
 
-**Everything built so far is in daily use by its author, and nobody else.** All
-of group A (A1–A48) and group B through F21 are done, along with the Immich
-connector in all three stages, the Google Timeline import, weather enrichment,
-achievements, the residence and the gap report. The record of what
-each release contained is in [Appendix A](DECISIONS.md#appendix-a--what-was-built-and-when).
+**Life-Dash is a personal tool with exactly one operator, and it is going to
+stay that way** (decided 2026-09-26, note 228). The repository is public, but it
+is not a product: nothing here is built for a stranger's first ten minutes, and
+there is no publication date to work towards.
 
-Work currently accumulates on `main` **without a version number**. The
-`:main` image is what the author runs; a SemVer tag exists so that a *user*
-can tell two states apart, and until publication there is exactly one operator,
-who does not need a number to test.
+All of group A (A1–A48) and group B through F21 are done, along with the Immich
+connector in all three stages, the Google Timeline import, weather enrichment,
+achievements, the residence and the gap report. The record of what each release
+contained is in [Appendix A](DECISIONS.md#appendix-a--what-was-built-and-when).
+
+### What that decision struck
+
+The former release gate R1/R2 existed to get a stranger from zero to a working
+instance. With no stranger, these are gone rather than postponed:
+
+- **R1(b)** screenshots, a GIF and the “why not X” comparison in the README
+- **R1(c)** a one-command start against versioned images *as a promise to
+  others* — the images are built anyway (see §4), which is all one operator
+  needs
+- **R1(g)** the donation link
+- **R2** the MkDocs documentation site. `docs/DEPLOY.md`, `.env.example` and
+  the README remain the operating documentation.
+- the promotion plan, the purge of the old tags, releases and ghcr images, and
+  archiving the changelog at a 1.0 cut — all of them only made sense before a
+  first public release
+
+### What stays, and why
+
+- **The hardening (R1d) stays exactly as built** — startup checks, CSP,
+  security headers, log redaction, revocable sessions, the unprivileged
+  container. A life database on a reachable server needs all of it, whoever
+  else reads the code.
+- **`SECURITY.md`, `CONTRIBUTING.md` and the issue templates stay.** The
+  repository is public, and those are what a public repository should carry.
+- **The demo dataset stays, as a test fixture rather than a showcase.** The CI
+  job `live-check` and the measuring tools (`_measure_api.py DEMO=1`,
+  `measure-timeline-chrome.js`) need a populated instance without a network;
+  that was always half its job. It gets no further polish for its own sake —
+  the open question about its weather running 5–7 K too cold is closed as not
+  needed.
+
+### What the decision added: the data is kept
+
+**The operated database is the life database from now on**, and there will be
+no fresh start. That turns one thing that was “best effort during the test
+phase” into the project's single hard promise: **every schema change must
+migrate the existing database, and must be shown to.** R1(f) was struck on the
+grounds that nobody would ever upgrade *into* 1.0 — that reasoning is void.
+
+In practice, the rules this repository already follows become obligations:
+
+- `migrate.py` stays additive and hand-written (`_MISSING_COLUMNS`,
+  `_DROPPED_TABLES`); a step that rebuilds a table gets a test that starts from
+  the **old** shape and checks every field of an existing row
+  (`test_f18_migration.py` is the model).
+- Every step runs on SQLite *and* PostgreSQL (`tools/pg-test.ps1`, CI) —
+  PostgreSQL is what is operated.
+- Before an image with schema changes goes onto the server: the app's ZIP
+  export *with photos* **and** a `pg_dump` ([DEPLOY.md §7, Backup](../DEPLOY.md#backup)).
+  The dump is the way back to exactly the old state; the export is the way
+  back that does not depend on the old schema at all.
 
 ---
 
-## 2. Two rules that decide where a package sits
+## 2. How work is ordered
 
-**Only new import connectors wait for the 1.x line.** 1.0 is defined by
-exclusion as *the complete tool for capturing and exploring a life by hand* — a
-connector widens the intake, not the concept. A package that improves capture
-or exploration is therefore not a 1.x candidate at all; it belongs before 1.0
-or nowhere.
-
-**An inserted release needs a schema consequence *and* an observed complaint.**
-Anything else rides on `main` with no version of its own. A version number is
-for a difference a user would notice on upgrade.
+**By usefulness in daily use, nothing else.** The old two-line rule (“only new
+import connectors wait for 1.x”) existed to protect a 1.0 promise; without it,
+every item below is simply backlog, and a package moves up when using the app
+turns up a reason. Observations from real use still become numbered notes in
+[`DECISIONS.md`](DECISIONS.md) first.
 
 Effort: **S** = hours · **M** = about a day · **L** = several days. No package
 blocks another except where stated.
 
 ---
 
-## 3. Ahead of 1.0
+## 3. Backlog
 
-### R1 — ready for publication · L
+### T1 — the timeline rebuilds the whole list per page · S–M
 
-The gate before any promotion. **Parts a (note 203), d (notes 208–210) and e
-(note 211) are built**; three left, in order:
-
-| | Part | Why it is in the gate |
-|---|---|---|
-| **b** | **Screenshots and a short GIF in the README**, plus the “why not X” comparison | The one thing a stranger looks at before deciding to install. |
-| **c** | **A genuine one-command start** — `docker compose up` against versioned ghcr images instead of a local build | “Ten minutes from zero to a populated instance” is the 1.0 promise; a build step breaks it. |
-| **g** | A discreet **donation link** in the README — deliberately **not** in the app interface, and deliberately not before there is something worth funding | |
-
-> **Part f — a tested upgrade path from an older database — was struck on
-> 2026-08-09**, by the one person it protected. There is exactly one instance
-> in the world, its owner treats the whole 0.x line as a test phase, and he
-> will start from empty rather than carry anything across. The gate kept a
-> promise nobody had made: after 1.0 semantic versioning applies and migrations
-> become promises to strangers, but **the first stranger installs 1.0 and has
-> nothing to upgrade from**. Testing a path from a database that will not exist
-> is work whose result cannot be observed. `migrate.py` keeps doing what it
-> does; what is gone is the obligation to prove it against a 0.x dump before
-> publication.
-
-### R2 — a documentation site · M
-
-The README has quietly become the only entry point and is doing three jobs:
-the pitch, the installation, and a step-by-step guide in a deliberate order.
-That is two jobs too many for the page a stranger judges the project by.
-
-**MkDocs Material, built from Markdown in this repository, served by GitHub
-Pages** — no web space needed, and a custom domain can be put in front later.
-Not Docusaurus: that is a Node/React build with a four-figure dependency count,
-and this project has no build step and no npm in the application at all.
-Versioned docs, i18n and React components in pages are precisely what it does
-not need before 1.0. Shape: overview · install · features · guides ·
-administration · development.
-
-> **The real risk is not writing the pages, it is the second copy.**
-> `.env.example` is the setup reference, the README carries the sensible
-> order, the CHANGELOG carries what changed, the module YAMLs carry the
-> categories. A site that repeats any of them creates a second place the same
-> fact can be wrong in — and documentation drift is silent, which is this
-> project's recurring defect rather than brokenness.
->
-> **The rule is therefore: move or generate, never copy.** `DEPLOY.md`
-> *dissolves into* the install section rather than being mirrored by it; the
-> settings page is checked against `.env.example` **in both directions** by a
-> guard (an undocumented key and an invented key are both defects); the job
-> catalogue is generated from `JOB_TYPES` rather than hand-written.
-> `ARCHITECTURE.md` and `DECISIONS.md` stay out of the navigation and are
-> linked from a “design decisions” page — they are working documents, and
-> publishing them as documentation would turn every note in them into a
-> promise.
-
-Screenshots come last, after the demo mode, for the same reason the README's
-do: taken from an unfinished feature set they would be redone every release.
-Runs on `main` without a version of its own — a documentation site is the
-definition of something no user notices on upgrade.
-
----
-
-## 4. Behind 1.0 — the 1.x line
-
-Narrowed to **new import sources** plus three named exceptions. Everything else
-that was once parked here has moved forward.
+Left over from notes 179 and 227. Layout is no longer the problem
+(`content-visibility`, heights carried across the rebuild), but the
+**JavaScript** rebuild still grows with every loaded page: 50 ms at page 6,
+284 ms under 4× CPU throttling (`tools/measure-timeline-chrome.js`). The fix is
+to append the new groups instead of replacing `innerHTML` — which touches the
+index-based registers `VISIT_GROUPS` and `TL_STRIP_MEDIA`, and the boundary
+group that a new page can extend. Measure with the Chrome tool, and check the
+jump, not only the time.
 
 ### P6.1 — a shared view across accounts · M–L
 
@@ -169,13 +162,12 @@ does not have to be made twice.
 
 ### P5.2 — Whisper voice input · M
 
-Server-side speech-to-text, also for voice memos as a file. **The one package
-kept behind 1.0 despite not being an import:** it is the only remaining item
-that adds a heavy new runtime dependency — a model on a machine that today is a
-Raspberry Pi — the browser API works meanwhile, and the demo dataset does not
-render it.
+Server-side speech-to-text, also for voice memos as a file. Deliberately low:
+it is the only item here that adds a heavy new runtime dependency — a model on
+a machine that today is a Raspberry Pi — and the browser's own speech API works
+in the meantime.
 
-### New import sources — deliberately last
+### New import sources
 
 | No. | Package | Effort | Content |
 |---|---|---|---|
@@ -188,55 +180,29 @@ render it.
 
 ---
 
-## 5. Release plan
-
-**What 1.0 means here.** Not “feature complete” — a *promise*: the data model
-is stable, semantic versioning applies **from then on**, and a stranger goes
-from zero to a populated, working instance in ten minutes. The promise starts
-at 1.0 and points forward: nothing is promised about upgrading *into* it, which
-is why the tested 0.x upgrade path was struck (see R1 above). 1.0 is therefore the **publication version**;
-everything that does not serve that promise is pushed to 1.x on purpose.
-
-**Ordering principle:** features first, while the data model is still cheap to
-change → then the demo dataset, which freezes what the features look like →
-then hardening, packaging and the project surface. The demo data comes after
-the features deliberately: seeded from an unfinished feature set, it would be
-rebuilt every release.
-
-| Version | Theme | Contains |
-|---|---|---|
-| **0.40.0** | **The last 0.x — whatever daily use turns up, plus the demo mode** | **The demo dataset (R1a) is built** (note 203): thirty-two invented years — five places lived in, twenty-nine trips across six continents, concerts, sightings, journal entries, imported paths, weather for every day and a collection that is deliberately not maxed out, behind one flag and without a network call. No planned feature content beyond it. Everything else that has gathered on `main` since 0.39.0 rides along. This is the release that unblocks everything public — and the only 0.x a stranger will ever see. |
-| **1.0.0** | **Publication** — three stages on `main`, one tag | **(i) Hardening and operations** (R1c/d): `AUTH_MODE=dev` unstartable in a production-shaped environment · no secrets in logs · security headers and a CSP, with the map libraries served by this instance rather than a CDN · pinned base images · Dependabot · `SECURITY.md` · versioned ghcr images and a genuine `docker compose up` · backup and restore documented, media folder included. **(ii) Project surface** (R1b/e/g and R2): README with screenshots and a GIF · the documentation site · the comparison table · `CONTRIBUTING.md` · issue templates · “what this project deliberately does not do” · the donation link. **(iii) Freeze and fresh-install pass**: no new features — walk the stranger's path from an empty machine, fix what it turns up, verify every `.env.example` key is real and every documented command works. |
-
-None of the three 1.0 stages gets a version of its own: a user notices none of
-them on upgrade. Then promotion, in order: selfh.st → r/selfhosted →
-awesome-selfhosted → Show HN → Fediverse/Lemmy/r/quantifiedself.
-
-**Pace.** There is no deadline, and the plan is written accordingly: nothing
-that belongs in a 1.0 is deferred to make a date.
-
-### The version history is being cut before publication (2026-08-04)
-
-Forty-nine tags exist across 154 commits, starting at `v0.1` — the result of
-building before the two-track model existed, when a SemVer tag was the only way
-to get an image onto one's own server. **Before the repository is published,
-the old tags, GitHub releases and ghcr image versions are deleted.** None of
-them is installable: no upgrade path out of a 0.x database was ever tested, and
-since R1(f) was struck none ever will be, so an old image leads to a database
-that goes nowhere. **Striking R1(f) makes deleting the tags more necessary, not
-less** — an image nobody can leave is one nobody should be able to enter.
-
-What survives the cut is the record, which was never the tags: the reasoning in
-[`DECISIONS.md`](DECISIONS.md), the release-by-release account in its
-[Appendix A.4](DECISIONS.md#a4-releases-0210--0390), and the user-facing
-history in the changelog — which is archived rather than deleted at the 1.0 cut
-(`CHANGELOG.md` starts at 1.0.0, everything before it moves to
-`docs/CHANGELOG-0.x.md`). The git history itself is untouched: it is 28 MB, and
-`DECISIONS.md` cites commits by hash.
 
 ---
 
-## 6. Open questions
+## 4. Versions
+
+The two tracks stay, because they answer a question the operator has too —
+*which state is running on my server?*
+
+- **`:main`** is built from every push to `main`: for trying things out.
+- **A SemVer tag** builds `:X.Y.Z`, `:X.Y` and `:latest` — a state worth pinning
+  in `LIFEDASH_VERSION`.
+
+**A tag is cut when the operator wants one**, not at a milestone. Several
+packages may share a version; a version marks a difference the operator would
+notice on upgrade, and every schema change is such a difference. At the tagged
+commit `[Unreleased]` in the changelog must be empty. There is no 1.0 event
+planned: the number stays in `0.x` until there is a reason to call the data
+model stable — and since the data is kept, that reason is really a question of
+how migrations are handled, not of publication.
+
+---
+
+## 5. Open questions
 
 Observations from real use become **numbered notes** in
 [`DECISIONS.md`](DECISIONS.md), work packages become entries in this file.

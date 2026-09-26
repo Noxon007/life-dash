@@ -150,8 +150,10 @@ work, deciding the architecture, reviewing the result and running it daily. This
 is stated up front rather than buried: if you are going to host a database of
 your own life, you should know how the software was made.
 
-This is currently a single-author project. Issues and questions are welcome;
-pull requests are not being accepted yet.
+**This is a personal tool, built for its author's own use.** The code is public
+and free to use under the licence, but it is not run as a product: there is no
+release schedule, no support, and pull requests are not accepted. Issues are
+still welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Stack
 

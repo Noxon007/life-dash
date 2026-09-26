@@ -2924,6 +2924,44 @@ repair for each: delete it.
     (carry removed, carry rounded, gutter removed, window unclipped, window
     growing per page); each one turned the right assertion red.
 
+228. ✅ **Not to be published: a personal tool with one operator.** Decided by
+    the user on 2026-09-26: *“my goal is no longer to publish this properly —
+    it is only for me. It should still be clean and best practice.”*
+
+    **What fell away is everything that served a stranger.** R1(b) screenshots
+    and comparison, R1(c) as a promise of a one-command start for others, R1(g)
+    the donation link, R2 the documentation site, the promotion order, the purge
+    of the old tags and images, archiving the changelog at a 1.0 cut, and the
+    idea of 1.0 as a publication. The roadmap no longer has a gate; it has a
+    backlog ordered by daily use. The rule “only import connectors wait for
+    1.x” went with it — it only protected a promise that no longer exists.
+
+    **What stays is everything a reachable life database needs anyway**: the
+    hardening of notes 208–210, CI on both databases, the guards. And the files
+    a *public repository* should carry (`SECURITY.md`, `CONTRIBUTING.md`, issue
+    templates) — the repository stays public, the product does not happen. The
+    demo dataset stays too, but as what it half was already: the populated,
+    offline fixture the `live-check` job and the measuring tools run against.
+    Its known flaw (weather 5–7 K too cold, note 224) mattered only in a
+    screenshot and is closed as not needed.
+
+    **One thing became stricter, not looser.** Asked in the same round: the
+    operated database is kept for good; there will be no fresh start. R1(f) had
+    been struck because “the first stranger installs 1.0 and has nothing to
+    upgrade from” — with no stranger and no reset, the one instance that exists
+    is precisely the one that must upgrade, every time. **Migrating the existing
+    data is now the project's single hard promise**: every schema step tested
+    from the old shape on both dialects, and a dump plus the ZIP export before
+    an image with schema changes goes onto the server (ROADMAP §1).
+
+    Alongside, as housekeeping in the same round: `httpx` → `httpx2` (Starlette
+    1.6 warned on every run), and `backend/pytest.ini` makes **any warning an
+    error**. The strict rule immediately surfaced two leaks in the tests that
+    Python's default filters had been ignoring all along (`ResourceWarning` is
+    silent by default) — a file opened without `with` and an engine fixture
+    that was never disposed, together failing four tests; both are closed now,
+    and the next warning will fail the build instead of joining the noise.
+
 ## Appendix B — the concept document's closed chapters
 
 **Why these are here.** On 2026-08-04 `KONZEPT.md` was split into
