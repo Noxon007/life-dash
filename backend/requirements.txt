@@ -1,6 +1,6 @@
 fastapi==0.141.1
 uvicorn[standard]==0.53.0
-sqlalchemy==2.0.54
+sqlalchemy==2.1.0
 pydantic==2.13.5
 pydantic-settings==2.15.0
 pyyaml==6.0.3
@@ -10,7 +10,7 @@ Pillow==12.3.0
 python-multipart==0.0.32
 python-dateutil==2.9.0.post0
 # Auth (OIDC / Pocket ID): JWT-Validierung inkl. RS256 (JWKS)
-PyJWT[crypto]==2.14.0
+PyJWT[crypto]==2.15.0
 # Der Datenbanktreiber. Anmerkung 223: stand als einziges Paket UNGEPINNT im
 # Dockerfile hinter dieser Datei, während requirements-dev.txt dieselbe
 # Bibliothek auf 2.9.10 festlegte — zwei Orte, eine Angabe, auseinanderlaufend.
