@@ -29,4 +29,4 @@ pytest-cov==7.1.0
 # aber bei JEDEM Lauf eine StarletteDeprecationWarning — und eine Warnung, die
 # jeder Lauf zeigt, liest niemand mehr, auch nicht die nächste, die etwas
 # bedeutet.
-httpx2==2.13.1
+httpx2==2.16.0
